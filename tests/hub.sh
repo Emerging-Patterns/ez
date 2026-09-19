@@ -78,8 +78,8 @@ lib="$root/lib"
 python3 - "$root/ez.lock.json" "$lib" "$root/hub" <<'PY'
 import json, os, shutil, sys
 lock, lib, hub = json.load(open(sys.argv[1])), sys.argv[2], sys.argv[3]
-for h, files in lock["packages"].items():
-    for at in files:
+for h, entry in lock["packages"].items():
+    for at in entry["files"]:
         dst = os.path.join(lib, h, at)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copyfile(os.path.join(hub, h, at), dst)

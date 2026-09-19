@@ -6,8 +6,7 @@ sandbox, where there is no network.
 
 ```
 bun bin/ez-lock.ts main.bend > ez.lock.json    # resolve every 0x import, transitively
-./tests/hub.sh                                 # the lock builds offline
-./tests/nix.sh                                 # nix-build produces the BEND_LIB tree
+./gate.sh                                      # every test
 ```
 
 In Nix:
@@ -16,6 +15,39 @@ In Nix:
 bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.json;
 # ... buildPhase = "BEND_LIB=${bendLib} bend main.bend -o app";
 ```
+
+## Depending on a repo that never published
+
+`bend --publish` is per entry file, and the `0x<hash>` it produces is a pure
+function of that file and everything it imports. Nothing about it needs the hub.
+So ez computes the hash an unpublished repo *would* get, and lays the package
+out under that name:
+
+```
+bun bin/ez-git.ts https://github.com/owner/repo <40-char rev> src/lib.bend
+# 0x7e63a5b990a375c304ed462c071214a6
+# import 0x7e63a5b990a375c304ed462c071214a6/lib.bend as Lib
+```
+
+Paste that import line into your source and build. The import is the same line a
+published package would have given you, so if upstream publishes that exact tree
+later, the hash matches and the hub just starts serving it. Nothing in your
+source changes.
+
+`ez.lock.json` records the git url and rev instead of the hub for that package,
+and `nix/bend-lib.nix` rebuilds it with `fetchgit`. `tests/git.sh` runs the whole
+path against a served fixture repo and checks the nix tree byte for byte against
+the vendored one.
+
+`tests/publish.sh` keeps the hash honest. It runs real `bend --publish` against a
+local hub and fails if ez's hash differs from the one bend mines. That test is
+the reason this is safe to rely on.
+
+The two alternatives, for comparison. You can publish their code yourself, since
+the hub has no ownership and any tree can be published by anyone, but that puts
+someone else's work on a public hub and still needs the network. Or you can
+vendor the repo and use a relative import, which works today and needs no tool,
+but leaves the dependency uncontent-addressed and unpinned.
 
 ## Why only this
 
@@ -79,7 +111,12 @@ the build then runs with the hub unreachable.
 
 ## Layout
 
+    bin/pkg.ts          the package and hash `bend --publish` would produce
     bin/ez-lock.ts      walks the import graph, writes ez.lock.json
+    bin/ez-git.ts       vendors an unpublished git repo under its would-be hash
     nix/bend-lib.nix    ez.lock.json -> a BEND_LIB store path
+    tests/oracle.ts     a local stand-in for the hub, so --publish can be run
+    tests/publish.sh    ez's hash must equal the one bend mines
     tests/hub.sh        two-level fake hub; lock, then build offline
-    tests/nix.sh        the same through nix-build
+    tests/git.sh        an unpublished repo, vendored and rebuilt through nix
+    tests/nix.sh        the hub path through nix-build
