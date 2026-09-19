@@ -94,16 +94,18 @@ function roots(entry: string, seen: Set<string>): string[] {
 }
 
 async function main() {
-  const entry = process.argv[2];
-  if (entry === undefined) {
-    process.stderr.write("usage: ez-lock <entry.bend>\n");
+  const entries = process.argv.slice(2);
+  if (entries.length === 0) {
+    process.stderr.write("usage: ez-lock <entry.bend>..\n");
     process.exit(1);
   }
   const origins: Record<string, Source> = existsSync(ORIGINS)
     ? JSON.parse(readFileSync(ORIGINS, "utf8"))
     : {};
 
-  const queue = roots(entry, new Set());
+  // a repo has as many roots as it has entry points, and the lock covers them all
+  const seen = new Set<string>();
+  const queue = entries.flatMap((e) => roots(e, seen));
   const packages: Record<string, Entry> = {};
   while (queue.length > 0) {
     const hash = queue.shift()!;

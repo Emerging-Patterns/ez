@@ -1,4 +1,13 @@
-# ez's own ledger. Nothing here yet: ez depends on no Bend packages.
+# ez's own ledger: every package this repo imports, and where it came from.
 [package]
 name = "ez"
 entry = "manifest/manifest.bend"
+
+# sha256 with a proof of equivalence to an executable FIPS 180-4 spec. Never
+# published to the hub, so it is pinned to a commit and vendored under the hash
+# `bend --publish` would have given it.
+[deps.sha256]
+hash = "0x0a5c2c95283e42e081da247c84debe18"
+git = "https://github.com/Giulio2002/bend-sha256"
+rev = "c16cd69cedff0e9e19251401dee1cd973458faef"
+entry = "sha256.bend"

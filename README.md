@@ -5,8 +5,11 @@ that is one job: make a Bend project with hub dependencies build inside a Nix
 sandbox, where there is no network.
 
 ```
+nix develop                                    # bend, bun, and BEND_LIB set
 bun bin/ez-lock.ts main.bend > ez.lock.json    # resolve every 0x import, transitively
-./gate.sh                                      # every test
+bun bin/ez-restore.ts                          # fill BEND_LIB from the lock
+./gate.sh                                      # every test, on the JS and native lanes
+nix flake check                                # the same, in the sandbox
 ```
 
 In Nix:
@@ -88,15 +91,30 @@ tables, no numbers.
 
 ## Written in Bend
 
-The manifest is Bend (`manifest/`), tested the way bolt tests: each `tests/*.bend`
-ends in the `#|` lines its run must print, and `./gate.sh` checks them on the JS
-lane and the native CPU lane.
+The manifest (`manifest/`) and sha256 (`sha/`) are Bend, tested the way bolt
+tests: each `tests/*.bend` ends in the `#|` lines its run must print, and
+`./gate.sh` checks them on the JS lane and the native CPU lane.
 
-The rest is still TypeScript, and porting it needs foreign effects Base does not
-have. `bend base` offers file IO, TCP, `get_env` and `args`. It has no TLS, so
-the hub's HTTPS needs a C and JS effect pair. It has no subprocess, so `git`
-needs the same. And sha256 has to be written, in Bend or foreign. That is the
-order of the remaining port: sha256, then fetch, then git.
+sha256 is [Giulio2002/bend-sha256](https://github.com/Giulio2002/bend-sha256),
+which proves its output equal to an executable FIPS 180-4 specification. It was
+never published to the hub, so ez depends on it the way this README describes:
+pinned to a commit, vendored under the hash `bend --publish` would have given it.
+ez is its own first user. `sha/tests/hex.bend` checks the two FIPS vectors and
+one real manifest line, whose digest is the package hash `0x182e9ab8...` that
+`tests/hub.sh` builds against.
+
+`ez-lock`, `ez-git`, `ez-restore` and `pkg` are still TypeScript. Porting them
+needs foreign effects Base does not have. `bend base` offers file IO, TCP,
+`get_env` and `args`. It has no TLS, so the hub's HTTPS needs a C and JS effect
+pair, and it has no subprocess, so `git` needs the same. That is the order of
+the remaining port: the fetch effect, then git, then the walk that uses them.
+
+### A gotcha worth knowing
+
+A Bend module reached through a path with a hyphen in it breaks the JS backend.
+`import ./bend-sha256/sha256.bend as S` compiles to a JS identifier containing
+`-` and dies with `SyntaxError: Unexpected token '-'`. Renaming the directory
+fixes it. Vendoring under `0x<hash>/` sidesteps it, since a hash has no hyphen.
 
 ## Why only this
 
@@ -160,9 +178,15 @@ the build then runs with the hub unreachable.
 
 ## Layout
 
+    ez.toml             the ledger: every package this repo imports
+    ez.lock.json        the resolved closure, with each file's sha256
+    flake.nix           bend, bun, the BEND_LIB from the lock, and the checks
+    manifest/           ez.toml, read in Bend
+    sha/                sha256, from a vendored package ez pins in its own ledger
     bin/pkg.ts          the package and hash `bend --publish` would produce
     bin/ez-lock.ts      walks the import graph, writes ez.lock.json
     bin/ez-git.ts       vendors an unpublished git repo under its would-be hash
+    bin/ez-restore.ts   fills BEND_LIB from the lock, without re-resolving
     nix/bend-lib.nix    ez.lock.json -> a BEND_LIB store path
     tests/oracle.ts     a local stand-in for the hub, so --publish can be run
     tests/publish.sh    ez's hash must equal the one bend mines

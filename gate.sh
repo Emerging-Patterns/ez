@@ -5,6 +5,10 @@
 set -u
 cd "$(dirname "$0")"
 js_only=0; [ "${1:-}" = "--js-only" ] && js_only=1
+# vendored packages live with the project, so the pin is per project, not in
+# ~/.bend/lib. A fresh checkout has only the lock, so fill it from that.
+export BEND_LIB=$PWD/.ez/lib
+[ -d "$BEND_LIB" ] || bun bin/ez-restore.ts
 pass=0; total=0
 check() { # name, expected, observed
   total=$((total + 1))
