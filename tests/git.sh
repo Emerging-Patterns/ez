@@ -49,6 +49,10 @@ daemon=$!
 for _ in $(seq 50); do git ls-remote "git://127.0.0.1:$port/upstream.git" >/dev/null 2>&1 && break; sleep 0.1; done
 url="git://127.0.0.1:$port/upstream.git"
 
+# an annotated tag, so the peeled ^{} row is what must be pinned
+git -C "$root/upstream" -c user.email=t@t -c user.name=t tag -a v1.0 -m v1.0
+git -C "$root/upstream" push -q "$root/srv/upstream.git" v1.0
+
 # our project depends on it
 mkdir -p "$root/app"
 cd "$root/app"
@@ -62,6 +66,12 @@ $line
 def main() -> U32:
   Lib.quad(11)
 EOF
+
+tagged=$(BEND_LIB="$root/app/.ez/tag" bun "$ez/bin/ez-git.ts" "$url" v1.0 src/lib.bend 2>"$root/tag.log" | head -1)
+check "a tag resolves to the same package as its commit" "$hash" "$tagged"
+check "the tag it resolved through is written down" "v1.0 is $rev" "$(cat "$root/tag.log")"
+check "the lock keeps the tag beside the rev" "v1.0" \
+  "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]].get("tag",""))' "$root/app/.ez/origins.json" "$hash")"
 
 check "the vendored package builds, with no hub at all" "44" \
   "$(BEND_HUB=http://127.0.0.1:1 BEND_LIB=$root/app/.ez/lib bend main.bend 2>&1 | tail -1)"

@@ -49,6 +49,55 @@ someone else's work on a public hub and still needs the network. Or you can
 vendor the repo and use a relative import, which works today and needs no tool,
 but leaves the dependency uncontent-addressed and unpinned.
 
+## The ledger
+
+Bend's content addressing answers *how a package is fetched*. Nothing answers
+*which packages this repo depends on*. An import line carries a bare
+`0x7e63a5b990a375c304ed462c071214a6`, scattered across whatever files use it. It
+does not say what the package is, where it came from, or whether a newer commit
+exists. `ez.toml` is that list.
+
+```toml
+[package]
+name = "myapp"
+entry = "src/main.bend"
+
+[deps.json]
+hash = "0x1111111111111111111111111111aaaa"
+
+[deps.wire]
+hash = "0x7e63a5b990a375c304ed462c071214a6"
+git = "https://github.com/owner/repo"
+rev = "16773c0aa9914b5f04d062469d50100111eb9c9c"
+tag = "v1.0"
+entry = "src/lib.bend"
+```
+
+A dependency with no `git` key lives on the hub. One with a `git` key was
+vendored from a commit, and `tag` records what a human asked for, so an upgrade
+knows what to re-resolve rather than guessing.
+
+The hash appears both here and in the import lines, so they can drift. ez treats
+the manifest as the record and the import lines as the truth, and reports a
+disagreement rather than rewriting your source. Rewriting is a thing ez could do
+later, behind an explicit command.
+
+The TOML is a deliberate subset. Sections, comments, and `key = "value"` pairs,
+because every value a dependency carries is a string. No arrays, no inline
+tables, no numbers.
+
+## Written in Bend
+
+The manifest is Bend (`manifest/`), tested the way bolt tests: each `tests/*.bend`
+ends in the `#|` lines its run must print, and `./gate.sh` checks them on the JS
+lane and the native CPU lane.
+
+The rest is still TypeScript, and porting it needs foreign effects Base does not
+have. `bend base` offers file IO, TCP, `get_env` and `args`. It has no TLS, so
+the hub's HTTPS needs a C and JS effect pair. It has no subprocess, so `git`
+needs the same. And sha256 has to be written, in Bend or foreign. That is the
+order of the remaining port: sha256, then fetch, then git.
+
 ## Why only this
 
 The `ez` design spec was written for a hypothetical proof language. Bend 2.0.16

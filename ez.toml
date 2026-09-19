@@ -1,0 +1,4 @@
+# ez's own ledger. Nothing here yet: ez depends on no Bend packages.
+[package]
+name = "ez"
+entry = "manifest/manifest.bend"

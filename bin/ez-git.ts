@@ -20,16 +20,27 @@ function git(...args: string[]): void {
   if (r.exitCode !== 0) throw new Error("git " + args.join(" ") + ": " + r.stderr.toString().trim());
 }
 
+// a tag or branch is what a human asks for; the commit it names is what gets
+// pinned, and both are written down so an upgrade knows what to re-resolve
+function resolve(url: string, ref: string): { rev: string; tag?: string } {
+  if (/^[0-9a-f]{40}$/.test(ref)) return { rev: ref };
+  const r = Bun.spawnSync(["git", "ls-remote", url, ref, "refs/tags/" + ref + "^{}"]);
+  if (r.exitCode !== 0) throw new Error("git ls-remote " + url + ": " + r.stderr.toString().trim());
+  const rows = r.stdout.toString().trim().split("\n").filter((l) => l !== "")
+    .map((l) => l.split("\t"));
+  if (rows.length === 0) throw new Error(url + " has no ref named " + ref);
+  // an annotated tag resolves through its peeled ^{} row, which is the commit
+  const peeled = rows.find(([, at]) => at.endsWith("^{}"));
+  return { rev: (peeled ?? rows[0])[0], tag: ref };
+}
+
 function main() {
-  const [url, rev, entry] = process.argv.slice(2);
+  const [url, ref, entry] = process.argv.slice(2);
   if (entry === undefined) {
-    process.stderr.write("usage: ez-git <url> <rev> <entry.bend>\n");
+    process.stderr.write("usage: ez-git <url> <rev|tag|branch> <entry.bend>\n");
     process.exit(1);
   }
-  if (!/^[0-9a-f]{40}$/.test(rev)) {
-    process.stderr.write("ez-git: rev must be a full 40-character commit hash, not a branch or tag\n");
-    process.exit(1);
-  }
+  const { rev, tag } = resolve(url, ref);
 
   const work = path.join(LIB, ".work-" + rev);
   rmSync(work, { recursive: true, force: true });
@@ -60,11 +71,12 @@ function main() {
   rmSync(work, { recursive: true, force: true });
 
   const origins = existsSync(ORIGINS) ? JSON.parse(readFileSync(ORIGINS, "utf8")) : {};
-  origins[pkg.hash] = { kind: "git", url, rev, entry, narHash };
+  origins[pkg.hash] = { kind: "git", url, rev, entry, narHash, ...(tag === undefined ? {} : { tag }) };
   mkdirSync(path.dirname(ORIGINS), { recursive: true });
   writeFileSync(ORIGINS, JSON.stringify(origins, null, 2) + "\n");
 
   const name = path.basename(entry, ".bend");
+  if (tag !== undefined) process.stderr.write(tag + " is " + rev + "\n");
   process.stdout.write(pkg.hash + "\n");
   process.stdout.write("import " + pkg.hash + "/" + path.basename(entry) + " as " +
     name[0].toUpperCase() + name.slice(1) + "\n");
