@@ -1,7 +1,7 @@
-# On a pushed v* tag (`git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`):
-# open a GitHub Release. Tag + GitHub Release only.
-# No native package attach. GitHub already ships a source archive on the release.
-# Notes are GitHub-generated from commits since the previous tag.
+# On a pushed v* tag: publish ez to bendhub, then open a GitHub Release whose
+# name includes the bendhub package hash. Tag form stays vX.Y.Z.
+# Fires only when Bend sources changed since the previous v* tag.
+# GitHub already ships a source archive; no native binary attach.
 
 name: release
 
@@ -17,7 +17,75 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: softprops/action-gh-release@v3
+      - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+
+      - id: gate
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if ! echo "$tag" | grep -qxE 'v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "skip: ${tag} is not a vX.Y.Z tag"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          case "$tag" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+          git fetch --tags --force
+          prev=$(git tag -l 'v*' --sort=-v:refname | grep -vxF "$tag" | head -1 || true)
+          if [ -n "$prev" ]; then
+            changes=$(git diff --name-only "$prev" "$tag" -- \
+              ':(glob)**/*.bend' \
+              ':(exclude,glob)**/tests/**' || true)
+            if [ -z "$changes" ]; then
+              echo "No Bend sources changed since ${prev}; refusing release"
+              exit 1
+            fi
+            echo "Bend changes since ${prev}:"
+            printf '%s\n' "$changes"
+          else
+            echo "No previous v* tag; allowing first release"
+          fi
+
+      - id: hub
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          # Package hash bendhub will serve (matches bend --publish).
+          hash=$(nix develop -c bun -e 'import { pkg_of } from "./bin/pkg.ts"; console.log(pkg_of("ez/main.bend").hash)')
+          if ! echo "$hash" | grep -qxE '0x[0-9a-f]+'; then
+            echo "bad package hash: ${hash}"
+            exit 1
+          fi
+          echo "hash=${hash}" >> "$GITHUB_OUTPUT"
+          # Upload the package to the default bend hub.
+          nix develop -c bend ez/main.bend --publish | tee /tmp/bend-publish.log
+          if ! grep -q "$hash" /tmp/bend-publish.log; then
+            echo "publish output did not mention ${hash}"
+            cat /tmp/bend-publish.log
+            exit 1
+          fi
+
+      - name: GitHub Release
+        if: steps.gate.outputs.skip != 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.gate.outputs.tag }}
+          name: ${{ steps.gate.outputs.tag }} ${{ steps.hub.outputs.hash }}
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ steps.gate.outputs.prerelease == 'true' }}
+          body: |
+            Bendhub package: `${{ steps.hub.outputs.hash }}`
+
+            Run:
+            ```bash
+            bend ${{ steps.hub.outputs.hash }}/main.bend
+            ```
