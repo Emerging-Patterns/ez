@@ -54,11 +54,12 @@
       };
 
       # every .bend test prints the `#|` lines of its trailer, on the JS lane.
-      # curl and coreutils are here because run/run.bend runs programs: bend
-      # links only pthread and libm, so TLS is curl's job.
+      # curl, git and coreutils are here because run/run.bend runs programs:
+      # bend links only pthread and libm, so TLS is curl's job and a checkout
+      # is git's.
       tests = pkgs.runCommand "ez-tests"
         {
-          nativeBuildInputs = [ bend pkgs.curl pkgs.coreutils ];
+          nativeBuildInputs = [ bend pkgs.curl pkgs.git pkgs.coreutils ];
           BEND_LIB = bendLib;
         }
         ''
