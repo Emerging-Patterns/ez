@@ -17,7 +17,7 @@ type Note is Data:
 
 # the lock's path. It is named once so the file's format and name are one edit.
 def lock() -> String:
-  "ez.lock.json"
+  "ez.lock.toml"
 
 # the ledger's path
 def toml() -> String:

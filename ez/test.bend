@@ -148,15 +148,28 @@ def one.js(on: Bool, cap: Bool, +path: String, +wanted: String, t: Tally) -> IO(
         js : String <- Cap.run(cap, ["bend", path])
         check(path ++ " (js)", wanted, Q.filter(R.text(js)), t)
 
-# what is being worked on, on stderr, so a run that takes minutes says so while
-# it takes them. Results stay on stdout, where something may be reading them.
-def saying(+path: String) -> IO(Unit):
-  IO.print_err("  " ++ path)
+# what is being worked on, while it is worked on, so a run that takes minutes
+# says so. Off unless EZ_PROGRESS asks, because the one thing reading a run is
+# entitled to expect is that its last line is the count: the effect hands back
+# stdout and stderr down one pipe, so whichever is flushed last wins, and a
+# progress line must not be able to win.
+def saying(on: Bool, +path: String) -> IO(Unit):
+  match on:
+    case False{}:
+      IO.pure(Unit, Unit{})
+    case True{}:
+      IO.print_err("  " ++ path)
+
+# whether a run says what it is doing as it does it
+def progress() -> IO(Bool):
+  do IO<Bool>:
+    +v : String <- Env.var("EZ_PROGRESS", "")
+    return Bool.not(String.is_empty(v))
 
 # one test file, on the JS lane and then the native one
-def one(+path: String, +cap: Bool, cpu: Bool, t: Tally) -> IO(Tally):
+def one(+path: String, +cap: Bool, cpu: Bool, +loud: Bool, t: Tally) -> IO(Tally):
   do IO<Tally>:
-    saying(path)
+    saying(loud, path)
     src : Maybe<&2, String> <- F.read(path)
     +text : String <- IO.pure(String, F.text_of(src))
     +wanted : String <- IO.pure(String, trailer(text))
@@ -165,35 +178,35 @@ def one(+path: String, +cap: Bool, cpu: Bool, t: Tally) -> IO(Tally):
 
 # every test file, in order. The list comes first because a self-call must
 # shrink an argument before it changes one.
-def each(ts: List<&2, String>, +cap: Bool, +cpu: Bool, t: Tally) -> IO(Tally):
+def each(ts: List<&2, String>, +cap: Bool, +cpu: Bool, +loud: Bool, t: Tally) -> IO(Tally):
   match ts:
     case []:
       IO.pure(Tally, t)
     case h <> rest:
       do IO<Tally>:
-        next : Tally <- one(h, cap, cpu, t)
-        each(rest, cap, cpu, next)
+        next : Tally <- one(h, cap, cpu, loud, t)
+        each(rest, cap, cpu, loud, next)
 
 # a proof's verdict is the line, never the exit status. Both
 # `All terms check, with N unsafe annotations.` and 2.0.18's
 # `All terms check, but N defs rely on unsafe or foreign code:` exit 0, so a
 # gate reading the status alone goes green on a claim that leans on code
 # nothing proved. Only the bare line means every term was proved outright.
-def proof(+path: String, cap: Bool, t: Tally) -> IO(Tally):
+def proof(+path: String, cap: Bool, loud: Bool, t: Tally) -> IO(Tally):
   do IO<Tally>:
-    saying(path)
+    saying(loud, path)
     +out : String <- Cap.run(cap, ["bend", path])
     check(path, "All terms check.", head(R.text(out)), t)
 
 # every proof in the tree, checked
-def proofs(ps: List<&2, String>, +cap: Bool, t: Tally) -> IO(Tally):
+def proofs(ps: List<&2, String>, +cap: Bool, +loud: Bool, t: Tally) -> IO(Tally):
   match ps:
     case []:
       IO.pure(Tally, t)
     case h <> rest:
       do IO<Tally>:
-        next : Tally <- proof(h, cap, t)
-        proofs(rest, cap, next)
+        next : Tally <- proof(h, cap, loud, t)
+        proofs(rest, cap, loud, next)
 
 # every file of a kind in the tree, sorted, so a run's report is the same twice
 # over. Base has no readdir, so this is `find`. `.claude` is skipped along with
@@ -240,8 +253,9 @@ def run(as: List<&2, String>) -> IO(Unit):
     _mk : String <- R.exec(["mkdir", "-p", ".gate"])
     +cap : Bool <- Cap.ok()
     Cap.warn(cap)
+    +loud : Bool <- progress()
     ts : List<&2, String> <- find()
-    t : Tally <- each(ts, cap, Bool.not(String.eq(Args.at(as, 0n), "--js-only")), Tally{0n, 0n})
+    t : Tally <- each(ts, cap, Bool.not(String.eq(Args.at(as, 0n), "--js-only")), loud, Tally{0n, 0n})
     ps : List<&2, String> <- find.proofs()
-    all : Tally <- proofs(ps, cap, t)
+    all : Tally <- proofs(ps, cap, loud, t)
     done(all)
