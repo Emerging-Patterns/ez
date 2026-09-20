@@ -1,0 +1,129 @@
+# Sibling of Emerging-Patterns/bolt tag workflow; keep shape aligned.
+#
+# Cuts an annotated vX.Y.Z tag (and the GitHub Release: a GITHUB_TOKEN
+# tag push does not start release.yml). ez version lives in flake.nix
+# only (`version = "X.Y.Z"` on the ez package).
+#
+# How to cut a release
+#   1. Land the version on master in flake.nix.
+#   2. Actions → Tag → Run workflow, from master:
+#        - leave version empty and bump=none → tag what flake.nix says
+#        - version=X.Y.Z → tag that (fails if flake.nix is a different version)
+#        - bump=patch|minor|major → rewrite flake.nix, commit, tag the
+#          new X.Y.Z
+#   3. Or tag locally: `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`
+#      (release.yml then opens the GitHub Release).
+#
+# Does not attach a nix binary. Does not `bend --publish`. Does not
+# publish to hub/marketplace.
+
+name: tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "X.Y.Z to tag (empty = version in flake.nix)"
+        required: false
+        type: string
+        default: ""
+      bump:
+        description: "If version is empty, bump flake.nix then tag"
+        required: false
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+        default: none
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check version, tag, and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_IN: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+
+          flake_ver=$(grep -oE 'version = "[0-9]+\.[0-9]+\.[0-9]+"' flake.nix \
+            | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          if [ -z "$flake_ver" ]; then
+            echo "could not read version from flake.nix"
+            exit 1
+          fi
+          file_ver="$flake_ver"
+
+          ver=$(printf '%s' "$VERSION_IN" | tr -d '[:space:]')
+          ver="${ver#v}"
+          bump_files=0
+          if [ -n "$ver" ]; then
+            :
+          elif [ "${BUMP:-none}" != none ]; then
+            IFS=. read -r maj min pat <<< "$file_ver"
+            case "$BUMP" in
+              major) ver="$((maj + 1)).0.0" ;;
+              minor) ver="$maj.$((min + 1)).0" ;;
+              patch) ver="$maj.$min.$((pat + 1))" ;;
+              *) echo "unknown bump: $BUMP"; exit 1 ;;
+            esac
+            bump_files=1
+          else
+            ver="$file_ver"
+          fi
+
+          if ! echo "$ver" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "version must be X.Y.Z, got: $ver"
+            exit 1
+          fi
+          if [ "$bump_files" -eq 0 ] && [ "$ver" != "$file_ver" ]; then
+            echo "asked to tag v$ver but flake.nix is $file_ver"
+            echo "bump flake.nix first, or use bump="
+            exit 1
+          fi
+
+          git fetch --tags --force
+          if git rev-parse "refs/tags/v$ver" >/dev/null 2>&1; then
+            echo "tag v$ver already exists"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ "$bump_files" -eq 1 ]; then
+            sed -i -E 's/version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$ver"'"/' flake.nix
+            if ! grep -q "version = \"$ver\"" flake.nix; then
+              echo "failed to write flake.nix version $ver"
+              exit 1
+            fi
+            git add flake.nix
+            git commit -m "Release v$ver"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+          git tag -a "v$ver" -m "v$ver"
+          git push origin "v$ver"
+
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$ver" '
+              $0 ~ "^##[ \\[]+v?" ver {found=1; print; next}
+              found && /^## / {exit}
+              found {print}
+            ' CHANGELOG.md > /tmp/release-notes.md
+          fi
+          if [ -s /tmp/release-notes.md ]; then
+            gh release create "v$ver" --title "v$ver" --notes-file /tmp/release-notes.md
+          else
+            gh release create "v$ver" --title "v$ver" --generate-notes
+          fi
