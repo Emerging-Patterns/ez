@@ -1,21 +1,6 @@
-# Sibling of Emerging-Patterns/bolt tag workflow; keep shape aligned.
-#
-# Cuts an annotated vX.Y.Z tag (and the GitHub Release: a GITHUB_TOKEN
-# tag push does not start release.yml). ez version lives in flake.nix
-# only (`version = "X.Y.Z"` on the ez package).
-#
-# How to cut a release
-#   1. Land the version on master in flake.nix.
-#   2. Actions → Tag → Run workflow, from master:
-#        - leave version empty and bump=none → tag what flake.nix says
-#        - version=X.Y.Z → tag that (fails if flake.nix is a different version)
-#        - bump=patch|minor|major → rewrite flake.nix, commit, tag the
-#          new X.Y.Z
-#   3. Or tag locally: `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`
-#      (release.yml then opens the GitHub Release).
-#
-# Does not attach a nix binary. Does not `bend --publish`. Does not
-# publish to hub/marketplace.
+# workflow_dispatch: cut an annotated vX.Y.Z from the flake.nix version
+# (the only version file). Creates the GitHub Release here because a
+# GITHUB_TOKEN tag push does not start release.yml.
 
 name: tag
 

@@ -1,14 +1,6 @@
-# Sibling of Emerging-Patterns/bolt release workflow; keep shape aligned.
-# ez default branch is master (bolt's is main).
-#
-# Annotated vX.Y.Z tag → GitHub Release. No nix binary attach (GitHub
-# already ships a source archive). No hub/marketplace. No `bend --publish`.
-#
-# This file runs on a pushed v* tag (a human `git tag -a && git push`,
-# or tag.yml). Tag + GitHub Release only.
-#
-# Notes: CHANGELOG.md section for this version if present, else GitHub's
-# generated notes from commits since the previous tag.
+# Push of a v* tag → GitHub Release. Skip if the release already exists.
+# Notes from CHANGELOG.md for that version, else --generate-notes.
+# No binary attach.
 
 name: release
 
