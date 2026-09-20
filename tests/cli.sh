@@ -82,11 +82,43 @@ check "check passes with the git remote gone" "0" \
 check "run gives the program's answer" "42" \
   "$("$ez/ez/ez" run 2>/dev/null | tail -1)"
 
+mkdir -p src/tests
+cat > src/tests/ok.bend <<'EOF'
+import Base
+
+def main() -> IO(Unit):
+  IO.print("ok one")
+
+#|ok one
+EOF
+check "test passes a file that prints its trailer" "PASS: 1 / 1" \
+  "$("$ez/ez/ez" test --js-only 2>&1 | tail -1)"
+
+cat > src/tests/bad.bend <<'EOF'
+import Base
+
+def main() -> IO(Unit):
+  IO.print("ok one")
+
+#|ok two
+EOF
+check "test fails a file that does not" "1" \
+  "$("$ez/ez/ez" test --js-only >/dev/null 2>&1; echo $?)"
+rm src/tests/bad.bend
+
+check "doctor passes a project with nothing wrong" "0" \
+  "$("$ez/ez/ez" doctor >/dev/null 2>&1; echo $?)"
+
 "$ez/ez/ez" remove lib
 check "remove drops it from the ledger" "0" \
   "$(grep -c 'deps.lib' ez.toml || true)"
 check "and leaves the package stanza alone" "myapp" \
   "$(grep '^name' ez.toml | sed 's/.*"\(.*\)"/\1/')"
+
+check "doctor reports a hash the ledger no longer names" "1" \
+  "$("$ez/ez/ez" doctor 2>&1 | grep -c "^drift: $hash is imported")"
+check "and that drift fails the command" "1" \
+  "$("$ez/ez/ez" doctor >/dev/null 2>&1; echo $?)"
 
 check "an unknown subcommand fails" "1" \
   "$("$ez/ez/ez" nonsense >/dev/null 2>&1; echo $?)"
