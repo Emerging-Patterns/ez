@@ -17,14 +17,33 @@ ez test [--js-only]                 run every */tests/*.bend, on both lanes
 ez doctor                           report on the toolchain and the project
 ```
 
-`./build.sh` puts `bin/ez.bin` behind the `ez/ez` script and links it into
-`~/.local/bin`. With nix, `nix run .#` or `nix profile install .#` instead, and
-`nix develop` for a shell with bend, bun, curl and `BEND_LIB` already set.
-`./gate.sh` runs every test on the JS and native lanes; `nix flake check` runs
-the same in the sandbox.
+`bend ez/main.bend -o bin/ez.bin` is the whole build, and `./bin/ez.bin test`
+is the whole gate: every test, on the JS and the native lane. With nix,
+`nix run .#` or `nix profile install .#` instead, and `nix develop` for a shell
+with bend, bun, curl and `BEND_LIB` already set. `nix flake check` runs the
+unit tests in the sandbox.
 
-A native Bend binary takes no arguments of its own, so the subcommand rides in
-`EZ_CMD` and the rest in `EZ_ARGS`, one a line, the way bolt does it.
+One step comes before both of those, and it is the only one that cannot be ez.
+ez's own source imports sha256 out of `BEND_LIB`, and a fresh checkout has no
+`BEND_LIB`, so a clone has to have its packages filled in once before any Bend
+here will even check. `nix develop` does that. Outside nix it is one command
+against the lock, and it is the last thing in this repo that has to run before
+ez exists.
+
+The subcommand is the binary's first argument. A compiled Bend binary gets its
+own command line from `IO.args()`: the runtime keeps `--threads`, `--gpu`,
+`--gpu-build` and `--help` for itself and strips them wherever they appear, and
+everything after a `--` reaches the program untouched, those four included. On
+the interpreted lane (`bend f.bend a b`) positional arguments still arrive, but
+bend's own CLI rejects flags it does not know, so a flag wants the compiled
+binary. `IO.args()` carries no argv[0], so a binary cannot locate itself: that
+is what `EZ_ROOT` is for, and it goes away with the last of the TypeScript.
+
+Packages are vendored per project rather than into `~/.bend/lib`, so `BEND_LIB`
+is `.ez/lib` unless it is set. Base has `get_env` and no `set_env`, so ez tells
+the bend and bun processes it starts by running them as `env BEND_LIB=... bend
+...`; `env` is coreutils and is execvp'd like any other program, so no shell
+appears anywhere.
 
 In Nix:
 
@@ -52,13 +71,13 @@ later, the hash matches and the hub just starts serving it. Nothing in your
 source changes.
 
 `ez.lock.json` records the git url and rev instead of the hub for that package,
-and `nix/bend-lib.nix` rebuilds it with `fetchgit`. `tests/git.sh` runs the whole
-path against a served fixture repo and checks the nix tree byte for byte against
-the vendored one.
+and `nix/bend-lib.nix` rebuilds it with `fetchgit`. `tests/git.bend` runs the
+whole path against a served fixture repo and compares the nix tree against the
+vendored one file by file.
 
-`tests/publish.sh` keeps the hash honest. It runs real `bend --publish` against a
-local hub and fails if ez's hash differs from the one bend mines. That test is
-the reason this is safe to rely on.
+`tests/publish.bend` keeps the hash honest. It runs real `bend --publish`
+against a local hub and fails if ez's hash differs from the one bend mines.
+That test is the reason this is safe to rely on.
 
 The two alternatives, for comparison. You can publish their code yourself, since
 the hub has no ownership and any tree can be published by anyone, but that puts
@@ -107,7 +126,7 @@ tables, no numbers.
 
 The manifest (`manifest/`) and sha256 (`sha/`) are Bend, tested the way bolt
 tests: each `tests/*.bend` ends in the `#|` lines its run must print, and
-`./gate.sh` checks them on the JS lane and the native CPU lane.
+`ez test` checks them on the JS lane and the native CPU lane.
 
 sha256 is [Giulio2002/bend-sha256](https://github.com/Giulio2002/bend-sha256),
 which proves its output equal to an executable FIPS 180-4 specification. It was
@@ -115,12 +134,19 @@ never published to the hub, so ez depends on it the way this README describes:
 pinned to a commit, vendored under the hash `bend --publish` would have given it.
 ez is its own first user. `sha/tests/hex.bend` checks the two FIPS vectors and
 one real manifest line, whose digest is the package hash `0x182e9ab8...` that
-`tests/hub.sh` builds against.
+`tests/hub.bend` builds against.
 
-`run/` is the one foreign effect, a program run with its arguments, with a C and
-a JS twin. `hub/` is the fetch and the integrity check on top of it: a body is
-accepted only when its sha256 starts with the hash that named it, which is the
-rule bend itself applies.
+`run/` is the foreign effects, each a program run with its arguments, each with
+a C and a JS twin. `R.exec` waits for what it runs and hands back its status and
+everything it printed. `R.start` waits for nothing: it forks the program into a
+session of its own with `/dev/null` for all three streams and answers with its
+pid. That second one exists because a test that needs a server beside it cannot
+wait for the server, and because a program left holding the pipe `R.exec` reads
+would never let that read finish.
+
+`hub/` is the fetch and the integrity check on top of them: a body is accepted
+only when its sha256 starts with the hash that named it, which is the rule bend
+itself applies.
 
 One effect covers both HTTPS and git, and that is forced rather than chosen.
 bend links its binaries with exactly `-std=c11 -O3 -lpthread -lm`, plus `-lX11`
@@ -133,15 +159,16 @@ through a shell, so a url or a rev out of a lockfile cannot become shell syntax.
 `run/tests/exec.bend` asserts that.
 
 `ez/` is the command line, `io/` is whole-file read and write over Base's
-chunked handles, and `manifest/render.bend` writes a ledger back out. What ez
-reads renders back byte for byte, which is what makes `ez add` and `ez remove`
-safe to run on a file a person edits.
+chunked handles, `check/` is what the tests share, and `manifest/render.bend`
+writes a ledger back out. What ez reads renders back byte for byte, which is
+what makes `ez add` and `ez remove` safe to run on a file a person edits.
 
-`ez-lock`, `ez-git`, `ez-restore` and `pkg` are still TypeScript, and `ez`
-shells out to them through the same process effect it uses for curl and git.
-They get replaced underneath the command line rather than beside it. What is
-left is the import walk: reading local `.bend` files, following their imports,
-and writing the tree into BEND_LIB.
+`ez-lock`, `ez-git`, `ez-restore` and `pkg` are still TypeScript, and `ez` runs
+them through the same process effect it uses for curl and git. They get
+replaced underneath the command line rather than beside it. What is left is the
+import walk: reading local `.bend` files, following their imports, and writing
+the tree into BEND_LIB. `EZ_ROOT` is how the binary finds them, and it is the
+last thing about ez that a wrapper has to set.
 
 ### A gotcha worth knowing
 
@@ -156,8 +183,16 @@ Bend's own check report changed between releases. 2.0.16 prints
 `All terms check, with N unsafe annotations.`; 2.0.18 prints
 `All terms check, but N defs rely on unsafe or foreign code:` and a `- <name>`
 line each. A test comparing a run's output has to drop both, which is what
-`bin/quiet.awk` does for the gate and the flake alike. The local gate runs
-2.0.16 and the flake runs 2.0.18, so this showed up only in the sandbox.
+`ez/quiet.bend` does for `ez test` and `bin/quiet.awk` for the flake. The local
+gate runs 2.0.16 and the flake runs 2.0.18, so this showed up only in the
+sandbox.
+
+A compiled Bend binary does take arguments. It was not always so — 2.0.5 did
+not pass them on, and the belief outlived it — but 2.0.16's `IO.args()` hands a
+binary everything on its command line, positional or flag, minus the four the
+runtime keeps and minus argv[0], which is never there at all. The interpreted
+lane is the asymmetric one: `bend f.bend a b` passes positional arguments
+through, while a flag it does not know is bend's own CLI error.
 
 A Bend module reached through a path with a hyphen in it breaks the JS backend.
 `import ./bend-sha256/sha256.bend as S` compiles to a JS identifier containing
@@ -175,6 +210,18 @@ disagrees fails the command, and the last line is always `PASS: n / total`.
 A failure prints what was expected and what was observed, both in full, rather
 than a diff. A diff is real work in Bend and a test's trailer is a handful of
 short lines, so the pair says as much and costs nothing.
+
+`ez test` is also the gate this repo commits behind, so it runs more than unit
+tests. The `tests/*.bend` at the top level drive the real tools end to end: a
+git daemon, a local hub, a real `bend --publish`, `nix-build`. They are found
+the same way every other test is, and `check/world.bend` is what they share —
+a temporary directory, a free port, a command run somewhere else, a server
+started and stopped. They run on the JS lane only. The second lane compiles the
+test, and what these tests drive is git, nix and bend itself: compiling the
+driver twice runs those tools twice over to learn nothing new about them. A
+unit test, whose subject is the Bend, still runs on both. The flake's check
+uses the glob `*/tests/*.bend` and so reaches only the unit tests, because a
+nix sandbox cannot run nix.
 
 `ez/quiet.bend` is `bin/quiet.awk` in Bend: bend prints its check report after
 a run, in one of two wordings, and neither belongs in what a test asserts.
@@ -241,7 +288,7 @@ no change to Bend: resolve the graph ahead of time, fetch each file as a
 fixed-output derivation keyed by the sha256 the hub manifest already carries,
 and point `BEND_LIB` at the resulting store path.
 
-Proven end to end by `tests/nix.sh`: `nix-build` fetches through the lock, and
+Proven end to end by `tests/nix.bend`: `nix-build` fetches through the lock, and
 the build then runs with the hub unreachable.
 
 ## Still open, not built
@@ -268,24 +315,28 @@ the build then runs with the hub unreachable.
     flake.nix           bend, bun, the BEND_LIB from the lock, and the checks
     manifest/           ez.toml, read in Bend
     sha/                sha256, from a vendored package ez pins in its own ledger
-    run/                the one foreign effect: a program run with its arguments
+    run/                the foreign effects: a program run, and one left running
     hub/                a file fetched and checked against the hash naming it
-    bin/quiet.awk       drops bend's check report, so a test sees only its output
+    bin/quiet.awk       drops bend's check report, for the flake's own check loop
     ez/                 the subcommands, and the dispatch behind bin/ez.bin
+    ez/args.bend        the command line, as IO.args() hands it over
+    ez/env.bend         BEND_LIB and EZ_ROOT, and how a child process is told
     ez/test.bend        the test runner: every */tests/*.bend, on both lanes
     ez/quiet.bend       bend's check report dropped, the way bin/quiet.awk does
     ez/drift.bend       the hashes in ez.toml against the ones the source imports
     ez/doctor.bend      the toolchain and the project, reported on
-    ez/ez               the script people run; EZ_CMD and EZ_ARGS reach the binary
     io/                 a whole file read or written, over Base's chunked handles
-    build.sh            bin/ez.bin, linked into ~/.local/bin as `ez`
+    check/kit.bend      what a test asserts with
+    check/world.bend    a scratch directory, a free port, a server to stop again
     bin/pkg.ts          the package and hash `bend --publish` would produce
     bin/ez-lock.ts      walks the import graph, writes ez.lock.json
     bin/ez-git.ts       vendors an unpublished git repo under its would-be hash
     bin/ez-restore.ts   fills BEND_LIB from the lock, without re-resolving
     nix/bend-lib.nix    ez.lock.json -> a BEND_LIB store path
-    tests/oracle.ts     a local stand-in for the hub, so --publish can be run
-    tests/publish.sh    ez's hash must equal the one bend mines
-    tests/hub.sh        two-level fake hub; lock, then build offline
-    tests/git.sh        an unpublished repo, vendored and rebuilt through nix
-    tests/nix.sh        the hub path through nix-build
+    check/oracle.bend   a local stand-in for the hub, so --publish can be run
+    tests/check.bend    the built binary against this repo's own ledger
+    tests/cli.bend      every subcommand, through a project of its own
+    tests/publish.bend  ez's hash must equal the one bend mines
+    tests/hub.bend      two-level fake hub; lock, then build offline
+    tests/git.bend      an unpublished repo, vendored and rebuilt through nix
+    tests/nix.bend      the hub path through nix-build

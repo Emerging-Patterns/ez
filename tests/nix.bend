@@ -30,21 +30,21 @@ def publish(+hub: String, +at: String, +text: String) -> IO(String):
     return h
 
 # the lock nix reads, written from the entry against the hub that is up
-def lock(+repo: String, +app: String, +hub: String) -> IO(Unit):
-  do IO<Unit>:
-    +out : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
-      "BEND_LIB=" ++ app ++ "/lib", "bun", repo ++ "/bin/ez-lock.ts",
-      "main.bend"]))
-    wrote : Bool <- F.write(app ++ "/ez.lock.json", R.text(out))
-    yes("the lock was written", wrote)
+def lock(+repo: String, +app: String, +hub: String) -> IO(String):
+  do IO<String>:
+    _o : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
+      "EZ_ROOT=" ++ repo, repo ++ "/bin/ez.bin", "lock"]))
+    +at : String <- W.only(app, "ez.lock.*")
+    yes("the lock was written", Bool.not(String.is_empty(at)))
+    return at
 
 # the BEND_LIB nix builds out of that lock, and the build that then needs no
 # hub at all
-def sandbox(+repo: String, +app: String, +hash: String) -> IO(Unit):
+def sandbox(+repo: String, +app: String, +hash: String, +lock: String) -> IO(Unit):
   do IO<Unit>:
     _n : Bool <- F.write(app ++ "/build.nix",
       "let pkgs = import <nixpkgs> { };\nin pkgs.callPackage " ++ repo ++
-      "/nix/bend-lib.nix { } " ++ app ++ "/ez.lock.json\n")
+      "/nix/bend-lib.nix { } " ++ lock ++ "\n")
     +out : String <- R.exec(["nix-build", "--no-out-link", app ++ "/build.nix"])
     +at : String <- IO.pure(String,
       W.starting.last(String.lines(R.text(out)), "/nix/store/", ""))
@@ -67,10 +67,11 @@ def go(+repo: String, +root: String, +port: String) -> IO(Unit):
       "def main() -> U32:\n  A.double(21)\n")
     +pid : String <- W.spawn(W.inside(root ++ "/hub", ["python3", "-m",
       "http.server", port, "--bind", "127.0.0.1"]))
-    up : Bool <- W.ready(["curl", "-fsS", "http://127.0.0.1:" ++ port ++ "/"])
+    up : Bool <- W.ready(["curl", "-fsS", "--max-time", "5",
+      "http://127.0.0.1:" ++ port ++ "/"])
     yes("the hub answers", up)
-    lock(repo, root ++ "/app", "http://127.0.0.1:" ++ port)
-    sandbox(repo, root ++ "/app", a)
+    +at : String <- lock(repo, root ++ "/app", "http://127.0.0.1:" ++ port)
+    sandbox(repo, root ++ "/app", a, at)
     W.stop(pid)
     W.rm(root)
 

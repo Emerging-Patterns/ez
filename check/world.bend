@@ -119,6 +119,20 @@ def rm(at: String) -> IO(Unit):
 def inside(at: String, args: List<&2, String>) -> List<&2, String>:
   List.append(&2, String, ["env", "-C", at, "-u", "BEND_LIB"], args)
 
+# `ez` run in a project directory. EZ_ROOT is how the binary finds the
+# TypeScript it has not absorbed yet, since `IO.args()` carries no argv[0].
+def ez(+repo: String, +app: String, args: List<&2, String>) -> List<&2, String>:
+  inside(app, List.append(&2, String,
+    ["env", "EZ_ROOT=" ++ repo, repo ++ "/bin/ez.bin"], args))
+
+# the one file a pattern names, or "" when it names none. The lock's name is
+# ez's business and not a test's, so a test looks for it rather than spelling
+# it out.
+def only(+at: String, +pat: String) -> IO(String):
+  do IO<String>:
+    +out : String <- R.exec(["find", at, "-maxdepth", "1", "-name", pat])
+    return first(nonblank(String.lines(R.text(out))))
+
 # a TCP port nothing is listening on, so a stray server elsewhere can never
 # answer for the one this test started
 def port() -> IO(String):
@@ -142,7 +156,8 @@ def stop(pid: String) -> IO(Unit):
     return Unit{}
 
 # a command retried until it answers or the tries run out: how a test waits for
-# the server it just started. The verdict and the count are scrutinised
+# the server it just started. A Bend server started on the interpreted lane
+# takes tens of seconds to reach its first accept, so the count is generous. The verdict and the count are scrutinised
 # together, so one def covers both endings and nothing recurses mutually.
 def until(+args: List<&2, String>, n: Nat, ok: Bool) -> IO(Bool):
   match n ok:
@@ -158,4 +173,4 @@ def until(+args: List<&2, String>, n: Nat, ok: Bool) -> IO(Bool):
 
 # a server answered before the test went on without it
 def ready(args: List<&2, String>) -> IO(Bool):
-  until(args, 100n, False{})
+  until(args, 600n, False{})

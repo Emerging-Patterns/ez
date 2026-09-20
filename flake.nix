@@ -57,10 +57,11 @@
       # tests in the top-level `tests/`: those drive real git daemons, a real
       # `bend --publish` and `nix-build`, none of which a sandbox can do.
       # curl and coreutils are here because run/run.bend runs programs: bend
-      # links only pthread and libm, so TLS is curl's job.
+      # links only pthread and libm, so TLS is curl's job. procps is for the
+      # test that asks which program a started pid turned out to be.
       tests = pkgs.runCommand "ez-tests"
         {
-          nativeBuildInputs = [ bend pkgs.curl pkgs.coreutils ];
+          nativeBuildInputs = [ bend pkgs.curl pkgs.coreutils pkgs.procps ];
           BEND_LIB = bendLib;
         }
         ''

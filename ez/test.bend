@@ -74,9 +74,9 @@ def say(ok: Bool, name: String, want: String, got: String) -> IO(Unit):
 def tally.go(ok: Bool, p: Nat, n: Nat) -> Tally:
   match ok:
     case True{}:
-      Tally{1n + p, 1n + n}
+      Tally{(1n + p : Nat), (1n + n : Nat)}
     case False{}:
-      Tally{p, 1n + n}
+      Tally{p, (1n + n : Nat)}
 
 # the tally with this comparison's verdict in it
 def tally(ok: Bool, t: Tally) -> Tally:
@@ -101,6 +101,13 @@ def ran(built_ok: Bool, +built: String, +path: String, +wanted: String,
         out : String <- R.exec([bin(path), "--gpu", "off"])
         check(path ++ " (cpu)", wanted, Q.chomp(R.text(out)), t)
 
+# whether a test is one of the unit tests, which live in a `tests/` beside the
+# code they are about. The end-to-end tests are the top-level `tests/`, and
+# what they drive is git, nix and bend itself: compiling the driver a second
+# time would run those tools twice over to learn nothing new about them.
+def unit(+path: String) -> Bool:
+  Bool.not(String.starts_with(rel(path), "tests/"))
+
 # the native CPU lane: the test compiled, then the binary run. Skipped when
 # `--js-only` asked for it, since a C compile per test dominates the wall clock.
 def lane(cpu: Bool, +path: String, +wanted: String, t: Tally) -> IO(Tally):
@@ -119,7 +126,7 @@ def one(+path: String, cpu: Bool, t: Tally) -> IO(Tally):
     +wanted : String <- IO.pure(String, trailer(F.text_of(src)))
     js : String <- Env.exec(["bend", path])
     first : Tally <- check(path ++ " (js)", wanted, Q.filter(R.text(js)), t)
-    lane(cpu, path, wanted, first)
+    lane(Bool.and(cpu, unit(path)), path, wanted, first)
 
 # every test file, in order. The list comes first because a self-call must
 # shrink an argument before it changes one.

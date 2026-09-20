@@ -82,10 +82,11 @@ def vendor(+repo: String, +app: String, +url: String, +rev: String) -> IO(String
       W.first(String.lines(R.text(tag))), hash)
     Check.eq_str("the tag it resolved through is written down",
       W.containing(String.lines(R.text(tag)), " is "), "v1.0 is " ++ rev)
-    +org : Maybe<&2, String> <- F.read(app ++ "/.ez/origins.json")
-    Check.eq_str("the lock keeps the tag beside the rev",
-      W.nth(String.split(
-        W.containing(String.lines(F.text_of(org)), "\"tag\""), '"'), 3n), "v1.0")
+    +ats : String <- W.only(app ++ "/.ez", "origins.*")
+    +org : Maybe<&2, String> <- F.read(ats)
+    yes("the lock keeps the tag beside the rev",
+      String.contains(
+        W.containing(String.lines(F.text_of(org)), "tag"), "v1.0"))
     return hash
 
 # the vendored package built with no hub at all, and the lock that records
@@ -99,10 +100,9 @@ def local(+repo: String, +app: String, +hash: String, +rev: String) -> IO(Unit):
       "BEND_LIB=" ++ app ++ "/.ez/lib", "bend", "main.bend"]))
     Check.eq_str("the vendored package builds, with no hub at all",
       answer(out), "44")
-    +lk : String <- R.exec(W.inside(app, ["env", "BEND_LIB=" ++ app ++ "/.ez/lib",
-      "bun", repo ++ "/bin/ez-lock.ts", "main.bend"]))
-    _l : Bool <- F.write(app ++ "/ez.lock.json", R.text(lk))
-    +txt : Maybe<&2, String> <- F.read(app ++ "/ez.lock.json")
+    _lk : String <- R.exec(W.ez(repo, app, ["lock"]))
+    +at : String <- W.only(app, "ez.lock.*")
+    +txt : Maybe<&2, String> <- F.read(at)
     yes("the lock records the git rev, not the hub",
       Bool.and(String.contains(F.text_of(txt), "git"),
         String.contains(F.text_of(txt), rev)))
@@ -111,9 +111,10 @@ def local(+repo: String, +app: String, +hash: String, +rev: String) -> IO(Unit):
 # line of the build that names one, since the build's log shares the stream.
 def rebuild(+repo: String, +app: String, +hash: String) -> IO(Unit):
   do IO<Unit>:
+    +lock : String <- W.only(app, "ez.lock.*")
     _n : Bool <- F.write(app ++ "/build.nix",
       "let pkgs = import <nixpkgs> { };\nin pkgs.callPackage " ++ repo ++
-      "/nix/bend-lib.nix { } " ++ app ++ "/ez.lock.json\n")
+      "/nix/bend-lib.nix { } " ++ lock ++ "\n")
     +out : String <- R.exec(["nix-build", "--no-out-link", app ++ "/build.nix"])
     +at : String <- IO.pure(String,
       W.starting.last(String.lines(R.text(out)), "/nix/store/", ""))

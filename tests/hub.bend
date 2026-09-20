@@ -39,7 +39,8 @@ def publish(+hub: String, +at: String, +text: String) -> IO(String):
     _m : Bool <- F.write(hub ++ "/" ++ h ++ "/manifest", man)
     return h
 
-# every package hash the lock names, sorted and said once each
+# every package hash the lock names, sorted and said once each. The lock is
+# grepped rather than parsed, so its format is not this test's business.
 def named(+at: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     +out : String <- R.exec(["grep", "-ohE", "0x[0-9a-f]{32}", at])
@@ -47,19 +48,18 @@ def named(+at: String) -> IO(List<&2, String>):
       W.nonblank(String.lines(R.text(out)))))
 
 # the entry, locked against the hub that is serving the two packages
-def lock(+repo: String, +app: String, +lib: String, +hub: String) -> IO(Bool):
-  do IO<Bool>:
-    +out : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
-      "BEND_LIB=" ++ lib, "bun", repo ++ "/bin/ez-lock.ts", "main.bend"]))
-    wrote : Bool <- F.write(app ++ "/ez.lock.json", R.text(out))
-    return wrote
+def lock(+repo: String, +app: String, +hub: String) -> IO(Unit):
+  do IO<Unit>:
+    _o : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
+      "EZ_ROOT=" ++ repo, repo ++ "/bin/ez.bin", "lock"]))
+    return Unit{}
 
 # BEND_LIB filled from the lock and nothing else, which is what the nix
 # derivation does and what a checkout without a network needs
-def restore(+repo: String, +app: String, +lib: String, +hub: String) -> IO(Unit):
+def restore(+repo: String, +app: String, +hub: String) -> IO(Unit):
   do IO<Unit>:
     _o : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
-      "BEND_LIB=" ++ lib, "bun", repo ++ "/bin/ez-restore.ts"]))
+      "EZ_ROOT=" ++ repo, repo ++ "/bin/ez.bin", "fetch"]))
     return Unit{}
 
 # the entry built against a BEND_LIB, with the hub pointed at a dead port so a
@@ -85,18 +85,19 @@ def go(+repo: String, +root: String, +port: String) -> IO(Unit):
       "def main() -> U32:\n  B.quad(11)\n")
     +pid : String <- W.spawn(W.inside(root ++ "/hub", ["python3", "-m",
       "http.server", port, "--bind", "127.0.0.1"]))
-    up : Bool <- W.ready(["curl", "-fsS", "http://127.0.0.1:" ++ port ++ "/"])
+    up : Bool <- W.ready(["curl", "-fsS", "--max-time", "5",
+      "http://127.0.0.1:" ++ port ++ "/"])
     yes("the hub answers", up)
-    wrote : Bool <- lock(repo, root ++ "/app", root ++ "/lib",
-      "http://127.0.0.1:" ++ port)
-    yes("the lock was written", wrote)
-    hs : List<&2, String> <- named(root ++ "/app/ez.lock.json")
+    lock(repo, root ++ "/app", "http://127.0.0.1:" ++ port)
+    +at : String <- W.only(root ++ "/app", "ez.lock.*")
+    yes("the lock was written", Bool.not(String.is_empty(at)))
+    hs : List<&2, String> <- named(at)
     Check.eq_str("the lock names both packages, the direct one and its own " ++
       "dependency", String.join(hs, "\n"),
       String.join(List.sort(~String, ~String.is_le, [a, b]), "\n"))
-    restore(repo, root ++ "/app", root ++ "/lib", "http://127.0.0.1:" ++ port)
+    restore(repo, root ++ "/app", "http://127.0.0.1:" ++ port)
     W.stop(pid)
-    +good : String <- build(root ++ "/app", root ++ "/lib")
+    +good : String <- build(root ++ "/app", root ++ "/app/.ez/lib")
     Check.eq_str("the locked lib builds with the hub unreachable",
       answer(good), "44")
     +bad : String <- build(root ++ "/app", root ++ "/empty")
