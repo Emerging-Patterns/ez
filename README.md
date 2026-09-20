@@ -17,10 +17,12 @@ ez test [--js-only]                 run every */tests/*.bend, on both lanes
 ez doctor                           report on the toolchain and the project
 ```
 
-`bend ez/main.bend -o bin/ez.bin` is the whole build, and `./bin/ez.bin test`
-is the whole gate: every test, on the JS and the native lane. A fresh checkout
-runs `bin/bootstrap.sh` first, to fill BEND_LIB before there is an ez to fill it
-with. With nix, `nix run .#` or `nix profile install .#` instead, and
+`BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin` is the whole build, and
+`./bin/ez.bin test` is the whole gate: every test, on the JS and the native
+lane. A clone needs nothing fetched first — the one package ez builds itself
+with is vendored under `.ez/lib/` — but `bend` looks in `~/.bend/lib` unless
+told otherwise, so the variable is the whole of the bootstrap. Measured from a
+bare clone with no network: 44 seconds. With nix, `nix run .#` or `nix profile install .#` instead, and
 `nix develop` for a shell with bend, bun, git, openssl and `BEND_LIB` already
 set. `nix flake check` runs the unit tests in the sandbox.
 
@@ -260,10 +262,16 @@ them, and bend, in agreement until that one is ported too. `EZ_ROOT` is how the
 binary finds them, and it is the last thing a wrapper has to set: `IO.args()`
 carries no argv[0], so a binary cannot locate itself.
 
-`bin/bootstrap.sh` is the one job that cannot be ez. `ez fetch` is Bend that
-imports sha256 out of BEND_LIB, so on a fresh checkout there is nothing to run
-it with. The bootstrap reads the lock ez wrote and applies the same rule to
-every file it fetches.
+ez builds itself with no ez. Its own Bend imports sha256 out of BEND_LIB, so a
+checkout with an empty BEND_LIB cannot check any Bend here, let alone run
+`ez fetch` to fill it. So the package is vendored, under the `0x` hash that
+names it, exactly as this README says to vendor a package nobody published. A
+clone builds with no network, no bun and no shell, and `ez fetch` keeps its job
+of refilling and checking everything else.
+
+The alternative was a script that read the lock and fetched, and that is a
+third implementation of one rule beside `lock/restore.bend` and
+`nix/bend-lib.nix`. Three copies drift; one vendored tree does not.
 
 ### A gotcha worth knowing
 
@@ -430,7 +438,7 @@ the build then runs with the hub unreachable.
     ez/drift.bend       the hashes in ez.toml against the ones the source imports
     ez/doctor.bend      the toolchain and the project, reported on
     io/                 a whole file read or written, over Base's chunked handles
-    bin/bootstrap.sh    the first BEND_LIB, before there is an ez to fill it
+    .ez/lib/0x0a5c…/   sha256, vendored, so a clone can build ez at all
     bin/pkg.ts          the import walk again, in TypeScript, for ez-git alone
     bin/ez-git.ts       vendors an unpublished git repo under its would-be hash
     nix/bend-lib.nix    ez.lock.toml -> a BEND_LIB store path
