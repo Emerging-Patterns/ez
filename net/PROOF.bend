@@ -1,6 +1,7 @@
 # net: the proofs. `bend PROOF.bend` is the gate.
 import Base
 import ./http.bend as Http
+import ./url.bend as Url
 import ./LAWS.bend as Laws
 
 # LAW: one step of the partition, with the branch the pick takes given as a
@@ -143,3 +144,22 @@ def Laws.clen_exact(st, body):
       lt_self(Http.utf8.len(body))),
     Equal.cong(String, Http.Reply, x => Http.Reply{st, x},
       Http.utf8.take(body, Http.utf8.len(body)), body, take_all(body)))
+
+# LAW: every string starts with nothing
+law starts_nil:
+  for s: String
+  {String.starts_with(s, SNil{}) == True{} : Bool}
+
+def starts_nil(s):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      {==}
+
+def Laws.path_absolute(ps):
+  match ps:
+    case []:
+      {==}
+    case h <> t:
+      starts_nil(String.join(t, "/"))

@@ -4,6 +4,14 @@
 # proved rather than sampled.
 import Base
 import ./http.bend as Http
+import ./url.bend as Url
+
+# LAW: the path a url comes apart into is always absolute, however few or many
+# slashes the url had. The request line is `GET <path> HTTP/1.1`, so a path
+# that did not start at the root would be a request no server answers.
+law path_absolute:
+  for ps: List<&2, String>
+  {String.starts_with(Url.path.of(ps), "/") == True{} : Bool}
 
 # LAW: take and drop partition a string at the same byte offset, whatever the
 # offset and whatever the string holds. Nothing is lost between them and

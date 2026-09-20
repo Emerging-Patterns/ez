@@ -15,6 +15,13 @@ law value_first:
   for ps: List<&2, T.Kv>
   {T.value(T.Kv{k, v} <> ps, k) == v : String}
 
+# LAW: whatever a ledger quotes, the parser takes back out of the quotes
+# unchanged. `ez.lock.toml` writes every value quoted and a file path as a
+# quoted key, so this round trip is what makes a lock readable by the writer.
+law quote_strip:
+  for +s: String
+  {T.strip(T.quote(s), '"', '"') == s : String}
+
 # LAW: dropping a dependency drops every entry of that name, so dropping twice
 # is dropping once. `ez remove` on a ledger it already edited is a no-op.
 law without_idem:

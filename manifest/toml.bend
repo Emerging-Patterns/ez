@@ -84,11 +84,28 @@ def strip.front(cs: List<&2, Char>, c: Char) -> List<&2, Char>:
     case +h <> t:
       strip.cut(Char.is_eq(h, c), h, t)
 
+# the chars from one already taken off the front, without one trailing `c`.
+# The list is the first argument because that is the one the walk shrinks.
+def strip.back.go(t: List<&2, Char>, +h: Char, +c: Char) -> List<&2, Char>:
+  match t:
+    case []:
+      strip.cut(Char.is_eq(h, c), h, [])
+    case +h2 <> t2:
+      h <> strip.back.go(t2, h2, c)
+
+# the chars without one trailing `c`, if there is one. Walking to the end is
+# what a reverse, a cut and a reverse back did before; it is one pass rather
+# than three, and the end of a list is a case a proof can reach.
+def strip.back(cs: List<&2, Char>, +c: Char) -> List<&2, Char>:
+  match cs:
+    case []:
+      []
+    case +h <> t:
+      strip.back.go(t, h, c)
+
 # the string without one leading `a` and one trailing `b`
 def strip(s: String, a: Char, b: Char) -> String:
-  +cs = strip.front(String.to_list(s), a)
-  +rs = strip.front(List.reverse(&2, Char, cs), b)
-  String.from_list(List.reverse(&2, Char, rs))
+  String.from_list(strip.back(strip.front(String.to_list(s), a), b))
 
 # a pair line, once it is known to hold an `=`: the key is what precedes the
 # first one, the value everything after, so an `=` inside a value survives

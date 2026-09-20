@@ -108,6 +108,31 @@ Every value is a string. No arrays, no inline tables, no numbers.
 a parser for this and no parser for that, and `builtins.fromTOML` reads it just
 as well.
 
+## What is proved
+
+A property proved beats an example checked, so where a claim can be stated to
+Bend's checker it is: `<project>/LAWS.bend` states the claims and
+`<project>/PROOF.bend` proves them, and `bend PROOF.bend` must print that all
+terms check. `manifest/`, `net/`, `pkg/` and `lock/` have them, and
+`check/eq.bend` holds the one Base fact they all need, that a string equals
+itself.
+
+What is proved: that `utf8.take` and `utf8.drop` partition a string at any
+byte offset and that a body whose `Content-Length` is its own byte count comes
+back exactly, which is the framing the client rests on; that a parsed url's
+path is absolute; that whatever the TOML writer quotes the reader takes back
+out of the quotes unchanged; that a table answers a key with the value written
+for it; that `ez add` and `ez remove` are idempotent; that a file named twice
+in a row is published once; and that a package resolves to the origin recorded
+for it.
+
+What is not, and stays an example: that `parse` and `render` are inverses on a
+whole document, that `trim` and `norm` are idempotent, and that `manifest_of`
+does not depend on the order the walk found the files in. The first two need a
+`String.split`/`String.join` inverse, which needs the soundness of Bend's
+decidable char equality; the third is a property of Base's `List.sort`.
+`tests/publish.sh` holds that last one down against real `bend --publish`.
+
 ## Written in Bend
 
 Everything but one tool is Bend, tested the way bolt tests: each `tests/*.bend`

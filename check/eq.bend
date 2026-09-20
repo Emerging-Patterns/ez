@@ -87,3 +87,14 @@ law string_eq_self:
 def string_eq_self(s):
   Equal.cong((String & String) & Cmp, Bool, r => String.eq.fin(r),
     String.cmp(s, s), ((s, s), EQ{}), string_cmp_self(s))
+
+# LAW: a char equals itself
+law char_eq_self:
+  for +c: Char
+  {Char.is_eq(c, c) == True{} : Bool}
+
+def char_eq_self(c):
+  match c:
+    case Chr{+x}:
+      Equal.cong(Cmp, Bool, r => Cmp.is_eq(r), U32.cmp(x, x), EQ{},
+        u32_cmp_self(x))
