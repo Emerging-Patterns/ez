@@ -13,6 +13,13 @@ import ./args.bend as Args
 
 # how many gigabytes one `bend` may have. 8 is what fits beside the rest of
 # this machine; a project whose closure costs more says so in EZ_CAP.
+#
+# The cap is also the divisor the gate picks its width from, since a run has to
+# assume every job it starts at once could want the whole of it. So a cap set
+# higher than a tree needs does not only reserve memory, it narrows the gate:
+# the dearest aggregate here peaks at 3.3G, and at the 8G cap that is a width
+# of 4 where 11 would fit. Lower EZ_CAP, or set EZ_JOBS outright, for a tree
+# you have measured.
 def gb() -> IO(String):
   Env.var("EZ_CAP", "8")
 
@@ -37,13 +44,18 @@ def pre(on: Bool, +g: String) -> List<&2, String>:
     case False{}:
       []
 
-# a program run under the cap, with this project's BEND_LIB set for it. The
-# cap goes outside `env`, so the variable is set inside the cgroup.
+# a program's arguments dressed the way the cap wants them, for a caller that
+# is not going to run it here. The cap goes outside `env`, so the variable is
+# set inside the cgroup.
+def argv(on: Bool, +g: String, +at: String, args: List<&2, String>) -> List<&2, String>:
+  List.append(&2, String, pre(on, g), Env.line(at, args))
+
+# a program run under the cap, with this project's BEND_LIB set for it
 def run(on: Bool, args: List<&2, String>) -> IO(String):
   do IO<String>:
     +g : String <- gb()
     at : String <- Env.lib()
-    R.exec(List.append(&2, String, pre(on, g), Env.line(at, args)))
+    R.exec(argv(on, g, at, args))
 
 # the status the kernel leaves on a process it killed for memory
 def killed(+out: String) -> Bool:
