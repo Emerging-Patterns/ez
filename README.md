@@ -25,19 +25,28 @@ upstream publishes that tree later the hub simply starts serving it.
 With nix:
 
 ```bash
-nix profile install .#
+nix profile install github:Emerging-Patterns/ez
 ```
 
-From a clone — no network needed, since the one package ez builds itself with is
-vendored:
+Without nix — install Bend, then build ez with it:
 
 ```bash
+curl -fsSL https://bend-lang.com/install.sh | sh
+git clone https://github.com/Emerging-Patterns/ez
+cd ez
 BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
 ```
 
-`bend` looks in `~/.bend/lib` unless told otherwise, which is the whole of the
-bootstrap. `nix develop` gives a shell with bend, git, openssl and `BEND_LIB`
-already set.
+Nothing is fetched: the one package ez builds itself with is vendored, and
+`bend` only needs telling where it is, since it looks in `~/.bend/lib`
+otherwise. Put `bin/ez.bin` on your PATH as `ez`.
+
+`ez add` is the one subcommand with further requirements. It still shells out
+to `bin/ez-git.ts`, so it wants `bun`, and `EZ_ROOT` pointing at the checkout
+so the binary can find that file wherever you ran it from. Every other
+subcommand needs only `bend` and `git`. The nix package sets `EZ_ROOT` for you.
+
+`nix develop` gives a shell with bend, git, openssl and `BEND_LIB` already set.
 
 ## Usage
 
