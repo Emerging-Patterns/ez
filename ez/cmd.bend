@@ -84,8 +84,33 @@ def refuse(r: M.Read) -> IO(Unit):
 # all, and a library entry, having no main, checks clean and then exits 1 with
 # "no main to run" from the emit. A check failure throws before the emit, so
 # that message can only follow a check that passed.
+#
+# It is matched as a whole line, because that is the shape of the thing being
+# claimed: bend prints it as `Error: no main to run` and nothing else. Asked as
+# a substring of the whole output, the same words appearing anywhere — inside
+# some other error's text, or in a source line bend echoed back while
+# reporting on it — would answer yes and mean nothing, and a failing check
+# would read as a passing one. Two other line-shaped facts in this tree were
+# being asked of whole files the same way, and one of them silently dropped a
+# test before it was caught.
+def no.main(+line: String) -> Bool:
+  String.eq(line, "Error: no main to run")
+
+# whether any line of the output is that one. The rest of the walk is bound
+# before the `Bool.or` rather than written under it: `Bool.or` is an ordinary
+# function and reduces both sides, so a recursive call sitting inside one is
+# not a branch the condition can decline. Bound first it is a plain fold over
+# a handful of lines, which is what the rest of this tree does too.
+def said.no.main(ls: List<&2, String>) -> Bool:
+  match ls:
+    case Nil{}:
+      False{}
+    case Con{+h, t}:
+      +rest = said.no.main(t)
+      Bool.or(no.main(h), rest)
+
 def check.passed(+out: String) -> Bool:
-  Bool.or(R.ok(out), String.contains(R.text(out), "no main to run"))
+  Bool.or(R.ok(out), said.no.main(String.lines(R.text(out))))
 
 # a passing check says so, since bend says nothing when it is happy
 def check.said(passed: Bool, entry: String, text: String) -> IO(Unit):
