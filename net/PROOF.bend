@@ -213,7 +213,7 @@ law drop_agrees.arm:
   {Bool.pick(String, b, SCon{h, t}, Laws.old.drop(t, m))
     == Http.utf8.drop.step(b, h, t, _u => Http.utf8.drop(t, m)) : String}
 
-def drop_agrees.arm(h, t, m, b, ih):
+def drop_agrees.arm(_h, _t, _m, b, ih):
   match b:
     case True{}:
       {==}
@@ -281,7 +281,7 @@ law hex_agrees.arm:
     == Http.hex.step(b, acc,
       _u => Http.hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v)))) : Nat}
 
-def hex_agrees.arm(t, acc, v, b, ih):
+def hex_agrees.arm(_t, _acc, _v, b, ih):
   match b:
     case True{}:
       {==}

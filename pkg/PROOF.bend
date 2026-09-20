@@ -68,7 +68,7 @@ law dedup_keeps.arm:
   for bb: Bool
   {List.is_empty(&2, P.File, P.dedup.pick(bb, f, b <> t)) == False{} : Bool}
 
-def dedup_keeps.arm(f, b, t, bb):
+def dedup_keeps.arm(_f, _b, _t, bb):
   match bb:
     case True{}:
       {==}
@@ -98,7 +98,7 @@ law base_last.go:
   for +x: String
   {Path.base.go(List.append(&2, String, ps, [x]), h) == x : String}
 
-def base_last.go(ps, h, x):
+def base_last.go(ps, _h, x):
   match ps:
     case []:
       {==}
@@ -293,7 +293,7 @@ law tri.mid.gt:
   for z: Cmp
   {tri(x, GT{}, z) == True{} : Bool}
 
-def tri.mid.gt(x, z):
+def tri.mid.gt(x, _z):
   match x:
     case LT{}:
       {==}
@@ -455,7 +455,7 @@ law rec.snd:
   for r: (String & String) & Cmp
   {String.order.fin(String.cmp.rec(h1, h2, r)) == String.order.fin(r) : Cmp}
 
-def rec.snd(h1, h2, r):
+def rec.snd(_h1, _h2, r):
   ((a1, a2), c) = r
   {==}
 
@@ -500,7 +500,7 @@ law lex.flip:
   for r: Cmp
   {cmp.lex(cmp.flip(u), cmp.flip(r)) == cmp.flip(cmp.lex(u, r)) : Cmp}
 
-def lex.flip(u, r):
+def lex.flip(u, _r):
   match u:
     case LT{}:
       {==}
@@ -1159,7 +1159,7 @@ law and.left:
   for e: {Bool.and(u, v) == True{} : Bool}
   {u == True{} : Bool}
 
-def and.left(u, v, e):
+def and.left(u, _v, e):
   match u:
     case True{}:
       {==}

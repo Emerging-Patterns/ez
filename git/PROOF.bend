@@ -10,7 +10,7 @@ import ./LAWS.bend as Laws
 # named key finds the pair written for it, and `tag` runs off the end of the
 # six into whatever follows. Nothing is left symbolic but the values, and they
 # are carried through untouched.
-def Laws.origin_read(url, rev, entry, root, nar, ts):
+def Laws.origin_read(_url, _rev, _entry, _root, _nar, _ts):
   {==}
 
 # The three agreement laws at the foot of LAWS.bend, which say that this

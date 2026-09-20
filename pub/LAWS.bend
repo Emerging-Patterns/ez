@@ -24,6 +24,10 @@ def any_name.step(here: Bool, rest: Unit -> Bool) -> Bool:
     case False{}:
       rest(Unit{})
 
+# the walk itself: a list holds a name when its head is one, or when the rest
+# of it does. Written with `any_name.step` above so that the tail is a thunk
+# and the walk stops at the first name, rather than reading every line of an
+# output whose first line already answered.
 def any_name(ls: List<&2, String>) -> Bool:
   match ls:
     case []:
