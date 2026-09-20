@@ -35,7 +35,8 @@
       # path reaches a Nix store path) and a CA bundle, which OpenSSL takes
       # from SSL_CERT_FILE. git stays, because `ez add` vendors a repo.
       # The TypeScript helpers live beside it under libexec until they are
-      # Bend, and EZ_ROOT is how the binary finds them.
+      # Bend, and EZ_ROOT is how the binary finds them: `IO.args()` carries no
+      # argv[0], so a binary cannot locate itself.
       ez = pkgs.stdenv.mkDerivation {
         pname = "ez";
         version = "0.1.0";
@@ -43,14 +44,12 @@
         nativeBuildInputs = [ bend llvm.clang pkgs.makeWrapper ];
         BEND_LIB = bendLib;
         buildPhase = "bend ez/main.bend -o ez.bin";
-        # the same layout as the repo, since the script finds the binary and the
-        # helpers relative to its own parent
         installPhase = ''
-          mkdir -p $out/libexec/ez/bin $out/libexec/ez/ez $out/bin
+          mkdir -p $out/libexec/ez/bin $out/bin
           cp ez.bin $out/libexec/ez/bin/ez.bin
           cp bin/*.ts bin/*.awk $out/libexec/ez/bin/
-          cp ez/ez $out/libexec/ez/ez/ez
-          makeWrapper $out/libexec/ez/ez/ez $out/bin/ez \
+          makeWrapper $out/libexec/ez/bin/ez.bin $out/bin/ez \
+            --set EZ_ROOT $out/libexec/ez \
             --set EZ_LIBSSL ${pkgs.openssl.out}/lib/libssl.so \
             --set-default SSL_CERT_FILE ${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt \
             --prefix PATH : ${pkgs.lib.makeBinPath [
@@ -59,13 +58,17 @@
         '';
       };
 
-      # every .bend test prints the `#|` lines of its trailer, on the JS lane.
+      # every unit test prints the `#|` lines of its trailer, on the JS lane.
+      # The glob is `*/tests/*.bend` and so reaches none of the end-to-end
+      # tests in the top-level `tests/`: those drive real git daemons, a real
+      # `bend --publish` and `nix-build`, none of which a sandbox can do.
       # git and coreutils are here because run/run.bend runs programs, and a
-      # checkout is git's job. curl is gone: net/ speaks HTTP and HTTPS itself,
-      # and no test in this set opens a socket, so the sandbox needs no network.
+      # checkout is git's job; procps is for the test that asks which program a
+      # started pid turned out to be. curl is gone: net/ speaks HTTP and HTTPS
+      # itself.
       tests = pkgs.runCommand "ez-tests"
         {
-          nativeBuildInputs = [ bend pkgs.git pkgs.coreutils ];
+          nativeBuildInputs = [ bend pkgs.git pkgs.coreutils pkgs.procps ];
           BEND_LIB = bendLib;
         }
         ''
