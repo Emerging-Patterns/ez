@@ -41,17 +41,18 @@ Nothing is fetched: the one package ez builds itself with is vendored, and
 `bend` only needs telling where it is, since it looks in `~/.bend/lib`
 otherwise. Put `bin/ez.bin` on your PATH as `ez`.
 
-`ez add` is the one subcommand with further requirements. It still shells out
-to `bin/ez-git.ts`, so it wants `bun`, and `EZ_ROOT` pointing at the checkout
-so the binary can find that file wherever you ran it from. Every other
-subcommand needs only `bend` and `git`. The nix package sets `EZ_ROOT` for you.
+ez is Bend and nothing else, so the binary is all there is: no runtime, no
+helper scripts beside it, nothing to point an environment variable at. Every
+subcommand needs `bend` and `git`, and `ez add` also wants `nix` on PATH,
+because the NAR hash it records for a vendored repo is `nix hash path`'s to
+give.
 
 `nix develop` gives a shell with bend, git, openssl and `BEND_LIB` already set.
 
 ## Usage
 
 ```
-ez init [name] [entry.bend]      write an ez.toml for a new project
+ez init [name] [entry.bend]      write an ez.toml, and a .gitignore for it
 ez add <url> <ref> <entry.bend>  vendor a git package and record it
 ez remove <name>                 drop a package from the ledger
 ez lock                          resolve every import, write ez.lock.toml
@@ -75,11 +76,18 @@ hash = "0x7e63a5b990a375c304ed462c071214a6"
 git = "https://github.com/owner/repo"
 rev = "16773c0aa9914b5f04d062469d50100111eb9c9c"
 tag = "v1.0"
+root = "."
+narHash = "sha256-..."
 entry = "src/lib.bend"
 ```
 
 A dependency with no `git` key lives on the hub. `ez doctor` reports when the
 ledger and the repo's import lines disagree; it never rewrites your source.
+
+The ledger is enough on its own. `root` and `narHash` are there so that
+`ez lock` never has to consult anything a clone does not have, which is what
+lets someone who has just cloned your repo run `ez lock` and get your lock
+back to the byte, without re-running `ez add`.
 
 In a flake — ez's own flake turns your lock into a `BEND_LIB` store path, so
 there is nothing to copy into your repo:
