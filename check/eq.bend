@@ -106,3 +106,154 @@ def char_eq_self(c):
     case Chr{+x}:
       Equal.cong(Cmp, Bool, r => Cmp.is_eq(r), U32.cmp(x, x), EQ{},
         u32_cmp_self(x))
+
+# A bit is one thing or the other, never both, so an equation between the two
+# holds anything at all. Every proof that lifts a computed condition into a
+# parameter reaches an arm the hypothesis has ruled out, and this is how that
+# arm is closed. It was written out in pkg/PROOF.bend first; it belongs here,
+# beside the other Base facts Base does not state.
+
+# the type that is empty exactly where a bit is True
+def bit.emp(b: Bool) -> Type:
+  match b:
+    case False{}:
+      Unit
+    case True{}:
+      Empty
+
+def bit.clash(e: {False{} == True{} : Bool}) -> Empty:
+  %e : bit.emp(_)
+  Unit{}
+
+def bit.gone(a, -A: Kind(a), e: Empty) -> A:
+  match e:
+
+def bit.absurd(a, -A: Kind(a), e: {False{} == True{} : Bool}) -> A:
+  bit.gone(a, A, bit.clash(e))
+
+# and the same read the other way round
+def bit.emp2(b: Bool) -> Type:
+  match b:
+    case False{}:
+      Empty
+    case True{}:
+      Unit
+
+def bit.clash2(e: {True{} == False{} : Bool}) -> Empty:
+  %e : bit.emp2(_)
+  Unit{}
+
+def bit.absurd2(a, -A: Kind(a), e: {True{} == False{} : Bool}) -> A:
+  bit.gone(a, A, bit.clash2(e))
+
+# LAW: the left half of an `and` that answered True
+law and.left:
+  for u: Bool
+  for v: Bool
+  for e: {Bool.and(u, v) == True{} : Bool}
+  {u == True{} : Bool}
+
+def and.left(u, _v, e):
+  match u:
+    case True{}:
+      {==}
+    case False{}:
+      e
+
+# LAW: the right half of an `and` that answered True
+law and.right:
+  for u: Bool
+  for v: Bool
+  for e: {Bool.and(u, v) == True{} : Bool}
+  {v == True{} : Bool}
+
+def and.right(u, v, e):
+  match u:
+    case True{}:
+      e
+    case False{}:
+      bit.absurd(&2, {v == True{} : Bool}, e)
+
+# LAW: what a negation that answered True was told
+law not.true:
+  for u: Bool
+  for e: {Bool.not(u) == True{} : Bool}
+  {u == False{} : Bool}
+
+def not.true(u, e):
+  match u:
+    case True{}:
+      bit.absurd(&2, {True{} == False{} : Bool}, e)
+    case False{}:
+      {==}
+
+# LAW: every string starts with the empty string
+law starts_nil:
+  for s: String
+  {String.starts_with(s, "") == True{} : Bool}
+
+# the prefix runs out first whatever the string is, so both arms answer True
+def starts_nil(s):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      {==}
+
+# LAW: one string appended to another leaves the first a prefix of the whole
+law starts_append:
+  for +a: String
+  for b: String
+  {String.starts_with(String.append(a, b), a) == True{} : Bool}
+
+# by induction on the prefix, with each character compared against itself
+def starts_append(a, b):
+  match a:
+    case SNil{}:
+      starts_nil(b)
+    case SCon{+h, +t}:
+      Equal.trans(Bool,
+        String.starts_with.if(String.append(t, b), t, Char.is_eq(h, h)),
+        String.starts_with.if(String.append(t, b), t, True{}),
+        True{},
+        Equal.cong(Bool, Bool,
+          x => String.starts_with.if(String.append(t, b), t, x),
+          Char.is_eq(h, h), True{}, char_eq_self(h)),
+        starts_append(t, b))
+
+# LAW: nothing appended to a string leaves the string. This and the law
+# under it were written out in net/PROOF.bend first.
+law append_nil:
+  for s: String
+  {String.append(s, SNil{}) == s : String}
+
+# by induction on the string, with each character carried over the tail's law
+def append_nil(s):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      Equal.cong(String, String, x => SCon{h, x},
+        String.append(t, SNil{}), t, append_nil(t))
+
+# LAW: where the brackets fall in a run of appends does not change the run.
+# This is what lets the chunk loop drop its accumulator: appending each chunk
+# onto what came before it and appending each chunk onto what comes after it
+# give the same string, and only the second is linear in the body.
+law append_assoc:
+  for a: String
+  for b: String
+  for c: String
+  {String.append(String.append(a, b), c)
+    == String.append(a, String.append(b, c)) : String}
+
+# by induction on the left string, which is the one both runs copy
+def append_assoc(a, b, c):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      Equal.cong(String, String, x => SCon{h, x},
+        String.append(String.append(t, b), c),
+        String.append(t, String.append(b, c)),
+        append_assoc(t, b, c))
