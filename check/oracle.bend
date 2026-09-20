@@ -7,10 +7,11 @@
 #
 #   bend check/oracle.bend <dir> <port>
 #
-# The file is one module because it is one program: the reading of a body is
-# pure and sits above, the sockets and the writing are below, and nothing in the
-# upper half touches IO. Plaintext HTTP only; bend speaks TLS to the real hub,
-# and run/run.bend explains why a Bend binary cannot.
+# What is here is the hub: the reading of a body is pure and sits above, the
+# sockets and the writing are below, and nothing in the upper half touches IO.
+# Reading a request off a socket and writing an answer back are check/serve.bend,
+# shared with check/framing.bend. Plaintext HTTP only; bend speaks TLS to the
+# real hub, and run/run.bend explains why a Bend binary cannot.
 #
 # `GET /` answers `ok`, so a script can wait for the oracle before it publishes.
 # One connection is served at a time, each answer states its length and closes
@@ -19,25 +20,7 @@ import Base
 import ../sha/sha.bend as Sha
 import ../io/file.bend as F
 import ../run/run.bend as R
-
-# a string's length where a Nat would be too dear: a body is thousands of
-# characters and every one of them would be a Succ
-def size(s: String) -> U32:
-  match s:
-    case SNil{}:
-      0
-    case SCon{_c, t}:
-      U32.inc(size(t))
-
-# the nth of a list of words, or "" when it is not there
-def at(xs: List<&2, String>, n: Nat) -> String:
-  match xs n:
-    case Nil{} _m:
-      ""
-    case Con{h, _t} 0n:
-      h
-    case Con{_h, t} 1n+p:
-      at(t, p)
+import ./serve.bend as S
 
 # a list with its last element gone, the head held back one step so the walk can
 # see whether it is looking at the last one. The list comes first because a
@@ -490,99 +473,13 @@ def parse.open(fuel: Nat, m: Maybe<&2, String>) -> Obj:
 # arms of its choice, so a fuel of the body's whole length would be a walk of
 # the body's whole length past its end.
 def parse(+body: String) -> Obj:
-  parse.open(U32.to_nat(U32.add(U32.div(size(body), 6), 8)), eat(ws(body), '{'))
+  parse.open(U32.to_nat(U32.add(U32.div(S.size(body), 6), 8)), eat(ws(body), '{'))
 
-# a request read off a socket: its head lines and its body, or a request whose
-# head has not arrived in full yet
-type Msg is Data:
-  MPartial{}
-  MFull{head: List<&2, String>, body: String}
-
-# a head line put back in front of the ones after it
-def cut.put(h: String, m: Msg) -> Msg:
-  match m:
-    case MPartial{}:
-      MPartial{}
-    case MFull{head, body}:
-      MFull{h <> head, body}
-
-# a request's lines split at the blank one. The body is joined back with the
-# newlines it was split on, so nothing in it is lost or invented.
-def cut(ls: List<&2, String>) -> Msg:
-  match ls:
-    case []:
-      MPartial{}
-    case +h <> +t:
-      Bool.pick(Msg, Bool.or(String.is_empty(h), String.eq(h, "\r")),
-        MFull{[], String.join(t, "\n")},
-        cut.put(h, cut(t)))
-
-# a request whose head came out empty has not arrived: nothing has been read
-# yet, and the one blank line that split it was the whole of it
-def msg.head(hs: List<&2, String>, body: String) -> Msg:
-  match hs:
-    case []:
-      MPartial{}
-    case h <> t:
-      MFull{h <> t, body}
-
-# a split that found no head at all, taken back
-def msg.at(m: Msg) -> Msg:
-  match m:
-    case MPartial{}:
-      MPartial{}
-    case MFull{head, body}:
-      msg.head(head, body)
-
-# what has been read off a socket so far, as a request
-def msg.of(text: String) -> Msg:
-  msg.at(cut(String.lines(text)))
-
-# a head line's Content-Length, or whatever the lines after it stated
-def clen.at(+line: String, rest: U32) -> U32:
-  Bool.pick(U32, String.starts_with(String.to_lower(line), "content-length:"),
-    Maybe.default(&2, U32, U32.read(String.trim(String.drop(line, 15n))), 0),
-    rest)
-
-# how long a head says its body is, or zero when it says nothing
-def clen(hs: List<&2, String>) -> U32:
-  match hs:
-    case []:
-      0
-    case h <> t:
-      clen.at(h, clen(t))
-
-# whether a request has arrived whole
-def complete.of(m: Msg) -> Bool:
-  match m:
-    case MPartial{}:
-      False{}
-    case MFull{head, body}:
-      U32.is_ge(size(body), clen(head))
-
-# whether what has been read so far is the whole request: its head has ended and
-# its body is as long as the head said it would be
-def complete(text: String) -> Bool:
-  complete.of(msg.of(text))
-
-# an answer's bytes. Every one of them states its length and says the connection
-# closes, because bend, curl and nix's fetcher all read a body to the length
-# they were promised and then expect the socket to shut.
-def response(status: String, +body: String) -> String:
-  "HTTP/1.1 " ++ status ++ "\r\nContent-Length: " ++ U32.show(size(body)) ++
-    "\r\nConnection: close\r\n\r\n" ++ body
-
-# the socket shut once the answer has gone out
-def send.done(sr: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Unit):
-  (sock, _r) = sr
-  Socket.close(sock)
-
-# one answer written and the connection closed
+# one answer written and the connection closed. Every answer states its length
+# and says the connection closes, because bend, curl and nix's fetcher all read
+# a body to the length they were promised and then expect the socket to shut.
 def answer(sock: Socket, status: String, body: String) -> IO(Unit):
-  do IO<Unit>:
-    sr : Socket & Result<&1, &1, U32 & String, Unit> <-
-      TCP.send(sock, response(status, body))
-    send.done(sr)
+  S.answer(sock, S.response(status, body))
 
 # a file that was there, or the 404 for one that was not
 def serve.file(sock: Socket, m: Maybe<&2, String>) -> IO(Unit):
@@ -680,69 +577,25 @@ def serve.pick(post: Bool, sock: Socket, dir: String, +path: String,
 # a request's first line taken apart into its method and its path
 def serve.req(sock: Socket, dir: String, first: String, body: String) -> IO(Unit):
   +parts = String.split(first, ' ')
-  serve.pick(String.eq(at(parts, 0n), "POST"), sock, dir, at(parts, 1n), body)
+  serve.pick(String.eq(S.at(parts, 0n), "POST"), sock, dir, S.at(parts, 1n), body)
 
 # a request served, or refused when its head never ended
-def serve.msg(sock: Socket, dir: String, m: Msg) -> IO(Unit):
+def serve.msg(sock: Socket, dir: String, m: S.Msg) -> IO(Unit):
   match m:
-    case MPartial{}:
+    case S.MPartial{}:
       answer(sock, "400 Bad Request", "an incomplete request")
-    case MFull{head, body}:
-      serve.req(sock, dir, at(head, 0n), body)
-
-# an empty chunk means the client stopped writing, whole request or not
-def recv.chunk(chunk: String, sock: Socket, acc: String,
-  rest: Socket -> String -> IO(Socket & String)) -> IO(Socket & String):
-  match chunk:
-    case SNil{}:
-      IO.pure(Socket & String, (sock, acc))
-    case SCon{c, t}:
-      rest(sock, acc ++ SCon{c, t})
-
-# a failed read ends the request as surely as an empty one
-def recv.got(r: Result<&1, &1, U32 & String, String>, sock: Socket, acc: String,
-  rest: Socket -> String -> IO(Socket & String)) -> IO(Socket & String):
-  match r:
-    case Fail{_e}:
-      IO.pure(Socket & String, (sock, acc))
-    case Done{chunk}:
-      recv.chunk(chunk, sock, acc, rest)
-
-# the socket comes back paired with what it read
-def recv.next(got: Socket & Result<&1, &1, U32 & String, String>, acc: String,
-  rest: Socket -> String -> IO(Socket & String)) -> IO(Socket & String):
-  (sock, r) = got
-  recv.got(r, sock, acc, rest)
-
-# nothing more is asked for once the whole request is in hand
-def recv.more(done: Bool, sock: Socket, acc: String,
-  rest: Socket -> String -> IO(Socket & String)) -> IO(Socket & String):
-  match done:
-    case True{}:
-      IO.pure(Socket & String, (sock, acc))
-    case False{}:
-      do IO<Socket & String>:
-        got : Socket & Result<&1, &1, U32 & String, String> <- TCP.recv(sock, 65536)
-        recv.next(got, acc, rest)
-
-# a whole request read off a socket, one chunk at a time until the head has
-# ended and the body is as long as Content-Length promised
-def recv.go(fuel: Nat, sock: Socket, +acc: String) -> IO(Socket & String):
-  match fuel:
-    case 0n:
-      IO.pure(Socket & String, (sock, acc))
-    case 1n+f:
-      recv.more(complete(acc), sock, acc, s => a => recv.go(f, s, a))
+    case S.MFull{head, body}:
+      serve.req(sock, dir, S.at(head, 0n), body)
 
 # what a connection read, served
 def once.at(got: Socket & String, dir: String) -> IO(Unit):
   (sock, text) = got
-  serve.msg(sock, dir, msg.of(text))
+  serve.msg(sock, dir, S.msg.of(text))
 
 # one connection, read and answered and shut
 def once(sock: Socket, dir: String) -> IO(Unit):
   do IO<Unit>:
-    got : Socket & String <- recv.go(U32.to_nat(4096), sock, "")
+    got : Socket & String <- S.request(sock)
     once.at(got, dir)
 
 # a listener with connections left in it, or one that has stopped accepting
@@ -837,7 +690,7 @@ def copy(xs: List<&1, String>) -> List<&2, String>:
 
 # the command line: a directory to serve, and a port to serve it on
 def start(+as: List<&2, String>) -> IO(Unit):
-  begin(at(as, 0n), Maybe.default(&2, U32, U32.read(at(as, 1n)), 0))
+  begin(S.at(as, 0n), Maybe.default(&2, U32, U32.read(S.at(as, 1n)), 0))
 
 def main() -> IO(Unit):
   do IO<Unit>:
