@@ -236,9 +236,11 @@ def done.exit(all: Bool) -> IO(Unit):
     case False{}:
       IO.die(Unit, 1, "")
 
-# the count, and the exit status it implies
+# the count, and the exit status it implies. The reminder sits above the count
+# and never below it: a run's last line is its verdict, and something reads it.
 def done.go(+p: Nat, +n: Nat) -> IO(Unit):
   do IO<Unit>:
+    IO.print("tests are a last resort for what you cannot prove")
     IO.print("PASS: " ++ Nat.show(p) ++ " / " ++ Nat.show(n))
     done.exit(Nat.is_eq(p, n))
 
