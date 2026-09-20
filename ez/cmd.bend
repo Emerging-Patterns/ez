@@ -10,6 +10,7 @@ import ../lock/lock.bend as Lock
 import ../lock/restore.bend as Restore
 import ../git/git.bend as Git
 import ../pub/pub.bend as Pub
+import ../pkg/path.bend as P
 import ./args.bend as Args
 import ./env.bend as Env
 import ./cap.bend as Cap
@@ -270,15 +271,45 @@ def init.ignore(+name: String) -> IO(Bool):
     +text : String <- IO.pure(String, F.text_of(g))
     init.ignore.put(init.missing(init.rules(name), String.lines(text)), text)
 
-# a new project: a ledger naming this directory and its entry file, and the
-# ignore rules for what ez will generate beside them
+# the entry of a new project: a program that checks and runs
+def init.stub() -> String:
+  "import Base\n\ndef main() -> IO(Unit):\n  IO.print(\"hello\")\n"
+
+# the entry written, with every directory above it made first. Base has no
+# mkdir, so this is the same coreutils call every other write that needs a
+# directory already uses.
+def init.entry.put(+at: String) -> IO(Bool):
+  do IO<Bool>:
+    _mk : String <- R.exec(["mkdir", "-p", P.dir(at)])
+    F.write(at, init.stub())
+
+# an entry that is already there is left alone, so a second `ez init` does not
+# overwrite the program
+def init.entry.go(g: Maybe<&2, String>, +at: String) -> IO(Bool):
+  match g:
+    case Some{_s}:
+      IO.pure(Bool, True{})
+    case None{}:
+      init.entry.put(at)
+
+# the project's entry file, made when the directory does not already hold one
+def init.entry(+at: String) -> IO(Bool):
+  do IO<Bool>:
+    g : Maybe<&2, String> <- F.read(at)
+    init.entry.go(g, at)
+
+# a new project: a ledger naming this directory and its entry file, the
+# ignore rules for what ez will generate beside them, and the entry itself
+# when the directory does not already hold one
 def init(+as: List<&2, String>) -> IO(Unit):
   do IO<Unit>:
     +name : String <- IO.pure(String, init.name(Args.at(as, 0n)))
+    +at : String <- IO.pure(String, entry.or(Args.at(as, 1n)))
     wrote : Bool <- F.write(toml(),
-      Rend.show(M.Manifest{name, entry.or(Args.at(as, 1n)), []}))
+      Rend.show(M.Manifest{name, at, []}))
     +kept : Bool <- init.ignore(name)
-    report.exit(Bool.and(wrote, kept))
+    +made : Bool <- init.entry(at)
+    report.exit(Bool.and(wrote, Bool.and(kept, made)))
 
 # the last path component
 def add.base(ps: List<&2, String>) -> String:

@@ -52,7 +52,7 @@ nix profile install github:Emerging-Patterns/ez
 ## Usage
 
 ```
-ez init [name] [entry.bend]      write an ez.toml, and a .gitignore for it
+ez init [name] [entry.bend]      scaffold a project: ez.toml, .gitignore, entry
 ez add <url> <ref> <entry.bend>  vendor a git package and record it
 ez remove <name>                 drop a package from the ledger
 ez lock                          resolve every import, write ez.lock.toml
