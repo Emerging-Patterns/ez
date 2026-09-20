@@ -7,12 +7,7 @@ import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ../manifest/render.bend as Rend
 import ./args.bend as Args
-
-# where ez was installed, so it finds its own helpers wherever it is run from
-def root() -> IO(String):
-  do IO<String>:
-    r : Result<&1, &1, U32 & String, String> <- IO.get_env("EZ_ROOT")
-    return Args.text_of(r)
+import ./env.bend as Env
 
 # a helper beside the binary, by name
 def tool(at: String, name: String) -> String:
@@ -81,7 +76,7 @@ def check() -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- load()
     +at : String <- IO.pure(String, entry(r))
-    +out : String <- R.exec(["bend", at, "-o", ".ez/check.js"])
+    +out : String <- Env.exec(["bend", at, "-o", ".ez/check.js"])
     check.said(check.passed(out), at, R.text(out))
 
 # where a build lands: what was asked for, or `bin/ez.out`
@@ -92,14 +87,14 @@ def build.out(+at: String) -> String:
 def build(as: List<&2, String>) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- load()
-    +out : String <- R.exec(["bend", entry(r), "-o", build.out(Args.at(as, 0n))])
+    +out : String <- Env.exec(["bend", entry(r), "-o", build.out(Args.at(as, 0n))])
     report(out)
 
 # the entry run, which checks it first
 def run(as: List<&2, String>) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- load()
-    +out : String <- R.exec(List.append(&2, String, ["bend", entry(r)], as))
+    +out : String <- Env.exec(List.append(&2, String, ["bend", entry(r)], as))
     report(out)
 
 # every .bend file under the current directory, for the lock's roots
@@ -123,15 +118,15 @@ def lock.written(ok: Bool, +text: String) -> IO(Unit):
 def lock() -> IO(Unit):
   do IO<Unit>:
     srcs : List<&2, String> <- sources()
-    at : String <- root()
-    +out : String <- R.exec(List.append(&2, String, ["bun", tool(at, "ez-lock.ts")], srcs))
+    at : String <- Env.root()
+    +out : String <- Env.exec(List.append(&2, String, ["bun", tool(at, "ez-lock.ts")], srcs))
     lock.written(R.ok(out), R.text(out))
 
 # BEND_LIB filled from the lock, with nothing re-resolved
 def fetch() -> IO(Unit):
   do IO<Unit>:
-    at : String <- root()
-    +out : String <- R.exec(["bun", tool(at, "ez-restore.ts")])
+    at : String <- Env.root()
+    +out : String <- Env.exec(["bun", tool(at, "ez-restore.ts")])
     report(out)
 
 # the name a new ledger takes: what was asked for, or `app`
@@ -189,8 +184,8 @@ def add.got(ok: Bool, +text: String) -> IO(Unit):
 # `ez add <url> <rev|tag|branch> <entry.bend>`
 def add(as: List<&2, String>) -> IO(Unit):
   do IO<Unit>:
-    at : String <- root()
-    +out : String <- R.exec(List.append(&2, String, ["bun", tool(at, "ez-git.ts")], as))
+    at : String <- Env.root()
+    +out : String <- Env.exec(List.append(&2, String, ["bun", tool(at, "ez-git.ts")], as))
     add.got(R.ok(out), R.text(out))
 
 # the ledger with a dependency dropped

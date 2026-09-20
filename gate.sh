@@ -41,7 +41,7 @@ mkdir -p bin
 if ! built=$(run bend ez/main.bend -o bin/ez.bin); then
   check "ez/main.bend (build)" "" "$built"
 else
-  check "ez check (the repo's own ledger)" "ok manifest/manifest.bend" "$(./ez/ez check 2>&1)"
+  check "ez check (the repo's own ledger)" "ok manifest/manifest.bend" "$(./bin/ez.bin check 2>&1)"
 fi
 
 # the shell tests drive the tools end to end

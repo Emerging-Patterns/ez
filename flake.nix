@@ -31,7 +31,8 @@
 
       # the `ez` binary, with everything it shells out to on its PATH. The
       # TypeScript helpers live beside it under libexec until they are Bend,
-      # and EZ_ROOT is how the binary finds them.
+      # and EZ_ROOT is how the binary finds them: `IO.args()` carries no
+      # argv[0], so a binary cannot locate itself.
       ez = pkgs.stdenv.mkDerivation {
         pname = "ez";
         version = "0.1.0";
@@ -39,21 +40,22 @@
         nativeBuildInputs = [ bend llvm.clang pkgs.makeWrapper ];
         BEND_LIB = bendLib;
         buildPhase = "bend ez/main.bend -o ez.bin";
-        # the same layout as the repo, since the script finds the binary and the
-        # helpers relative to its own parent
         installPhase = ''
-          mkdir -p $out/libexec/ez/bin $out/libexec/ez/ez $out/bin
+          mkdir -p $out/libexec/ez/bin $out/bin
           cp ez.bin $out/libexec/ez/bin/ez.bin
           cp bin/*.ts bin/*.awk $out/libexec/ez/bin/
-          cp ez/ez $out/libexec/ez/ez/ez
-          makeWrapper $out/libexec/ez/ez/ez $out/bin/ez \
+          makeWrapper $out/libexec/ez/bin/ez.bin $out/bin/ez \
+            --set EZ_ROOT $out/libexec/ez \
             --prefix PATH : ${pkgs.lib.makeBinPath [
               bend pkgs.bun pkgs.git pkgs.curl pkgs.findutils pkgs.coreutils
             ]}
         '';
       };
 
-      # every .bend test prints the `#|` lines of its trailer, on the JS lane.
+      # every unit test prints the `#|` lines of its trailer, on the JS lane.
+      # The glob is `*/tests/*.bend` and so reaches none of the end-to-end
+      # tests in the top-level `tests/`: those drive real git daemons, a real
+      # `bend --publish` and `nix-build`, none of which a sandbox can do.
       # curl and coreutils are here because run/run.bend runs programs: bend
       # links only pthread and libm, so TLS is curl's job.
       tests = pkgs.runCommand "ez-tests"

@@ -9,6 +9,7 @@ import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ./args.bend as Args
 import ./drift.bend as D
+import ./env.bend as Env
 
 # one thing doctor looked at: what to print, and whether it is a problem
 type Note is Data:
@@ -130,28 +131,14 @@ def lib.judge(+lib: String, +want: List<&2, String>, have: List<&2, String>) -> 
   lib.said(List.is_empty(&2, String, gone), lib,
     List.length(&2, String, want), gone)
 
-# BEND_LIB, when it is set to something
-def lib.set(+lib: String, want: List<&2, String>) -> IO(Note):
-  do IO<Note>:
-    have : List<&2, String> <- present(lib)
-    return lib.judge(lib, want, have)
-
-# BEND_LIB. Unset, bend falls back to ~/.bend/lib and reaches for the hub, which
-# is the thing ez exists to avoid, so that is a problem and not a remark.
-def lib.go(unset: Bool, lib: String, want: List<&2, String>) -> IO(Note):
-  match unset:
-    case True{}:
-      IO.pure(Note, Note{True{},
-        "BEND_LIB: unset, so bend would use ~/.bend/lib and reach the hub"})
-    case False{}:
-      lib.set(lib, want)
-
-# where the packages this build resolves against live
+# where the packages this build resolves against live. It is what ez itself
+# passes to every bend it starts, so an unset BEND_LIB is not a finding: the
+# default is `.ez/lib` beside the project, and what matters is what is in it.
 def lib(want: List<&2, String>) -> IO(Note):
   do IO<Note>:
-    r : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_LIB")
-    +at : String <- IO.pure(String, Args.text_of(r))
-    lib.go(String.is_empty(at), at, want)
+    +at : String <- Env.lib()
+    have : List<&2, String> <- present(at)
+    return lib.judge(at, want, have)
 
 # every `import 0x...` line in the repo. Base has no readdir, so this is grep,
 # and the exclusions keep the vendored copies under .ez out of the answer.

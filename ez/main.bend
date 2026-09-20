@@ -1,11 +1,13 @@
-# ez: the one binary behind the `ez` script. EZ_CMD picks the subcommand and
-# EZ_ARGS carries the rest, one a line, because a native Bend binary takes no
-# arguments of its own. Build it native (`bend ez/main.bend -o bin/ez.bin`).
+# ez: the one binary. Its first argument is the subcommand and the rest are
+# that subcommand's, read straight off the command line with `IO.args()`.
+# Build it native (`bend ez/main.bend -o bin/ez.bin`); interpreted, bend's own
+# CLI would take the flags meant for ez.
 import Base
 import ./args.bend as Args
 import ./cmd.bend as Cmd
 import ./test.bend as Test
 import ./doctor.bend as Doctor
+import ./env.bend as Env
 
 # a subcommand
 type Sub is Data:
@@ -80,8 +82,13 @@ def dispatch(sub: Sub, as: List<&2, String>) -> IO(Unit):
     case CUnknown{name}:
       IO.die(Unit, 1, "ez: no such command: " ++ name)
 
+# the command line taken apart: the subcommand, then its own arguments
+def go(line: String & List<&2, String>) -> IO(Unit):
+  (name, as) = line
+  dispatch(command(name), as)
+
 def main() -> IO(Unit):
   do IO<Unit>:
-    name : String <- Args.command()
-    as : List<&2, String> <- Args.args()
-    dispatch(command(name), as)
+    Env.make()
+    as : List<&2, String> <- Args.all()
+    go(Args.split(as))

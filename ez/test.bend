@@ -7,6 +7,7 @@ import Base
 import ../run/run.bend as R
 import ../io/file.bend as F
 import ./args.bend as Args
+import ./env.bend as Env
 import ./quiet.bend as Q
 
 # how many comparisons were made, and how many of them held
@@ -108,7 +109,7 @@ def lane(cpu: Bool, +path: String, +wanted: String, t: Tally) -> IO(Tally):
       IO.pure(Tally, t)
     case True{}:
       do IO<Tally>:
-        +out : String <- R.exec(["bend", path, "-o", bin(path)])
+        +out : String <- Env.exec(["bend", path, "-o", bin(path)])
         ran(R.ok(out), Q.filter(R.text(out)), path, wanted, t)
 
 # one test file, on the JS lane and then the native one
@@ -116,7 +117,7 @@ def one(+path: String, cpu: Bool, t: Tally) -> IO(Tally):
   do IO<Tally>:
     src : Maybe<&2, String> <- F.read(path)
     +wanted : String <- IO.pure(String, trailer(F.text_of(src)))
-    js : String <- R.exec(["bend", path])
+    js : String <- Env.exec(["bend", path])
     first : Tally <- check(path ++ " (js)", wanted, Q.filter(R.text(js)), t)
     lane(cpu, path, wanted, first)
 
