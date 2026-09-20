@@ -24,6 +24,10 @@ def main() -> IO(Unit):
     Check.eq_str("a body shorter than its Content-Length is a torn response",
       Http.show(Http.parse(framed("hel", "5"))),
       "torn the response body stopped before its Content-Length")
+    Check.eq_str("Content-Length counts bytes, not code points",
+      Http.show(Http.parse(framed("h\u{e9}llo", "6"))), "200 h\u{e9}llo")
+    Check.eq_str("a chunk length counts bytes too",
+      Http.show(Http.parse(chunked("6\r\nh\u{e9}llo\r\n0\r\n\r\n"))), "200 h\u{e9}llo")
     Check.eq_str("with no framing header the whole rest is the body",
       Http.show(Http.parse("HTTP/1.1 200 OK\r\n\r\nplain")), "200 plain")
     Check.eq_str("a status that is not 200 is still read",
@@ -48,6 +52,8 @@ def main() -> IO(Unit):
 #|ok a Content-Length body is the status and that many chars
 #|ok a body longer than its Content-Length is cut to it
 #|ok a body shorter than its Content-Length is a torn response
+#|ok Content-Length counts bytes, not code points
+#|ok a chunk length counts bytes too
 #|ok with no framing header the whole rest is the body
 #|ok a status that is not 200 is still read
 #|ok a header is found whatever case it was written in

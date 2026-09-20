@@ -2,12 +2,15 @@
 # it. bend accepts any prefix of the sha256, and a package's `0x` name is the
 # first 32 characters of its manifest's digest, so the check is a prefix test.
 import Base
+import ../net/client.bend as Client
 import ../run/run.bend as R
 import ../sha/sha.bend as Sha
 
-# the body of a GET. curl speaks the TLS bend cannot link (run/run.bend).
+# the body of a GET, from ez's own client (net/client.bend). The answer keeps
+# the shape a run answers with, a status on its own first line and then the
+# text, which is the shape curl's answer had.
 def get(url: String) -> IO(String):
-  R.exec(["curl", "-fsS", "--max-time", "60", url])
+  Client.get(url)
 
 # a body is the one that was asked for when its digest starts with the hash
 def matches(want: String, +body: String) -> Bool:

@@ -81,6 +81,44 @@ def hex.go(s: String, +acc: Nat) -> Nat:
 def hexlen(s: String) -> Nat:
   hex.go(String.trim(first(String.split(s, ';'))), 0n)
 
+# the bytes one code point takes in UTF-8. Content-Length counts bytes and a
+# Bend String counts code points, and the two differ the moment a body holds
+# anything outside ASCII, so the difference is spelled out here rather than
+# silently mis-framing the body.
+def utf8.width(+u: U32) -> Nat:
+  Bool.pick(Nat, U32.is_lt(u, 128), 1n,
+    Bool.pick(Nat, U32.is_lt(u, 2048), 2n,
+      Bool.pick(Nat, U32.is_lt(u, 65536), 3n, 4n)))
+
+# how many bytes of UTF-8 a string is
+def utf8.len(s: String) -> Nat:
+  match s:
+    case SNil{}:
+      0n
+    case SCon{h, t}:
+      Nat.add(utf8.width(Char.to_u32(h)), utf8.len(t))
+
+# the front of a string that is this many bytes of UTF-8. A code point that
+# would not fit whole is not taken at all.
+def utf8.take(s: String, +n: Nat) -> String:
+  match s:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, t}:
+      +w = utf8.width(Char.to_u32(h))
+      Bool.pick(String, Nat.is_lt(n, w), SNil{},
+        SCon{h, utf8.take(t, Nat.sub(n, w))})
+
+# the rest of a string after this many bytes of UTF-8
+def utf8.drop(s: String, +n: Nat) -> String:
+  match s:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, +t}:
+      +w = utf8.width(Char.to_u32(h))
+      Bool.pick(String, Nat.is_lt(n, w), SCon{h, t},
+        utf8.drop(t, Nat.sub(n, w)))
+
 # a chunked body put back together. One pass: a chunk header has been divided
 # off, its length says how much of what follows is body, and the rest is the
 # next header. A zero length leaves nothing to divide, so the next pass ends.
@@ -93,8 +131,8 @@ def chunks(fuel: Nat, c: Cut, acc: String) -> String:
       acc
     case 1n+f Cut{before, +after}:
       +n = hexlen(before)
-      chunks(f, divide(String.drop(after, Nat.add(n, 2n)), "\r\n"),
-        acc ++ String.take(after, n))
+      chunks(f, divide(utf8.drop(after, Nat.add(n, 2n)), "\r\n"),
+        acc ++ utf8.take(after, n))
 
 # a `Transfer-Encoding: chunked` body as the bytes it stands for
 def dechunk(+s: String) -> String:
@@ -139,11 +177,11 @@ def parse.short(status: U32, n: Nat, body: String, short: Bool) -> Reply:
     case True{}:
       Torn{"the response body stopped before its Content-Length"}
     case False{}:
-      Reply{status, String.take(body, n)}
+      Reply{status, utf8.take(body, n)}
 
-# a body framed by Content-Length
+# a body framed by Content-Length, which is a count of bytes
 def parse.clen(status: U32, +n: Nat, +body: String) -> Reply:
-  parse.short(status, n, body, Nat.is_lt(String.length(body), n))
+  parse.short(status, n, body, Nat.is_lt(utf8.len(body), n))
 
 # a body framed by Content-Length when there was one. With neither header the
 # end of the connection framed it, which `Connection: close` asked for.
