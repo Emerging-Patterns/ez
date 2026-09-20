@@ -3,6 +3,8 @@
 # against it, then proves the locked BEND_LIB builds with the hub unreachable.
 #   ./tests/hub.sh
 set -u
+# the gate exports BEND_LIB for its own lanes; a test picks its own
+unset BEND_LIB
 cd "$(dirname "$0")/.."
 root=$(mktemp -d)
 trap 'st=$?; kill %1 2>/dev/null; rm -rf "$root"; exit $st' EXIT

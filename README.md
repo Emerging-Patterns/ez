@@ -5,12 +5,24 @@ that is one job: make a Bend project with hub dependencies build inside a Nix
 sandbox, where there is no network.
 
 ```
-nix develop                                    # bend, bun, and BEND_LIB set
-bun bin/ez-lock.ts main.bend > ez.lock.json    # resolve every 0x import, transitively
-bun bin/ez-restore.ts                          # fill BEND_LIB from the lock
-./gate.sh                                      # every test, on the JS and native lanes
-nix flake check                                # the same, in the sandbox
+ez init myapp main.bend             write an ez.toml for a new project
+ez add <url> <ref> <entry.bend>     vendor a git package and record it
+ez remove <name>                    drop a package from the ledger
+ez lock                             resolve every import, write ez.lock.json
+ez fetch                            fill BEND_LIB from the lock
+ez check                            check the entry, without running it
+ez build [out]                      build the entry to a native binary
+ez run [args..]                     check and run the entry
 ```
+
+`./build.sh` puts `bin/ez.bin` behind the `ez/ez` script and links it into
+`~/.local/bin`. With nix, `nix run .#` or `nix profile install .#` instead, and
+`nix develop` for a shell with bend, bun, curl and `BEND_LIB` already set.
+`./gate.sh` runs every test on the JS and native lanes; `nix flake check` runs
+the same in the sandbox.
+
+A native Bend binary takes no arguments of its own, so the subcommand rides in
+`EZ_CMD` and the rest in `EZ_ARGS`, one a line, the way bolt does it.
 
 In Nix:
 
@@ -118,12 +130,25 @@ Arguments reach the effect newline separated and go straight to `execvp`, never
 through a shell, so a url or a rev out of a lockfile cannot become shell syntax.
 `run/tests/exec.bend` asserts that.
 
-`ez-lock`, `ez-git`, `ez-restore` and `pkg` are still TypeScript. What is left to
-port is the walk that uses these pieces: reading local `.bend` files, following
-imports, and writing the tree into BEND_LIB. Base has file IO but no mkdir and
-no readdir, so directories go through the same process effect.
+`ez/` is the command line, `io/` is whole-file read and write over Base's
+chunked handles, and `manifest/render.bend` writes a ledger back out. What ez
+reads renders back byte for byte, which is what makes `ez add` and `ez remove`
+safe to run on a file a person edits.
+
+`ez-lock`, `ez-git`, `ez-restore` and `pkg` are still TypeScript, and `ez`
+shells out to them through the same process effect it uses for curl and git.
+They get replaced underneath the command line rather than beside it. What is
+left is the import walk: reading local `.bend` files, following their imports,
+and writing the tree into BEND_LIB.
 
 ### A gotcha worth knowing
+
+`bend f.bend -o out` is how you check a file without running its main, and its
+exit status is the verdict, with one exception. A file with no main checks
+clean and then exits 1 with `Error: no main to run` from the emit. A check
+failure throws before the emit, so that message can only follow a check that
+passed. A clean file with a main prints nothing at all, so "it said nothing" is
+success, not a missing signal.
 
 Bend's own check report changed between releases. 2.0.16 prints
 `All terms check, with N unsafe annotations.`; 2.0.18 prints
@@ -207,6 +232,10 @@ the build then runs with the hub unreachable.
     run/                the one foreign effect: a program run with its arguments
     hub/                a file fetched and checked against the hash naming it
     bin/quiet.awk       drops bend's check report, so a test sees only its output
+    ez/                 the subcommands, and the dispatch behind bin/ez.bin
+    ez/ez               the script people run; EZ_CMD and EZ_ARGS reach the binary
+    io/                 a whole file read or written, over Base's chunked handles
+    build.sh            bin/ez.bin, linked into ~/.local/bin as `ez`
     bin/pkg.ts          the package and hash `bend --publish` would produce
     bin/ez-lock.ts      walks the import graph, writes ez.lock.json
     bin/ez-git.ts       vendors an unpublished git repo under its would-be hash

@@ -75,10 +75,12 @@ function main() {
   mkdirSync(path.dirname(ORIGINS), { recursive: true });
   writeFileSync(ORIGINS, JSON.stringify(origins, null, 2) + "\n");
 
+  // stdout is the record, five lines, for whatever writes the ledger; anything
+  // a person reads goes to stderr
   const name = path.basename(entry, ".bend");
+  process.stdout.write([pkg.hash, url, rev, tag ?? "", entry].join("\n") + "\n");
   if (tag !== undefined) process.stderr.write(tag + " is " + rev + "\n");
-  process.stdout.write(pkg.hash + "\n");
-  process.stdout.write("import " + pkg.hash + "/" + path.basename(entry) + " as " +
+  process.stderr.write("import " + pkg.hash + "/" + path.basename(entry) + " as " +
     name[0].toUpperCase() + name.slice(1) + "\n");
 }
 

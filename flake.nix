@@ -29,20 +29,27 @@
       # network in the sandbox beyond the lock's own fixed-output fetches
       bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.json;
 
-      # the tools, until they are Bend: bun on PATH, sources beside it
+      # the `ez` binary, with everything it shells out to on its PATH. The
+      # TypeScript helpers live beside it under libexec until they are Bend,
+      # and EZ_ROOT is how the binary finds them.
       ez = pkgs.stdenv.mkDerivation {
         pname = "ez";
         version = "0.1.0";
         src = self;
-        nativeBuildInputs = [ pkgs.makeWrapper ];
+        nativeBuildInputs = [ bend llvm.clang pkgs.makeWrapper ];
+        BEND_LIB = bendLib;
+        buildPhase = "bend ez/main.bend -o ez.bin";
+        # the same layout as the repo, since the script finds the binary and the
+        # helpers relative to its own parent
         installPhase = ''
-          mkdir -p $out/libexec/ez $out/bin
-          cp -r bin $out/libexec/ez/bin
-          for t in ez-lock ez-git ez-restore; do
-            makeWrapper ${pkgs.bun}/bin/bun $out/bin/$t \
-              --add-flags $out/libexec/ez/bin/$t.ts \
-              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.git pkgs.nix pkgs.curl ]}
-          done
+          mkdir -p $out/libexec/ez/bin $out/libexec/ez/ez $out/bin
+          cp ez.bin $out/libexec/ez/bin/ez.bin
+          cp bin/*.ts bin/*.awk $out/libexec/ez/bin/
+          cp ez/ez $out/libexec/ez/ez/ez
+          makeWrapper $out/libexec/ez/ez/ez $out/bin/ez \
+            --prefix PATH : ${pkgs.lib.makeBinPath [
+              bend pkgs.bun pkgs.git pkgs.curl pkgs.findutils pkgs.coreutils
+            ]}
         '';
       };
 
@@ -69,7 +76,7 @@
         '';
     in {
       packages.${system} = { inherit ez bend bend-cc bendLib; default = ez; };
-      apps.${system}.default = { type = "app"; program = "${ez}/bin/ez-lock"; };
+      apps.${system}.default = { type = "app"; program = "${ez}/bin/ez"; };
       checks.${system} = { inherit tests ez; };
       devShells.${system}.default = pkgs.mkShellNoCC {
         packages = [ bend bend-cc pkgs.bun pkgs.git pkgs.curl ];

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# ez: the command line of the one binary, bin/ez.bin.
+#   ez init [name] [entry.bend]     write an ez.toml for a new project
+#   ez add <url> <ref> <entry>      vendor a git package and record it
+#   ez remove <name>                drop a package from the ledger
+#   ez lock                         resolve every import, write ez.lock.json
+#   ez fetch                        fill BEND_LIB from the lock
+#   ez check                        check the entry, without running it
+#   ez build [out]                  build the entry to a native binary
+#   ez run [args..]                 check and run the entry
+# A native Bend binary takes no arguments, so the subcommand rides in EZ_CMD
+# and the rest in EZ_ARGS, one a line.
+set -eu
+root="$(dirname "$(readlink -f "$0")")/.."
+bin="$root/bin/ez.bin"
+cmd="${1:-help}"
+[ $# -gt 0 ] && shift
+# vendored packages live with the project, so the pin is per project
+export BEND_LIB="${BEND_LIB:-$PWD/.ez/lib}"
+export EZ_ROOT="$root"
+mkdir -p "$BEND_LIB" .ez bin
+EZ_CMD="$cmd" EZ_ARGS="$(printf '%s\n' "$@")" exec "$bin" --gpu off

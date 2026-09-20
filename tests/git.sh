@@ -4,6 +4,8 @@
 # the same tree from the pinned rev.
 #   ./tests/git.sh
 set -u
+# the gate exports BEND_LIB for its own lanes; a test picks its own
+unset BEND_LIB
 cd "$(dirname "$0")/.."
 ez=$PWD
 root=$(mktemp -d)
@@ -56,8 +58,17 @@ git -C "$root/upstream" push -q "$root/srv/upstream.git" v1.0
 # our project depends on it
 mkdir -p "$root/app"
 cd "$root/app"
-line=$(BEND_LIB="$root/app/.ez/lib" bun "$ez/bin/ez-git.ts" "$url" "$rev" src/lib.bend | tail -1)
-hash=$(echo "$line" | sed 's|^import \(0x[0-9a-f]*\)/.*|\1|')
+rec=$(BEND_LIB="$root/app/.ez/lib" bun "$ez/bin/ez-git.ts" "$url" "$rev" src/lib.bend 2>"$root/add.log")
+hash=$(echo "$rec" | sed -n 1p)
+line=$(grep '^import ' "$root/add.log")
+
+check "the record names the hash, url, rev and entry" \
+  "$hash
+$url
+$rev
+
+src/lib.bend" \
+  "$rec"
 
 cat > main.bend <<EOF
 import Base
@@ -67,9 +78,9 @@ def main() -> U32:
   Lib.quad(11)
 EOF
 
-tagged=$(BEND_LIB="$root/app/.ez/tag" bun "$ez/bin/ez-git.ts" "$url" v1.0 src/lib.bend 2>"$root/tag.log" | head -1)
+tagged=$(BEND_LIB="$root/app/.ez/tag" bun "$ez/bin/ez-git.ts" "$url" v1.0 src/lib.bend 2>"$root/tag.log" | sed -n 1p)
 check "a tag resolves to the same package as its commit" "$hash" "$tagged"
-check "the tag it resolved through is written down" "v1.0 is $rev" "$(cat "$root/tag.log")"
+check "the tag it resolved through is written down" "v1.0 is $rev" "$(grep ' is ' "$root/tag.log")"
 check "the lock keeps the tag beside the rev" "v1.0" \
   "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]].get("tag",""))' "$root/app/.ez/origins.json" "$hash")"
 

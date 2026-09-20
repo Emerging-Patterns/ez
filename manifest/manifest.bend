@@ -70,6 +70,11 @@ def source_of(+pairs: List<&2, T.Kv>) -> Source:
 def dep_of(+full: String, +pairs: List<&2, T.Kv>) -> Dep:
   Dep{String.drop(full, 5n), value(pairs, "hash"), value(pairs, "entry"), source_of(pairs)}
 
+# a dependency's own name, for finding or replacing it
+def dep.name(d: Dep) -> String:
+  Dep{n, _h, _e, _s} = d
+  n
+
 # a section joins the dependencies only when it is a `[deps.<name>]`
 def deps.put(is_dep: Bool, s: T.Sect, rest: List<&2, Dep>) -> List<&2, Dep>:
   match is_dep:

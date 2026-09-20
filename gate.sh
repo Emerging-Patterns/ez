@@ -36,6 +36,14 @@ for t in */tests/*.bend; do
   check "$t (cpu)" "$want" "$("$bin" --gpu off 2>&1)"
 done
 
+# the binary people run, built the way build.sh builds it
+mkdir -p bin
+if ! built=$(run bend ez/main.bend -o bin/ez.bin); then
+  check "ez/main.bend (build)" "" "$built"
+else
+  check "ez check (the repo's own ledger)" "ok manifest/manifest.bend" "$(./ez/ez check 2>&1)"
+fi
+
 # the shell tests drive the tools end to end
 for t in tests/*.sh; do
   check "$t" "" "$("$t" >/dev/null 2>&1; [ $? = 0 ] || echo failed)"
