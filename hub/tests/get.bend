@@ -10,7 +10,7 @@ def chomp(+s: String) -> String:
 
 # a file:// url under the directory the test runs in. This test is about the
 # digest, not the socket, so the body comes off the disk and no server has to
-# be started; tests/fetch.sh is where a socket is driven.
+# be started; tests/fetch.bend is where a socket is driven.
 def here(+dir: String, at: String) -> String:
   "file://" ++ dir ++ "/" ++ at
 
