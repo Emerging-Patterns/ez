@@ -3,14 +3,21 @@
 # derivation, so `bend` never touches the network inside the sandbox.
 #
 # A package resolves from the hub, or, when it was vendored from a repo that
-# never published, from the git rev recorded in .ez/origins.toml. Both end up
-# as the same BEND_LIB tree.
+# never published, from the git rev recorded for it. Both end up as the same
+# BEND_LIB tree.
+#
+# Two files record a rev: ez.toml, which is committed, and .ez/origins.toml,
+# which `ez add` writes and .gitignore keeps out of the repo. The ledger is the
+# authority and the cache is only a cache, because a clone has the first and
+# never the second, and a lock that needs a gitignored file is a lock a clone
+# cannot reproduce.
 import Base
 import ../io/file.bend as F
 import ../run/run.bend as R
 import ../sha/sha.bend as Sha
 import ../hub/hub.bend as Web
 import ../manifest/toml.bend as T
+import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
 
@@ -25,7 +32,7 @@ type Src is Data:
 type Pack is Data:
   Pack{hash: String, src: Src, files: List<&2, K.File>}
 
-# a package's origin, as .ez/origins.toml records it
+# a package's origin, as ez.toml or .ez/origins.toml records it
 type Origin is Data:
   Origin{hash: String, src: Src}
 
@@ -130,6 +137,46 @@ def origins(ss: List<&2, T.Sect>) -> List<&2, Origin>:
       []
     case +h <> t:
       origin.put(named2(segs(h), "origins"), h, origins(t))
+
+# a ledger's dependency as an origin, when it names a repo. A hub dependency
+# contributes nothing, because a package no origin names already resolves from
+# the hub, and a record saying so would only be a second way to say it.
+def ledger.put(git: Bool, +d: M.Dep) -> List<&2, Origin>:
+  match git:
+    case True{}:
+      [Origin{M.dep.hash(d), Git{M.source.url(M.source.dep(d)),
+        M.source.rev(M.source.dep(d)), M.dep.entry(d),
+        M.source.root(M.source.dep(d)), M.source.nar(M.source.dep(d)),
+        M.source.tag(M.source.dep(d))}}]
+    case False{}:
+      []
+
+# every origin a ledger's dependencies record, in the order written
+def ledger.origins(ds: List<&2, M.Dep>) -> List<&2, Origin>:
+  match ds:
+    case []:
+      []
+    case +h <> t:
+      List.append(&2, Origin,
+        ledger.put(M.source.is_git(M.source.dep(h)), h), ledger.origins(t))
+
+# every origin a ledger records. A ledger that would not parse records none,
+# so a broken ez.toml leaves the lock exactly where it was without a guess.
+def ledger.read(r: M.Read) -> List<&2, Origin>:
+  match r:
+    case M.Bad{_why}:
+      []
+    case M.Good{m}:
+      M.Manifest{_n, _e, ds} = m
+      ledger.origins(ds)
+
+# the ledger first, the cache behind it. `origin` answers with the first record
+# of a hash, so a package ez.toml names resolves from ez.toml however stale
+# .ez/origins.toml has become, and a package it does not name still resolves
+# from the cache. That is the only order under which a fresh clone, which has
+# the ledger and no cache at all, resolves what a working checkout resolves.
+def origins.all(led: List<&2, Origin>, cache: List<&2, Origin>) -> List<&2, Origin>:
+  List.append(&2, Origin, led, cache)
 
 # this origin's source when the hash matches, otherwise whatever the rest gave
 def origin.at(o: Origin, rest: Src, h: String) -> Src:
@@ -606,6 +653,15 @@ def src.root(s: Src) -> String:
     case Git{_u, _r, _e, root, _n, _t}:
       root
 
+# the NAR hash nix rebuilds a vendored package's checkout by, or "" when it
+# comes from the hub
+def src.nar(s: Src) -> String:
+  match s:
+    case Hub{}:
+      ""
+    case Git{_u, _r, _e, _ro, nar, _t}:
+      nar
+
 # where the hub is, which is where bend's own is unless BEND_HUB says otherwise
 def hub.or(+s: String) -> String:
   Bool.pick(String, String.is_empty(s), "https://hub.bend-lang.com", s)
@@ -639,11 +695,22 @@ def lib() -> IO(String):
 def origins.at(lib: String) -> String:
   P.dir(lib) ++ "/origins.toml"
 
-# the origins recorded beside a BEND_LIB
+# the origins recorded beside a BEND_LIB. This file is a cache: `ez add` writes
+# it as it vendors, and .gitignore keeps it out of the repo.
 def origins_of(+lib: String) -> IO(List<&2, Origin>):
   do IO<List<&2, Origin>>:
     m : Maybe<&2, String> <- F.read(origins.at(lib))
     return origins(T.sects(T.parse(F.text_of(m))))
+
+# where the ledger is, which is the project root this command was run from
+def ledger.at() -> String:
+  "ez.toml"
+
+# the origins the committed ledger records
+def ledger_of(+at: String) -> IO(List<&2, Origin>):
+  do IO<List<&2, Origin>>:
+    m : Maybe<&2, String> <- F.read(at)
+    return ledger.read(M.parse(F.text_of(m)))
 
 # the version of bend that resolved a lock, for the record
 def version() -> IO(String):
@@ -651,10 +718,15 @@ def version() -> IO(String):
     +out : String <- R.exec(["bend", "version"])
     return K.word(K.words(String.trim(R.text(out))), 1n)
 
-# the lock of a project, resolved against a named hub and BEND_LIB
-def lock.at(+hub: String, +at: String, entries: List<&2, String>) -> IO(String):
+# the lock of a project, resolved against a named hub, ledger and BEND_LIB. The
+# ledger's path is a parameter rather than the fixed name, so a test can lock a
+# project that is not the one it was started in.
+def lock.at(+hub: String, +toml: String, +at: String,
+  entries: List<&2, String>) -> IO(String):
   do IO<String>:
-    orgs : List<&2, Origin> <- origins_of(at)
+    led : List<&2, Origin> <- ledger_of(toml)
+    cache : List<&2, Origin> <- origins_of(at)
+    +orgs : List<&2, Origin> <- IO.pure(List<&2, Origin>, origins.all(led, cache))
     hs : List<&2, String> <- roots(U32.to_nat(100000), entries, Seen{[], []})
     ps : List<&2, Pack> <- resolve(U32.to_nat(100000), hub, at, orgs, hs, [])
     ver : String <- version()
@@ -665,4 +737,4 @@ def lock(entries: List<&2, String>) -> IO(String):
   do IO<String>:
     at : String <- lib()
     h : String <- hub()
-    lock.at(h, at, entries)
+    lock.at(h, ledger.at(), at, entries)

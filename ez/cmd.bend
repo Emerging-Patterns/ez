@@ -149,10 +149,21 @@ def add.alias(+at: String) -> String:
   String.take(add.base(String.split(at, '/')), Nat.sub(String.length(
     add.base(String.split(at, '/'))), 5n))
 
-# the five lines `ez-git` answers with: hash, url, rev, tag, entry
-def add.dep(+rec: List<&2, String>) -> M.Dep:
+# the five lines `ez-git` answers with: hash, url, rev, tag, entry. The root and
+# the NAR hash are not among them, so they come from the origin it wrote as it
+# vendored. Both belong in the ledger: they are what `ez lock` needs and what a
+# clone, which never sees .ez/origins.toml, would otherwise have to guess.
+def add.dep(+rec: List<&2, String>, +src: Lock.Src) -> M.Dep:
   M.Dep{add.alias(Args.at(rec, 4n)), Args.at(rec, 0n), Args.at(rec, 4n),
-    M.Git{Args.at(rec, 1n), Args.at(rec, 2n), Args.at(rec, 3n)}}
+    M.Git{Args.at(rec, 1n), Args.at(rec, 2n), Args.at(rec, 3n),
+      Lock.src.root(src), Lock.src.nar(src)}}
+
+# what `ez-git` recorded about the package it just vendored
+def add.origin(+hash: String) -> IO(Lock.Src):
+  do IO<Lock.Src>:
+    at : String <- Lock.lib()
+    orgs : List<&2, Lock.Origin> <- Lock.origins_of(at)
+    return Lock.origin(orgs, hash)
 
 # the ledger with this dependency written into it
 def add.write(r: M.Read, d: M.Dep) -> IO(Unit):
@@ -172,7 +183,9 @@ def add.got(ok: Bool, +text: String) -> IO(Unit):
     case True{}:
       do IO<Unit>:
         r : M.Read <- load()
-        add.write(r, add.dep(String.lines(text)))
+        +rec : List<&2, String> <- IO.pure(List<&2, String>, String.lines(text))
+        src : Lock.Src <- add.origin(Args.at(rec, 0n))
+        add.write(r, add.dep(rec, src))
 
 # `ez add <url> <rev|tag|branch> <entry.bend>`
 def add(as: List<&2, String>) -> IO(Unit):

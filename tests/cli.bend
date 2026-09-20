@@ -82,10 +82,14 @@ def ledger(+repo: String, +app: String, +url: String, +rev: String) -> IO(String
     _a : String <- R.exec(W.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
     +t2 : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
     +hash : String <- IO.pure(String, W.value(F.text_of(t2), "hash"))
+    +nar : String <- IO.pure(String, W.value(F.text_of(t2), "narHash"))
     Check.eq_str("add records the package under its name",
       stanza(F.text_of(t2), "[deps.lib]"),
       "[deps.lib]\nhash = \"" ++ hash ++ "\"\ngit = \"" ++ url ++
-      "\"\nrev = \"" ++ rev ++ "\"\nentry = \"src/lib.bend\"")
+      "\"\nrev = \"" ++ rev ++ "\"\nroot = \"src\"\nnarHash = \"" ++ nar ++
+      "\"\nentry = \"src/lib.bend\"")
+    yes("and records the NAR hash the ledger locks it by",
+      String.starts_with(nar, "sha256-"))
     return hash
 
 # the project that depends on it, and every question `ez` answers about it once
@@ -175,6 +179,7 @@ def main() -> IO(Unit):
 #|ok the upstream remote answers
 #|ok init writes a ledger
 #|ok add records the package under its name
+#|ok and records the NAR hash the ledger locks it by
 #|ok lock records the git source
 #|ok fetch fills BEND_LIB from the lock alone
 #|ok check passes with the git remote gone
