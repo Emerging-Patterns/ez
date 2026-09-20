@@ -8,6 +8,7 @@ import ../run/run.bend as R
 import ../io/file.bend as F
 import ./args.bend as Args
 import ./env.bend as Env
+import ./cap.bend as Cap
 import ./quiet.bend as Q
 
 # how many comparisons were made, and how many of them held
@@ -89,6 +90,23 @@ def check(name: String, +wanted: String, +got: String, t: Tally) -> IO(Tally):
     say(String.eq(wanted, got), name, wanted, got)
     return tally(String.eq(wanted, got), t)
 
+# the first line of a run's output, which is a proof's whole verdict
+def head.of(ls: List<&2, String>) -> String:
+  match ls:
+    case []:
+      ""
+    case h <> _t:
+      h
+
+# the first line of some text
+def head(text: String) -> String:
+  head.of(String.lines(text))
+
+# a test whose header says so is not run on the JS lane, which overflows its
+# stack on a string over about 65 KB. The native lane has no such limit.
+def js_lane(+text: String) -> Bool:
+  Bool.not(String.contains(text, "# lanes: native"))
+
 # the native lane, once the binary is either built or not. A build that failed
 # is itself a failure, and its output is what the test observed.
 def ran(built_ok: Bool, +built: String, +path: String, +wanted: String,
@@ -110,43 +128,92 @@ def unit(+path: String) -> Bool:
 
 # the native CPU lane: the test compiled, then the binary run. Skipped when
 # `--js-only` asked for it, since a C compile per test dominates the wall clock.
-def lane(cpu: Bool, +path: String, +wanted: String, t: Tally) -> IO(Tally):
+def lane(cpu: Bool, cap: Bool, +path: String, +wanted: String, t: Tally) -> IO(Tally):
   match cpu:
     case False{}:
       IO.pure(Tally, t)
     case True{}:
       do IO<Tally>:
-        +out : String <- Env.exec(["bend", path, "-o", bin(path)])
-        ran(R.ok(out), Q.filter(R.text(out)), path, wanted, t)
+        +g : String <- Cap.gb()
+        +out : String <- Cap.run(cap, ["bend", path, "-o", bin(path)])
+        ran(R.ok(out), Cap.why(out, g) ++ Q.filter(R.text(out)), path, wanted, t)
+
+# the JS lane, which a `# lanes: native` header turns off for this test
+def one.js(on: Bool, cap: Bool, +path: String, +wanted: String, t: Tally) -> IO(Tally):
+  match on:
+    case False{}:
+      IO.pure(Tally, t)
+    case True{}:
+      do IO<Tally>:
+        js : String <- Cap.run(cap, ["bend", path])
+        check(path ++ " (js)", wanted, Q.filter(R.text(js)), t)
+
+# what is being worked on, on stderr, so a run that takes minutes says so while
+# it takes them. Results stay on stdout, where something may be reading them.
+def saying(+path: String) -> IO(Unit):
+  IO.print_err("  " ++ path)
 
 # one test file, on the JS lane and then the native one
-def one(+path: String, cpu: Bool, t: Tally) -> IO(Tally):
+def one(+path: String, +cap: Bool, cpu: Bool, t: Tally) -> IO(Tally):
   do IO<Tally>:
+    saying(path)
     src : Maybe<&2, String> <- F.read(path)
-    +wanted : String <- IO.pure(String, trailer(F.text_of(src)))
-    js : String <- Env.exec(["bend", path])
-    first : Tally <- check(path ++ " (js)", wanted, Q.filter(R.text(js)), t)
-    lane(Bool.and(cpu, unit(path)), path, wanted, first)
+    +text : String <- IO.pure(String, F.text_of(src))
+    +wanted : String <- IO.pure(String, trailer(text))
+    first : Tally <- one.js(js_lane(text), cap, path, wanted, t)
+    lane(Bool.and(cpu, unit(path)), cap, path, wanted, first)
 
 # every test file, in order. The list comes first because a self-call must
 # shrink an argument before it changes one.
-def each(ts: List<&2, String>, +cpu: Bool, t: Tally) -> IO(Tally):
+def each(ts: List<&2, String>, +cap: Bool, +cpu: Bool, t: Tally) -> IO(Tally):
   match ts:
     case []:
       IO.pure(Tally, t)
     case h <> rest:
       do IO<Tally>:
-        next : Tally <- one(h, cpu, t)
-        each(rest, cpu, next)
+        next : Tally <- one(h, cap, cpu, t)
+        each(rest, cap, cpu, next)
 
-# every test in the tree, sorted, so a run's report is the same twice over.
-# Base has no readdir, so this is `find`.
-def find() -> IO(List<&2, String>):
+# a proof's verdict is the line, never the exit status. Both
+# `All terms check, with N unsafe annotations.` and 2.0.18's
+# `All terms check, but N defs rely on unsafe or foreign code:` exit 0, so a
+# gate reading the status alone goes green on a claim that leans on code
+# nothing proved. Only the bare line means every term was proved outright.
+def proof(+path: String, cap: Bool, t: Tally) -> IO(Tally):
+  do IO<Tally>:
+    saying(path)
+    +out : String <- Cap.run(cap, ["bend", path])
+    check(path, "All terms check.", head(R.text(out)), t)
+
+# every proof in the tree, checked
+def proofs(ps: List<&2, String>, +cap: Bool, t: Tally) -> IO(Tally):
+  match ps:
+    case []:
+      IO.pure(Tally, t)
+    case h <> rest:
+      do IO<Tally>:
+        next : Tally <- proof(h, cap, t)
+        proofs(rest, cap, next)
+
+# every file of a kind in the tree, sorted, so a run's report is the same twice
+# over. Base has no readdir, so this is `find`. `.claude` is skipped along with
+# the build directories: an agent's worktree is a whole second copy of the repo
+# living inside it, and running its tests would double the gate to test nothing
+# new.
+def find.at(+what: String, +how: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
-    out : String <- R.exec(["find", ".", "-path", "*/tests/*.bend",
+    out : String <- R.exec(["find", ".", how, what,
       "-not", "-path", "./.ez/*", "-not", "-path", "./.gate/*",
-      "-not", "-path", "./.git/*"])
+      "-not", "-path", "./.git/*", "-not", "-path", "./.claude/*"])
     return List.sort(~String, ~String.is_le, Args.nonempty(String.lines(R.text(out))))
+
+# every test file
+def find() -> IO(List<&2, String>):
+  find.at("*/tests/*.bend", "-path")
+
+# every proof file
+def find.proofs() -> IO(List<&2, String>):
+  find.at("PROOF.bend", "-name")
 
 # anything that failed fails the command, or a script around it learns nothing
 def done.exit(all: Bool) -> IO(Unit):
@@ -171,6 +238,10 @@ def done(t: Tally) -> IO(Unit):
 def run(as: List<&2, String>) -> IO(Unit):
   do IO<Unit>:
     _mk : String <- R.exec(["mkdir", "-p", ".gate"])
+    +cap : Bool <- Cap.ok()
+    Cap.warn(cap)
     ts : List<&2, String> <- find()
-    t : Tally <- each(ts, Bool.not(String.eq(Args.at(as, 0n), "--js-only")), Tally{0n, 0n})
-    done(t)
+    t : Tally <- each(ts, cap, Bool.not(String.eq(Args.at(as, 0n), "--js-only")), Tally{0n, 0n})
+    ps : List<&2, String> <- find.proofs()
+    all : Tally <- proofs(ps, cap, t)
+    done(all)
