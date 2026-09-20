@@ -13,6 +13,8 @@ ez fetch                            fill BEND_LIB from the lock
 ez check                            check the entry, without running it
 ez build [out]                      build the entry to a native binary
 ez run [args..]                     check and run the entry
+ez test [--js-only]                 run every */tests/*.bend, on both lanes
+ez doctor                           report on the toolchain and the project
 ```
 
 `./build.sh` puts `bin/ez.bin` behind the `ez/ez` script and links it into
@@ -162,6 +164,42 @@ A Bend module reached through a path with a hyphen in it breaks the JS backend.
 `-` and dies with `SyntaxError: Unexpected token '-'`. Renaming the directory
 fixes it. Vendoring under `0x<hash>/` sidesteps it, since a hash has no hyphen.
 
+## The test runner
+
+Bend has no `bend test`, so `ez test` is one. It finds every `*/tests/*.bend`,
+reads the `#|` trailer that says what the run must print, runs the file on the
+JS lane and then compiled to a native CPU binary, and compares. `--js-only`
+skips the native lane, which spends a C compile per test. Anything that
+disagrees fails the command, and the last line is always `PASS: n / total`.
+
+A failure prints what was expected and what was observed, both in full, rather
+than a diff. A diff is real work in Bend and a test's trailer is a handful of
+short lines, so the pair says as much and costs nothing.
+
+`ez/quiet.bend` is `bin/quiet.awk` in Bend: bend prints its check report after
+a run, in one of two wordings, and neither belongs in what a test asserts.
+Comparison ignores trailing blank lines, the way a shell's `$(...)` does, so a
+trailing newline is never the difference.
+
+## The doctor
+
+`ez doctor` reports on what would stop this project from building, and exits
+non-zero when something is wrong. Each line says what was found, not that it
+passed: which `bend`, which C compiler and whether `$CC` chose it, whether the
+two programs the one foreign effect reaches for are on the PATH, what
+`ez.toml` says, how many packages the lock names, and whether `BEND_LIB`
+holds every one of them.
+
+The check worth having is the last one. A package hash is written in two
+places, the `[deps.<name>]` section and the `import 0x...` line that uses it,
+and nothing keeps them equal. ez reports the disagreement in both directions.
+A hash the source imports that the ledger never names is one. A ledger entry no
+import line uses is the other. It rewrites neither, because the manifest is the
+record and the import lines are the truth.
+
+The lock is read by grepping it for `0x` hashes rather than parsing it, so its
+format is not doctor's business. Its name is `lock()` in `ez/doctor.bend`, once.
+
 ## Why only this
 
 The `ez` design spec was written for a hypothetical proof language. Bend 2.0.16
@@ -215,8 +253,9 @@ the build then runs with the hub unreachable.
   and the GPU decision comes from `$CUDA_HOME` and whether
   `/usr/local/cuda/include/nvrtc.h` exists. Same source, different machine,
   different binary. The emitted C is unaffected, so pinning `CC` closes it.
-- **A test runner.** bolt hand-rolls one in `gate.sh`: `tests/*.bend` files each
-  end in the `#|` lines their run must print. There is no `bend test`.
+- **A test runner.** There is still no `bend test`. `ez test` is one, for this
+  shape of test: a run's output compared against the `#|` trailer the file ends
+  in. Nothing about it is known to Bend.
 - **No hash re-check on a populated `BEND_LIB`.** `bend` skips the hub entirely
   when the file is already there, and does not re-hash it. Under Nix the store
   path is the integrity guarantee, so this is fine there, and worth knowing
@@ -233,6 +272,10 @@ the build then runs with the hub unreachable.
     hub/                a file fetched and checked against the hash naming it
     bin/quiet.awk       drops bend's check report, so a test sees only its output
     ez/                 the subcommands, and the dispatch behind bin/ez.bin
+    ez/test.bend        the test runner: every */tests/*.bend, on both lanes
+    ez/quiet.bend       bend's check report dropped, the way bin/quiet.awk does
+    ez/drift.bend       the hashes in ez.toml against the ones the source imports
+    ez/doctor.bend      the toolchain and the project, reported on
     ez/ez               the script people run; EZ_CMD and EZ_ARGS reach the binary
     io/                 a whole file read or written, over Base's chunked handles
     build.sh            bin/ez.bin, linked into ~/.local/bin as `ez`
