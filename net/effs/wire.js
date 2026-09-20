@@ -83,6 +83,7 @@ function ezwire_tls() {
           SSL_connect: { args: ["ptr"], returns: "i32" },
           SSL_read: { args: ["ptr", "ptr", "i32"], returns: "i32" },
           SSL_write: { args: ["ptr", "ptr", "i32"], returns: "i32" },
+          SSL_get_error: { args: ["ptr", "i32"], returns: "i32" },
           SSL_shutdown: { args: ["ptr"], returns: "i32" },
         });
         break;
@@ -179,16 +180,26 @@ function ezwire_say(tls, fd, ssl, text) {
   return true;
 }
 
-// everything the server sends before it closes
+// everything the server sends before it closes. A TLS read that stops for any
+// reason other than the peer being done is a cut connection, not a short body:
+// SSL_ERROR_ZERO_RETURN is 6 and SSL_ERROR_SYSCALL with nothing read is 5, and
+// those two are the only clean ends.
 function ezwire_hear(tls, fd, ssl) {
   const ffi = require("bun:ffi");
   const b = new Uint8Array(16384);
   const parts = [];
+  let bad = false;
   for (;;) {
     const n = ssl === null
       ? Number(io_sys().recv(fd, ffi.ptr(b), b.length, 0))
       : tls.SSL_read(ssl, ffi.ptr(b), b.length);
     if (n <= 0) {
+      if (ssl === null) {
+        bad = n < 0;
+      } else {
+        const why = tls.SSL_get_error(ssl, n);
+        bad = !(why === 6 || (why === 5 && n === 0));
+      }
       break;
     }
     parts.push(b.slice(0, n));
@@ -203,7 +214,8 @@ function ezwire_hear(tls, fd, ssl) {
     all.set(p, at);
     at += p.length;
   }
-  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(all);
+  return { bad: bad,
+    text: new TextDecoder("utf-8", { ignoreBOM: true }).decode(all) };
 }
 
 function ezwire_talk(spec) {
@@ -236,7 +248,9 @@ function ezwire_talk(spec) {
   if (!ezwire_say(tls, fd, ssl, spec.slice(at))) {
     out = "55\nthe request to " + cut[1] + " could not be sent";
   } else {
-    out = "0\n" + ezwire_hear(tls, fd, ssl);
+    const got = ezwire_hear(tls, fd, ssl);
+    out = got.bad ? "56\nthe answer from " + cut[1] + " was cut short"
+      : "0\n" + got.text;
   }
   if (ssl !== null) {
     tls.SSL_shutdown(ssl);

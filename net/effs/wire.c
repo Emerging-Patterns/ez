@@ -23,8 +23,11 @@
 #define EZWIRE_VERIFY_PEER 1
 #define EZWIRE_SET_SNI 55
 #define EZWIRE_NAME_HOST 0
-#define EZWIRE_WANT_ZERO 6
-#define EZWIRE_WANT_SYSCALL 5
+// SSL_ERROR_ZERO_RETURN, the peer's own close_notify, and SSL_ERROR_SYSCALL
+// with nothing read, which is the peer closing the socket without one. Both
+// mean the response ended; anything else means it was cut off.
+#define EZWIRE_SHUT_CLEAN 6
+#define EZWIRE_SHUT_EOF 5
 
 // the OpenSSL entry points a client handshake needs, and the context they are
 // used through. A void* stands in for SSL_CTX* and SSL*, which is all a caller
@@ -213,8 +216,10 @@ static int ezwire_say(int fd, void* ssl, const char* text, size_t len) {
 
 // everything the server sends before it closes. `Connection: close` is what
 // makes that the end of the response; the framing headers then say how much of
-// it is body.
-static char* ezwire_hear(int fd, void* ssl, size_t* len) {
+// it is body. A TLS read that stops for any reason other than the peer being
+// done sets `bad`, so a connection cut mid-body is an error and not a short
+// file that happens to parse.
+static char* ezwire_hear(int fd, void* ssl, size_t* len, int* bad) {
   size_t cap = 65536;
   size_t at = 0;
   char* buf = malloc(cap);
@@ -226,6 +231,13 @@ static char* ezwire_hear(int fd, void* ssl, size_t* len) {
     int n = ssl != NULL ? ezwire_tls.read(ssl, buf + at, 16384)
       : (int)recv(fd, buf + at, 16384, 0);
     if (n <= 0) {
+      if (ssl == NULL) {
+        *bad = n < 0;
+      } else {
+        int why = ezwire_tls.error(ssl, n);
+        *bad = !(why == EZWIRE_SHUT_CLEAN
+          || (why == EZWIRE_SHUT_EOF && n == 0));
+      }
       break;
     }
     at += (size_t)n;
@@ -283,18 +295,18 @@ Term ezwire_talk_run(Env e, Term* f, IoWork* w) {
   if (fd < 0) {
     int wn = snprintf(why, sizeof(why), "could not reach %s port %s",
       part[1], part[2]);
-    Term bad = ezwire_say_back(e, 6, why, (size_t)wn);
+    Term miss = ezwire_say_back(e, 6, why, (size_t)wn);
     free(spec);
-    return bad;
+    return miss;
   }
   void* ssl = secure ? ezwire_shake(fd, part[1]) : NULL;
   if (secure && ssl == NULL) {
     close(fd);
     int wn = snprintf(why, sizeof(why), "the TLS handshake with %s failed",
       part[1]);
-    Term bad = ezwire_say_back(e, 35, why, (size_t)wn);
+    Term miss = ezwire_say_back(e, 35, why, (size_t)wn);
     free(spec);
-    return bad;
+    return miss;
   }
   Term out;
   if (ezwire_say(fd, ssl, part[3], strlen(part[3])) != 0) {
@@ -303,8 +315,15 @@ Term ezwire_talk_run(Env e, Term* f, IoWork* w) {
     out = ezwire_say_back(e, 55, why, (size_t)wn);
   } else {
     size_t len = 0;
-    char* got = ezwire_hear(fd, ssl, &len);
-    out = ezwire_say_back(e, 0, got, len);
+    int bad = 0;
+    char* got = ezwire_hear(fd, ssl, &len, &bad);
+    if (bad) {
+      int wn = snprintf(why, sizeof(why), "the answer from %s was cut short",
+        part[1]);
+      out = ezwire_say_back(e, 56, why, (size_t)wn);
+    } else {
+      out = ezwire_say_back(e, 0, got, len);
+    }
     free(got);
   }
   if (ssl != NULL) {

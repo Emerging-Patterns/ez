@@ -134,6 +134,11 @@ nothing to say about that. Base's own sockets do not help either — `TCP.connec
 puts its host through `inet_pton`, so it reaches an address literal and no name
 — so the effect resolves with getaddrinfo and connects the socket itself.
 
+Certificates are verified and the hostname is checked against them, so a wrong
+name, an expired chain or a self-signed one is a handshake that fails rather
+than a body that arrives. There is no POST, no redirect following, no cookie and
+no proxy, because the hub asks for none of those.
+
 The client does one thing: GET a url and answer with the body. `net/url.bend`
 and `net/http.bend` are pure, so the request format, the status line, the header
 lookup and both body framings are tested with no server anywhere;
