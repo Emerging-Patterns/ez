@@ -116,6 +116,25 @@ def some(ts: List<&2, String>, +want_unit: Bool) -> List<&2, String>:
       +more = some(t, want_unit)
       Bool.pick(List<&2, String>, keep(want_unit, unit(h)), h <> more, more)
 
+# whether an end-to-end test is one this run will take. `--unit-only` says no
+# to all of them, for a caller that has a sandbox rather than a machine: the
+# top-level `tests/` start real git daemons, publish to a real hub and shell
+# out to `nix-build`, and a sandbox has no network, no nix daemon and no ports
+# to give them. The unit tests, which read and write nothing outside the tree,
+# are unaffected. This is selection and nothing else — a run that takes an
+# end-to-end test still runs it exactly as it did.
+def keep.solo(+want: Bool, +is_unit: Bool) -> Bool:
+  Bool.and(want, Bool.not(is_unit))
+
+# the end-to-end tests, or none of them
+def solos(ts: List<&2, String>, +want: Bool) -> List<&2, String>:
+  match ts:
+    case Nil{}:
+      Nil{}
+    case Con{+h, t}:
+      +more = solos(t, want)
+      Bool.pick(List<&2, String>, keep.solo(want, unit(h)), h <> more, more)
+
 # a project named once more, or not again. The walk runs over a sorted list, so
 # every test of a project is consecutive and the head of what came back is the
 # only one this could repeat.
@@ -733,7 +752,8 @@ def fresh.dir(+at: String) -> IO(Unit):
     _mk : String <- R.exec(["mkdir", "-p", at])
     return Unit{}
 
-# `ez test [--js-only] [--full]`: every test in the tree, on every lane.
+# `ez test [--js-only] [--full] [--unit-only]`: every test in the tree, on
+# every lane.
 #
 # The whole run is planned before any of it is started, then handed to `R.par`
 # in two waves: what every unit runs first, and then the binaries the native
@@ -755,12 +775,13 @@ def run(+as: List<&2, String>) -> IO(Unit):
 
     +full : Bool <- IO.pure(Bool, flag(as, "--full"))
     +on : Bool <- IO.pure(Bool, Bool.not(flag(as, "--js-only")))
+    +e2e : Bool <- IO.pure(Bool, Bool.not(flag(as, "--unit-only")))
     +g : String <- Cap.gb()
     +at : String <- Env.lib()
     +jobs : String <- width()
     +ts : List<&2, String> <- find()
     +us : List<&2, String> <- IO.pure(List<&2, String>, some(ts, True{}))
-    es : List<&2, String> <- IO.pure(List<&2, String>, some(ts, False{}))
+    es : List<&2, String> <- IO.pure(List<&2, String>, solos(ts, e2e))
     shadow(repo, projs(us))
     ps : List<&2, String> <- find.proofs()
     +ws : List<&2, Work> <- plan(projs(us), us, es, ps, on, full, tool, loud)
