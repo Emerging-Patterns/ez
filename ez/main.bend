@@ -36,7 +36,7 @@ def usage() -> String:
   "  ez check                        check the entry, without running it\n" ++
   "  ez build [out]                  build the entry to a native binary\n" ++
   "  ez run [args..]                 check and run the entry\n" ++
-  "  ez test [--js-only]             run every */tests/*.bend, on both lanes\n" ++
+  "  ez test [--js-only] [--full]    run every */tests/*.bend, on both lanes\n" ++
   "  ez doctor                       report on the toolchain and the project\n"
 
 # a subcommand by its name

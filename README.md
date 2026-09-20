@@ -59,7 +59,7 @@ ez fetch                         fill BEND_LIB from the lock
 ez check                         check the entry, without running it
 ez build [out]                   build the entry to a native binary
 ez run [args..]                  check and run the entry
-ez test [--js-only]              run every */tests/*.bend, on both lanes
+ez test [--js-only] [--full]     run every */tests/*.bend, on both lanes
 ez doctor                        report on the toolchain and the project
 ```
 
@@ -95,5 +95,8 @@ bendLib = inputs.ez.lib.${system}.bendLib ./ez.lock.toml;
 Every file comes from a fixed-output derivation keyed by the sha256 the lock
 already records, so the build needs no network and `bend` never reaches the hub.
 
-`ez test` is the gate: `EZ_PROGRESS=1` to see it work, `EZ_CAP` to change the
-memory cap each `bend` runs under.
+`ez test` is the gate. It compiles a project's tests into one binary rather
+than one each, and caches a lane on the content of everything it reads, so a
+second run of an unchanged tree is seconds. `--full` ignores the cache,
+`EZ_PROGRESS=1` shows it working, and `EZ_CAP` changes the memory cap each
+`bend` runs under.

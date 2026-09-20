@@ -1,6 +1,6 @@
 # run: a program run with its arguments, on both lanes
 import Base
-import ../run.bend as R
+import ../../run/run.bend as R
 import ../../check/kit.bend as Check
 
 def main() -> IO(Unit):
