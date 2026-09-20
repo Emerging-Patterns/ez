@@ -1,6 +1,7 @@
-# Push of a v* tag → GitHub Release. Skips if the release already exists.
-# Notes from CHANGELOG.md for that version when present, else generated notes.
-# No binary attach.
+# On a pushed v* tag (`git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`):
+# open a GitHub Release. Tag + GitHub Release only.
+# No native package attach. GitHub already ships a source archive on the release.
+# Notes are GitHub-generated from commits since the previous tag.
 
 name: release
 
@@ -16,60 +17,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v3
         with:
-          fetch-depth: 0
-
-      - id: meta
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          if ! echo "$tag" | grep -qxE 'v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?'; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "skip: ${tag} is not a vX.Y.Z tag"
-            exit 0
-          fi
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "release ${tag} already exists"
-            exit 0
-          fi
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-          case "$tag" in
-            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
-            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
-          esac
-          ver="${tag#v}"
-          notes=false
-          if [ -f CHANGELOG.md ]; then
-            awk -v ver="$ver" '
-              $0 ~ "^##[ \\[]+v?" ver {found=1; print; next}
-              found && /^## / {exit}
-              found {print}
-            ' CHANGELOG.md > /tmp/release-notes.md
-            if [ -s /tmp/release-notes.md ]; then
-              notes=true
-            fi
-          fi
-          echo "notes=${notes}" >> "$GITHUB_OUTPUT"
-
-      - name: Release (changelog notes)
-        if: steps.meta.outputs.skip != 'true' && steps.meta.outputs.notes == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: ${{ steps.meta.outputs.tag }}
-          body_path: /tmp/release-notes.md
-          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
-
-      - name: Release (generated notes)
-        if: steps.meta.outputs.skip != 'true' && steps.meta.outputs.notes != 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: ${{ steps.meta.outputs.tag }}
           generate_release_notes: true
-          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          prerelease: ${{ contains(github.ref_name, '-') }}

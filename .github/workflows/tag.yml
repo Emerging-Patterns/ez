@@ -1,15 +1,16 @@
-# workflow_dispatch: resolve X.Y.Z from flake.nix (the only version file),
-# optionally bump it, then create the GitHub Release (and tag) via
-# softprops/action-gh-release. A GITHUB_TOKEN tag push does not start release.yml.
+# Cuts a vX.Y.Z tag and GitHub Release from workflow_dispatch
+# (a GITHUB_TOKEN tag does not start release.yml).
 #
 # How to cut a release
-#   1. Land the version on master in flake.nix (or use bump below).
+#   1. Land the version on master in flake.nix (`version = "X.Y.Z"` on the ez package).
 #   2. Actions → Tag → Run workflow, from master:
 #        - leave version empty and bump=none → tag what flake.nix says
 #        - version=X.Y.Z → tag that (fails if flake.nix differs)
-#        - bump=patch|minor|major → rewrite flake.nix, commit, tag
+#        - bump=patch|minor|major → rewrite flake.nix, commit, tag the new X.Y.Z
 #   3. Or tag locally: `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`
 #      (release.yml then opens the GitHub Release).
+#
+# Does not attach a nix binary. Does not `bend --publish`.
 
 name: tag
 
@@ -41,11 +42,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      - id: ver
+          ref: ${{ github.ref_name }}
+      - name: Resolve version
+        id: ver
         env:
-          GH_TOKEN: ${{ github.token }}
           VERSION_IN: ${{ inputs.version }}
           BUMP: ${{ inputs.bump }}
         run: |
@@ -57,6 +57,7 @@ jobs:
             echo "could not read version from flake.nix"
             exit 1
           fi
+          file_ver="$flake_ver"
 
           ver=$(printf '%s' "$VERSION_IN" | tr -d '[:space:]')
           ver="${ver#v}"
@@ -64,7 +65,7 @@ jobs:
           if [ -n "$ver" ]; then
             :
           elif [ "${BUMP:-none}" != none ]; then
-            IFS=. read -r maj min pat <<< "$flake_ver"
+            IFS=. read -r maj min pat <<< "$file_ver"
             case "$BUMP" in
               major) ver="$((maj + 1)).0.0" ;;
               minor) ver="$maj.$((min + 1)).0" ;;
@@ -73,64 +74,42 @@ jobs:
             esac
             bump_files=1
           else
-            ver="$flake_ver"
+            ver="$file_ver"
           fi
 
           if ! echo "$ver" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
             echo "version must be X.Y.Z, got: $ver"
             exit 1
           fi
-          if [ "$bump_files" -eq 0 ] && [ "$ver" != "$flake_ver" ]; then
-            echo "asked to tag v${ver} but flake.nix is ${flake_ver}"
+          if [ "$bump_files" -eq 0 ] && [ "$ver" != "$file_ver" ]; then
+            echo "asked to tag v$ver but flake.nix is $file_ver"
             echo "bump flake.nix first, or use bump="
             exit 1
           fi
 
-          git fetch --tags --force
-          if git rev-parse "refs/tags/v${ver}" >/dev/null 2>&1; then
-            echo "tag v${ver} already exists"
-            exit 1
-          fi
-
           if [ "$bump_files" -eq 1 ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            sed -i -E 's/version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"${ver}"'"/' flake.nix
-            if ! grep -q "version = \"${ver}\"" flake.nix; then
-              echo "failed to write flake.nix version ${ver}"
+            sed -i -E 's/version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$ver"'"/' flake.nix
+            if ! grep -q "version = \"$ver\"" flake.nix; then
+              echo "failed to write flake.nix version $ver"
               exit 1
             fi
-            git add flake.nix
-            git commit -m "Release v${ver}"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
-          echo "version=${ver}" >> "$GITHUB_OUTPUT"
-          notes=false
-          if [ -f CHANGELOG.md ]; then
-            awk -v ver="$ver" '
-              $0 ~ "^##[ \\[]+v?" ver {found=1; print; next}
-              found && /^## / {exit}
-              found {print}
-            ' CHANGELOG.md > /tmp/release-notes.md
-            if [ -s /tmp/release-notes.md ]; then
-              notes=true
-            fi
-          fi
-          echo "notes=${notes}" >> "$GITHUB_OUTPUT"
-
-      - name: Release (changelog notes)
-        if: steps.ver.outputs.notes == 'true'
-        uses: softprops/action-gh-release@v2
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "bump_files=$bump_files" >> "$GITHUB_OUTPUT"
+      - name: Commit version bump
+        id: commit
+        if: steps.ver.outputs.bump_files == '1'
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: Release v${{ steps.ver.outputs.version }}
+          file_pattern: flake.nix
+          branch: ${{ github.ref_name }}
+          disable_globbing: true
+          commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.ver.outputs.version }}
-          name: v${{ steps.ver.outputs.version }}
-          body_path: /tmp/release-notes.md
-
-      - name: Release (generated notes)
-        if: steps.ver.outputs.notes != 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.ver.outputs.version }}
-          name: v${{ steps.ver.outputs.version }}
           generate_release_notes: true
+          target_commitish: ${{ steps.commit.outputs.commit_hash || github.sha }}
