@@ -20,20 +20,50 @@
 // rather than the memory it has — the cap bounds what one job may take, so a
 // width read off the total would happily start seven jobs entitled to more
 // than the machine has left and leave the kernel to sort it out.
+//
+// Spare means MemAvailable, which is the kernel's own estimate of what a new
+// job could get, page cache it would reclaim included. `sysinfo` has no field
+// for it: its freeram plus bufferram left out the 14 GB in Cached here and
+// answered 2 where the kernel answered 4, which is a gate running at half the
+// width the machine could carry. sysinfo is still the fallback for a system
+// with no /proc.
 #include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/sysinfo.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+// the gigabytes a new job could have, by the kernel's own reckoning, or 0 when
+// this system does not say
+static double ezrun_par_spare(void) {
+  FILE* f = fopen("/proc/meminfo", "r");
+  if (f) {
+    char name[64];
+    unsigned long kb = 0;
+    while (fscanf(f, "%63s %lu kB\n", name, &kb) == 2) {
+      if (strcmp(name, "MemAvailable:") == 0) {
+        fclose(f);
+        return (double)kb / (1024.0 * 1024.0);
+      }
+    }
+    fclose(f);
+  }
+  struct sysinfo si;
+  if (sysinfo(&si) == 0) {
+    double unit = si.mem_unit ? (double)si.mem_unit : 1.0;
+    return (((double)si.freeram + (double)si.bufferram) * unit) /
+      (1024.0 * 1024.0 * 1024.0);
+  }
+  return 0.0;
+}
 
 // how many of these may run at once, when the caller did not say
 static int ezrun_par_width(int cap_gb) {
   long cores = sysconf(_SC_NPROCESSORS_ONLN);
   int n = cores > 0 ? (int)cores : 1;
-  struct sysinfo si;
-  if (cap_gb > 0 && sysinfo(&si) == 0) {
-    double unit = si.mem_unit ? (double)si.mem_unit : 1.0;
-    double spare = (double)si.freeram + (double)si.bufferram;
-    double gb = (spare * unit) / (1024.0 * 1024.0 * 1024.0);
+  double gb = ezrun_par_spare();
+  if (cap_gb > 0 && gb > 0.0) {
     int fits = (int)(gb / (double)cap_gb);
     if (fits < n) {
       n = fits;
