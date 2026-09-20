@@ -146,11 +146,13 @@ def lib(want: List<&2, String>) -> IO(Note):
     return lib.judge(at, want, have)
 
 # every `import 0x...` line in the repo. Base has no readdir, so this is grep,
-# and the exclusions keep the vendored copies under .ez out of the answer.
+# and the exclusions keep everything under .ez out of the answer: the vendored
+# copies of the packages, and the gate's shadow, where every source of the repo
+# stands a second time behind a symlink.
 def imports() -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     +out : String <- R.exec(["grep", "-rh", "--include=*.bend",
-      "--exclude-dir=.ez", "--exclude-dir=.gate", "--exclude-dir=.git",
+      "--exclude-dir=.ez", "--exclude-dir=.git",
       "-e", "^import 0x", "."])
     return answered(R.ok(out), R.text(out))
 

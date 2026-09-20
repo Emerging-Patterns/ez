@@ -42,7 +42,7 @@ def key.on(on: Bool, +lane: String, +tool: String, +entry: String) -> IO(String)
 
 # where a lane's answer is remembered
 def at(+k: String) -> String:
-  ".gate/cache/" ++ k
+  ".ez/cache/" ++ k
 
 # whether a file is there
 def there(m: Maybe<&2, String>) -> Bool:
@@ -75,5 +75,5 @@ def keep(ok: Bool, +k: String, +what: String) -> IO(Unit):
 # the directory the answers are kept in
 def make() -> IO(Unit):
   do IO<Unit>:
-    _mk : String <- R.exec(["mkdir", "-p", ".gate/cache"])
+    _mk : String <- R.exec(["mkdir", "-p", ".ez/cache"])
     return Unit{}

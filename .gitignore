@@ -1,5 +1,4 @@
 result
-.gate/
 .ez/*
 # except the one package ez needs to build itself. ez's own Bend imports
 # sha256 out of BEND_LIB, so a checkout with an empty BEND_LIB cannot check
