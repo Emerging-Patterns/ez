@@ -13,6 +13,13 @@ import ./args.bend as Args
 
 # how many gigabytes one `bend` may have. 8 is what fits beside the rest of
 # this machine; a project whose closure costs more says so in EZ_CAP.
+#
+# The cap is also the divisor the gate picks its width from, since a run has to
+# assume every job it starts at once could want the whole of it. So a cap set
+# higher than a tree needs does not only reserve memory, it narrows the gate:
+# the dearest aggregate here peaks at 3.3G, and at the 8G cap that is a width
+# of 4 where 11 would fit. Lower EZ_CAP, or set EZ_JOBS outright, for a tree
+# you have measured.
 def gb() -> IO(String):
   Env.var("EZ_CAP", "8")
 
