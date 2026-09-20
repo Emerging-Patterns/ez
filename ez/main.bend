@@ -19,6 +19,7 @@ type Sub is Data:
   CCheck{}
   CBuild{}
   CRun{}
+  CPublish{}
   CTest{}
   CDoctor{}
   CHelp{}
@@ -36,7 +37,10 @@ def usage() -> String:
   "  ez check                        check the entry, without running it\n" ++
   "  ez build [out]                  build the entry to a native binary\n" ++
   "  ez run [args..]                 check and run the entry\n" ++
-  "  ez test [--js-only] [--full]    run every */tests/*.bend, on both lanes\n" ++
+  "  ez publish                      send the entry to the hub, under ez's " ++
+  "0x name\n" ++
+  "  ez test [--js-only] [--full] [--unit-only]\n" ++
+  "                                  run every */tests/*.bend, on both lanes\n" ++
   "  ez doctor                       report on the toolchain and the project\n"
 
 # a subcommand by its name
@@ -49,10 +53,12 @@ def command(+name: String) -> Sub:
             Bool.pick(Sub, String.eq(name, "check"), CCheck{},
               Bool.pick(Sub, String.eq(name, "build"), CBuild{},
                 Bool.pick(Sub, String.eq(name, "run"), CRun{},
-                  Bool.pick(Sub, String.eq(name, "test"), CTest{},
-                    Bool.pick(Sub, String.eq(name, "doctor"), CDoctor{},
-                      Bool.pick(Sub, Bool.or(String.eq(name, "help"), String.is_empty(name)),
-                        CHelp{}, CUnknown{name})))))))))))
+                  Bool.pick(Sub, String.eq(name, "publish"), CPublish{},
+                    Bool.pick(Sub, String.eq(name, "test"), CTest{},
+                      Bool.pick(Sub, String.eq(name, "doctor"), CDoctor{},
+                        Bool.pick(Sub, Bool.or(String.eq(name, "help"),
+                          String.is_empty(name)),
+                          CHelp{}, CUnknown{name}))))))))))))
 
 # what a subcommand runs
 def dispatch(sub: Sub, as: List<&2, String>) -> IO(Unit):
@@ -73,6 +79,8 @@ def dispatch(sub: Sub, as: List<&2, String>) -> IO(Unit):
       Cmd.build(as)
     case CRun{}:
       Cmd.run(as)
+    case CPublish{}:
+      Cmd.publish()
     case CTest{}:
       Test.run(as)
     case CDoctor{}:

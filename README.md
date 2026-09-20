@@ -60,7 +60,9 @@ ez fetch                         fill BEND_LIB from the lock
 ez check                         check the entry, without running it
 ez build [out]                   build the entry to a native binary
 ez run [args..]                  check and run the entry
-ez test [--js-only] [--full]     run every */tests/*.bend, on both lanes
+ez publish                       send the entry to the hub, under ez's 0x name
+ez test [--js-only] [--full] [--unit-only]
+                                 run every */tests/*.bend, on both lanes
 ez doctor                        report on the toolchain and the project
 ```
 

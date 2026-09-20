@@ -45,7 +45,6 @@
         installPhase = ''
           mkdir -p $out/libexec/ez/bin $out/bin
           cp ez.bin $out/libexec/ez/bin/ez.bin
-          cp bin/*.awk $out/libexec/ez/bin/
           makeWrapper $out/libexec/ez/bin/ez.bin $out/bin/ez \
             --set EZ_LIBSSL ${pkgs.openssl.out}/lib/libssl.so \
             --set-default SSL_CERT_FILE ${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt \
@@ -55,30 +54,44 @@
         '';
       };
 
-      # every unit test prints the `#|` lines of its trailer, on the JS lane.
-      # The glob is `*/tests/*.bend` and so reaches none of the end-to-end
-      # tests in the top-level `tests/`: those drive real git daemons, a real
-      # `bend --publish` and `nix-build`, none of which a sandbox can do.
-      # git and coreutils are here because run/run.bend runs programs, and a
-      # checkout is git's job; procps is for the test that asks which program a
-      # started pid turned out to be. curl is gone: net/ speaks HTTP and HTTPS
-      # itself.
+      # the gate, run by the gate's own runner. This used to be a shell loop
+      # that started one `bend` per test file and filtered the check report out
+      # of each one with awk. Everything that loop did, `ez test` does better
+      # and in Bend: it compiles a project's tests as one program rather than
+      # one each, it caches a lane that has already held, it checks every
+      # `PROOF.bend` in the tree, and `ez/quiet.bend` is the filter awk was.
+      # The loop was kept on the belief that a check could not call `ez`
+      # because it would need a built one; the `ez` package two definitions up
+      # is a built one, so it can.
+      #
+      # `--unit-only` is the one thing a sandbox has to say. It leaves out the
+      # top-level `tests/`, which drive real git daemons, a real
+      # `bend --publish` and `nix-build` — no network, no nix daemon and no
+      # ports here. The old loop excluded them by the shape of its glob; this
+      # excludes them by asking for it, and for the same reason.
+      #
+      # `--js-only` is the second. The native lane compiles through a clang
+      # that reaches for the system's `ld` and dynamic linker, and a sandbox
+      # has neither; the old loop only ever ran the JS lane either.
+      #
+      # The source is copied because `ez test` writes: `.ez/` holds the shadow
+      # it compiles the aggregates in, the cache and each run's output, and the
+      # store path it comes from is read-only. `EZ_DEADLINE=0` turns off the
+      # five minute budget, which is a number for a developer's machine and not
+      # for a builder of unknown speed with a cold cache. procps is for the
+      # test that asks which program a started pid turned out to be; the rest
+      # of what the runner shells out to rides on the `ez` wrapper's own PATH.
       tests = pkgs.runCommand "ez-tests"
         {
-          nativeBuildInputs = [ bend pkgs.git pkgs.coreutils pkgs.procps ];
+          nativeBuildInputs = [ ez pkgs.procps ];
           BEND_LIB = bendLib;
+          EZ_DEADLINE = "0";
         }
         ''
-          cd ${self}
-          fail=0
-          for t in */tests/*.bend; do
-            want=$(sed -n 's/^#|//p' "$t")
-            got=$(bend "$t" 2>&1 | awk -f ${self}/bin/quiet.awk)
-            if [ "$want" != "$got" ]; then
-              echo "FAIL: $t"; diff <(echo "$want") <(echo "$got") | sed 's/^/  /'; fail=1
-            fi
-          done
-          [ $fail = 0 ] || exit 1
+          cp -r ${self} src
+          chmod -R u+w src
+          cd src
+          ez test --js-only --unit-only
           echo ok > $out
         '';
     in {

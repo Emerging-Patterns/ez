@@ -84,3 +84,378 @@ law line_of_agrees:
 law bare_all_agrees:
   for cs: List<&2, Char>
   {old.bare.all(cs) == T.bare.all(cs) : Bool}
+
+# The rest of the ledger: the slice of TOML under it, the reading of a parsed
+# document into a model, and the writing of that model back out. A ledger is a
+# file a person edits, so every one of these is a claim about what ez will do
+# with what they wrote.
+#
+# Two pieces of vocabulary the laws below need and nothing else uses: they
+# name, in a form Bend can walk, the one field of a half-read document and the
+# one bit of a read that says whether it is a ledger.
+
+# whether a document was read into a ledger rather than into a reason
+def is_good(r: M.Read) -> Bool:
+  match r:
+    case M.Bad{why}:
+      False{}
+    case M.Good{m}:
+      True{}
+
+# the section a half-read document is still filling
+def toml.open(t: T.Toml) -> String:
+  T.Toml{bad, name, pairs, done} = t
+  name
+
+# LAW: a space at the front of a line is not part of the line. The trim runs
+# before the line is classified, so a `[section]` indented by a space is still
+# a section header and a key indented by a space is still that key.
+law trim_drops_leading_space:
+  for s: String
+  {T.trim(SCon{' ', s}) == T.trim(s) : String}
+
+# LAW: the first error a document holds is the one it reports; a later one
+# never replaces it. A syntax error puts the parser in a state every line
+# after it is read in, so the last error is the least informative one there
+# is.
+law first_error_wins:
+  for +bad: String
+  for why: String
+  for e: {False{} == String.is_empty(bad) : Bool}
+  {T.first(bad, why) == bad : String}
+
+# LAW: the pairs written before the first header are not a section. TOML has
+# no top-level table here, and inventing one named "" would give `pairs_of` a
+# section to find.
+law flush_skips_unnamed:
+  for pairs: List<&2, T.Kv>
+  for done: List<&2, T.Sect>
+  {T.flush("", pairs, done) == done : List<&2, T.Sect>}
+
+# LAW: and a header that was written is a section whether or not anything was
+# written under it, with its pairs back in the order they were written.
+law flush_keeps_named:
+  for +name: String
+  for pairs: List<&2, T.Kv>
+  for done: List<&2, T.Sect>
+  for e: {False{} == String.is_empty(name) : Bool}
+  {T.flush(name, pairs, done)
+    == T.Sect{name, List.reverse(&2, T.Kv, pairs)} <> done : List<&2, T.Sect>}
+
+# LAW: a pair written before any header is an error and is not filed anywhere.
+# Silently keeping it would put it in whatever section came next.
+law put_outside_section_is_bad:
+  for bad: String
+  for pairs: List<&2, T.Kv>
+  for done: List<&2, T.Sect>
+  for +key: String
+  for val: String
+  {T.put(T.Toml{bad, "", pairs, done}, key, val)
+    == T.Toml{T.first(bad, key ++ " = is outside any section"), "", pairs, done}
+    : T.Toml}
+
+# LAW: and a pair written under a header joins that header's section, with the
+# key and the value it was written with.
+law put_in_section:
+  for bad: String
+  for +name: String
+  for pairs: List<&2, T.Kv>
+  for done: List<&2, T.Sect>
+  for key: String
+  for val: String
+  for e: {False{} == String.is_empty(name) : Bool}
+  {T.put(T.Toml{bad, name, pairs, done}, key, val)
+    == T.Toml{bad, name, T.Kv{key, val} <> pairs, done} : T.Toml}
+
+# LAW: a blank line changes nothing about a document being read. This is the
+# first question `line_of` asks and the reason it asks it first: an empty
+# string starts with nothing and holds nothing, so every later test would miss
+# it and the line would be called neither a header nor a key.
+law step_skips_blank:
+  for st: T.Toml
+  {T.step(st, "") == st : T.Toml}
+
+# LAW: a document leaves no section open. Whatever the last line did, `parse`
+# flushes what it was filling, so `sects` is every section the document held
+# and not every section but the last.
+law parse_closes_sections:
+  for text: String
+  {toml.open(T.parse(text)) == "" : String}
+
+# LAW: the sections a parse found are the ones it finished
+law sects_is_done:
+  for bad: String
+  for name: String
+  for pairs: List<&2, T.Kv>
+  for done: List<&2, T.Sect>
+  {T.sects(T.Toml{bad, name, pairs, done}) == done : List<&2, T.Sect>}
+
+# LAW: a header always cuts into at least one segment, so a lookup that reads
+# the first of them never reads off the end of the list.
+law segments_never_empty:
+  for s: String
+  {List.is_empty(&2, String, T.segments(s)) == False{} : Bool}
+
+# LAW: a quote is never part of a segment: it toggles the quoting and nothing
+# else, so a pair of them cuts nothing and leaves nothing behind. This is half
+# of why `packages."0x0a".files` is three segments rather than four; the other
+# half, that the dot between a pair of them is kept, is what
+# `manifest/tests/parse.bend` samples as "a quoted segment keeps its dots".
+# Quantifying that half over every header wants a reverse-involution lemma for
+# the accumulator the segment walk carries its answer in, and this file needs
+# no such lemma otherwise.
+law segments_quotes_toggle:
+  for s: String
+  {T.segments(SCon{'"', SCon{'"', s}}) == T.segments(s) : List<&2, String>}
+
+# LAW: a key with nothing in it is never bare, so it is written quoted and
+# reads back as the key it was rather than as the start of the next line.
+law bare_needs_a_char:
+  for +s: String
+  for e: {True{} == String.is_empty(s) : Bool}
+  {T.bare(s) == False{} : Bool}
+
+# LAW: a key that can be written without quotes is written without them
+law key_is_bare_when_it_can:
+  for +s: String
+  for e: {True{} == T.bare(s) : Bool}
+  {T.key(s) == s : String}
+
+# LAW: and one that cannot is quoted, whole. Nothing in between: a key is
+# never written half-escaped, which is what makes `quote_strip` reach every
+# key a ledger holds.
+law key_is_quoted_when_it_must:
+  for +s: String
+  for e: {False{} == T.bare(s) : Bool}
+  {T.key(s) == T.quote(s) : String}
+
+# LAW: a document of one table is that table's header and then its pairs, with
+# nothing before it and no separator after it.
+law render_one_table:
+  for +n: String
+  for ps: List<&2, T.Kv>
+  {T.render([T.Sect{n, ps}]) == "[" ++ n ++ "]\n" ++ T.render.pairs(ps)
+    : String}
+
+# LAW: a section answers a key with the value written for it, the way a table
+# does. `manifest.value` is the table lookup and not a second one.
+law value_first_in_section:
+  for +k: String
+  for v: String
+  for ps: List<&2, T.Kv>
+  {M.value(T.Kv{k, v} <> ps, k) == v : String}
+
+# LAW: a document answers a section name with the pairs of the first section
+# of that name. A later table of the same name never shadows an earlier one,
+# which matters because a ledger a person edited may well hold two.
+law pairs_of_first:
+  for +name: String
+  for ps: List<&2, T.Kv>
+  for ss: List<&2, T.Sect>
+  {M.pairs_of(T.Sect{name, ps} <> ss, name) == ps : List<&2, T.Kv>}
+
+# LAW: a dependency section that names no repo is a hub package. This is the
+# one place ez decides that a package needs no checkout, so it must turn on
+# the `git` key being absent and on nothing else.
+law source_of_hub:
+  for +pairs: List<&2, T.Kv>
+  for e: {True{} == String.is_empty(M.value(pairs, "git")) : Bool}
+  {M.source_of(pairs) == M.Hub{} : M.Source}
+
+# LAW: a `[deps.<name>]` section is a dependency of that name, with the
+# prefix off and nothing else taken with it.
+law dep_of_drops_prefix:
+  for +name: String
+  for +pairs: List<&2, T.Kv>
+  {M.dep.name(M.dep_of("deps." ++ name, pairs)) == name : String}
+
+# LAW: a section answers with the name it was written with
+law name_of_sect:
+  for +n: String
+  for ps: List<&2, T.Kv>
+  {M.name_of(T.Sect{n, ps}) == n : String}
+
+# LAW: every `[deps.<name>]` section becomes a dependency, in the order the
+# document wrote them.
+law deps_takes_dep_sections:
+  for +name: String
+  for +ps: List<&2, T.Kv>
+  for ss: List<&2, T.Sect>
+  {M.deps(T.Sect{"deps." ++ name, ps} <> ss)
+    == M.dep_of("deps." ++ name, ps) <> M.deps(ss) : List<&2, M.Dep>}
+
+# LAW: and a section that is not one is passed over rather than read as one
+law deps_skips_other_sections:
+  for +n: String
+  for ps: List<&2, T.Kv>
+  for ss: List<&2, T.Sect>
+  for e: {False{} == String.starts_with(n, "deps.") : Bool}
+  {M.deps(T.Sect{n, ps} <> ss) == M.deps(ss) : List<&2, M.Dep>}
+
+# LAW: a dependency section with no hash is reported, by its own name, before
+# any section after it. A hash is the `0x` name the import line carries, so a
+# section without one names a package ez cannot resolve.
+law missing_finds_first:
+  for +n: String
+  for +ps: List<&2, T.Kv>
+  for ss: List<&2, T.Sect>
+  for e0: {True{} == String.starts_with(n, "deps.") : Bool}
+  for e1: {True{} == String.is_empty(M.value(ps, "hash")) : Bool}
+  {M.missing(T.Sect{n, ps} <> ss) == n : String}
+
+# LAW: a syntax error is reported before a missing hash. A section that did
+# not parse cannot be judged for what it holds.
+law problem_syntax_first:
+  for +bad: String
+  for +miss: String
+  for e: {False{} == String.is_empty(bad) : Bool}
+  {M.problem(bad, miss) == bad : String}
+
+# LAW: once a document is known to be sound, building it cannot fail. Every
+# refusal ez makes about a ledger is made by `problem`, and this says `build`
+# adds none of its own.
+law build_is_good:
+  for +ss: List<&2, T.Sect>
+  {is_good(M.build(ss)) == True{} : Bool}
+
+# LAW: and a document with any problem at all is never read into a ledger. It
+# comes back as the problem, so no command can go on with a half-read file.
+law read_refuses_a_problem:
+  for +bad: String
+  for +ss: List<&2, T.Sect>
+  for e: {False{} == String.is_empty(M.problem(bad, M.missing(ss))) : Bool}
+  {M.read(bad, ss) == M.Bad{M.problem(bad, M.missing(ss))} : M.Read}
+
+# LAW: the ledger is read out of the sections the parse found and the first
+# syntax error it found, and out of nothing else -- not out of the text again.
+law parse_reads_the_sections:
+  for +text: String
+  for bad: String
+  for name: String
+  for pairs: List<&2, T.Kv>
+  for sects: List<&2, T.Sect>
+  for e: {T.Toml{bad, name, pairs, sects} == T.parse(text) : T.Toml}
+  {M.parse(text) == M.read(bad, sects) : M.Read}
+
+# LAW: a ledger that did not read says so before it says anything else
+law show_bad_is_marked:
+  for why: String
+  {String.starts_with(M.show(M.Bad{why}), "error: ") == True{} : Bool}
+
+# LAW: and one that did opens with the package's own name
+law show_good_opens_with_name:
+  for +n: String
+  for e: String
+  for ds: List<&2, M.Dep>
+  {String.starts_with(M.show(M.Good{M.Manifest{n, e, ds}}), n) == True{}
+    : Bool}
+
+# LAW: a lookup answers with the first dependency of that name, whole
+law find_first:
+  for +n: String
+  for h: String
+  for en: String
+  for s: M.Source
+  for t: List<&2, M.Dep>
+  {M.find(M.Dep{n, h, en, s} <> t, n) == M.Dep{n, h, en, s} : M.Dep}
+
+# LAW: and a ledger that did not read names no dependency at all, rather than
+# the first one it happened to have parsed before it gave up.
+law dep_of_unread_is_blank:
+  for why: String
+  for name: String
+  {M.dep(M.Bad{why}, name) == M.Dep{"", "", "", M.Hub{}} : M.Dep}
+
+# LAW: the commit a ledger pins a dependency to is the commit its git section
+# wrote. This and the law under it are what `ez lock` and `ez doctor` read,
+# and they reach through the lookup, the source and the accessor at once.
+law rev_of_names_the_commit:
+  for mn: String
+  for me: String
+  for +n: String
+  for h: String
+  for en: String
+  for url: String
+  for +rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for t: List<&2, M.Dep>
+  {M.rev_of(M.Good{M.Manifest{mn, me,
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}} <> t}}, n) == rev
+    : String}
+
+# LAW: and the tag it was asked for is the tag its git section wrote
+law tag_of_names_the_tag:
+  for mn: String
+  for me: String
+  for +n: String
+  for h: String
+  for en: String
+  for url: String
+  for rev: String
+  for +tag: String
+  for root: String
+  for nar: String
+  for t: List<&2, M.Dep>
+  {M.tag_of(M.Good{M.Manifest{mn, me,
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}} <> t}}, n) == tag
+    : String}
+
+# LAW: a key with no value leaves no trace in the file. An absent tag or entry
+# is absent, and never written as an empty string the next read would take for
+# a value.
+law line_absent:
+  for key: String
+  {R.line(key, "") == "" : String}
+
+# LAW: so a git source with no tag writes the four keys it does have and
+# nothing where the tag would be.
+law source_omits_absent_tag:
+  for url: String
+  for rev: String
+  for root: String
+  for nar: String
+  {R.source(M.Git{url, rev, "", root, nar})
+    == R.line("git", url) ++ R.line("rev", rev) ++ R.line("root", root)
+      ++ R.line("narHash", nar) : String}
+
+# LAW: a dependency's section is headed by that dependency's own name
+law dep_opens_its_section:
+  for +n: String
+  for h: String
+  for e: String
+  for s: M.Source
+  {String.starts_with(R.dep(M.Dep{n, h, e, s}), "\n[deps." ++ n) == True{}
+    : Bool}
+
+# LAW: rendering a list of dependencies renders each of them, in order, and
+# adds nothing between. Splitting the list splits the text at the same place,
+# which is what makes the file the ledger and not a summary of it.
+law deps_splits:
+  for as: List<&2, M.Dep>
+  for +bs: List<&2, M.Dep>
+  {R.deps(List.append(&2, M.Dep, as, bs)) == R.deps(as) ++ R.deps(bs) : String}
+
+# LAW: a rendered ledger opens with the package table, so what it writes is a
+# document `parse` reads back as a ledger and not as a loose pair.
+law show_opens_with_package:
+  for n: String
+  for e: String
+  for ds: List<&2, M.Dep>
+  {String.starts_with(R.show(M.Manifest{n, e, ds}), "[package]\n") == True{}
+    : Bool}
+
+# LAW: a ledger that did not read renders as nothing. `ez add` and `ez remove`
+# write what they render, so a failed read that rendered a guess would
+# overwrite a good file with it.
+law render_of_unread_is_blank:
+  for why: String
+  {R.render(M.Bad{why}) == "" : String}
+
+# LAW: removing a dependency twice is removing it once, which is what makes
+# `ez remove` safe to run on a ledger it already edited.
+law remove_idem:
+  for m: M.Manifest
+  for +name: String
+  {R.remove(R.remove(m, name), name) == R.remove(m, name) : M.Manifest}

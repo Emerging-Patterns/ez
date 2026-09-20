@@ -200,3 +200,127 @@ law seen_has_agrees:
   for xs: List<&2, String>
   for +s: String
   {old.seen.has(xs, s) == P.seen.has(xs, s) : Bool}
+
+# The path algebra, which is the other half of what a package's identity rests
+# on: a module's name inside a package is the path it was reached through, and
+# Base has no realpath, so `.` and `..` are resolved by text. A miscount there
+# renames a module, and a renamed module is a different `0x` name.
+#
+# Two pieces of vocabulary the laws below need and nothing else uses. They
+# say, in a form Bend can walk, what "this path holds no separator" means and
+# which half of a half-finished normalisation is the root flag.
+
+# whether a string holds no separator, and so is one component of a path
+def slashless(s: String) -> Bool:
+  match s:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      Bool.and(Bool.not(Char.is_eq(h, '/')), slashless(t))
+
+# whether a half-finished normalisation began at the root
+def walk.abs(w: Path.Walk) -> Bool:
+  Path.Walk{abs, out} = w
+  abs
+
+# LAW: a component that is none of the three the walk acts on is kept, text
+# for text. This is what makes a module's name the path it was reached
+# through: the normaliser rewrites `.` and `..` and copies everything else, so
+# no component is ever silently folded, trimmed or cased.
+law comp_name:
+  for +c: String
+  for e0: {False{} == String.is_empty(c) : Bool}
+  for e1: {False{} == String.eq(c, ".") : Bool}
+  for e2: {False{} == String.eq(c, "..") : Bool}
+  {Path.comp_of(c) == Path.CName{c} : Path.Comp}
+
+# LAW: a climb cancels the component it climbs off, whatever was kept before
+# it and whether or not the path began at the root.
+law up_cancels:
+  for abs: Bool
+  for +h: String
+  for t: List<&2, String>
+  for e: {False{} == String.eq(h, "..") : Bool}
+  {Path.up(abs, h <> t) == t : List<&2, String>}
+
+# LAW: and a climb past a climb cancels nothing, because a climb is not a
+# component to climb off. Two `..` in a row stay two: this is the edge that
+# decides how far `pkg.place` re-roots a package, and folding them would
+# re-root it one directory too shallow.
+law up_stacks:
+  for abs: Bool
+  for t: List<&2, String>
+  {Path.up(abs, ".." <> t) == ".." <> (".." <> t) : List<&2, String>}
+
+# LAW: a path with no separator in it splits into itself, one component. The
+# two laws under it are read off this one.
+law split_plain:
+  for +p: String
+  for +e: {slashless(p) == True{} : Bool}
+  {String.split(p, '/') == [p] : List<&2, String>}
+
+# LAW: so the base of a path with no separator is the path. The walk carries
+# the one component it has, and nothing follows it.
+law base_plain:
+  for +p: String
+  for e: {slashless(p) == True{} : Bool}
+  {Path.base(p) == p : String}
+
+# LAW: and asking for the last component of such a path, or for more
+# components than it has, gives all of it rather than the empty string a bad
+# `take` would give. `pkg/tests/path.bend` samples this as "fewer components
+# than asked for is all of them"; it holds for every such path and every
+# count.
+law tail_plain:
+  for +p: String
+  for q: Nat
+  for e: {slashless(p) == True{} : Bool}
+  {Path.tail(p, 1n+q) == p : String}
+
+# LAW: taking the directory of a path is joining a climb onto it. `dir` is
+# written as a splice and `join` as a normalisation of a splice, and this
+# holds the one to the other, so the climb `pkg.place` takes is the join
+# `join_agrees` already covers.
+law dir_is_climb:
+  for +p: String
+  for e: {False{} == String.is_empty(p) : Bool}
+  {Path.dir(p) == Path.join(p, "..") : String}
+
+# LAW: a leading climb is one climb more than what follows it. This is the
+# count `pkg.place` re-roots by, so a path that climbs twice must count twice.
+law ups_climb:
+  for p: String
+  {Path.ups("../" ++ p) == 1n+Path.ups(p) : Nat}
+
+# LAW: a path that does not end in `.bend` is its own module name. The strip
+# is a strip and never a truncation of five characters off whatever it was
+# handed.
+law unbend_plain:
+  for +p: String
+  for e: {False{} == String.ends_with(p, ".bend") : Bool}
+  {Path.unbend(p) == p : String}
+
+# LAW: a normalisation carries the root flag it started with, whatever the
+# components did to what it kept.
+law walk_keeps_root:
+  for cs: List<&2, String>
+  for +w: Path.Walk
+  {walk.abs(Path.norm.walk(cs, w)) == walk.abs(w) : Bool}
+
+# LAW: so a path that began at the root normalises to a path that begins at
+# the root. A climb at the root goes nowhere, which is `up.root`, and this is
+# that fact stated where it bites: no count of `..` walks a normalisation off
+# the top of an absolute path.
+law norm_absolute:
+  for +p: String
+  for e: {True{} == String.starts_with(p, "/") : Bool}
+  {String.starts_with(Path.norm(p), "/") == True{} : Bool}
+
+# LAW: and so re-rooting an absolute path leaves it absolute, however many
+# directories it is climbed back off. `pkg.place` climbs by the deepest `..`
+# any module of the package used, and this says that count cannot escape.
+law climb_absolute:
+  for n: Nat
+  for +p: String
+  for e: {True{} == String.starts_with(p, "/") : Bool}
+  {String.starts_with(Path.climb(n, p), "/") == True{} : Bool}

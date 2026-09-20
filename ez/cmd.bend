@@ -9,6 +9,7 @@ import ../manifest/render.bend as Rend
 import ../lock/lock.bend as Lock
 import ../lock/restore.bend as Restore
 import ../git/git.bend as Git
+import ../pub/pub.bend as Pub
 import ./args.bend as Args
 import ./env.bend as Env
 import ./cap.bend as Cap
@@ -83,8 +84,33 @@ def refuse(r: M.Read) -> IO(Unit):
 # all, and a library entry, having no main, checks clean and then exits 1 with
 # "no main to run" from the emit. A check failure throws before the emit, so
 # that message can only follow a check that passed.
+#
+# It is matched as a whole line, because that is the shape of the thing being
+# claimed: bend prints it as `Error: no main to run` and nothing else. Asked as
+# a substring of the whole output, the same words appearing anywhere — inside
+# some other error's text, or in a source line bend echoed back while
+# reporting on it — would answer yes and mean nothing, and a failing check
+# would read as a passing one. Two other line-shaped facts in this tree were
+# being asked of whole files the same way, and one of them silently dropped a
+# test before it was caught.
+def no.main(+line: String) -> Bool:
+  String.eq(line, "Error: no main to run")
+
+# whether any line of the output is that one. The rest of the walk is bound
+# before the `Bool.or` rather than written under it: `Bool.or` is an ordinary
+# function and reduces both sides, so a recursive call sitting inside one is
+# not a branch the condition can decline. Bound first it is a plain fold over
+# a handful of lines, which is what the rest of this tree does too.
+def said.no.main(ls: List<&2, String>) -> Bool:
+  match ls:
+    case Nil{}:
+      False{}
+    case Con{+h, t}:
+      +rest = said.no.main(t)
+      Bool.or(no.main(h), rest)
+
 def check.passed(+out: String) -> Bool:
-  Bool.or(R.ok(out), String.contains(R.text(out), "no main to run"))
+  Bool.or(R.ok(out), said.no.main(String.lines(R.text(out))))
 
 # a passing check says so, since bend says nothing when it is happy
 def check.said(passed: Bool, entry: String, text: String) -> IO(Unit):
@@ -133,6 +159,19 @@ def run(as: List<&2, String>) -> IO(Unit):
     r : M.Read <- load()
     +out : String <- Env.exec(List.append(&2, String, ["bend", entry(r)], as))
     report(out)
+
+# `ez publish`: the entry the ledger names, sent to the hub the way `ez build`
+# and `ez check` build and check that same entry. The `0x` name reported is the
+# one `pkg/pkg.bend` computed from the file set; what `bend --publish` printed
+# is only checked against it. `pub/pub.bend` holds the whole of it, laws and
+# all, and is handed the project's BEND_LIB the way `git/git.bend` is handed it
+# for a vendoring.
+def publish() -> IO(Unit):
+  do IO<Unit>:
+    r : M.Read <- load()
+    +at : String <- IO.pure(String, entry(r))
+    lib : String <- Env.lib()
+    Pub.publish(lib, at)
 
 # every .bend file under the current directory, for the lock's roots
 def sources() -> IO(List<&2, String>):

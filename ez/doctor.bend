@@ -5,6 +5,7 @@
 # problem fails the command.
 import Base
 import ../run/run.bend as R
+import ../run/bend.bend as Bend
 import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ./args.bend as Args
@@ -48,17 +49,23 @@ def probe.note(ok: Bool, name: String, +text: String) -> Note:
     case False{}:
       Note{True{}, name ++ ": not on PATH"}
 
-# the flag a program answers its version with. bend 2.0.17 dropped --version
-# for a subcommand; everyone else still uses the flag.
-def probe.flag(+name: String) -> String:
-  Bool.pick(String, String.eq(name, "bend"), "version", "--version")
+# how a program is asked for its version, once it is known whether this is
+# bend. Everything else answers the flag; bend has answered it two ways over
+# its versions, so that question goes to run/bend, which knows both spellings
+# and reports whichever one answered.
+def probe.ask(is_bend: Bool, name: String) -> IO(String):
+  match is_bend:
+    case True{}:
+      Bend.version()
+    case False{}:
+      R.exec([name, "--version"])
 
 # a program asked for its version, which answers both whether it is there and
 # which one it is. bend's check report changed wording between 2.0.16 and
 # 2.0.18, and the native lane needs a C compiler, so the version is the finding.
 def probe(+name: String) -> IO(Note):
   do IO<Note>:
-    +out : String <- R.exec([name, probe.flag(name)])
+    +out : String <- probe.ask(String.eq(name, "bend"), name)
     return probe.note(R.ok(out), name, R.text(out))
 
 # the C compiler the native lane will use: `$CC` when it is set, else `cc`.

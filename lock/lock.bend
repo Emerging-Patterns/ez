@@ -14,6 +14,7 @@
 import Base
 import ../io/file.bend as F
 import ../run/run.bend as R
+import ../run/bend.bend as Bend
 import ../sha/sha.bend as Sha
 import ../hub/hub.bend as Web
 import ../git/git.bend as Git
@@ -735,7 +736,7 @@ def ledger_of(+at: String) -> IO(List<&2, Origin>):
 # the version of bend that resolved a lock, for the record
 def version() -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(["bend", "version"])
+    +out : String <- Bend.version()
     return K.word(K.words(String.trim(R.text(out))), 1n)
 
 # the lock of a project, resolved against a named hub, ledger and BEND_LIB. The
