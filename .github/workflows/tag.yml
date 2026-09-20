@@ -10,7 +10,7 @@
 #   3. Or tag locally: `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`
 #      (release.yml then opens the GitHub Release).
 #
-# Does not attach a nix binary. Does not `bend --publish`.
+# Tag and GitHub Release only; GitHub ships the source archive.
 
 name: tag
 
