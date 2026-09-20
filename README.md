@@ -22,18 +22,13 @@ upstream publishes that tree later the hub simply starts serving it.
 
 ## Install
 
-Prefer bendhub once a release exists. The live package hash is on the latest
-GitHub Release title (`vX.Y.Z 0x…`):
+With nix:
 
 ```bash
-curl -fsSL https://bend-lang.com/install.sh | sh
-bend 0xREPLACE_WITH_RELEASE_HASH/main.bend -- --help
+nix profile install github:Emerging-Patterns/ez
 ```
 
-Replace `0xREPLACE_WITH_RELEASE_HASH` with the hash from that release. After the
-first publish, this README will pin a real hash here.
-
-Build from a checkout:
+Without nix — install Bend, then build ez with it:
 
 ```bash
 curl -fsSL https://bend-lang.com/install.sh | sh
@@ -51,14 +46,7 @@ to `bin/ez-git.ts`, so it wants `bun`, and `EZ_ROOT` pointing at the checkout
 so the binary can find that file wherever you ran it from. Every other
 subcommand needs only `bend` and `git`. The nix package sets `EZ_ROOT` for you.
 
-Or with nix:
-
-```bash
-nix profile install github:Emerging-Patterns/ez
-```
-
 `nix develop` gives a shell with bend, git, openssl and `BEND_LIB` already set.
-
 
 ## Usage
 
