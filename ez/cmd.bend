@@ -9,6 +9,7 @@ import ../manifest/render.bend as Rend
 import ../lock/lock.bend as Lock
 import ../lock/restore.bend as Restore
 import ../git/git.bend as Git
+import ../pub/pub.bend as Pub
 import ./args.bend as Args
 import ./env.bend as Env
 import ./cap.bend as Cap
@@ -133,6 +134,19 @@ def run(as: List<&2, String>) -> IO(Unit):
     r : M.Read <- load()
     +out : String <- Env.exec(List.append(&2, String, ["bend", entry(r)], as))
     report(out)
+
+# `ez publish`: the entry the ledger names, sent to the hub the way `ez build`
+# and `ez check` build and check that same entry. The `0x` name reported is the
+# one `pkg/pkg.bend` computed from the file set; what `bend --publish` printed
+# is only checked against it. `pub/pub.bend` holds the whole of it, laws and
+# all, and is handed the project's BEND_LIB the way `git/git.bend` is handed it
+# for a vendoring.
+def publish() -> IO(Unit):
+  do IO<Unit>:
+    r : M.Read <- load()
+    +at : String <- IO.pure(String, entry(r))
+    lib : String <- Env.lib()
+    Pub.publish(lib, at)
 
 # every .bend file under the current directory, for the lock's roots
 def sources() -> IO(List<&2, String>):
