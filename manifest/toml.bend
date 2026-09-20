@@ -174,6 +174,21 @@ def parse.fin(r: Toml) -> Toml:
 def parse(text: String) -> Toml:
   parse.fin(List.foldl(~&2, ~String, ~Toml, ~step, String.lines(text), Toml{"", "", [], []}))
 
+# this pair's value when the key matches, otherwise whatever the rest of the
+# table gave
+def value.at(kv: Kv, rest: String, key: String) -> String:
+  Kv{k, v} = kv
+  Bool.pick(String, String.eq(k, key), v, rest)
+
+# the value written for a key in a table, or "" when it is absent. The scan
+# recurses first and picks after, so no recursive call hides inside a branch.
+def value(pairs: List<&2, Kv>, +key: String) -> String:
+  match pairs:
+    case []:
+      ""
+    case h <> t:
+      value.at(h, value(t, key), key)
+
 # the sections a parse found, in the order they were written
 def sects(t: Toml) -> List<&2, Sect>:
   Toml{_bad, _name, _pairs, done} = t
