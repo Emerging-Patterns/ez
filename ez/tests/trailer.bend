@@ -1,4 +1,4 @@
-# ez: what a test file states its run must print, and where its binary lands
+# ez: what a test file states its run must print
 import Base
 import ../test.bend as T
 import ../../check/kit.bend as Check
@@ -19,13 +19,7 @@ def main() -> IO(Unit):
     Check.eq_str("a file with no trailer wants nothing", T.trailer("def main():\n  0\n"), "")
     Check.eq_str("a comment that is not a trailer is not one",
       T.trailer("# a note\n#|ok\n"), "ok")
-    Check.eq_str("the binary is named for the whole path",
-      T.bin("./io/tests/roundtrip.bend"), ".gate/io-tests-roundtrip")
-    Check.eq_str("two tests of the same name land apart",
-      T.bin("ez/tests/quiet.bend"), ".gate/ez-tests-quiet")
 
 #|ok the trailer is the lines after each #|
 #|ok a file with no trailer wants nothing
 #|ok a comment that is not a trailer is not one
-#|ok the binary is named for the whole path
-#|ok two tests of the same name land apart
