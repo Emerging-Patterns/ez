@@ -648,7 +648,7 @@ def origins_of(+lib: String) -> IO(List<&2, Origin>):
 # the version of bend that resolved a lock, for the record
 def version() -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(["bend", "--version"])
+    +out : String <- R.exec(["bend", "version"])
     return K.word(K.words(String.trim(R.text(out))), 1n)
 
 # the lock of a project, resolved against a named hub and BEND_LIB

@@ -48,12 +48,17 @@ def probe.note(ok: Bool, name: String, +text: String) -> Note:
     case False{}:
       Note{True{}, name ++ ": not on PATH"}
 
+# the flag a program answers its version with. bend 2.0.17 dropped --version
+# for a subcommand; everyone else still uses the flag.
+def probe.flag(+name: String) -> String:
+  Bool.pick(String, String.eq(name, "bend"), "version", "--version")
+
 # a program asked for its version, which answers both whether it is there and
 # which one it is. bend's check report changed wording between 2.0.16 and
 # 2.0.18, and the native lane needs a C compiler, so the version is the finding.
 def probe(+name: String) -> IO(Note):
   do IO<Note>:
-    +out : String <- R.exec([name, "--version"])
+    +out : String <- R.exec([name, probe.flag(name)])
     return probe.note(R.ok(out), name, R.text(out))
 
 # the C compiler the native lane will use: `$CC` when it is set, else `cc`.
