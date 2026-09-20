@@ -20,7 +20,7 @@ import ./env.bend as Env
 # native lane hands its C to whatever `$CC` names, so both belong in the key.
 def tool() -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(["bend", "--version"])
+    +out : String <- R.exec(["bend", "version"])
     +cc : String <- Env.var("CC", "cc")
     return String.trim(R.text(out)) ++ " " ++ cc
 
