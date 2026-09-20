@@ -103,13 +103,34 @@ ez is its own first user. `sha/tests/hex.bend` checks the two FIPS vectors and
 one real manifest line, whose digest is the package hash `0x182e9ab8...` that
 `tests/hub.sh` builds against.
 
-`ez-lock`, `ez-git`, `ez-restore` and `pkg` are still TypeScript. Porting them
-needs foreign effects Base does not have. `bend base` offers file IO, TCP,
-`get_env` and `args`. It has no TLS, so the hub's HTTPS needs a C and JS effect
-pair, and it has no subprocess, so `git` needs the same. That is the order of
-the remaining port: the fetch effect, then git, then the walk that uses them.
+`run/` is the one foreign effect, a program run with its arguments, with a C and
+a JS twin. `hub/` is the fetch and the integrity check on top of it: a body is
+accepted only when its sha256 starts with the hash that named it, which is the
+rule bend itself applies.
+
+One effect covers both HTTPS and git, and that is forced rather than chosen.
+bend links its binaries with exactly `-std=c11 -O3 -lpthread -lm`, plus `-lX11`
+or `-lasound` when the generated C includes those headers. Nothing else can be
+linked, so a TLS client cannot live in C here. curl and git already speak those
+protocols and are on the PATH, so ez runs them.
+
+Arguments reach the effect newline separated and go straight to `execvp`, never
+through a shell, so a url or a rev out of a lockfile cannot become shell syntax.
+`run/tests/exec.bend` asserts that.
+
+`ez-lock`, `ez-git`, `ez-restore` and `pkg` are still TypeScript. What is left to
+port is the walk that uses these pieces: reading local `.bend` files, following
+imports, and writing the tree into BEND_LIB. Base has file IO but no mkdir and
+no readdir, so directories go through the same process effect.
 
 ### A gotcha worth knowing
+
+Bend's own check report changed between releases. 2.0.16 prints
+`All terms check, with N unsafe annotations.`; 2.0.18 prints
+`All terms check, but N defs rely on unsafe or foreign code:` and a `- <name>`
+line each. A test comparing a run's output has to drop both, which is what
+`bin/quiet.awk` does for the gate and the flake alike. The local gate runs
+2.0.16 and the flake runs 2.0.18, so this showed up only in the sandbox.
 
 A Bend module reached through a path with a hyphen in it breaks the JS backend.
 `import ./bend-sha256/sha256.bend as S` compiles to a JS identifier containing
@@ -183,6 +204,9 @@ the build then runs with the hub unreachable.
     flake.nix           bend, bun, the BEND_LIB from the lock, and the checks
     manifest/           ez.toml, read in Bend
     sha/                sha256, from a vendored package ez pins in its own ledger
+    run/                the one foreign effect: a program run with its arguments
+    hub/                a file fetched and checked against the hash naming it
+    bin/quiet.awk       drops bend's check report, so a test sees only its output
     bin/pkg.ts          the package and hash `bend --publish` would produce
     bin/ez-lock.ts      walks the import graph, writes ez.lock.json
     bin/ez-git.ts       vendors an unpublished git repo under its would-be hash

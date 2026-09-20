@@ -38,23 +38,28 @@
         installPhase = ''
           mkdir -p $out/libexec/ez $out/bin
           cp -r bin $out/libexec/ez/bin
-          for t in ez-lock ez-git; do
+          for t in ez-lock ez-git ez-restore; do
             makeWrapper ${pkgs.bun}/bin/bun $out/bin/$t \
               --add-flags $out/libexec/ez/bin/$t.ts \
-              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.git pkgs.nix ]}
+              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.git pkgs.nix pkgs.curl ]}
           done
         '';
       };
 
-      # every .bend test prints the `#|` lines of its trailer, on the JS lane
+      # every .bend test prints the `#|` lines of its trailer, on the JS lane.
+      # curl and coreutils are here because run/run.bend runs programs: bend
+      # links only pthread and libm, so TLS is curl's job.
       tests = pkgs.runCommand "ez-tests"
-        { nativeBuildInputs = [ bend ]; BEND_LIB = bendLib; }
+        {
+          nativeBuildInputs = [ bend pkgs.curl pkgs.coreutils ];
+          BEND_LIB = bendLib;
+        }
         ''
           cd ${self}
           fail=0
           for t in */tests/*.bend; do
             want=$(sed -n 's/^#|//p' "$t")
-            got=$(bend "$t" 2>&1 | grep -v '^All terms check, with [0-9]* unsafe annotation')
+            got=$(bend "$t" 2>&1 | awk -f ${self}/bin/quiet.awk)
             if [ "$want" != "$got" ]; then
               echo "FAIL: $t"; diff <(echo "$want") <(echo "$got") | sed 's/^/  /'; fail=1
             fi
@@ -67,7 +72,7 @@
       apps.${system}.default = { type = "app"; program = "${ez}/bin/ez-lock"; };
       checks.${system} = { inherit tests ez; };
       devShells.${system}.default = pkgs.mkShellNoCC {
-        packages = [ bend bend-cc pkgs.bun pkgs.git ];
+        packages = [ bend bend-cc pkgs.bun pkgs.git pkgs.curl ];
         # vendored packages live with the project, not in ~/.bend/lib, so the
         # pin is per project
         shellHook = ''

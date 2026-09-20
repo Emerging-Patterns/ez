@@ -20,7 +20,7 @@ check() { # name, expected, observed
 }
 # bend reports its unsafe annotations on stderr after the check; that is not the
 # program's output, and a test's `#|` lines do not carry it
-run() { local out; out=$("$@" 2>&1); local st=$?; printf '%s\n' "$out" | grep -v '^All terms check, with [0-9]* unsafe annotation'; return $st; }
+run() { local out; out=$("$@" 2>&1); local st=$?; printf '%s\n' "$out" | awk -f bin/quiet.awk; return $st; }
 
 # every .bend test must print the `#|` lines in its trailer, on each lane
 for t in */tests/*.bend; do
