@@ -22,12 +22,6 @@ def var(name: String, +alt: String) -> IO(String):
 def lib() -> IO(String):
   var("BEND_LIB", ".ez/lib")
 
-# where ez was installed, so it finds the helpers it has not absorbed yet.
-# `IO.args()` carries no argv[0], so a binary cannot locate itself; this is set
-# by whoever installs ez and goes away with the last of the TypeScript.
-def root() -> IO(String):
-  var("EZ_ROOT", ".")
-
 # the command with the project's BEND_LIB in front of it
 def line(at: String, args: List<&2, String>) -> List<&2, String>:
   List.append(&2, String, ["env", "BEND_LIB=" ++ at], args)

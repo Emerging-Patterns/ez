@@ -1,6 +1,7 @@
 {
-  # bend comes from bendlang/bend's own flake; this one adds bun for the tools
-  # that are not ported yet, and the clang the native lane needs.
+  # bend comes from bendlang/bend's own flake; this one adds the clang the
+  # native lane needs. Nothing else: ez is Bend, and what it shells out to is
+  # git and coreutils.
   description = "ez: dependency tracking, lockfile and vendoring tool for Bend 2, written in Bend";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -34,9 +35,6 @@
       # needs instead is libssl by name (it opens it at run time, and no search
       # path reaches a Nix store path) and a CA bundle, which OpenSSL takes
       # from SSL_CERT_FILE. git stays, because `ez add` vendors a repo.
-      # The TypeScript helpers live beside it under libexec until they are
-      # Bend, and EZ_ROOT is how the binary finds them: `IO.args()` carries no
-      # argv[0], so a binary cannot locate itself.
       ez = pkgs.stdenv.mkDerivation {
         pname = "ez";
         version = "0.1.0";
@@ -47,13 +45,12 @@
         installPhase = ''
           mkdir -p $out/libexec/ez/bin $out/bin
           cp ez.bin $out/libexec/ez/bin/ez.bin
-          cp bin/*.ts bin/*.awk $out/libexec/ez/bin/
+          cp bin/*.awk $out/libexec/ez/bin/
           makeWrapper $out/libexec/ez/bin/ez.bin $out/bin/ez \
-            --set EZ_ROOT $out/libexec/ez \
             --set EZ_LIBSSL ${pkgs.openssl.out}/lib/libssl.so \
             --set-default SSL_CERT_FILE ${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt \
             --prefix PATH : ${pkgs.lib.makeBinPath [
-              bend pkgs.bun pkgs.git pkgs.findutils pkgs.coreutils
+              bend pkgs.git pkgs.findutils pkgs.coreutils
             ]}
         '';
       };
@@ -93,7 +90,7 @@
       apps.${system}.default = { type = "app"; program = "${ez}/bin/ez"; };
       checks.${system} = { inherit tests ez; };
       devShells.${system}.default = pkgs.mkShellNoCC {
-        packages = [ bend bend-cc pkgs.bun pkgs.git pkgs.openssl pkgs.cacert ];
+        packages = [ bend bend-cc pkgs.git pkgs.openssl pkgs.cacert ];
         # vendored packages live with the project, not in ~/.bend/lib, so the
         # pin is per project. EZ_LIBSSL and SSL_CERT_FILE are what the client
         # in net/ needs: it opens libssl by name at run time, and OpenSSL takes

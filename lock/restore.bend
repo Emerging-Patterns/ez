@@ -6,6 +6,7 @@ import ../io/file.bend as F
 import ../run/run.bend as R
 import ../sha/sha.bend as Sha
 import ../hub/hub.bend as Web
+import ../git/git.bend as Git
 import ../manifest/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
@@ -73,28 +74,6 @@ def git.all(+from: String, +lib: String, +hash: String, fs: List<&2, K.File>) ->
         git.one(from, lib, hash, h)
         git.all(from, lib, hash, t)
 
-# a git command that failed stops the restore, with whatever git said
-def ran(ok: Bool, what: String, text: String) -> IO(Unit):
-  match ok:
-    case True{}:
-      IO.pure(Unit, Unit{})
-    case False{}:
-      IO.die(Unit, 1, "ez: git " ++ what ++ ": " ++ text)
-
-# one git command
-def git.run(what: String, args: List<&2, String>) -> IO(Unit):
-  do IO<Unit>:
-    +out : String <- R.exec(args)
-    ran(R.ok(out), what, R.text(out))
-
-# the checkout a vendored package is rebuilt from: the pinned commit alone, at
-# the depth of one
-def clone(+work: String, +url: String, +rev: String) -> IO(Unit):
-  do IO<Unit>:
-    git.run("init", ["git", "init", "-q", work])
-    git.run("fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", url, rev])
-    git.run("checkout", ["git", "-C", work, "checkout", "-q", rev])
-
 # a vendored package, rebuilt from the rev the lock pins. Its paths are written
 # from the package's root inside the repo, which is not always the entry's own
 # directory.
@@ -103,7 +82,7 @@ def git.pkg(+lib: String, +hash: String, url: String, rev: String, root: String,
   +work = lib ++ "/.work-" ++ hash
   do IO<Unit>:
     _rm : String <- R.exec(["rm", "-rf", work])
-    clone(work, url, rev)
+    Git.clone(work, url, rev)
     git.all(P.join(work, root), lib, hash, fs)
     _cl : String <- R.exec(["rm", "-rf", work])
     return Unit{}

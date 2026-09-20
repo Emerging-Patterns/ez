@@ -32,7 +32,7 @@ def all(ps: List<&2, L.Pack>) -> String:
     case h <> t:
       shown(h) ++ all(t)
 
-# a .ez/origins.toml, as ez-git writes it
+# a .ez/origins.toml, as `git/git.bend` writes it
 def orig() -> String:
   "[origins.\"0xaa\"]\n" ++
   "kind = \"git\"\n" ++

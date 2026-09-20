@@ -10,6 +10,7 @@ import ../io/file.bend as F
 import ../run/run.bend as R
 import ../sha/sha.bend as Sha
 import ../hub/hub.bend as Web
+import ../git/git.bend as Git
 import ../manifest/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
@@ -634,15 +635,11 @@ def lib() -> IO(String):
     r : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_LIB")
     return lib.or(String.trim(env.text(r)))
 
-# where the origins of vendored packages are written down, which is beside the
-# BEND_LIB they were vendored into
-def origins.at(lib: String) -> String:
-  P.dir(lib) ++ "/origins.toml"
-
-# the origins recorded beside a BEND_LIB
+# the origins recorded beside a BEND_LIB. The file's name belongs to the half
+# that writes it, so it is asked for rather than spelled again here.
 def origins_of(+lib: String) -> IO(List<&2, Origin>):
   do IO<List<&2, Origin>>:
-    m : Maybe<&2, String> <- F.read(origins.at(lib))
+    m : Maybe<&2, String> <- F.read(Git.origins.at(lib))
     return origins(T.sects(T.parse(F.text_of(m))))
 
 # the version of bend that resolved a lock, for the record

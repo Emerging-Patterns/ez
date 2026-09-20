@@ -8,6 +8,7 @@
 import Base
 import ../run/run.bend as R
 import ../io/file.bend as F
+import ../ez/quiet.bend as Q
 import ../check/kit.bend as Check
 import ../check/world.bend as W
 
@@ -25,10 +26,14 @@ def repo(+at: String) -> IO(Unit):
       "  M.double(M.double(x))\n")
     return Unit{}
 
-# what ez says a file's package would be, without publishing it. This is the
-# last of the TypeScript the tests reach into directly.
-def ours(+script: String, +entry: String) -> IO(String):
-  R.exec(["bun", "-e", script, entry])
+# what ez says a file's package would be, without publishing it: the hash on
+# the first line, the directory its paths are written from on the second, then
+# the manifest. One run answers both questions, because a second `bend` over
+# `pkg/main.bend` would cost a whole check to learn nothing new. The check
+# report shares the stream with the answer, so the caller takes it back out.
+def ours(+here: String, +entry: String) -> IO(String):
+  R.exec(["env", "BEND_LIB=" ++ here ++ "/.ez/lib", "EZ_ENTRY=" ++ entry,
+    "bend", here ++ "/pkg/main.bend"])
 
 # the hash `bend --publish` mined, which is the line of its output that names a
 # package: the proof of work reports as it goes, on the same stream.
@@ -39,22 +44,22 @@ def theirs(+repo: String, +port: String) -> IO(String):
       "--publish"]))
     return W.starting(String.lines(R.text(out)), "0x")
 
-# the two hashes, and then the two manifests the hashes are taken over
-def compare(+root: String, +port: String) -> IO(Unit):
+# the two hashes, and then the two manifests the hashes are taken over. The
+# manifests are compared with their trailing blank dropped from both sides:
+# the hash above is the digest of the manifest text, so its equality already
+# pins the bytes, and this second check is here to say which line differs when
+# the first one fails.
+def compare(+here: String, +root: String, +port: String) -> IO(Unit):
   do IO<Unit>:
     +got : String <- theirs(root ++ "/repo", port)
-    +want : String <- ours(
-      "import {pkg_of} from \"./bin/pkg.ts\"; " ++
-      "console.log(pkg_of(process.argv[1]).hash)",
-      root ++ "/repo/src/lib.bend")
-    Check.eq_str("ez computes the hash bend publishes", W.line(want), got)
+    +out : String <- ours(here, root ++ "/repo/src/lib.bend")
+    +said : List<&2, String> <- IO.pure(List<&2, String>,
+      String.lines(Q.filter(R.text(out))))
+    Check.eq_str("ez computes the hash bend publishes", W.nth(said, 0n), got)
     +man : Maybe<&2, String> <- F.read(root ++ "/hub/" ++ got ++ "/manifest")
-    +mine : String <- ours(
-      "import {pkg_of, manifest_of} from \"./bin/pkg.ts\"; " ++
-      "process.stdout.write(manifest_of(pkg_of(process.argv[1]).files))",
-      root ++ "/repo/src/lib.bend")
     Check.eq_str("ez computes the manifest bend publishes",
-      R.text(mine), F.text_of(man))
+      Q.chomp(String.join(List.drop(&2, String, said, 2n), "\n")),
+      Q.chomp(F.text_of(man)))
 
 # everything, once the scratch directory and the port are known
 def go(+here: String, +root: String, +port: String) -> IO(Unit):
@@ -67,7 +72,7 @@ def go(+here: String, +root: String, +port: String) -> IO(Unit):
       "http://127.0.0.1:" ++ port ++ "/"])
     Check.eq_str("the oracle answers",
       Bool.pick(String, up, "yes", "no"), "yes")
-    compare(root, port)
+    compare(here, root, port)
     W.stop(pid)
     W.rm(root)
 
