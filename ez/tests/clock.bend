@@ -26,11 +26,9 @@ def main() -> IO(Unit):
     yes("the epoch has", past)
     +never : Bool <- Clock.over("")
     yes("and a run with no deadline is never over it", Bool.not(never))
-    Check.eq_str("a budget bounds each job by what is left of it",
-      String.join(Clock.bound("1789930000", "300"), " "),
-      "timeout --kill-after=10 300")
-    yes("and no budget bounds nothing",
-      List.is_empty(&2, String, Clock.bound("", "300")))
+    Check.eq_str("the deadline the run effect keeps is the absolute second",
+      Clock.by.effect("1789930000"), "1789930000")
+    Check.eq_str("and no budget is a deadline of zero", Clock.by.effect(""), "0")
 
 #|ok a budget of seconds is one that is being kept
 #|ok zero turns it off
@@ -40,5 +38,5 @@ def main() -> IO(Unit):
 #|ok five minutes from now has not gone by
 #|ok the epoch has
 #|ok and a run with no deadline is never over it
-#|ok a budget bounds each job by what is left of it
-#|ok and no budget bounds nothing
+#|ok the deadline the run effect keeps is the absolute second
+#|ok and no budget is a deadline of zero

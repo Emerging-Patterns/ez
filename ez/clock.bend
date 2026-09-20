@@ -64,9 +64,9 @@ def over.go(none: Bool, +deadline: String) -> IO(Bool):
 def over(+deadline: String) -> IO(Bool):
   over.go(String.is_empty(deadline), deadline)
 
-# what a job may still have, so that one that hangs cannot outlast the budget
-# on its own. `timeout` kills it at the deadline and answers 124, which reads
-# as any other failing build does.
-def bound(+deadline: String, +s: String) -> List<&2, String>:
-  Bool.pick(List<&2, String>, String.is_empty(deadline), [],
-    ["timeout", "--kill-after=10", s])
+# the deadline as the run effect wants it: an absolute second, or "0" when
+# there is no budget to keep. The effect is what queues the jobs, so it is what
+# keeps the deadline; a job bounded by what was left when its batch started is
+# not bounded at all once it waits its turn behind three others.
+def by.effect(+deadline: String) -> String:
+  Bool.pick(String, String.is_empty(deadline), "0", deadline)

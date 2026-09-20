@@ -12,8 +12,9 @@ function ezrun_par(cmd) {
   const fs = require("fs");
   const line = cmd.split("\n");
   const dir = line.length > 2 ? line[2] : ".";
+  const by = line.length > 3 ? parseInt(line[3], 10) : 0;
   const codes = [];
-  let i = 3;
+  let i = 4;
   let n = 0;
   while (i < line.length) {
     const argc = parseInt(line[i], 10);
@@ -22,10 +23,17 @@ function ezrun_par(cmd) {
     }
     const args = line.slice(i + 1, i + 1 + argc);
     i += argc + 1;
+    const spare = by > 0 ? by - Math.floor(Date.now() / 1000) : 0;
+    if (by > 0 && spare <= 0) {
+      codes.push(124);
+      n += 1;
+      continue;
+    }
     const out = fs.openSync(dir + "/" + n, "w");
     try {
-      const r = cp.spawnSync(args[0], args.slice(1), { stdio: ["ignore", out, out] });
-      codes.push(r.error !== undefined && r.error !== null ? 127 : r.status === null ? 128 : r.status);
+      const r = cp.spawnSync(args[0], args.slice(1),
+        { stdio: ["ignore", out, out], timeout: by > 0 ? spare * 1000 : undefined });
+      codes.push(r.error !== undefined && r.error !== null ? 127 : r.status === null ? 124 : r.status);
     } catch (e) {
       codes.push(127);
     }

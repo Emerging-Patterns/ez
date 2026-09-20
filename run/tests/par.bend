@@ -33,7 +33,7 @@ def nth(rs: List<&2, String>, n: Nat) -> String:
 def answers(+at: String) -> IO(Unit):
   do IO<Unit>:
     +rs : List<&2, String> <- R.par([["echo", "one two"], ["false"],
-      ["ez-no-such-program"], ["echo", "$HOME;ls"]], "", "8", at)
+      ["ez-no-such-program"], ["echo", "$HOME;ls"]], "", "8", at, "0")
     Check.eq_str("a job's output comes back with it", R.text(nth(rs, 0n)),
       "one two\n")
     Check.eq_str("and its status", R.code(nth(rs, 0n)), "0")
@@ -59,17 +59,34 @@ def overlap(+at: String) -> IO(Unit):
     W.mkdir(at ++ "/out")
     +rs : List<&2, String> <- R.par([["timeout", "5", "cat", at ++ "/f"],
       ["timeout", "5", "cp", at ++ "/word", at ++ "/f"]], "", "8",
-      at ++ "/out")
+      at ++ "/out", "0")
     Check.eq_str("a job that waits on another is run beside it, not after it",
       R.text(nth(rs, 0n)), "overlapped\n")
     yes("and it is not the timeout that ended it",
       String.eq(R.code(nth(rs, 0n)), "0"))
+
+# whether the deadline is kept by the effect rather than by whoever built the
+# jobs. The width is one, so these queue: without a deadline they would take
+# a minute and a half between them. The first is cut short by the alarm the
+# effect set on it, and the two behind it are never started at all, which is
+# the case a job bounded by what was left when the batch began would miss.
+def deadline(+at: String) -> IO(Unit):
+  do IO<Unit>:
+    +d : String <- R.exec(["date", "-d", "+3 seconds", "+%s"])
+    +rs : List<&2, String> <- R.par([["sleep", "30"], ["sleep", "30"],
+      ["sleep", "30"]], "1", "8", at, String.trim(R.text(d)))
+    Check.eq_str("a job the deadline cuts short answers 124",
+      R.code(nth(rs, 0n)), "124")
+    Check.eq_str("and one it never let start answers the same",
+      R.code(nth(rs, 2n)), "124")
 
 def go(+at: String) -> IO(Unit):
   do IO<Unit>:
     _w : Bool <- F.write(at ++ "/word", "overlapped\n")
     answers(at)
     overlap(at)
+    W.mkdir(at ++ "/by")
+    deadline(at ++ "/by")
     W.rm(at)
 
 def main() -> IO(Unit):
@@ -84,3 +101,5 @@ def main() -> IO(Unit):
 #|ok no shell reads the arguments
 #|ok a job that waits on another is run beside it, not after it
 #|ok and it is not the timeout that ended it
+#|ok a job the deadline cuts short answers 124
+#|ok and one it never let start answers the same

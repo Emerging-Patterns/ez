@@ -13,6 +13,13 @@
 // whichever filled its buffer first, and a file is what the caller reads back
 // anyway.
 //
+// The deadline is an absolute second, or 0 for none, and it is enforced here
+// because here is where the queueing happens. A job bounded by what was left
+// when the batch started is not bounded at all: with a width of four and
+// thirty jobs, the last one starts long after that and still gets the whole
+// window. So a job is skipped outright once the deadline has gone by, and one
+// that does start carries an alarm set to what is actually left.
+//
 // A width of 0 means the caller has no opinion and this works one out. Cores
 // are the obvious ceiling and the wrong one on their own: every one of these
 // runs under a memory cap, so what the machine can hold divides the answer as
@@ -27,11 +34,14 @@
 // answered 2 where the kernel answered 4, which is a gate running at half the
 // width the machine could carry. sysinfo is still the fallback for a system
 // with no /proc.
+#include <errno.h>
+#include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/sysinfo.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 // the gigabytes a new job could have, by the kernel's own reckoning, or 0 when
@@ -106,13 +116,17 @@ Term ezrun_par_run(Env e, Term* f, IoWork* w) {
   int want = lines > 0 ? atoi(line[0]) : 0;
   int cap_gb = lines > 1 ? atoi(line[1]) : 0;
   const char* dir = lines > 2 ? line[2] : ".";
+  long by = lines > 3 ? atol(line[3]) : 0;
   int width = want > 0 ? want : ezrun_par_width(cap_gb);
 
   // the jobs, each a vector into the fields already split
+  // a job says how many arguments it has and they follow it. A count that
+  // ran off the end would walk `line` out of its own allocation, so the walk
+  // stops rather than trusting it.
   size_t jobs = 0;
-  for (size_t i = 3; i < at;) {
+  for (size_t i = 4; i < at;) {
     int argc = atoi(line[i]);
-    if (argc <= 0) {
+    if (argc <= 0 || i + 1 + (size_t)argc > at) {
       break;
     }
     jobs++;
@@ -120,7 +134,7 @@ Term ezrun_par_run(Env e, Term* f, IoWork* w) {
   }
   char*** argvs = malloc((jobs ? jobs : 1) * sizeof(char**));
   size_t j = 0;
-  for (size_t i = 3; i < at && j < jobs;) {
+  for (size_t i = 4; i < at && j < jobs;) {
     int argc = atoi(line[i]);
     char** argv = malloc(((size_t)argc + 1) * sizeof(char*));
     for (int k = 0; k < argc; k++) {
@@ -142,6 +156,14 @@ Term ezrun_par_run(Env e, Term* f, IoWork* w) {
   int live = 0;
   while (next < jobs || live > 0) {
     while (next < jobs && live < width) {
+      // what is left of the run when this job starts, which is not what was
+      // left when the one before it did
+      long spare = by > 0 ? by - (long)time(NULL) : 0;
+      if (by > 0 && spare <= 0) {
+        codes[next] = 124;
+        next++;
+        continue;
+      }
       char path[4096];
       snprintf(path, sizeof(path), "%s/%zu", dir, next);
       pid_t pid = fork();
@@ -156,6 +178,11 @@ Term ezrun_par_run(Env e, Term* f, IoWork* w) {
         dup2(nul, 0);
         dup2(out, 1);
         dup2(out, 2);
+        // the alarm outlives the exec, and SIGALRM ends a process by default,
+        // so this is the deadline the job cannot run past
+        if (by > 0) {
+          alarm((unsigned int)spare);
+        }
         execvp(argvs[next][0], argvs[next]);
         _exit(127);
       }
@@ -169,6 +196,10 @@ Term ezrun_par_run(Env e, Term* f, IoWork* w) {
       int status = 0;
       pid_t done = wait(&status);
       if (done < 0) {
+        // a signal interrupting the wait is not the jobs finishing
+        if (errno == EINTR) {
+          continue;
+        }
         break;
       }
       // only a child of this batch's counts against the width. `wait` reaps
@@ -176,7 +207,13 @@ Term ezrun_par_run(Env e, Term* f, IoWork* w) {
       // let this return while jobs of its own were still writing their files.
       int slot = ezrun_par_slot(pids, (int)jobs, done);
       if (slot >= 0) {
-        codes[slot] = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+        // the alarm is the deadline, so a job it ended reads as a job that
+        // timed out rather than as one killed by a signal nobody sent
+        codes[slot] = WIFEXITED(status) ? WEXITSTATUS(status)
+          : WTERMSIG(status) == SIGALRM ? 124 : 128 + WTERMSIG(status);
+        // the slot stops answering to this pid, so that a pid the kernel
+        // handed out again could not overwrite a job already scored
+        pids[slot] = -1;
         live--;
       }
     }

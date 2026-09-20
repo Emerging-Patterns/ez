@@ -329,9 +329,9 @@ def idle() -> List<&2, String>:
 
 # a `bend` the runner starts: inside the memory cap, inside the budget, and
 # with this project's BEND_LIB set for it
-def under(cap: Bool, +g: String, +at: String, b: List<&2, String>,
+def under(cap: Bool, +g: String, +at: String,
   args: List<&2, String>) -> List<&2, String>:
-  Cap.argv(cap, g, at, List.append(&2, String, b, args))
+  Cap.argv(cap, g, at, args)
 
 # what running a lane means: the aggregate compiled to a binary, or the
 # aggregate interpreted where it stands
@@ -341,16 +341,15 @@ def lane.cmd(native: Bool, +dir: String) -> List<&2, String>:
     ["bend", G.src(dir, "all.js")])
 
 # the program a unit runs first, before anything about it is known
-def first(w: Work, cap: Bool, +g: String, +at: String,
-  +b: List<&2, String>) -> List<&2, String>:
+def first(w: Work, cap: Bool, +g: String, +at: String) -> List<&2, String>:
   match w:
     case Work.lane{hot, native, +dir, _ts, _key}:
       Bool.pick(List<&2, String>, hot, idle(),
-        under(cap, g, at, b, lane.cmd(native, dir)))
+        under(cap, g, at, lane.cmd(native, dir)))
     case Work.solo{+path}:
-      under(cap, g, at, b, ["bend", path])
+      under(cap, g, at, ["bend", path])
     case Work.proof{hot, +path, _key}:
-      Bool.pick(List<&2, String>, hot, idle(), under(cap, g, at, b, ["bend", path]))
+      Bool.pick(List<&2, String>, hot, idle(), under(cap, g, at, ["bend", path]))
 
 # the program a unit runs once the first one is done. Only a native lane has
 # one, and it is the binary the first program wrote. Every other unit answers
@@ -372,13 +371,12 @@ def second(w: Work) -> List<&2, String>:
       idle()
 
 # every unit's first program, in the work list's order
-def firsts(ws: List<&2, Work>, +cap: Bool, +g: String, +at: String,
-  +b: List<&2, String>) -> List<&2, List<&2, String>>:
+def firsts(ws: List<&2, Work>, +cap: Bool, +g: String, +at: String) -> List<&2, List<&2, String>>:
   match ws:
     case Nil{}:
       Nil{}
     case Con{h, t}:
-      first(h, cap, g, at, b) <> firsts(t, cap, g, at, b)
+      first(h, cap, g, at) <> firsts(t, cap, g, at)
 
 # every unit's second program, in the same order
 def seconds(ws: List<&2, Work>) -> List<&2, List<&2, String>>:
@@ -744,7 +742,7 @@ def run(+as: List<&2, String>) -> IO(Unit):
     +tool : String <- C.tool()
     +secs : String <- Clock.seconds()
     +deadline : String <- Clock.start(secs)
-    +bound : List<&2, String> <- IO.pure(List<&2, String>, Clock.bound(deadline, secs))
+
     +full : Bool <- IO.pure(Bool, flag(as, "--full"))
     +on : Bool <- IO.pure(Bool, Bool.not(flag(as, "--js-only")))
     +g : String <- Cap.gb()
@@ -758,8 +756,9 @@ def run(+as: List<&2, String>) -> IO(Unit):
     +ws : List<&2, Work> <- plan(projs(us), us, es, ps, on, full, tool, loud)
     fresh.dir(out.at("1"))
     fresh.dir(out.at("2"))
-    a1 : List<&2, String> <- R.par(firsts(ws, cap, g, at, bound), jobs, g, out.at("1"))
-    a2 : List<&2, String> <- R.par(seconds(ws), jobs, g, out.at("2"))
+    +by : String <- IO.pure(String, Clock.by.effect(deadline))
+    a1 : List<&2, String> <- R.par(firsts(ws, cap, g, at), jobs, g, out.at("1"), by)
+    a2 : List<&2, String> <- R.par(seconds(ws), jobs, g, out.at("2"), by)
     every : Tally <- report(ws, a1, a2, g, Tally{0n, 0n})
     +late : Bool <- Clock.over(deadline)
     kept : Tally <- budget(late, secs, every)

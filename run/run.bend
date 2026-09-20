@@ -76,10 +76,11 @@ def plan.go(js: List<&2, List<&2, String>>) -> String:
       "\n" ++ job(h) ++ plan.go(t)
 
 # what the effect is handed: how many may run at once, how many gigabytes each
-# was given, where they write, and then every job
+# was given, where they write, the second they must all be finished by, and
+# then every job
 def plan(js: List<&2, List<&2, String>>, +width: String, +gb: String,
-  +at: String) -> String:
-  String.join([width, gb, at], "\n") ++ plan.go(js)
+  +at: String, +by: String) -> String:
+  String.join([width, gb, at, by], "\n") ++ plan.go(js)
 
 # a program started with its arguments and left running; the answer is its pid
 def start(args: List<&2, String>) -> IO(String):
@@ -107,10 +108,17 @@ def par.read(cs: List<&2, String>, +at: String, +i: Nat) -> IO(List<&2, String>)
 # fills: job n writes to `at/n`, which is also where to look when one of them
 # did something surprising. A width of "" leaves the count to the effect, which
 # reads the cores and divides them by `gb`, the memory cap each job runs under.
+#
+# `by` is the second every job must be finished by, or "0" for no deadline. It
+# is kept by the effect rather than by the caller because the effect is what
+# queues: a job bounded by what was left when the batch started is not bounded
+# at all once it waits its turn behind three others. A job the deadline has
+# already gone by is not started and answers 124, and one that does start
+# cannot outlive it.
 def par(js: List<&2, List<&2, String>>, +width: String, +gb: String,
-  +at: String) -> IO(List<&2, String>):
+  +at: String, +by: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
-    +out : String <- ezrun.par(plan(js, width, gb, at))
+    +out : String <- ezrun.par(plan(js, width, gb, at, by))
     par.read(nonblank(String.lines(out)), at, 0n)
 
 # the first line of an answer, which is the exit status
