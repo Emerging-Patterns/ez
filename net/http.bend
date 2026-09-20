@@ -38,6 +38,25 @@ def divide.push(h: Char, r: Cut) -> Cut:
     case Cut{before, after}:
       Cut{SCon{h, before}, after}
 
+# one step of the walk, with the answer to "is the pattern here" already in
+# hand. The rest of the walk arrives as a thunk rather than as a value, and
+# only the arm that wants it applies it.
+#
+# This shape is the whole point of the def. `Bool.pick` is an ordinary
+# function, so both of its arms are built before it picks one; an arm that is
+# a recursive call is therefore not an arm at all but unconditional recursion
+# whose result is thrown away. A walk written as
+# `Bool.pick(Cut, here, stop, push(h, go(t)))` walks the whole string whatever
+# `here` says, and the comment on divide.go said the opposite of what the code
+# did. A thunk is a value; its body is only run where it is applied.
+def divide.step(here: Bool, h: Char, t: String, n: Nat,
+  rest: Unit -> Cut) -> Cut:
+  match here:
+    case True{}:
+      Cut{"", String.drop(SCon{h, t}, n)}
+    case False{}:
+      divide.push(h, rest(Unit{}))
+
 # the walk: the pattern is looked for here, and only when it is not here does
 # the rest of the string get looked at, so a hit near the front stops near the
 # front
@@ -46,9 +65,8 @@ def divide.go(s: String, +pat: String, +n: Nat) -> Cut:
     case SNil{}:
       NoCut{}
     case SCon{+h, +t}:
-      Bool.pick(Cut, String.starts_with(SCon{h, t}, pat),
-        Cut{"", String.drop(SCon{h, t}, n)},
-        divide.push(h, divide.go(t, pat, n)))
+      divide.step(String.starts_with(SCon{h, t}, pat), h, t, n,
+        u => divide.go(t, pat, n))
 
 # a string in two halves, around the first occurrence of a pattern. The pattern
 # itself belongs to neither half.
@@ -66,6 +84,17 @@ def hex.of(+u: U32) -> U32:
 def hex.val(c: Char) -> U32:
   hex.of(Char.to_u32(c))
 
+# one step of the hex read, with the answer to "was that a digit" in hand. A
+# thunk again, and for divide.step's reason: under a `Bool.pick` the digit
+# that ends the read still pays for the rest of the read, and for the
+# `Nat.mul` that feeds it, which is not free on a unary number.
+def hex.step(done: Bool, acc: Nat, rest: Unit -> Nat) -> Nat:
+  match done:
+    case True{}:
+      acc
+    case False{}:
+      rest(Unit{})
+
 # the hex digits at the front of a string, read until one is not a digit
 def hex.go(s: String, +acc: Nat) -> Nat:
   match s:
@@ -73,8 +102,8 @@ def hex.go(s: String, +acc: Nat) -> Nat:
       acc
     case SCon{+h, t}:
       +v = hex.val(h)
-      Bool.pick(Nat, U32.is_ge(v, 16), acc,
-        hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v))))
+      hex.step(U32.is_ge(v, 16), acc,
+        u => hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v))))
 
 # the length a chunk header states. Anything after a `;` is an extension, and
 # no extension ez could meet changes the length.
@@ -98,6 +127,18 @@ def utf8.len(s: String) -> Nat:
     case SCon{h, t}:
       Nat.add(utf8.width(Char.to_u32(h)), utf8.len(t))
 
+# one step of the take: `short` says the code point does not fit in what is
+# left to take, so the take stops here. The rest of the take is a thunk, for
+# divide.step's reason: under a `Bool.pick` the stop was not a stop, and
+# taking the first eight kilobytes off a four megabyte body walked all four
+# megabytes.
+def utf8.take.step(short: Bool, h: Char, rest: Unit -> String) -> String:
+  match short:
+    case True{}:
+      SNil{}
+    case False{}:
+      SCon{h, rest(Unit{})}
+
 # the front of a string that is this many bytes of UTF-8. A code point that
 # would not fit whole is not taken at all.
 def utf8.take(s: String, +n: Nat) -> String:
@@ -106,8 +147,16 @@ def utf8.take(s: String, +n: Nat) -> String:
       SNil{}
     case SCon{+h, t}:
       +w = utf8.width(Char.to_u32(h))
-      Bool.pick(String, Nat.is_lt(n, w), SNil{},
-        SCon{h, utf8.take(t, Nat.sub(n, w))})
+      utf8.take.step(Nat.is_lt(n, w), h, u => utf8.take(t, Nat.sub(n, w)))
+
+# one step of the drop, the same shape and for the same reason as take's
+def utf8.drop.step(short: Bool, h: Char, t: String,
+  rest: Unit -> String) -> String:
+  match short:
+    case True{}:
+      SCon{h, t}
+    case False{}:
+      rest(Unit{})
 
 # the rest of a string after this many bytes of UTF-8
 def utf8.drop(s: String, +n: Nat) -> String:
@@ -116,27 +165,32 @@ def utf8.drop(s: String, +n: Nat) -> String:
       SNil{}
     case SCon{+h, +t}:
       +w = utf8.width(Char.to_u32(h))
-      Bool.pick(String, Nat.is_lt(n, w), SCon{h, t},
-        utf8.drop(t, Nat.sub(n, w)))
+      utf8.drop.step(Nat.is_lt(n, w), h, t, u => utf8.drop(t, Nat.sub(n, w)))
 
 # a chunked body put back together. One pass: a chunk header has been divided
 # off, its length says how much of what follows is body, and the rest is the
 # next header. A zero length leaves nothing to divide, so the next pass ends.
 # The fuel is the body's own length, which no chunk walk can outlast.
-def chunks(fuel: Nat, c: Cut, acc: String) -> String:
+#
+# The chunk this pass decoded goes on the front of what the passes after it
+# decode, and there is no accumulator. `++` copies its left side, so an
+# accumulator carried forward is copied once per chunk and a body of k chunks
+# costs k^2 for no reason. Built this way each `++` copies one chunk and the
+# decode is linear in the body.
+def chunks(fuel: Nat, c: Cut) -> String:
   match fuel c:
     case 0n _:
-      acc
+      ""
     case 1n+f NoCut{}:
-      acc
+      ""
     case 1n+f Cut{before, +after}:
       +n = hexlen(before)
-      chunks(f, divide(utf8.drop(after, Nat.add(n, 2n)), "\r\n"),
-        acc ++ utf8.take(after, n))
+      utf8.take(after, n)
+        ++ chunks(f, divide(utf8.drop(after, Nat.add(n, 2n)), "\r\n"))
 
 # a `Transfer-Encoding: chunked` body as the bytes it stands for
 def dechunk(+s: String) -> String:
-  chunks(String.length(s), divide(s, "\r\n"), "")
+  chunks(String.length(s), divide(s, "\r\n"))
 
 # whether a head line names this header. The name is given in lower case; a
 # server may write it any way it likes.

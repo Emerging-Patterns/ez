@@ -4,7 +4,7 @@ import ./http.bend as Http
 import ./url.bend as Url
 import ./LAWS.bend as Laws
 
-# LAW: one step of the partition, with the branch the pick takes given as a
+# LAW: one step of the partition, with the branch the step takes given as a
 # parameter, since a match may not scrutinise a computed value
 law utf8_split.arm:
   for -h: Char
@@ -13,8 +13,8 @@ law utf8_split.arm:
   for b: Bool
   for ih: {String.append(Http.utf8.take(t, m), Http.utf8.drop(t, m)) == t : String}
   {String.append(
-    Bool.pick(String, b, SNil{}, SCon{h, Http.utf8.take(t, m)}),
-    Bool.pick(String, b, SCon{h, t}, Http.utf8.drop(t, m))) == SCon{h, t} : String}
+    Http.utf8.take.step(b, h, u => Http.utf8.take(t, m)),
+    Http.utf8.drop.step(b, h, t, u => Http.utf8.drop(t, m))) == SCon{h, t} : String}
 
 def utf8_split.arm(h, t, m, b, ih):
   match b:
@@ -112,9 +112,9 @@ def take_all(s):
           Http.utf8.width(Char.to_u32(h))))},
         SCon{h, t},
         Equal.cong(Bool, String,
-          b => Bool.pick(String, b, SNil{}, SCon{h, Http.utf8.take(t, Nat.sub(
+          b => Http.utf8.take.step(b, h, u => Http.utf8.take(t, Nat.sub(
             Nat.add(Http.utf8.width(Char.to_u32(h)), Http.utf8.len(t)),
-            Http.utf8.width(Char.to_u32(h))))}),
+            Http.utf8.width(Char.to_u32(h))))),
           Nat.is_lt(Nat.add(Http.utf8.width(Char.to_u32(h)), Http.utf8.len(t)),
             Http.utf8.width(Char.to_u32(h))),
           False{},
@@ -163,3 +163,213 @@ def Laws.path_absolute(ps):
       {==}
     case h <> t:
       starts_nil(String.join(t, "/"))
+
+# The rewrite of net/http.bend's chunked decode, proved to have changed only
+# what the decode costs. LAWS.bend keeps the definitions as they were; what
+# follows is that each new one answers what the old one answered.
+#
+# All four step laws have the same shape, because the four defects had the
+# same shape: a recursive call sitting in an arm of a `Bool.pick`, which is an
+# ordinary function and so builds both arms before it picks. The new code
+# hands the recursion in as a thunk and applies it only in the arm that wants
+# it. A `Bool.pick` and a thunked step agree arm for arm, which is what each
+# `.arm` law says, and induction on the string carries it.
+
+# LAW: one step of the take, with the branch given as a parameter, since a
+# match may not scrutinise a computed value
+law take_agrees.arm:
+  for -h: Char
+  for -t: String
+  for -m: Nat
+  for b: Bool
+  for ih: {Laws.old.take(t, m) == Http.utf8.take(t, m) : String}
+  {Bool.pick(String, b, SNil{}, SCon{h, Laws.old.take(t, m)})
+    == Http.utf8.take.step(b, h, u => Http.utf8.take(t, m)) : String}
+
+def take_agrees.arm(h, t, m, b, ih):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      Equal.cong(String, String, x => SCon{h, x},
+        Laws.old.take(t, m), Http.utf8.take(t, m), ih)
+
+def Laws.take_agrees(s, n):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      take_agrees.arm(h, t, Nat.sub(n, Http.utf8.width(Char.to_u32(h))),
+        Nat.is_lt(n, Http.utf8.width(Char.to_u32(h))),
+        Laws.take_agrees(t, Nat.sub(n, Http.utf8.width(Char.to_u32(h)))))
+
+# LAW: one step of the drop
+law drop_agrees.arm:
+  for -h: Char
+  for -t: String
+  for -m: Nat
+  for b: Bool
+  for ih: {Laws.old.drop(t, m) == Http.utf8.drop(t, m) : String}
+  {Bool.pick(String, b, SCon{h, t}, Laws.old.drop(t, m))
+    == Http.utf8.drop.step(b, h, t, u => Http.utf8.drop(t, m)) : String}
+
+def drop_agrees.arm(h, t, m, b, ih):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+def Laws.drop_agrees(s, n):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      drop_agrees.arm(h, t, Nat.sub(n, Http.utf8.width(Char.to_u32(h))),
+        Nat.is_lt(n, Http.utf8.width(Char.to_u32(h))),
+        Laws.drop_agrees(t, Nat.sub(n, Http.utf8.width(Char.to_u32(h)))))
+
+# LAW: one step of the walk
+law divide_agrees.arm:
+  for -h: Char
+  for -t: String
+  for -pat: String
+  for -n: Nat
+  for b: Bool
+  for ih: {Laws.old.divide.go(t, pat, n) == Http.divide.go(t, pat, n) : Http.Cut}
+  {Bool.pick(Http.Cut, b, Http.Cut{"", String.drop(SCon{h, t}, n)},
+    Http.divide.push(h, Laws.old.divide.go(t, pat, n)))
+    == Http.divide.step(b, h, t, n, u => Http.divide.go(t, pat, n)) : Http.Cut}
+
+def divide_agrees.arm(h, t, pat, n, b, ih):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      Equal.cong(Http.Cut, Http.Cut, r => Http.divide.push(h, r),
+        Laws.old.divide.go(t, pat, n), Http.divide.go(t, pat, n), ih)
+
+# LAW: the walk agrees, at whatever pattern length the divide hands it
+law divide_agrees.go:
+  for s: String
+  for +pat: String
+  for +n: Nat
+  {Laws.old.divide.go(s, pat, n) == Http.divide.go(s, pat, n) : Http.Cut}
+
+def divide_agrees.go(s, pat, n):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      divide_agrees.arm(h, t, pat, n,
+        String.starts_with(SCon{h, t}, pat),
+        divide_agrees.go(t, pat, n))
+
+def Laws.divide_agrees(s, pat):
+  divide_agrees.go(s, pat, String.length(pat))
+
+# LAW: one step of the hex read
+law hex_agrees.arm:
+  for -t: String
+  for -acc: Nat
+  for -v: U32
+  for b: Bool
+  for ih: {Laws.old.hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v)))
+    == Http.hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v))) : Nat}
+  {Bool.pick(Nat, b, acc,
+    Laws.old.hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v))))
+    == Http.hex.step(b, acc,
+      u => Http.hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v)))) : Nat}
+
+def hex_agrees.arm(t, acc, v, b, ih):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+def Laws.hex_agrees(s, acc):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      hex_agrees.arm(t, acc, Http.hex.val(h),
+        U32.is_ge(Http.hex.val(h), 16),
+        Laws.hex_agrees(t, Nat.add(Nat.mul(acc, 16n),
+          U32.to_nat(Http.hex.val(h)))))
+
+# LAW: nothing appended to a string leaves the string
+law append_nil:
+  for s: String
+  {String.append(s, SNil{}) == s : String}
+
+def append_nil(s):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      Equal.cong(String, String, x => SCon{h, x},
+        String.append(t, SNil{}), t, append_nil(t))
+
+# LAW: where the brackets fall in a run of appends does not change the run.
+# This is what lets the chunk loop drop its accumulator: appending each chunk
+# onto what came before it and appending each chunk onto what comes after it
+# give the same string, and only the second is linear in the body.
+law append_assoc:
+  for a: String
+  for b: String
+  for c: String
+  {String.append(String.append(a, b), c)
+    == String.append(a, String.append(b, c)) : String}
+
+def append_assoc(a, b, c):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      Equal.cong(String, String, x => SCon{h, x},
+        String.append(String.append(t, b), c),
+        String.append(t, String.append(b, c)),
+        append_assoc(t, b, c))
+
+# LAW: the loop with an accumulator is the loop without one, with whatever the
+# accumulator held in front of it. The law is stated for every accumulator and
+# not only the empty one, because that is what the induction needs: one pass
+# puts a chunk into the accumulator before the next pass sees it.
+law chunks_agrees:
+  for +fuel: Nat
+  for +c: Http.Cut
+  for +acc: String
+  {Laws.old.chunks(fuel, c, acc)
+    == String.append(acc, Http.chunks(fuel, c)) : String}
+
+def chunks_agrees(fuel, c, acc):
+  match fuel c:
+    case 0n _:
+      Equal.sym(String, String.append(acc, SNil{}), acc, append_nil(acc))
+    case 1n+f Http.NoCut{}:
+      Equal.sym(String, String.append(acc, SNil{}), acc, append_nil(acc))
+    case 1n+f Http.Cut{before, +after}:
+      Equal.trans(String,
+        Laws.old.chunks(f,
+          Http.divide(Http.utf8.drop(after,
+            Nat.add(Http.hexlen(before), 2n)), "\r\n"),
+          String.append(acc, Http.utf8.take(after, Http.hexlen(before)))),
+        String.append(
+          String.append(acc, Http.utf8.take(after, Http.hexlen(before))),
+          Http.chunks(f, Http.divide(Http.utf8.drop(after,
+            Nat.add(Http.hexlen(before), 2n)), "\r\n"))),
+        String.append(acc,
+          String.append(Http.utf8.take(after, Http.hexlen(before)),
+            Http.chunks(f, Http.divide(Http.utf8.drop(after,
+              Nat.add(Http.hexlen(before), 2n)), "\r\n")))),
+        chunks_agrees(f,
+          Http.divide(Http.utf8.drop(after,
+            Nat.add(Http.hexlen(before), 2n)), "\r\n"),
+          String.append(acc, Http.utf8.take(after, Http.hexlen(before)))),
+        append_assoc(acc, Http.utf8.take(after, Http.hexlen(before)),
+          Http.chunks(f, Http.divide(Http.utf8.drop(after,
+            Nat.add(Http.hexlen(before), 2n)), "\r\n"))))
+
+def Laws.dechunk_agrees(s):
+  chunks_agrees(String.length(s), Http.divide(s, "\r\n"), SNil{})
