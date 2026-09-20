@@ -79,6 +79,10 @@ def ledger(+repo: String, +app: String, +url: String, +rev: String) -> IO(String
     t : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
     Check.eq_str("init writes a ledger", Q.chomp(F.text_of(t)),
       "[package]\nname = \"myapp\"\nentry = \"main.bend\"")
+    e : Maybe<&2, String> <- F.read(app ++ "/main.bend")
+    Check.eq_str("and an entry that checks and runs",
+      Q.chomp(F.text_of(e)),
+      "import Base\n\ndef main() -> IO(Unit):\n  IO.print(\"hello\")")
     _a : String <- R.exec(W.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
     +t2 : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
     +hash : String <- IO.pure(String, W.value(F.text_of(t2), "hash"))
@@ -178,6 +182,7 @@ def main() -> IO(Unit):
 
 #|ok the upstream remote answers
 #|ok init writes a ledger
+#|ok and an entry that checks and runs
 #|ok add records the package under its name
 #|ok and records the NAR hash the ledger locks it by
 #|ok lock records the git source

@@ -29,7 +29,7 @@ type Sub is Data:
 def usage() -> String:
   "ez: dependency tracking and builds for Bend 2\n" ++
   "\n" ++
-  "  ez init [name] [entry.bend]     write an ez.toml for a new project\n" ++
+  "  ez init [name] [entry.bend]     scaffold a project: ez.toml, ignore, entry\n" ++
   "  ez add <url> <ref> <entry>      vendor a git package and record it\n" ++
   "  ez remove <name>                drop a package from the ledger\n" ++
   "  ez lock                         resolve every import, write ez.lock.toml\n" ++
