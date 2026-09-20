@@ -19,9 +19,9 @@ ez doctor                           report on the toolchain and the project
 
 `./build.sh` puts `bin/ez.bin` behind the `ez/ez` script and links it into
 `~/.local/bin`. With nix, `nix run .#` or `nix profile install .#` instead, and
-`nix develop` for a shell with bend, bun, curl and `BEND_LIB` already set.
-`./gate.sh` runs every test on the JS and native lanes; `nix flake check` runs
-the same in the sandbox.
+`nix develop` for a shell with bend, bun, git, openssl and `BEND_LIB` already
+set. `./gate.sh` runs every test on the JS and native lanes; `nix flake check`
+runs the same in the sandbox.
 
 A native Bend binary takes no arguments of its own, so the subcommand rides in
 `EZ_CMD` and the rest in `EZ_ARGS`, one a line, the way bolt does it.
@@ -117,20 +117,46 @@ ez is its own first user. `sha/tests/hex.bend` checks the two FIPS vectors and
 one real manifest line, whose digest is the package hash `0x182e9ab8...` that
 `tests/hub.sh` builds against.
 
-`run/` is the one foreign effect, a program run with its arguments, with a C and
-a JS twin. `hub/` is the fetch and the integrity check on top of it: a body is
-accepted only when its sha256 starts with the hash that named it, which is the
-rule bend itself applies.
+`run/` is a foreign effect, a program run with its arguments, with a C and a JS
+twin. `ez add` vendors a git repo, so git stays on the PATH and `run/` is how ez
+reaches it. Arguments reach the effect newline separated and go straight to
+`execvp`, never through a shell, so a url or a rev out of a lockfile cannot
+become shell syntax. `run/tests/exec.bend` asserts that.
 
-One effect covers both HTTPS and git, and that is forced rather than chosen.
-bend links its binaries with exactly `-std=c11 -O3 -lpthread -lm`, plus `-lX11`
-or `-lasound` when the generated C includes those headers. Nothing else can be
-linked, so a TLS client cannot live in C here. curl and git already speak those
-protocols and are on the PATH, so ez runs them.
+`net/` is the HTTP and HTTPS client, and `hub/` is the integrity check on top of
+it: a body is accepted only when its sha256 starts with the hash that named it,
+which is the rule bend itself applies.
 
-Arguments reach the effect newline separated and go straight to `execvp`, never
-through a shell, so a url or a rev out of a lockfile cannot become shell syntax.
-`run/tests/exec.bend` asserts that.
+HTTPS was curl's job and is not any more. bend links its binaries with exactly
+`-std=c11 -O3 -lpthread -lm`, plus `-lX11` or `-lasound` when the generated C
+includes those headers, so `-lssl` can never join that line. But nothing says a
+library has to be linked: `net/effs/wire.c` and its JS twin open libssl at run
+time with dlopen and take every symbol with dlsym, and a fixed link line has
+nothing to say about that. Base's own sockets do not help either — `TCP.connect`
+puts its host through `inet_pton`, so it reaches an address literal and no name
+— so the effect resolves with getaddrinfo and connects the socket itself.
+
+Certificates are verified and the hostname is checked against them, so a wrong
+name, an expired chain or a self-signed one is a handshake that fails rather
+than a body that arrives. There is no POST, no redirect following, no cookie and
+no proxy, because the hub asks for none of those.
+
+The client does one thing: GET a url and answer with the body. `net/url.bend`
+and `net/http.bend` are pure, so the request format, the status line, the header
+lookup and both body framings are tested with no server anywhere;
+`tests/fetch.sh` stands a plaintext one up and drives the socket half on both
+lanes. Two things are worth knowing. Content-Length and chunk lengths count
+bytes while a Bend String counts code points, so the framing counts UTF-8 bytes
+rather than `String.length`; a page with one accented character exposed this
+immediately. And a body arrives through the runtime's UTF-8 decode, which is
+lossy for bytes that are not UTF-8 — but that is the decode curl's output came
+through too, and ez fetches only Bend source and manifest text, so nothing
+changed and nothing is at risk.
+
+Under Nix that library is on no search path, so the `ez` wrapper sets
+`EZ_LIBSSL` at it and `SSL_CERT_FILE` at a CA bundle. When libssl will not open,
+the error says libssl and says why, rather than arriving as a connection that
+mysteriously failed.
 
 `ez/` is the command line, `io/` is whole-file read and write over Base's
 chunked handles, and `manifest/render.bend` writes a ledger back out. What ez
@@ -138,7 +164,7 @@ reads renders back byte for byte, which is what makes `ez add` and `ez remove`
 safe to run on a file a person edits.
 
 `ez-lock`, `ez-git`, `ez-restore` and `pkg` are still TypeScript, and `ez`
-shells out to them through the same process effect it uses for curl and git.
+shells out to them through the same process effect it uses for git.
 They get replaced underneath the command line rather than beside it. What is
 left is the import walk: reading local `.bend` files, following their imports,
 and writing the tree into BEND_LIB.
@@ -268,7 +294,12 @@ the build then runs with the hub unreachable.
     flake.nix           bend, bun, the BEND_LIB from the lock, and the checks
     manifest/           ez.toml, read in Bend
     sha/                sha256, from a vendored package ez pins in its own ledger
-    run/                the one foreign effect: a program run with its arguments
+    run/                a foreign effect: a program run with its arguments
+    net/                the HTTP and HTTPS client, and the socket under it
+    net/url.bend        a url in its scheme, host, port and path
+    net/http.bend       a GET formatted, and a response taken apart
+    net/wire.bend       the effect: one request out, one response back
+    net/client.bend     the two joined: a url in, a body out
     hub/                a file fetched and checked against the hash naming it
     bin/quiet.awk       drops bend's check report, so a test sees only its output
     ez/                 the subcommands, and the dispatch behind bin/ez.bin
@@ -289,3 +320,4 @@ the build then runs with the hub unreachable.
     tests/hub.sh        two-level fake hub; lock, then build offline
     tests/git.sh        an unpublished repo, vendored and rebuilt through nix
     tests/nix.sh        the hub path through nix-build
+    tests/fetch.sh      the client against a server it starts itself

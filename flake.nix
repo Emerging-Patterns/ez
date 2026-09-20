@@ -29,9 +29,13 @@
       # network in the sandbox beyond the lock's own fixed-output fetches
       bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.json;
 
-      # the `ez` binary, with everything it shells out to on its PATH. The
-      # TypeScript helpers live beside it under libexec until they are Bend,
-      # and EZ_ROOT is how the binary finds them.
+      # the `ez` binary, with everything it shells out to on its PATH. curl is
+      # not among them any more: net/ speaks HTTP and HTTPS itself, and what it
+      # needs instead is libssl by name (it opens it at run time, and no search
+      # path reaches a Nix store path) and a CA bundle, which OpenSSL takes
+      # from SSL_CERT_FILE. git stays, because `ez add` vendors a repo.
+      # The TypeScript helpers live beside it under libexec until they are
+      # Bend, and EZ_ROOT is how the binary finds them.
       ez = pkgs.stdenv.mkDerivation {
         pname = "ez";
         version = "0.1.0";
@@ -47,18 +51,20 @@
           cp bin/*.ts bin/*.awk $out/libexec/ez/bin/
           cp ez/ez $out/libexec/ez/ez/ez
           makeWrapper $out/libexec/ez/ez/ez $out/bin/ez \
+            --set EZ_LIBSSL ${pkgs.openssl.out}/lib/libssl.so \
+            --set-default SSL_CERT_FILE ${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt \
             --prefix PATH : ${pkgs.lib.makeBinPath [
-              bend pkgs.bun pkgs.git pkgs.curl pkgs.findutils pkgs.coreutils
+              bend pkgs.bun pkgs.git pkgs.findutils pkgs.coreutils
             ]}
         '';
       };
 
       # every .bend test prints the `#|` lines of its trailer, on the JS lane.
-      # curl and coreutils are here because run/run.bend runs programs: bend
-      # links only pthread and libm, so TLS is curl's job.
+      # coreutils is here because run/run.bend runs programs; no test in this
+      # set opens a socket, so the sandbox needs no network and no openssl.
       tests = pkgs.runCommand "ez-tests"
         {
-          nativeBuildInputs = [ bend pkgs.curl pkgs.coreutils ];
+          nativeBuildInputs = [ bend pkgs.coreutils ];
           BEND_LIB = bendLib;
         }
         ''
@@ -79,12 +85,16 @@
       apps.${system}.default = { type = "app"; program = "${ez}/bin/ez"; };
       checks.${system} = { inherit tests ez; };
       devShells.${system}.default = pkgs.mkShellNoCC {
-        packages = [ bend bend-cc pkgs.bun pkgs.git pkgs.curl ];
+        packages = [ bend bend-cc pkgs.bun pkgs.git pkgs.openssl pkgs.cacert ];
         # vendored packages live with the project, not in ~/.bend/lib, so the
-        # pin is per project
+        # pin is per project. EZ_LIBSSL and SSL_CERT_FILE are what the client
+        # in net/ needs: it opens libssl by name at run time, and OpenSSL takes
+        # its trust store from SSL_CERT_FILE.
         shellHook = ''
           export CC=bend-cc
           export BEND_LIB=$PWD/.ez/lib
+          export EZ_LIBSSL=${pkgs.openssl.out}/lib/libssl.so
+          export SSL_CERT_FILE=''${SSL_CERT_FILE:-${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt}
         '';
       };
     };

@@ -8,8 +8,9 @@ import ../../check/kit.bend as Check
 def chomp(+s: String) -> String:
   String.take(s, Nat.sub(String.length(s), 1n))
 
-# a file:// url under the directory the test runs in, so the fetch is a real
-# curl with no server to start
+# a file:// url under the directory the test runs in. This test is about the
+# digest, not the socket, so the body comes off the disk and no server has to
+# be started; tests/fetch.sh is where a socket is driven.
 def here(+dir: String, at: String) -> String:
   "file://" ++ dir ++ "/" ++ at
 
