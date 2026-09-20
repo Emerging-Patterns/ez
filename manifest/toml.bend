@@ -1,6 +1,8 @@
-# manifest/toml: the slice of TOML a dependency ledger needs. A line is blank, a
-# comment, a `[section]` header, or a `key = "value"` pair. No arrays, no inline
-# tables, no numbers, because every value a dependency carries is a string.
+# manifest/toml: the slice of TOML the ledger and the lock need. A line is
+# blank, a comment, a `[section]` header, or a `key = "value"` pair. A header is
+# a dotted path whose segments may be quoted, and a key may be quoted, so a file
+# path can be one. No arrays, no inline tables, no numbers, because every value
+# ez writes is a string.
 import Base
 
 # a key and the string written for it
@@ -95,7 +97,7 @@ def pair_of(parts: List<&2, String>) -> Line:
     case []:
       LBad{"an empty line cannot be a pair"}
     case h <> t:
-      LPair{trim(h), strip(trim(String.join(t, "=")), '"', '"')}
+      LPair{strip(trim(h), '"', '"'), strip(trim(String.join(t, "=")), '"', '"')}
 
 # a header line, once it is known to start with `[`
 def head_of(+s: String, shut: Bool) -> Line:
@@ -171,3 +173,144 @@ def parse.fin(r: Toml) -> Toml:
 # the sections of a document, and the first error if there was one
 def parse(text: String) -> Toml:
   parse.fin(List.foldl(~&2, ~String, ~Toml, ~step, String.lines(text), Toml{"", "", [], []}))
+
+# the sections a parse found, in the order they were written
+def sects(t: Toml) -> List<&2, Sect>:
+  Toml{_bad, _name, _pairs, done} = t
+  done
+
+# what a header's next character is: the quoting toggles, an unquoted dot cuts,
+# anything else is kept
+type Sym is Data:
+  SQuote{}
+  SDot{}
+  SKeep{c: Char}
+
+# a header char classified. `+c` because it is both asked about and kept.
+def seg.sym(+c: Char) -> Sym:
+  Bool.pick(Sym, Char.is_eq(c, '"'), SQuote{},
+    Bool.pick(Sym, Char.is_eq(c, '.'), SDot{}, SKeep{c}))
+
+# a header being cut apart: `quoted` is true inside quotes, `cur` is the segment
+# being gathered and `out` the finished ones, both reversed
+type Split is Data:
+  Split{quoted: Bool, cur: List<&2, Char>, out: List<&2, String>}
+
+# the segment gathered so far, in order
+def seg.done(cur: List<&2, Char>) -> String:
+  String.from_list(List.reverse(&2, Char, cur))
+
+# a dot inside quotes is part of the segment; outside, it ends one
+def seg.dot(quoted: Bool, cur: List<&2, Char>, out: List<&2, String>) -> Split:
+  match quoted:
+    case True{}:
+      Split{True{}, '.' <> cur, out}
+    case False{}:
+      Split{False{}, [], seg.done(cur) <> out}
+
+# the state once a char has been classified
+def seg.go(st: Split, s: Sym) -> Split:
+  Split{quoted, cur, out} = st
+  match s:
+    case SQuote{}:
+      Split{Bool.not(quoted), cur, out}
+    case SDot{}:
+      seg.dot(quoted, cur, out)
+    case SKeep{c}:
+      Split{quoted, c <> cur, out}
+
+# one char of a header against the state
+def seg.step(st: Split, c: Char) -> Split:
+  seg.go(st, seg.sym(c))
+
+# the segment still being gathered, closed, and the rest put back in order
+def seg.fin(st: Split) -> List<&2, String>:
+  Split{_quoted, cur, out} = st
+  List.reverse(&2, String, seg.done(cur) <> out)
+
+# a header's segments, unquoted. `packages."0x0a".files` is three of them, and a
+# quoted segment may hold the dots a bare one may not.
+def segments(s: String) -> List<&2, String>:
+  seg.fin(List.foldl(~&2, ~Char, ~Split, ~seg.step, String.to_list(s),
+    Split{False{}, [], []}))
+
+# a string in quotes, which is how a segment or a key that is not bare is
+# written, and how every value is
+def quote(+s: String) -> String:
+  "\"" ++ s ++ "\""
+
+# a char a bare key may hold. `+c` because it is asked four questions; a
+# predicate handed to a fold may not take one, so it is split out here.
+def bare.at(+c: Char) -> Bool:
+  Bool.or(Char.is_alpha(c), Bool.or(Char.is_digit(c),
+    Bool.or(Char.is_eq(c, '_'), Char.is_eq(c, '-'))))
+
+# a char a bare key may hold
+def bare.ok(c: Char) -> Bool:
+  bare.at(c)
+
+# whether a key can be written without quotes
+def bare(+s: String) -> Bool:
+  Bool.and(Bool.not(String.is_empty(s)),
+    List.all(~&2, ~Char, ~bare.ok, String.to_list(s)))
+
+# a key as it is written: bare when it can be, quoted when it must be
+def key(+s: String) -> String:
+  Bool.pick(String, bare(s), s, quote(s))
+
+# one `key = "value"` line
+def render.pair(kv: Kv) -> String:
+  Kv{k, v} = kv
+  key(k) ++ " = " ++ quote(v) ++ "\n"
+
+# every pair of a section, in the order it holds them
+def render.pairs(ps: List<&2, Kv>) -> String:
+  match ps:
+    case []:
+      ""
+    case h <> t:
+      render.pair(h) ++ render.pairs(t)
+
+# one table: its header, then its pairs. The header is written as it is given,
+# so a caller that needs a quoted segment quotes it.
+def render.sect(s: Sect) -> String:
+  Sect{n, ps} = s
+  "[" ++ n ++ "]\n" ++ render.pairs(ps)
+
+# every table of a document
+def render.all(ss: List<&2, Sect>) -> List<&2, String>:
+  match ss:
+    case []:
+      []
+    case h <> t:
+      render.sect(h) <> render.all(t)
+
+# a document of tables, one blank line between them
+def render(ss: List<&2, Sect>) -> String:
+  String.join(render.all(ss), "\n")
+
+# a pair as `key=value`, for a test or a report
+def show.kv(kv: Kv) -> String:
+  Kv{k, v} = kv
+  k ++ "=" ++ v
+
+# every pair of a section, shown
+def show.kvs(ps: List<&2, Kv>) -> List<&2, String>:
+  match ps:
+    case []:
+      []
+    case h <> t:
+      show.kv(h) <> show.kvs(t)
+
+# a section as `name key=value ..`
+def show.sect(s: Sect) -> String:
+  Sect{n, ps} = s
+  String.join(n <> show.kvs(ps), " ")
+
+# every section of a document, shown
+def show.sects(ss: List<&2, Sect>) -> List<&2, String>:
+  match ss:
+    case []:
+      []
+    case h <> t:
+      show.sect(h) <> show.sects(t)
