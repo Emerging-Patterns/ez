@@ -11,6 +11,7 @@
 # evidence would be worse than no cache at all, and `--full` ignores it.
 import Base
 import ../run/run.bend as R
+import ../run/bend.bend as Bend
 import ../io/file.bend as F
 import ../pkg/pkg.bend as K
 import ../sha/sha.bend as Sha
@@ -20,7 +21,7 @@ import ./env.bend as Env
 # native lane hands its C to whatever `$CC` names, so both belong in the key.
 def tool() -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(["bend", "version"])
+    +out : String <- Bend.version()
     +cc : String <- Env.var("CC", "cc")
     return String.trim(R.text(out)) ++ " " ++ cc
 
