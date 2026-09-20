@@ -27,7 +27,7 @@
 
       # the BEND_LIB tree ez's own ledger asks for, built from the lock with no
       # network in the sandbox beyond the lock's own fixed-output fetches
-      bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.json;
+      bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.toml;
 
       # the `ez` binary, with everything it shells out to on its PATH. curl is
       # not among them any more: net/ speaks HTTP and HTTPS itself, and what it
@@ -60,11 +60,12 @@
       };
 
       # every .bend test prints the `#|` lines of its trailer, on the JS lane.
-      # coreutils is here because run/run.bend runs programs; no test in this
-      # set opens a socket, so the sandbox needs no network and no openssl.
+      # git and coreutils are here because run/run.bend runs programs, and a
+      # checkout is git's job. curl is gone: net/ speaks HTTP and HTTPS itself,
+      # and no test in this set opens a socket, so the sandbox needs no network.
       tests = pkgs.runCommand "ez-tests"
         {
-          nativeBuildInputs = [ bend pkgs.coreutils ];
+          nativeBuildInputs = [ bend pkgs.git pkgs.coreutils ];
           BEND_LIB = bendLib;
         }
         ''

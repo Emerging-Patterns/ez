@@ -6,9 +6,11 @@ set -u
 cd "$(dirname "$0")"
 js_only=0; [ "${1:-}" = "--js-only" ] && js_only=1
 # vendored packages live with the project, so the pin is per project, not in
-# ~/.bend/lib. A fresh checkout has only the lock, so fill it from that.
+# ~/.bend/lib. A fresh checkout has only the lock, and `ez fetch` is Bend that
+# itself imports a package out of BEND_LIB, so the first fill is the one thing
+# that cannot be ez.
 export BEND_LIB=$PWD/.ez/lib
-[ -d "$BEND_LIB" ] || bun bin/ez-restore.ts
+[ -d "$BEND_LIB" ] || bin/bootstrap.sh
 pass=0; total=0
 check() { # name, expected, observed
   total=$((total + 1))

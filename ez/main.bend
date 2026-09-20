@@ -29,7 +29,7 @@ def usage() -> String:
   "  ez init [name] [entry.bend]     write an ez.toml for a new project\n" ++
   "  ez add <url> <ref> <entry>      vendor a git package and record it\n" ++
   "  ez remove <name>                drop a package from the ledger\n" ++
-  "  ez lock                         resolve every import, write ez.lock.json\n" ++
+  "  ez lock                         resolve every import, write ez.lock.toml\n" ++
   "  ez fetch                        fill BEND_LIB from the lock\n" ++
   "  ez check                        check the entry, without running it\n" ++
   "  ez build [out]                  build the entry to a native binary\n" ++

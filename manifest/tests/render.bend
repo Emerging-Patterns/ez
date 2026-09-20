@@ -2,7 +2,18 @@
 import Base
 import ../manifest.bend as M
 import ../render.bend as R
+import ../toml.bend as T
 import ../../check/kit.bend as Check
+
+# a document of nested tables, the shape a lock file takes
+def doc() -> List<&2, T.Sect>:
+  [T.Sect{"lock", [T.Kv{"hub", "https://hub.bend-lang.com"}]},
+   T.Sect{"packages." ++ T.quote("0xaa") ++ ".files",
+     [T.Kv{"src/lib.bend", "ab"}]}]
+
+# the sections of a document that parsed, shown as `name key=value ..` lines
+def shape(t: T.Toml) -> String:
+  String.join(T.show.sects(T.sects(t)), " ")
 
 def text() -> String:
   "[package]\n" ++
@@ -41,6 +52,13 @@ def main() -> IO(Unit):
       "[package]\nname = \"a\"\nentry = \"m.bend\"\n")
     Check.eq_str("removing one that is not there changes nothing", edited(R.remove(one, "zz")),
       "[package]\nname = \"a\"\nentry = \"m.bend\"\n")
+    Check.eq_str("a nested table renders with its path quoted where it must be",
+      T.render(doc()),
+      "[lock]\nhub = \"https://hub.bend-lang.com\"\n\n" ++
+      "[packages.\"0xaa\".files]\n\"src/lib.bend\" = \"ab\"\n")
+    Check.eq_str("a rendered document reads back as what it was",
+      shape(T.parse(T.render(doc()))),
+      "lock hub=https://hub.bend-lang.com packages.\"0xaa\".files src/lib.bend=ab")
 
 #|ok what was read renders back to itself
 #|ok a ledger that would not parse renders as nothing
@@ -49,3 +67,5 @@ def main() -> IO(Unit):
 #|ok adding the same name twice replaces it
 #|ok a dependency removed
 #|ok removing one that is not there changes nothing
+#|ok a nested table renders with its path quoted where it must be
+#|ok a rendered document reads back as what it was

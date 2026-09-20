@@ -8,7 +8,7 @@ sandbox, where there is no network.
 ez init myapp main.bend             write an ez.toml for a new project
 ez add <url> <ref> <entry.bend>     vendor a git package and record it
 ez remove <name>                    drop a package from the ledger
-ez lock                             resolve every import, write ez.lock.json
+ez lock                             resolve every import, write ez.lock.toml
 ez fetch                            fill BEND_LIB from the lock
 ez check                            check the entry, without running it
 ez build [out]                      build the entry to a native binary
@@ -29,7 +29,7 @@ A native Bend binary takes no arguments of its own, so the subcommand rides in
 In Nix:
 
 ```nix
-bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.json;
+bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.toml;
 # ... buildPhase = "BEND_LIB=${bendLib} bend main.bend -o app";
 ```
 
@@ -51,7 +51,7 @@ published package would have given you, so if upstream publishes that exact tree
 later, the hash matches and the hub just starts serving it. Nothing in your
 source changes.
 
-`ez.lock.json` records the git url and rev instead of the hub for that package,
+`ez.lock.toml` records the git url and rev instead of the hub for that package,
 and `nix/bend-lib.nix` rebuilds it with `fetchgit`. `tests/git.sh` runs the whole
 path against a served fixture repo and checks the nix tree byte for byte against
 the vendored one.
@@ -99,15 +99,20 @@ the manifest as the record and the import lines as the truth, and reports a
 disagreement rather than rewriting your source. Rewriting is a thing ez could do
 later, behind an explicit command.
 
-The TOML is a deliberate subset. Sections, comments, and `key = "value"` pairs,
-because every value a dependency carries is a string. No arrays, no inline
-tables, no numbers.
+The TOML is a deliberate subset. Comments, `key = "value"` pairs, and a
+`[table]` header whose path may be dotted and whose segments may be quoted, so
+a lock can write `[packages."0x0a5c...".files]` and a file path can be a key.
+Every value is a string. No arrays, no inline tables, no numbers.
+
+`ez.lock.toml` is the same subset, which is why it is TOML and not JSON: ez has
+a parser for this and no parser for that, and `builtins.fromTOML` reads it just
+as well.
 
 ## Written in Bend
 
-The manifest (`manifest/`) and sha256 (`sha/`) are Bend, tested the way bolt
-tests: each `tests/*.bend` ends in the `#|` lines its run must print, and
-`./gate.sh` checks them on the JS lane and the native CPU lane.
+Everything but one tool is Bend, tested the way bolt tests: each `tests/*.bend`
+ends in the `#|` lines its run must print, and `./gate.sh` checks them on the
+JS lane and the native CPU lane.
 
 sha256 is [Giulio2002/bend-sha256](https://github.com/Giulio2002/bend-sha256),
 which proves its output equal to an executable FIPS 180-4 specification. It was
@@ -163,11 +168,41 @@ chunked handles, and `manifest/render.bend` writes a ledger back out. What ez
 reads renders back byte for byte, which is what makes `ez add` and `ez remove`
 safe to run on a file a person edits.
 
-`ez-lock`, `ez-git`, `ez-restore` and `pkg` are still TypeScript, and `ez`
-shells out to them through the same process effect it uses for git.
-They get replaced underneath the command line rather than beside it. What is
-left is the import walk: reading local `.bend` files, following their imports,
-and writing the tree into BEND_LIB.
+`pkg/` is the import walk: the header scanner, the module walk, and the file
+set with its sha256s, which is the package `bend <entry> --publish` would
+upload. `lock/` is what that is for: `lock.bend` follows the project's own
+files into one another, resolves every `0x` package they reach and every
+package those import, and writes the closure out; `restore.bend` fills
+BEND_LIB back from it, checking each file against the sha256 the lock records.
+
+`bin/ez-git.ts` is the last TypeScript, and `ez add` shells out to it through
+the same process effect it uses for git. It is the only thing left
+using `bin/pkg.ts`, which is the same walk in TypeScript; `tests/publish.sh`
+keeps the two of them, and bend, in agreement until that one is ported too.
+
+`bin/bootstrap.sh` is the one job that cannot be ez. `ez fetch` is Bend that
+imports sha256 out of BEND_LIB, so on a fresh checkout there is nothing to run
+it with. The bootstrap reads the lock ez wrote and applies the same rule to
+every file it fetches.
+
+### What a package is rooted at
+
+Two things about `bend --publish` that are easy to get wrong, and were wrong
+here until `tests/fixture` was published at a local hub and the answer read off
+what bend uploaded.
+
+A foreign body is named from the module that imports it, not from the package
+root. `import "./beep.c"` inside `src/util/math.bend` is uploaded as
+`src/util/beep.c`. Naming it `src/beep.c` gives a different manifest, so a
+different hash, so a package the hub will never serve.
+
+A package is not rooted at the entry's directory. A module reached through `..`
+re-roots the package that many levels up, and then every path is written from
+there: an entry `src/lib.bend` that imports `../other/up.bend` publishes
+`src/lib.bend` and `other/up.bend`. Anything copying a package's files out —
+`ez fetch`, `nix/bend-lib.nix`, `ez add` — has to join them against that root
+and not against the entry's own directory. `pkg_of` answers with it for that
+reason.
 
 ### A gotcha worth knowing
 
@@ -290,9 +325,10 @@ the build then runs with the hub unreachable.
 ## Layout
 
     ez.toml             the ledger: every package this repo imports
-    ez.lock.json        the resolved closure, with each file's sha256
+    ez.lock.toml        the resolved closure, with each file's sha256
+    .ez/origins.toml    where a vendored package came from, per project
     flake.nix           bend, bun, the BEND_LIB from the lock, and the checks
-    manifest/           ez.toml, read in Bend
+    manifest/           ez.toml, and the TOML subset it is written in, in Bend
     sha/                sha256, from a vendored package ez pins in its own ledger
     run/                a foreign effect: a program run with its arguments
     net/                the HTTP and HTTPS client, and the socket under it
@@ -301,6 +337,9 @@ the build then runs with the hub unreachable.
     net/wire.bend       the effect: one request out, one response back
     net/client.bend     the two joined: a url in, a body out
     hub/                a file fetched and checked against the hash naming it
+    pkg/                the import walk: the package `bend --publish` would make
+    pkg/main.bend       that package, printed rather than published
+    lock/               the transitive resolution, and BEND_LIB filled from it
     bin/quiet.awk       drops bend's check report, so a test sees only its output
     ez/                 the subcommands, and the dispatch behind bin/ez.bin
     ez/test.bend        the test runner: every */tests/*.bend, on both lanes
@@ -310,11 +349,11 @@ the build then runs with the hub unreachable.
     ez/ez               the script people run; EZ_CMD and EZ_ARGS reach the binary
     io/                 a whole file read or written, over Base's chunked handles
     build.sh            bin/ez.bin, linked into ~/.local/bin as `ez`
-    bin/pkg.ts          the package and hash `bend --publish` would produce
-    bin/ez-lock.ts      walks the import graph, writes ez.lock.json
+    bin/bootstrap.sh    the first BEND_LIB, before there is an ez to fill it
+    bin/pkg.ts          the import walk again, in TypeScript, for ez-git alone
     bin/ez-git.ts       vendors an unpublished git repo under its would-be hash
-    bin/ez-restore.ts   fills BEND_LIB from the lock, without re-resolving
-    nix/bend-lib.nix    ez.lock.json -> a BEND_LIB store path
+    nix/bend-lib.nix    ez.lock.toml -> a BEND_LIB store path
+    tests/fixture/      a package with a nested module, a foreign body and a `..`
     tests/oracle.ts     a local stand-in for the hub, so --publish can be run
     tests/publish.sh    ez's hash must equal the one bend mines
     tests/hub.sh        two-level fake hub; lock, then build offline

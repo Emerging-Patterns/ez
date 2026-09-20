@@ -8,6 +8,7 @@ set -u
 unset BEND_LIB
 cd "$(dirname "$0")/.."
 ez=$PWD
+[ -x bin/ez.bin ] || ./build.sh >/dev/null
 root=$(mktemp -d)
 trap 'st=$?; kill ${daemon:-0} 2>/dev/null; rm -rf "$root"; exit $st' EXIT
 pass=0; total=0
@@ -16,6 +17,12 @@ check() { # name, expected, observed
   if [ "$2" = "$3" ]; then pass=$((pass + 1)); else
     echo "FAIL: $1"; diff <(echo "$2") <(echo "$3") | sed 's/^/  /'
   fi
+}
+# the lock and the origins are ez's own TOML subset, so a key is read out of
+# one without a parser
+val() { # file table key
+  awk -v t="[$2]" -v k="$3" '$0 == t { on = 1; next } /^\[/ { on = 0 }
+    on && index($0, k " = ") == 1 { sub(/^[^=]*= "/, ""); sub(/"$/, ""); print }' "$1"
 }
 
 # the upstream repo: never published, only pushed
@@ -81,20 +88,20 @@ EOF
 tagged=$(BEND_LIB="$root/app/.ez/tag" bun "$ez/bin/ez-git.ts" "$url" v1.0 src/lib.bend 2>"$root/tag.log" | sed -n 1p)
 check "a tag resolves to the same package as its commit" "$hash" "$tagged"
 check "the tag it resolved through is written down" "v1.0 is $rev" "$(grep ' is ' "$root/tag.log")"
-check "the lock keeps the tag beside the rev" "v1.0" \
-  "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]].get("tag",""))' "$root/app/.ez/origins.json" "$hash")"
+check "the origins keep the tag beside the rev" "v1.0" \
+  "$(val "$root/app/.ez/origins.toml" "origins.\"$hash\"" tag)"
 
 check "the vendored package builds, with no hub at all" "44" \
   "$(BEND_HUB=http://127.0.0.1:1 BEND_LIB=$root/app/.ez/lib bend main.bend 2>&1 | tail -1)"
 
-BEND_LIB="$root/app/.ez/lib" bun "$ez/bin/ez-lock.ts" main.bend > ez.lock.json
+BEND_LIB="$root/app/.ez/lib" "$ez/ez/ez" lock
 check "the lock records the git rev, not the hub" "git $rev" \
-  "$(python3 -c 'import json,sys; s=json.load(open("ez.lock.json"))["packages"][sys.argv[1]]["source"]; print(s["kind"], s["rev"])' "$hash")"
+  "$(val ez.lock.toml "packages.\"$hash\".source" kind) $(val ez.lock.toml "packages.\"$hash\".source" rev)"
 
 # nix rebuilds the same tree from the rev alone
 cat > build.nix <<NIX
 let pkgs = import <nixpkgs> { };
-in pkgs.callPackage $ez/nix/bend-lib.nix { } $root/app/ez.lock.json
+in pkgs.callPackage $ez/nix/bend-lib.nix { } $root/app/ez.lock.toml
 NIX
 out=$(nix-build --no-out-link build.nix 2>"$root/nix.log") || { cat "$root/nix.log"; echo "FAIL: nix-build"; exit 1; }
 

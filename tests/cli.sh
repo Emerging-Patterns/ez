@@ -16,6 +16,11 @@ check() { # name, expected, observed
     echo "FAIL: $1"; diff <(echo "$2") <(echo "$3") | sed 's/^/  /'
   fi
 }
+# the lock is ez's own TOML subset, so a key is read out of it without a parser
+val() { # file table key
+  awk -v t="[$2]" -v k="$3" '$0 == t { on = 1; next } /^\[/ { on = 0 }
+    on && index($0, k " = ") == 1 { sub(/^[^=]*= "/, ""); sub(/"$/, ""); print }' "$1"
+}
 
 [ -x bin/ez.bin ] || ./build.sh >/dev/null
 
@@ -69,7 +74,7 @@ EOF
 
 "$ez/ez/ez" lock >/dev/null 2>&1
 check "lock records the git source" "git $rev" \
-  "$(python3 -c 'import json,sys; s=json.load(open("ez.lock.json"))["packages"][sys.argv[1]]["source"]; print(s["kind"], s["rev"])' "$hash")"
+  "$(val ez.lock.toml "packages.\"$hash\".source" kind) $(val ez.lock.toml "packages.\"$hash\".source" rev)"
 
 rm -rf .ez/lib
 "$ez/ez/ez" fetch >/dev/null 2>&1

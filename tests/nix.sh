@@ -7,6 +7,8 @@ set -u
 # the gate exports BEND_LIB for its own lanes; a test picks its own
 unset BEND_LIB
 cd "$(dirname "$0")/.."
+ez=$PWD
+[ -x bin/ez.bin ] || ./build.sh >/dev/null
 root=$(mktemp -d)
 trap 'st=$?; kill %1 2>/dev/null; rm -rf "$root"; exit $st' EXIT
 
@@ -37,12 +39,12 @@ port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); pr
 (cd "$root/hub" && python3 -m http.server "$port" --bind 127.0.0.1 >/dev/null 2>&1) &
 for _ in $(seq 50); do curl -fsS "http://127.0.0.1:$port/" >/dev/null 2>&1 && break; sleep 0.1; done
 
-BEND_HUB=http://127.0.0.1:$port bun bin/ez-lock.ts "$root/app/main.bend" > "$root/ez.lock.json"
-cat "$root/ez.lock.json"
+(cd "$root/app" && BEND_HUB=http://127.0.0.1:$port BEND_LIB=$root/lib "$ez/ez/ez" lock)
+cat "$root/app/ez.lock.toml"
 
 cat > "$root/build.nix" <<NIX
 let pkgs = import <nixpkgs> { };
-in pkgs.callPackage $PWD/nix/bend-lib.nix { } $root/ez.lock.json
+in pkgs.callPackage $ez/nix/bend-lib.nix { } $root/app/ez.lock.toml
 NIX
 
 out=$(nix-build --no-out-link "$root/build.nix" 2>"$root/nix.log") || { cat "$root/nix.log"; echo "FAIL: nix-build"; exit 1; }

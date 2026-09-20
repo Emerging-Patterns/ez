@@ -25,20 +25,9 @@ type Read is Data:
   Bad{why: String}
   Good{m: Manifest}
 
-# this pair's value when the key matches, otherwise whatever the rest of the
-# section gave
-def value.at(kv: T.Kv, rest: String, key: String) -> String:
-  T.Kv{k, v} = kv
-  Bool.pick(String, String.eq(k, key), v, rest)
-
-# the value written for a key in a section, or "" when it is absent. The scan
-# recurses first and picks after, so no recursive call hides inside a branch.
-def value(pairs: List<&2, T.Kv>, +key: String) -> String:
-  match pairs:
-    case []:
-      ""
-    case h <> t:
-      value.at(h, value(t, key), key)
+# the value written for a key in a section, or "" when it is absent
+def value(pairs: List<&2, T.Kv>, key: String) -> String:
+  T.value(pairs, key)
 
 # this section's pairs when its name matches, otherwise the rest's
 def pairs.at(s: T.Sect, rest: List<&2, T.Kv>, name: String) -> List<&2, T.Kv>:

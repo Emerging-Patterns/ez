@@ -13,7 +13,36 @@ import * as path from "node:path";
 import { pkg_of, manifest_of } from "./pkg.ts";
 
 const LIB = path.resolve(process.env.BEND_LIB ?? ".ez/lib");
-const ORIGINS = path.join(path.dirname(LIB), "origins.json");
+const ORIGINS = path.join(path.dirname(LIB), "origins.toml");
+
+// the origins already written down. The file is ez's own TOML subset: a
+// `[origins."<hash>"]` table per package, holding only string values.
+function read_origins(): Record<string, Record<string, string>> {
+  if (!existsSync(ORIGINS)) return {};
+  const out: Record<string, Record<string, string>> = {};
+  let at: Record<string, string> | null = null;
+  for (const raw of readFileSync(ORIGINS, "utf8").split("\n")) {
+    const line = raw.trim();
+    const head = /^\[origins\."([^"]+)"\]$/.exec(line);
+    if (head !== null) {
+      at = {};
+      out[head[1]] = at;
+      continue;
+    }
+    const kv = /^([A-Za-z0-9_-]+) = "(.*)"$/.exec(line);
+    if (kv !== null && at !== null) at[kv[1]] = kv[2];
+  }
+  return out;
+}
+
+function write_origins(origins: Record<string, Record<string, string>>): void {
+  const text = Object.keys(origins).sort().map((h) =>
+    "[origins." + JSON.stringify(h) + "]\n" +
+    Object.entries(origins[h]).map(([k, v]) => k + " = " + JSON.stringify(v) + "\n").join("")
+  ).join("\n");
+  mkdirSync(path.dirname(ORIGINS), { recursive: true });
+  writeFileSync(ORIGINS, text);
+}
 
 function git(...args: string[]): void {
   const r = Bun.spawnSync(["git", ...args], { stdout: "ignore", stderr: "pipe" });
@@ -62,7 +91,9 @@ function main() {
   // lay the package out the way the hub serves it, so bend finds it with no fetch
   const dst = path.join(LIB, pkg.hash);
   rmSync(dst, { recursive: true, force: true });
-  const from = path.dirname(at);
+  // a package's paths are written from its root, which is the entry's own
+  // directory only when no module of it was reached through `..`
+  const from = pkg.root;
   for (const p of Object.keys(pkg.files)) {
     mkdirSync(path.join(dst, path.dirname(p)), { recursive: true });
     cpSync(path.join(from, p), path.join(dst, p));
@@ -70,10 +101,12 @@ function main() {
   writeFileSync(path.join(dst, "manifest"), manifest_of(pkg.files));
   rmSync(work, { recursive: true, force: true });
 
-  const origins = existsSync(ORIGINS) ? JSON.parse(readFileSync(ORIGINS, "utf8")) : {};
-  origins[pkg.hash] = { kind: "git", url, rev, entry, narHash, ...(tag === undefined ? {} : { tag }) };
-  mkdirSync(path.dirname(ORIGINS), { recursive: true });
-  writeFileSync(ORIGINS, JSON.stringify(origins, null, 2) + "\n");
+  const origins = read_origins();
+  origins[pkg.hash] = {
+    kind: "git", url, rev, entry, root: path.relative(work, pkg.root) || ".", narHash,
+    ...(tag === undefined ? {} : { tag }),
+  };
+  write_origins(origins);
 
   // stdout is the record, five lines, for whatever writes the ledger; anything
   // a person reads goes to stderr

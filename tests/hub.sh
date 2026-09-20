@@ -6,6 +6,8 @@ set -u
 # the gate exports BEND_LIB for its own lanes; a test picks its own
 unset BEND_LIB
 cd "$(dirname "$0")/.."
+ez=$PWD
+[ -x bin/ez.bin ] || ./build.sh >/dev/null
 root=$(mktemp -d)
 trap 'st=$?; kill %1 2>/dev/null; rm -rf "$root"; exit $st' EXIT
 pass=0; total=0
@@ -68,24 +70,17 @@ port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); pr
 for _ in $(seq 50); do curl -fsS "http://127.0.0.1:$port/" >/dev/null 2>&1 && break; sleep 0.1; done
 
 export BEND_HUB=http://127.0.0.1:$port
-bun bin/ez-lock.ts "$root/app/main.bend" > "$root/ez.lock.json"
+lib="$root/lib"
+cd "$root/app"
+BEND_LIB=$lib "$ez/ez/ez" lock
 
 check "the lock names both packages, the direct one and its own dependency" \
   "$A
 $B" \
-  "$(python3 -c 'import json,sys; print("\n".join(sorted(json.load(open(sys.argv[1]))["packages"])))' "$root/ez.lock.json")"
+  "$(sed -n 's/^\[packages\."\(0x[0-9a-f]*\)"\.files\]$/\1/p' ez.lock.toml | sort)"
 
 # populate BEND_LIB from the lock alone, the way the nix derivation does
-lib="$root/lib"
-python3 - "$root/ez.lock.json" "$lib" "$root/hub" <<'PY'
-import json, os, shutil, sys
-lock, lib, hub = json.load(open(sys.argv[1])), sys.argv[2], sys.argv[3]
-for h, entry in lock["packages"].items():
-    for at in entry["files"]:
-        dst = os.path.join(lib, h, at)
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copyfile(os.path.join(hub, h, at), dst)
-PY
+BEND_LIB=$lib "$ez/ez/ez" fetch >/dev/null
 
 kill %1 2>/dev/null || true
 export BEND_HUB=http://127.0.0.1:1   # the hub is gone
