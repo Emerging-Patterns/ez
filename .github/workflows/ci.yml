@@ -1,0 +1,29 @@
+# Sibling of Emerging-Patterns/bolt CI. Keep the install steps and job
+# layout aligned; only the default-branch filter and the flake check
+# command differ (bolt: main + its flake checks; ez: master + tests).
+#
+# The flake's `tests` check is the JS/`bend` runCommand over
+# `*/tests/*.bend`. That is the gate. `nix flake check` would also
+# build the native `ez` package, which is the 8GB-class compile we
+# keep off this runner.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - name: flake check
+        run: nix build --print-build-logs --no-link .#checks.x86_64-linux.tests
