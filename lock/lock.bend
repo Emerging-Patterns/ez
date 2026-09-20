@@ -377,10 +377,20 @@ def seen.hits(st: Seen) -> List<&2, String>:
   Seen{_files, hits} = st
   hits
 
+# whether a name is already among the ones a walk has read. Base's
+# `List.contains` applies an erased equality, which Bend's termination check
+# cannot see through; this scan is structural.
+def seen.holds(xs: List<&2, String>, +s: String) -> Bool:
+  match xs:
+    case []:
+      False{}
+    case +h <> t:
+      Bool.or(String.eq(h, s), seen.holds(t, s))
+
 # one file off the queue, skipped when it has been read already
 def root.next(+at: String, +st: Seen,
   go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
-  root.pick(List.contains(~String, ~String.eq, seen.files(st), at), at, st, go)
+  root.pick(seen.holds(seen.files(st), at), at, st, go)
 
 # the next file of the queue, handed on with what is left of it
 def root.pop(queue: List<&2, String>, +st: Seen,
@@ -450,11 +460,42 @@ def pack.all(ps: List<&2, Pack>) -> List<&2, T.Sect>:
 def pack.le(a: Pack, b: Pack) -> Bool:
   String.is_le(pack.hash(a), pack.hash(b))
 
+# where a package goes among the packages already in order. The rest of the
+# insertion is a parameter, because two defs that call each other are not
+# allowed.
+def pack.ins.put(le: Bool, x: Pack, h: Pack, t: List<&2, Pack>,
+  rest: List<&2, Pack>) -> List<&2, Pack>:
+  match le:
+    case True{}:
+      x <> (h <> t)
+    case False{}:
+      h <> rest
+
+# a package inserted into a list already in hash order
+def pack.ins(ps: List<&2, Pack>, +x: Pack) -> List<&2, Pack>:
+  match ps:
+    case []:
+      [x]
+    case Con{+h, +t}:
+      pack.ins.put(pack.le(x, h), x, h, t, pack.ins(t, x))
+
+# the packages in hash order. Insertion rather than Base's `List.sort`: that
+# one is a fuelled bottom-up merge sort, whose recursion Bend cannot check, so
+# it is reported as unsafe and every proof downstream of it inherits the
+# report. An insertion sort shrinks its list at every step, so Bend checks it,
+# and a lock names tens of packages, not thousands.
+def pack.sort(ps: List<&2, Pack>) -> List<&2, Pack>:
+  match ps:
+    case []:
+      []
+    case Con{+h, t}:
+      pack.ins(pack.sort(t), h)
+
 # the lock as a document: what resolved it, then every package it resolved
 def doc(hub: String, ver: String, ps: List<&2, Pack>) -> List<&2, T.Sect>:
   List.append(&2, T.Sect,
     [T.Sect{"lock", [T.Kv{"version", "2"}, T.Kv{"hub", hub}, T.Kv{"bend", ver}]}],
-    pack.all(List.sort(~Pack, ~pack.le, ps)))
+    pack.all(pack.sort(ps)))
 
 # the lock as the text written to ez.lock.toml
 def render(hub: String, ver: String, ps: List<&2, Pack>) -> String:

@@ -137,6 +137,25 @@ terms check. `manifest/`, `net/`, `pkg/` and `lock/` have them, and
 `check/eq.bend` holds the one Base fact they all need, that a string equals
 itself.
 
+`All terms check.` is the whole line, and the gate wants exactly that. Bend
+also reports `All terms check, with N unsafe annotations.` (2.0.16) or
+`All terms check, but N defs rely on unsafe or foreign code:` (2.0.18), and
+both of those exit 0, so a gate that reads the exit status goes green on a
+claim resting on code nothing proved. The wording is about termination, not
+about effects: Bend requires every recursion to shrink one of its inputs, and
+a def that recurses outside that rule is reported. An effect costs nothing —
+`run/`, `io/`, `hub/`, `sha/` and the socket half of `net/` all check clean.
+What costs is Base's higher-order list defs, `List.foldl`, `List.foldr`,
+`List.all`, `List.any`, `List.filter`, `List.contains` and `List.sort`, each
+of which applies a function parameter Bend has erased and so cannot read
+through. `List.sort` is four of them, being a fuelled bottom-up merge sort.
+
+So `manifest/`, `pkg/` and `lock/` do not call those. A fold over a list of a
+known type is written out as a walk, which is structural and checks; the two
+places that need an order use an insertion sort, which shrinks its list at
+every step, over Base's merge sort, which does not. Both lists are small: a
+package's files, and a lock's packages.
+
 What is proved: that `utf8.take` and `utf8.drop` partition a string at any
 byte offset and that a body whose `Content-Length` is its own byte count comes
 back exactly, which is the framing the client rests on; that a parsed url's
@@ -150,8 +169,11 @@ What is not, and stays an example: that `parse` and `render` are inverses on a
 whole document, that `trim` and `norm` are idempotent, and that `manifest_of`
 does not depend on the order the walk found the files in. The first two need a
 `String.split`/`String.join` inverse, which needs the soundness of Bend's
-decidable char equality; the third is a property of Base's `List.sort`.
-`tests/publish.sh` holds that last one down against real `bend --publish`.
+decidable char equality. The third was a property of Base's `List.sort` and is
+now a property of `pkg/pkg.bend`'s own `file.sort`, so it is reachable rather
+than out of hand: it needs a permutation lemma over the insertion, which
+nothing here carries yet. `tests/publish.sh` holds it down against real
+`bend --publish` in the meantime.
 
 ## Written in Bend
 
