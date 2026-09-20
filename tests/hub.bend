@@ -51,7 +51,7 @@ def named(+at: String) -> IO(List<&2, String>):
 def lock(+repo: String, +app: String, +hub: String) -> IO(Unit):
   do IO<Unit>:
     _o : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
-      "EZ_ROOT=" ++ repo, repo ++ "/bin/ez.bin", "lock"]))
+      repo ++ "/bin/ez.bin", "lock"]))
     return Unit{}
 
 # BEND_LIB filled from the lock and nothing else, which is what the nix
@@ -59,7 +59,7 @@ def lock(+repo: String, +app: String, +hub: String) -> IO(Unit):
 def restore(+repo: String, +app: String, +hub: String) -> IO(Unit):
   do IO<Unit>:
     _o : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
-      "EZ_ROOT=" ++ repo, repo ++ "/bin/ez.bin", "fetch"]))
+      repo ++ "/bin/ez.bin", "fetch"]))
     return Unit{}
 
 # the entry built against a BEND_LIB, with the hub pointed at a dead port so a

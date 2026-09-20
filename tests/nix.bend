@@ -33,7 +33,7 @@ def publish(+hub: String, +at: String, +text: String) -> IO(String):
 def lock(+repo: String, +app: String, +hub: String) -> IO(String):
   do IO<String>:
     _o : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
-      "EZ_ROOT=" ++ repo, repo ++ "/bin/ez.bin", "lock"]))
+      repo ++ "/bin/ez.bin", "lock"]))
     +at : String <- W.only(app, "ez.lock.*")
     yes("the lock was written", Bool.not(String.is_empty(at)))
     return at

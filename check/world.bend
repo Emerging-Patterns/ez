@@ -119,11 +119,10 @@ def rm(at: String) -> IO(Unit):
 def inside(at: String, args: List<&2, String>) -> List<&2, String>:
   List.append(&2, String, ["env", "-C", at, "-u", "BEND_LIB"], args)
 
-# `ez` run in a project directory. EZ_ROOT is how the binary finds the
-# TypeScript it has not absorbed yet, since `IO.args()` carries no argv[0].
+# `ez` run in a project directory. The binary is the whole of ez, so it is
+# started with nothing in front of it but the directory it runs in.
 def ez(+repo: String, +app: String, args: List<&2, String>) -> List<&2, String>:
-  inside(app, List.append(&2, String,
-    ["env", "EZ_ROOT=" ++ repo, repo ++ "/bin/ez.bin"], args))
+  inside(app, List.append(&2, String, [repo ++ "/bin/ez.bin"], args))
 
 # the one file a pattern names, or "" when it names none. The lock's name is
 # ez's business and not a test's, so a test looks for it rather than spelling

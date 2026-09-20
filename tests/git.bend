@@ -18,12 +18,6 @@ def yes(name: String, ok: Bool) -> IO(Unit):
 def answer(+out: String) -> String:
   W.last(String.lines(Q.filter(R.text(out))))
 
-# the first n lines of what a program printed. `ez-git` writes its record on
-# stdout and its advice on stderr, and the one foreign effect hands both back
-# on one stream, in that order.
-def head(+out: String, n: Nat) -> String:
-  String.join(List.take(&2, String, String.lines(R.text(out)), n), "\n")
-
 # the upstream repo: two files, one importing the other, committed, tagged and
 # never published
 def upstream(+at: String) -> IO(String):
@@ -68,20 +62,26 @@ def serve(+at: String, +port: String) -> IO(String):
     return pid
 
 # the repo vendored under the name it would have been published as, by rev and
-# then by tag, which must come out as the same package
+# then by tag, which must come out as the same package. The second vendoring
+# goes into a BEND_LIB of its own, so the two trees can be compared file by
+# file rather than one of them overwriting the other.
 def vendor(+repo: String, +app: String, +url: String, +rev: String) -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(W.inside(app, ["env", "BEND_LIB=" ++ app ++ "/.ez/lib",
-      "bun", repo ++ "/bin/ez-git.ts", url, rev, "src/lib.bend"]))
-    +hash : String <- IO.pure(String, W.first(String.lines(R.text(out))))
-    Check.eq_str("the record names the hash, url, rev and entry",
-      head(out, 5n), hash ++ "\n" ++ url ++ "\n" ++ rev ++ "\n\nsrc/lib.bend")
-    +tag : String <- R.exec(W.inside(app, ["env", "BEND_LIB=" ++ app ++ "/.ez/tag",
-      "bun", repo ++ "/bin/ez-git.ts", url, "v1.0", "src/lib.bend"]))
-    Check.eq_str("a tag resolves to the same package as its commit",
-      W.first(String.lines(R.text(tag))), hash)
+    _i : String <- R.exec(W.ez(repo, app, ["init", "myapp", "main.bend"]))
+    +out : String <- R.exec(W.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
+    +led : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
+    +hash : String <- IO.pure(String, W.value(F.text_of(led), "hash"))
+    Check.eq_str("add says the import line the package is reachable by",
+      W.containing(String.lines(R.text(out)), "import "),
+      "import " ++ hash ++ "/lib.bend as Lib")
+    +tag : String <- R.exec(W.inside(app, ["env",
+      "BEND_LIB=" ++ app ++ "/.ez/tag", repo ++ "/bin/ez.bin", "add", url,
+      "v1.0", "src/lib.bend"]))
     Check.eq_str("the tag it resolved through is written down",
       W.containing(String.lines(R.text(tag)), " is "), "v1.0 is " ++ rev)
+    +same : String <- R.exec(["diff", "-r", app ++ "/.ez/lib/" ++ hash,
+      app ++ "/.ez/tag/" ++ hash])
+    yes("a tag vendors the same package as its commit", R.ok(same))
     +ats : String <- W.only(app ++ "/.ez", "origins.*")
     +org : Maybe<&2, String> <- F.read(ats)
     yes("the lock keeps the tag beside the rev",
@@ -146,9 +146,9 @@ def main() -> IO(Unit):
     go(repo, root, port)
 
 #|ok the upstream remote answers
-#|ok the record names the hash, url, rev and entry
-#|ok a tag resolves to the same package as its commit
+#|ok add says the import line the package is reachable by
 #|ok the tag it resolved through is written down
+#|ok a tag vendors the same package as its commit
 #|ok the lock keeps the tag beside the rev
 #|ok the vendored package builds, with no hub at all
 #|ok the lock records the git rev, not the hub

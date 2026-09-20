@@ -8,12 +8,9 @@ import ../manifest/manifest.bend as M
 import ../manifest/render.bend as Rend
 import ../lock/lock.bend as Lock
 import ../lock/restore.bend as Restore
+import ../git/git.bend as Git
 import ./args.bend as Args
 import ./env.bend as Env
-
-# a helper beside the binary, by name
-def tool(at: String, name: String) -> String:
-  at ++ "/bin/" ++ name
 
 # the ledger's path, which is fixed
 def toml() -> String:
@@ -149,10 +146,16 @@ def add.alias(+at: String) -> String:
   String.take(add.base(String.split(at, '/')), Nat.sub(String.length(
     add.base(String.split(at, '/'))), 5n))
 
-# the five lines `ez-git` answers with: hash, url, rev, tag, entry
-def add.dep(+rec: List<&2, String>) -> M.Dep:
-  M.Dep{add.alias(Args.at(rec, 4n)), Args.at(rec, 0n), Args.at(rec, 4n),
-    M.Git{Args.at(rec, 1n), Args.at(rec, 2n), Args.at(rec, 3n)}}
+# a vendoring's answer as a ledger entry. The entry file is read twice, once
+# for the name and once for itself, so it arrives through a parameter.
+def add.dep.go(hash: String, url: String, rev: String, +at: String,
+  tag: String) -> M.Dep:
+  M.Dep{add.alias(at), hash, at, M.Git{url, rev, tag}}
+
+# what a vendoring answered, as the ledger records it
+def add.dep(g: Git.Got) -> M.Dep:
+  Git.Got{h, u, v, e, t} = g
+  add.dep.go(h, u, v, e, t)
 
 # the ledger with this dependency written into it
 def add.write(r: M.Read, d: M.Dep) -> IO(Unit):
@@ -164,22 +167,24 @@ def add.write(r: M.Read, d: M.Dep) -> IO(Unit):
         wrote : Bool <- F.write(toml(), Rend.show(Rend.add(m, d)))
         report.exit(wrote)
 
-# a git dependency resolved, vendored, and recorded in the ledger
-def add.got(ok: Bool, +text: String) -> IO(Unit):
-  match ok:
-    case False{}:
-      IO.die(Unit, 1, "ez: " ++ text)
-    case True{}:
-      do IO<Unit>:
-        r : M.Read <- load()
-        add.write(r, add.dep(String.lines(text)))
-
-# `ez add <url> <rev|tag|branch> <entry.bend>`
-def add(as: List<&2, String>) -> IO(Unit):
+# a git dependency vendored, and then recorded in the ledger under its own
+# name. The vendoring comes first: a ledger naming a package that is not on
+# disk is worse than no entry at all.
+def add.go(+url: String, +ref: String, +entry: String) -> IO(Unit):
   do IO<Unit>:
-    at : String <- Env.root()
-    +out : String <- Env.exec(List.append(&2, String, ["bun", tool(at, "ez-git.ts")], as))
-    add.got(R.ok(out), R.text(out))
+    lib : String <- Env.lib()
+    g : Git.Got <- Git.vendor(lib, url, ref, entry)
+    r : M.Read <- load()
+    add.write(r, add.dep(g))
+
+# `ez add <url> <rev|tag|branch> <entry.bend>`. All three are wanted: the
+# entry is what the package's hash is computed from, and guessing it would
+# name a different package.
+def add(+as: List<&2, String>) -> IO(Unit):
+  +at = Args.at(as, 2n)
+  Bool.pick(IO(Unit), String.is_empty(at),
+    IO.die(Unit, 1, "usage: ez add <url> <rev|tag|branch> <entry.bend>"),
+    add.go(Args.at(as, 0n), Args.at(as, 1n), at))
 
 # the ledger with a dependency dropped
 def remove.write(r: M.Read, name: String) -> IO(Unit):
