@@ -1,6 +1,6 @@
 # ez
 
-Dependency tracking and Nix builds for [Bend 2](https://github.com/bendlang/bend).
+Dependency tracking, lockfile and vendoring tool for [Bend 2](https://github.com/bendlang/bend), written in Bend.
 
 Bend 2 is already a package manager: `bend f.bend --publish` hashes a file and
 its local imports into a `0x<hash>` and serves them from a hub, and

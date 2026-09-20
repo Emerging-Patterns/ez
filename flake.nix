@@ -1,7 +1,7 @@
 {
   # bend comes from bendlang/bend's own flake; this one adds bun for the tools
   # that are not ported yet, and the clang the native lane needs.
-  description = "ez: dependency tracking and nix builds for Bend 2";
+  description = "ez: dependency tracking, lockfile and vendoring tool for Bend 2, written in Bend";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.bend = {
