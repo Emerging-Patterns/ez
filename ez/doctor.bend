@@ -9,6 +9,7 @@ import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ./args.bend as Args
 import ./drift.bend as D
+import ./sorted.bend as Sort
 import ./env.bend as Env
 
 # one thing doctor looked at: what to print, and whether it is a problem
@@ -97,8 +98,7 @@ def answered(ok: Bool, +text: String) -> List<&2, String>:
 def locked() -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     +out : String <- R.exec(["grep", "-ohE", "0x[0-9a-f]{32}", lock()])
-    return D.uniq(List.sort(~String, ~String.is_le,
-      answered(R.ok(out), R.text(out))))
+    return D.uniq(Sort.sort(answered(R.ok(out), R.text(out))))
 
 # what the lock amounts to
 def lock.note(+hs: List<&2, String>) -> Note:

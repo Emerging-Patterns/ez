@@ -17,10 +17,12 @@ ez test [--js-only]                 run every */tests/*.bend, on both lanes
 ez doctor                           report on the toolchain and the project
 ```
 
-`bend ez/main.bend -o bin/ez.bin` is the whole build, and `./bin/ez.bin test`
-is the whole gate: every test, on the JS and the native lane. A fresh checkout
-runs `bin/bootstrap.sh` first, to fill BEND_LIB before there is an ez to fill it
-with. With nix, `nix run .#` or `nix profile install .#` instead, and
+`BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin` is the whole build, and
+`./bin/ez.bin test` is the whole gate: every test, on the JS and the native
+lane. A clone needs nothing fetched first — the one package ez builds itself
+with is vendored under `.ez/lib/` — but `bend` looks in `~/.bend/lib` unless
+told otherwise, so the variable is the whole of the bootstrap. Measured from a
+bare clone with no network: 44 seconds. With nix, `nix run .#` or `nix profile install .#` instead, and
 `nix develop` for a shell with bend, bun, git, openssl and `BEND_LIB` already
 set. `nix flake check` runs the unit tests in the sandbox.
 
@@ -137,6 +139,25 @@ terms check. `manifest/`, `net/`, `pkg/` and `lock/` have them, and
 `check/eq.bend` holds the one Base fact they all need, that a string equals
 itself.
 
+`All terms check.` is the whole line, and the gate wants exactly that. Bend
+also reports `All terms check, with N unsafe annotations.` (2.0.16) or
+`All terms check, but N defs rely on unsafe or foreign code:` (2.0.18), and
+both of those exit 0, so a gate that reads the exit status goes green on a
+claim resting on code nothing proved. The wording is about termination, not
+about effects: Bend requires every recursion to shrink one of its inputs, and
+a def that recurses outside that rule is reported. An effect costs nothing —
+`run/`, `io/`, `hub/`, `sha/` and the socket half of `net/` all check clean.
+What costs is Base's higher-order list defs, `List.foldl`, `List.foldr`,
+`List.all`, `List.any`, `List.filter`, `List.contains` and `List.sort`, each
+of which applies a function parameter Bend has erased and so cannot read
+through. `List.sort` is four of them, being a fuelled bottom-up merge sort.
+
+So `manifest/`, `pkg/` and `lock/` do not call those. A fold over a list of a
+known type is written out as a walk, which is structural and checks; the two
+places that need an order use an insertion sort, which shrinks its list at
+every step, over Base's merge sort, which does not. Both lists are small: a
+package's files, and a lock's packages.
+
 What is proved: that `utf8.take` and `utf8.drop` partition a string at any
 byte offset and that a body whose `Content-Length` is its own byte count comes
 back exactly, which is the framing the client rests on; that a parsed url's
@@ -150,8 +171,11 @@ What is not, and stays an example: that `parse` and `render` are inverses on a
 whole document, that `trim` and `norm` are idempotent, and that `manifest_of`
 does not depend on the order the walk found the files in. The first two need a
 `String.split`/`String.join` inverse, which needs the soundness of Bend's
-decidable char equality; the third is a property of Base's `List.sort`.
-`tests/publish.sh` holds that last one down against real `bend --publish`.
+decidable char equality. The third was a property of Base's `List.sort` and is
+now a property of `pkg/pkg.bend`'s own `file.sort`, so it is reachable rather
+than out of hand: it needs a permutation lemma over the insertion, which
+nothing here carries yet. `tests/publish.bend` holds it down against real
+`bend --publish` in the meantime.
 
 ## Written in Bend
 
@@ -205,8 +229,8 @@ no proxy, because the hub asks for none of those.
 The client does one thing: GET a url and answer with the body. `net/url.bend`
 and `net/http.bend` are pure, so the request format, the status line, the header
 lookup and both body framings are tested with no server anywhere;
-`tests/fetch.sh` stands a plaintext one up and drives the socket half on both
-lanes. Two things are worth knowing. Content-Length and chunk lengths count
+`tests/fetch.bend` starts one — `check/framing.bend`, which is Bend too — and
+drives the socket half against it. Two things are worth knowing. Content-Length and chunk lengths count
 bytes while a Bend String counts code points, so the framing counts UTF-8 bytes
 rather than `String.length`; a page with one accented character exposed this
 immediately. And a body arrives through the runtime's UTF-8 decode, which is
@@ -238,10 +262,16 @@ them, and bend, in agreement until that one is ported too. `EZ_ROOT` is how the
 binary finds them, and it is the last thing a wrapper has to set: `IO.args()`
 carries no argv[0], so a binary cannot locate itself.
 
-`bin/bootstrap.sh` is the one job that cannot be ez. `ez fetch` is Bend that
-imports sha256 out of BEND_LIB, so on a fresh checkout there is nothing to run
-it with. The bootstrap reads the lock ez wrote and applies the same rule to
-every file it fetches.
+ez builds itself with no ez. Its own Bend imports sha256 out of BEND_LIB, so a
+checkout with an empty BEND_LIB cannot check any Bend here, let alone run
+`ez fetch` to fill it. So the package is vendored, under the `0x` hash that
+names it, exactly as this README says to vendor a package nobody published. A
+clone builds with no network, no bun and no shell, and `ez fetch` keeps its job
+of refilling and checking everything else.
+
+The alternative was a script that read the lock and fetched, and that is a
+third implementation of one rule beside `lock/restore.bend` and
+`nix/bend-lib.nix`. Three copies drift; one vendored tree does not.
 
 ### A gotcha worth knowing
 
@@ -408,13 +438,15 @@ the build then runs with the hub unreachable.
     ez/drift.bend       the hashes in ez.toml against the ones the source imports
     ez/doctor.bend      the toolchain and the project, reported on
     io/                 a whole file read or written, over Base's chunked handles
-    bin/bootstrap.sh    the first BEND_LIB, before there is an ez to fill it
+    .ez/lib/0x0a5c…/   sha256, vendored, so a clone can build ez at all
     bin/pkg.ts          the import walk again, in TypeScript, for ez-git alone
     bin/ez-git.ts       vendors an unpublished git repo under its would-be hash
     nix/bend-lib.nix    ez.lock.toml -> a BEND_LIB store path
     check/kit.bend      what a test asserts with
     check/world.bend    a scratch directory, a free port, a server to stop again
+    check/serve.bend    the plaintext HTTP the two test servers share
     check/oracle.bend   a local stand-in for the hub, so --publish can be run
+    check/framing.bend  a server about framing alone, written seven bytes a write
     tests/fixture/      a package with a nested module, a foreign body and a `..`
     tests/check.bend    the built binary against this repo's own ledger
     tests/cli.bend      every subcommand, through a project built from nothing
@@ -423,4 +455,3 @@ the build then runs with the hub unreachable.
     tests/git.bend      an unpublished repo, vendored and rebuilt through nix
     tests/nix.bend      the hub path through nix-build
     tests/fetch.bend    the client against a server it starts itself
-    tests/fetch.sh      fetch.bend's driver: the last shell script in the repo

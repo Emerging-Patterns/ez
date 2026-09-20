@@ -119,10 +119,20 @@ def scan.fin(st: Head) -> Scan:
   Head{_head, mods, foreign} = st
   Scan{List.reverse(&2, String, mods), List.reverse(&2, String, foreign)}
 
+# the header walked one line at a time. Base's `List.foldl` applies an erased
+# function parameter, which Bend's termination check cannot see through, so
+# every def reaching it is reported as relying on unsafe code; a walk written
+# out is structural and costs nothing.
+def scan.walk(ls: List<&2, String>, st: Head) -> Head:
+  match ls:
+    case []:
+      st
+    case h <> t:
+      scan.walk(t, scan.step(st, h))
+
 # what a source file's header imports
 def scan(text: String) -> Scan:
-  scan.fin(List.foldl(~&2, ~String, ~Head, ~scan.step, String.lines(text),
-    Head{True{}, [], []}))
+  scan.fin(scan.walk(String.lines(text), Head{True{}, [], []}))
 
 # the modules a scan found
 def scan.mods(s: Scan) -> List<&2, String>:
@@ -251,11 +261,21 @@ def visit.go(hit: Bool, file: String, ns: String, eb: String,
     case False{}:
       visit.read(file, ns, eb, seen, out)
 
+# whether a name is already among the ones the walk has reached. Base's
+# `List.contains` applies an erased equality, which falls outside the
+# termination check; this scan is structural.
+def seen.has(xs: List<&2, String>, +s: String) -> Bool:
+  match xs:
+    case []:
+      False{}
+    case +h <> t:
+      Bool.or(String.eq(h, s), seen.has(t, s))
+
 # one file of the walk: what it adds to the package, and what it asks for next
 def visit(eb: String, tk: Task, st: State) -> IO(Step):
   Task{+file, ns} = tk
   State{+seen, out} = st
-  visit.go(List.contains(~String, ~String.eq, seen, file), file, ns, eb, seen, out)
+  visit.go(seen.has(seen, file), file, ns, eb, seen, out)
 
 # what a visit answered, with its modules put at the front of the queue, so the
 # walk goes depth first the way bend's does
@@ -374,9 +394,40 @@ def dedup(fs: List<&2, File>) -> List<&2, File>:
     case Con{h, t}:
       dedup.head(h, dedup(t))
 
+# where a file goes among the files already in order: before the one it is not
+# after, otherwise behind it. The rest of the insertion is a parameter, because
+# two defs that call each other are not allowed.
+def file.ins.put(le: Bool, x: File, h: File, t: List<&2, File>,
+  rest: List<&2, File>) -> List<&2, File>:
+  match le:
+    case True{}:
+      x <> (h <> t)
+    case False{}:
+      h <> rest
+
+# a file inserted into a list already in path order
+def file.ins(fs: List<&2, File>, +x: File) -> List<&2, File>:
+  match fs:
+    case []:
+      [x]
+    case Con{+h, +t}:
+      file.ins.put(file.le(x, h), x, h, t, file.ins(t, x))
+
+# a file list in path order. Insertion rather than Base's `List.sort`: that one
+# is a fuelled bottom-up merge sort, whose recursion Bend cannot check, so it
+# is reported as unsafe and every proof downstream of it inherits the report.
+# An insertion sort shrinks its list at every step, so Bend checks it, and a
+# package's file set is small enough that the cost is not felt.
+def file.sort(fs: List<&2, File>) -> List<&2, File>:
+  match fs:
+    case []:
+      []
+    case Con{+h, t}:
+      file.ins(file.sort(t), h)
+
 # the files of a package, in path order and each one once
 def files_of(fs: List<&2, File>) -> List<&2, File>:
-  dedup(List.sort(~File, ~file.le, fs))
+  dedup(file.sort(fs))
 
 # a path that leaves the package behind, which no package may hold
 def escapes(+at: String) -> Bool:

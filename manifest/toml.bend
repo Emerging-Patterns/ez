@@ -59,9 +59,20 @@ def trim.out(st: Trim) -> List<&2, Char>:
   Trim{_skip, out} = st
   out
 
+# the walk one char at a time. Base's `List.foldl` applies an erased function
+# parameter, which puts it outside Bend's termination check and costs every
+# proof downstream an unsafe annotation; a walk written out is structural and
+# costs nothing.
+def trim.walk(cs: List<&2, Char>, st: Trim) -> Trim:
+  match cs:
+    case []:
+      st
+    case h <> t:
+      trim.walk(t, trim.step(st, h))
+
 # the chars with leading spaces dropped, reversed
 def trim.pass(cs: List<&2, Char>) -> List<&2, Char>:
-  trim.out(List.foldl(~&2, ~Char, ~Trim, ~trim.step, cs, Trim{True{}, []}))
+  trim.out(trim.walk(cs, Trim{True{}, []}))
 
 # the string with no leading or trailing spaces. Two passes: the first reverses
 # and drops what led, the second drops what trailed and puts it back in order.
@@ -187,9 +198,17 @@ def parse.fin(r: Toml) -> Toml:
   Toml{bad, name, pairs, done} = r
   Toml{bad, "", [], List.reverse(&2, Sect, flush(name, pairs, done))}
 
+# the walk one line at a time, written out rather than folded
+def parse.walk(ls: List<&2, String>, st: Toml) -> Toml:
+  match ls:
+    case []:
+      st
+    case h <> t:
+      parse.walk(t, step(st, h))
+
 # the sections of a document, and the first error if there was one
 def parse(text: String) -> Toml:
-  parse.fin(List.foldl(~&2, ~String, ~Toml, ~step, String.lines(text), Toml{"", "", [], []}))
+  parse.fin(parse.walk(String.lines(text), Toml{"", "", [], []}))
 
 # this pair's value when the key matches, otherwise whatever the rest of the
 # table gave
@@ -260,11 +279,18 @@ def seg.fin(st: Split) -> List<&2, String>:
   Split{_quoted, cur, out} = st
   List.reverse(&2, String, seg.done(cur) <> out)
 
+# the walk one char at a time, written out rather than folded
+def seg.walk(cs: List<&2, Char>, st: Split) -> Split:
+  match cs:
+    case []:
+      st
+    case h <> t:
+      seg.walk(t, seg.step(st, h))
+
 # a header's segments, unquoted. `packages."0x0a".files` is three of them, and a
 # quoted segment may hold the dots a bare one may not.
 def segments(s: String) -> List<&2, String>:
-  seg.fin(List.foldl(~&2, ~Char, ~Split, ~seg.step, String.to_list(s),
-    Split{False{}, [], []}))
+  seg.fin(seg.walk(String.to_list(s), Split{False{}, [], []}))
 
 # a string in quotes, which is how a segment or a key that is not bare is
 # written, and how every value is
@@ -277,14 +303,19 @@ def bare.at(+c: Char) -> Bool:
   Bool.or(Char.is_alpha(c), Bool.or(Char.is_digit(c),
     Bool.or(Char.is_eq(c, '_'), Char.is_eq(c, '-'))))
 
-# a char a bare key may hold
-def bare.ok(c: Char) -> Bool:
-  bare.at(c)
+# whether every char of a key is one a bare key may hold. Base's `List.all`
+# applies an erased function parameter and so falls outside the termination
+# check; this walk is structural.
+def bare.all(cs: List<&2, Char>) -> Bool:
+  match cs:
+    case []:
+      True{}
+    case +h <> t:
+      Bool.and(bare.at(h), bare.all(t))
 
 # whether a key can be written without quotes
 def bare(+s: String) -> Bool:
-  Bool.and(Bool.not(String.is_empty(s)),
-    List.all(~&2, ~Char, ~bare.ok, String.to_list(s)))
+  Bool.and(Bool.not(String.is_empty(s)), bare.all(String.to_list(s)))
 
 # a key as it is written: bare when it can be, quoted when it must be
 def key(+s: String) -> String:

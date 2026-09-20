@@ -85,12 +85,22 @@ def norm.fin(st: Walk) -> String:
   Walk{abs, out} = st
   norm.text(abs, String.join(List.reverse(&2, String, out), "/"))
 
+# the walk one component at a time. Base's `List.foldl` applies an erased
+# function parameter, which Bend's termination check cannot see through, so
+# every def reaching it is reported as relying on unsafe code; a walk written
+# out is structural and costs nothing.
+def norm.walk(cs: List<&2, String>, st: Walk) -> Walk:
+  match cs:
+    case []:
+      st
+    case h <> t:
+      norm.walk(t, norm.step(st, h))
+
 # a path with `.` and an inner `..` resolved by text. A leading `..` survives,
 # because a module reached through one re-roots the package rather than
 # escaping it.
 def norm(+p: String) -> String:
-  norm.fin(List.foldl(~&2, ~String, ~Walk, ~norm.step, String.split(p, '/'),
-    Walk{String.starts_with(p, "/"), []}))
+  norm.fin(norm.walk(String.split(p, '/'), Walk{String.starts_with(p, "/"), []}))
 
 # the component carried so far, kept when nothing follows it. The list is the
 # first argument because that is the one the walk shrinks.
@@ -131,9 +141,19 @@ def tail(p: String, n: Nat) -> String:
 def up.is(s: String) -> Bool:
   String.eq(s, "..")
 
+# the climbs among components counted one at a time. Base's `List.filter`
+# applies an erased function parameter, so it falls outside the termination
+# check; this count is structural.
+def ups.go(ps: List<&2, String>) -> Nat:
+  match ps:
+    case []:
+      0n
+    case +h <> t:
+      Nat.add(Bool.pick(Nat, up.is(h), 1n, 0n), ups.go(t))
+
 # how many components of a path are climbs
 def ups(p: String) -> Nat:
-  List.length(&2, String, List.filter(~String, ~up.is, String.split(p, '/')))
+  ups.go(String.split(p, '/'))
 
 # a module path without its `.bend`, which is how bend names the module
 def unbend(+p: String) -> String:
