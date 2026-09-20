@@ -44,13 +44,25 @@ def init.of(xs: List<&2, String>) -> List<&2, String>:
 def parent.of(p: String) -> String:
   String.join(init.of(String.split(p, '/')), "/")
 
+# one step of the skip, with the head's answer in hand. A recursive call in an
+# arm of a `Bool.pick` is not an arm: `Bool.pick` is an ordinary function and
+# builds both before it picks one, so the first non-space still cost a walk of
+# everything after it. The rest arrives as a thunk and only the arm that wants
+# it applies it.
+def ws.step(space: Bool, c: Char, t: String, rest: Unit -> String) -> String:
+  match space:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      SCon{c, t}
+
 # the text with its leading whitespace gone
 def ws(s: String) -> String:
   match s:
     case SNil{}:
       SNil{}
     case SCon{+c, +t}:
-      Bool.pick(String, Char.is_space(c), ws(t), SCon{c, t})
+      ws.step(Char.is_space(c), c, t, _u => ws(t))
 
 # a character that had to be there, either consumed or refused
 def eat.at(ok: Bool, rest: String) -> Maybe<&2, String>:
@@ -211,6 +223,16 @@ type Str is Data:
   SBad{why: String}
   SOk{text: String, rest: String}
 
+# one step of the measure, with the answer to "does this quote close it" in
+# hand. Under a `Bool.pick` the closing quote still cost a walk of the rest of
+# the body, and a `Succ` built over every character of it.
+def str.end.step(shut: Bool, rest: Unit -> Nat) -> Nat:
+  match shut:
+    case True{}:
+      0n
+    case False{}:
+      rest(Unit{})
+
 # how many characters lie before the quote that closes a string literal, or the
 # whole length when none does. `esc` says a backslash stood before this
 # character, so this one cannot close the literal and cannot escape the next.
@@ -219,8 +241,8 @@ def str.end(s: String, +esc: Bool) -> Nat:
     case SNil{}:
       0n
     case SCon{+c, t}:
-      Bool.pick(Nat, Bool.and(Bool.not(esc), Char.is_eq(c, '"')), 0n,
-        Succ{str.end(t, Bool.and(Bool.not(esc), Char.is_eq(c, '\\')))})
+      str.end.step(Bool.and(Bool.not(esc), Char.is_eq(c, '"')),
+        _u => Succ{str.end(t, Bool.and(Bool.not(esc), Char.is_eq(c, '\\')))})
 
 # a literal whose span decoded, or the escape that stopped it
 def str.done(u: Uns, rest: String) -> Str:
@@ -344,10 +366,19 @@ def mem.one.key(ok: Bool, rest: String) -> Mem:
     case True{}:
       mem.key(str.of(rest))
 
+# the end of the object, decided. The pair reader hangs off the other arm
+# rather than sitting in an argument, so an object that has ended does not
+# read a pair out of what follows it.
+def mem.one.shut(end: Bool, +s: String) -> Mem:
+  match end:
+    case True{}:
+      MEnd{}
+    case False{}:
+      mem.one.key(String.starts_with(s, "\""), String.drop(s, 1n))
+
 # either the brace that ends the object or the pair that continues it
 def mem.one.at(+s: String) -> Mem:
-  Bool.pick(Mem, String.starts_with(s, "}"), MEnd{},
-    mem.one.key(String.starts_with(s, "\""), String.drop(s, 1n)))
+  mem.one.shut(String.starts_with(s, "}"), s)
 
 # the next pair of the files object, read from wherever the last one left off
 def mem.one(s: String) -> Mem:

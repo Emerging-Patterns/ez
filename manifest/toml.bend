@@ -135,13 +135,53 @@ def head_of(+s: String, shut: Bool) -> Line:
     case False{}:
       LBad{s ++ " is not a section header"}
 
+# the last question: a line holding an `=` is a pair, and a line holding none
+# is neither of the two things a manifest may say. `String.split` is the cost
+# here, and it is paid only by a line that really is a pair.
+def line_of.pair(here: Bool, +s: String) -> Line:
+  match here:
+    case True{}:
+      pair_of(String.split(s, '='))
+    case False{}:
+      LBad{s ++ " is neither a section header nor a key"}
+
+# the section header decided, and the pair question asked only underneath it
+def line_of.head(here: Bool, +s: String) -> Line:
+  match here:
+    case True{}:
+      head_of(s, String.ends_with(s, "]"))
+    case False{}:
+      line_of.pair(String.contains(s, "="), s)
+
+# a comment, which may hold anything and so is answered before anything is
+# read out of the line
+def line_of.comment(here: Bool, +s: String) -> Line:
+  match here:
+    case True{}:
+      LSkip{}
+    case False{}:
+      line_of.head(String.starts_with(s, "["), s)
+
+# a blank line, which is the first question because an empty string starts
+# with nothing and holds nothing, and so would fall all the way through to
+# being called neither a header nor a key
+def line_of.blank(here: Bool, +s: String) -> Line:
+  match here:
+    case True{}:
+      LSkip{}
+    case False{}:
+      line_of.comment(String.starts_with(s, "#"), s)
+
 # what a trimmed line is. The order matters: a comment may hold anything.
+#
+# The cascade is four `match` arms rather than four nested `Bool.pick`s
+# because `Bool.pick` is an ordinary function: every arm of the nest was built
+# before any condition was consulted, so `head_of` and `String.split` ran for
+# every blank line and every comment line of every manifest and lockfile ez
+# reads. A lock with fifty packages is several hundred lines and each was
+# parsed two or three times over.
 def line_of(+s: String) -> Line:
-  Bool.pick(Line, String.is_empty(s), LSkip{},
-    Bool.pick(Line, String.starts_with(s, "#"), LSkip{},
-      Bool.pick(Line, String.starts_with(s, "["), head_of(s, String.ends_with(s, "]")),
-        Bool.pick(Line, String.contains(s, "="), pair_of(String.split(s, '=')),
-          LBad{s ++ " is neither a section header nor a key"}))))
+  line_of.blank(String.is_empty(s), s)
 
 # the first error wins, so a later one is dropped
 def first(+bad: String, why: String) -> String:
@@ -303,6 +343,16 @@ def bare.at(+c: Char) -> Bool:
   Bool.or(Char.is_alpha(c), Bool.or(Char.is_digit(c),
     Bool.or(Char.is_eq(c, '_'), Char.is_eq(c, '-'))))
 
+# one step of the walk, with the head's answer in hand. `Bool.and` runs both
+# of its sides, so the first char that a bare key may not hold still cost a
+# walk of the rest of the key.
+def bare.all.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      False{}
+
 # whether every char of a key is one a bare key may hold. Base's `List.all`
 # applies an erased function parameter and so falls outside the termination
 # check; this walk is structural.
@@ -311,7 +361,7 @@ def bare.all(cs: List<&2, Char>) -> Bool:
     case []:
       True{}
     case +h <> t:
-      Bool.and(bare.at(h), bare.all(t))
+      bare.all.step(bare.at(h), _u => bare.all(t))
 
 # whether a key can be written without quotes
 def bare(+s: String) -> Bool:

@@ -165,13 +165,29 @@ def spine(ds: List<&2, String>) -> List<&2, String>:
     case Con{+h, t}:
       List.append(&2, String, prefix(h), spine(t))
 
+# one step of a scan that is looking for one hit. Five scans in this file want
+# it, so it is stated once here rather than five times.
+#
+# `Bool.or` is an ordinary function, so both of its sides are reduced before
+# it answers: a scan written as `Bool.or(test(h), go(t))` reads the whole list
+# whatever the head said. The rest of the scan arrives as a thunk, which is a
+# value, and only the arm that wants it applies it. Handing the recursion in
+# as an ordinary argument would not do, because an argument is reduced before
+# the def it is passed to can decline it.
+def any.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
 # whether a list already holds this string
 def holds(ss: List<&2, String>, +s: String) -> Bool:
   match ss:
     case Nil{}:
       False{}
     case Con{+h, t}:
-      Bool.or(String.eq(h, s), holds(t, s))
+      any.step(String.eq(h, s), _u => holds(t, s))
 
 # the strings with each named once, the last of any repeat kept. Which one is
 # kept does not matter: a level is a `mkdir -p` and a set of links, the links
@@ -201,7 +217,7 @@ def carved(+dir: String, ds: List<&2, String>) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, t}:
-      Bool.or(carved.one(dir, h), carved(dir, t))
+      any.step(carved.one(dir, h), _u => carved(dir, t))
 
 # whether the shadow has to keep this name for itself: a directory a project's
 # aggregates land in, or the name the aggregates are written under
@@ -292,7 +308,7 @@ def started.go(ls: List<&2, String>) -> Bool:
     case Nil{}:
       False{}
     case Con{h, t}:
-      Bool.or(marked(h), started.go(t))
+      any.step(marked(h), _u => started.go(t))
 
 # whether the one binary ran at all. A test that runs as a `main` can still
 # fail to import — a do-block binder sharing its name with a def in the same
@@ -312,8 +328,8 @@ def coded(ls: List<&2, String>, +what: String) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, t}:
-      Bool.or(Bool.and(Bool.not(commented(h)), String.contains(h, what)),
-        coded(t, what))
+      any.step(Bool.and(Bool.not(commented(h)), String.contains(h, what)),
+        _u => coded(t, what))
 
 # whether any of these lines begins with this
 def headed.go(ls: List<&2, String>, +head: String) -> Bool:
@@ -321,7 +337,7 @@ def headed.go(ls: List<&2, String>, +head: String) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, t}:
-      Bool.or(String.starts_with(h, head), headed.go(t, head))
+      any.step(String.starts_with(h, head), _u => headed.go(t, head))
 
 # whether a file carries this header. A header is a line, and the difference
 # is the whole point: a file holding the same words in a string literal, or in

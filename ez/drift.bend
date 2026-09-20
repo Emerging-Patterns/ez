@@ -67,13 +67,23 @@ def uniq(ss: List<&2, String>) -> List<&2, String>:
 def imported(ls: List<&2, String>) -> List<&2, String>:
   uniq(Sort.sort(hashes(ls)))
 
+# one step of the scan, with the head's answer in hand. `Bool.or` reduces both
+# of its sides, so a scan written with it reads the whole list even when the
+# first entry answers. The rest arrives as a thunk.
+def has.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
 # whether a list holds this string
 def has(ss: List<&2, String>, +x: String) -> Bool:
   match ss:
     case []:
       False{}
     case h <> t:
-      Bool.or(String.eq(h, x), has(t, x))
+      has.step(String.eq(h, x), _u => has(t, x))
 
 # a string kept when the other list lacks it
 def missing.put(hit: Bool, h: String, rest: List<&2, String>) -> List<&2, String>:

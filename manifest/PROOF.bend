@@ -167,3 +167,129 @@ def Laws.add_idem(m, d):
           R.without(ds, M.dep.name(d)),
           without_append(R.without(ds, M.dep.name(d)), d),
           Laws.without_idem(ds, M.dep.name(d))))
+
+# The two agreement laws at the foot of LAWS.bend, which say that this pass's
+# rewrites for cost did not change an answer. Each is the same argument: a
+# `match` may not scrutinise a computed value, so the branch is lifted into a
+# parameter and the law is then applied to the branch the code computes. The
+# classifier takes four of them, one a level, in the order the cascade asks
+# its questions.
+
+# LAW: the last question, with the branch given as a parameter
+law line_of_agrees.pair:
+  for +s: String
+  for p: Bool
+  {Bool.pick(T.Line, p, T.pair_of(String.split(s, '=')),
+    T.LBad{s ++ " is neither a section header nor a key"})
+    == T.line_of.pair(p, s) : T.Line}
+
+def line_of_agrees.pair(_s, p):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# LAW: the section header, with the pair question's agreement alongside
+law line_of_agrees.head:
+  for +s: String
+  for p: Bool
+  for ih: {Bool.pick(T.Line, String.contains(s, "="),
+    T.pair_of(String.split(s, '=')),
+    T.LBad{s ++ " is neither a section header nor a key"})
+    == T.line_of.pair(String.contains(s, "="), s) : T.Line}
+  {Bool.pick(T.Line, p, T.head_of(s, String.ends_with(s, "]")),
+    Bool.pick(T.Line, String.contains(s, "="),
+      T.pair_of(String.split(s, '=')),
+      T.LBad{s ++ " is neither a section header nor a key"}))
+    == T.line_of.head(p, s) : T.Line}
+
+def line_of_agrees.head(_s, p, ih):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+# LAW: the comment, with the header question's agreement alongside
+law line_of_agrees.comment:
+  for +s: String
+  for p: Bool
+  for ih: {Bool.pick(T.Line, String.starts_with(s, "["),
+    T.head_of(s, String.ends_with(s, "]")),
+    Bool.pick(T.Line, String.contains(s, "="),
+      T.pair_of(String.split(s, '=')),
+      T.LBad{s ++ " is neither a section header nor a key"}))
+    == T.line_of.head(String.starts_with(s, "["), s) : T.Line}
+  {Bool.pick(T.Line, p, T.LSkip{},
+    Bool.pick(T.Line, String.starts_with(s, "["),
+      T.head_of(s, String.ends_with(s, "]")),
+      Bool.pick(T.Line, String.contains(s, "="),
+        T.pair_of(String.split(s, '=')),
+        T.LBad{s ++ " is neither a section header nor a key"})))
+    == T.line_of.comment(p, s) : T.Line}
+
+def line_of_agrees.comment(_s, p, ih):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+# LAW: the blank line, with the comment question's agreement alongside. This
+# is the arm that matters most: a cascade without it would fall through to
+# calling an empty line neither a header nor a key.
+law line_of_agrees.blank:
+  for +s: String
+  for p: Bool
+  for ih: {Bool.pick(T.Line, String.starts_with(s, "#"), T.LSkip{},
+    Bool.pick(T.Line, String.starts_with(s, "["),
+      T.head_of(s, String.ends_with(s, "]")),
+      Bool.pick(T.Line, String.contains(s, "="),
+        T.pair_of(String.split(s, '=')),
+        T.LBad{s ++ " is neither a section header nor a key"})))
+    == T.line_of.comment(String.starts_with(s, "#"), s) : T.Line}
+  {Bool.pick(T.Line, p, T.LSkip{},
+    Bool.pick(T.Line, String.starts_with(s, "#"), T.LSkip{},
+      Bool.pick(T.Line, String.starts_with(s, "["),
+        T.head_of(s, String.ends_with(s, "]")),
+        Bool.pick(T.Line, String.contains(s, "="),
+          T.pair_of(String.split(s, '=')),
+          T.LBad{s ++ " is neither a section header nor a key"}))))
+    == T.line_of.blank(p, s) : T.Line}
+
+def line_of_agrees.blank(_s, p, ih):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+def Laws.line_of_agrees(s):
+  line_of_agrees.blank(s, String.is_empty(s),
+    line_of_agrees.comment(s, String.starts_with(s, "#"),
+      line_of_agrees.head(s, String.starts_with(s, "["),
+        line_of_agrees.pair(s, String.contains(s, "=")))))
+
+# LAW: one step of the bare-key walk, with the head's answer given as a
+# parameter and the rest of the walk's agreement alongside
+law bare_all_agrees.arm:
+  for t: List<&2, Char>
+  for p: Bool
+  for ih: {Laws.old.bare.all(t) == T.bare.all(t) : Bool}
+  {Bool.and(p, Laws.old.bare.all(t))
+    == T.bare.all.step(p, _u => T.bare.all(t)) : Bool}
+
+def bare_all_agrees.arm(_t, p, ih):
+  match p:
+    case True{}:
+      ih
+    case False{}:
+      {==}
+
+def Laws.bare_all_agrees(cs):
+  match cs:
+    case []:
+      {==}
+    case +h <> +t:
+      bare_all_agrees.arm(t, T.bare.at(h), Laws.bare_all_agrees(t))

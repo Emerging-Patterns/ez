@@ -13,8 +13,8 @@ law utf8_split.arm:
   for b: Bool
   for ih: {String.append(Http.utf8.take(t, m), Http.utf8.drop(t, m)) == t : String}
   {String.append(
-    Http.utf8.take.step(b, h, u => Http.utf8.take(t, m)),
-    Http.utf8.drop.step(b, h, t, u => Http.utf8.drop(t, m))) == SCon{h, t} : String}
+    Http.utf8.take.step(b, h, _u => Http.utf8.take(t, m)),
+    Http.utf8.drop.step(b, h, t, _u => Http.utf8.drop(t, m))) == SCon{h, t} : String}
 
 def utf8_split.arm(h, t, m, b, ih):
   match b:
@@ -112,7 +112,7 @@ def take_all(s):
           Http.utf8.width(Char.to_u32(h))))},
         SCon{h, t},
         Equal.cong(Bool, String,
-          b => Http.utf8.take.step(b, h, u => Http.utf8.take(t, Nat.sub(
+          b => Http.utf8.take.step(b, h, _u => Http.utf8.take(t, Nat.sub(
             Nat.add(Http.utf8.width(Char.to_u32(h)), Http.utf8.len(t)),
             Http.utf8.width(Char.to_u32(h))))),
           Nat.is_lt(Nat.add(Http.utf8.width(Char.to_u32(h)), Http.utf8.len(t)),
@@ -184,7 +184,7 @@ law take_agrees.arm:
   for b: Bool
   for ih: {Laws.old.take(t, m) == Http.utf8.take(t, m) : String}
   {Bool.pick(String, b, SNil{}, SCon{h, Laws.old.take(t, m)})
-    == Http.utf8.take.step(b, h, u => Http.utf8.take(t, m)) : String}
+    == Http.utf8.take.step(b, h, _u => Http.utf8.take(t, m)) : String}
 
 def take_agrees.arm(h, t, m, b, ih):
   match b:
@@ -211,7 +211,7 @@ law drop_agrees.arm:
   for b: Bool
   for ih: {Laws.old.drop(t, m) == Http.utf8.drop(t, m) : String}
   {Bool.pick(String, b, SCon{h, t}, Laws.old.drop(t, m))
-    == Http.utf8.drop.step(b, h, t, u => Http.utf8.drop(t, m)) : String}
+    == Http.utf8.drop.step(b, h, t, _u => Http.utf8.drop(t, m)) : String}
 
 def drop_agrees.arm(h, t, m, b, ih):
   match b:
@@ -239,7 +239,7 @@ law divide_agrees.arm:
   for ih: {Laws.old.divide.go(t, pat, n) == Http.divide.go(t, pat, n) : Http.Cut}
   {Bool.pick(Http.Cut, b, Http.Cut{"", String.drop(SCon{h, t}, n)},
     Http.divide.push(h, Laws.old.divide.go(t, pat, n)))
-    == Http.divide.step(b, h, t, n, u => Http.divide.go(t, pat, n)) : Http.Cut}
+    == Http.divide.step(b, h, t, n, _u => Http.divide.go(t, pat, n)) : Http.Cut}
 
 def divide_agrees.arm(h, t, pat, n, b, ih):
   match b:
@@ -279,7 +279,7 @@ law hex_agrees.arm:
   {Bool.pick(Nat, b, acc,
     Laws.old.hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v))))
     == Http.hex.step(b, acc,
-      u => Http.hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v)))) : Nat}
+      _u => Http.hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v)))) : Nat}
 
 def hex_agrees.arm(t, acc, v, b, ih):
   match b:

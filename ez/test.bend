@@ -569,13 +569,23 @@ def done(t: Tally) -> IO(Unit):
   Tally{p, n} = t
   done.go(p, n)
 
+# one step of the scan, with the head's answer in hand. `Bool.or` reduces both
+# of its sides, so the flag found first still cost a walk of the arguments
+# after it. The rest arrives as a thunk.
+def flag.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
 # whether a flag was given, wherever among the arguments it sits
 def flag(as: List<&2, String>, +name: String) -> Bool:
   match as:
     case Nil{}:
       False{}
     case Con{h, t}:
-      Bool.or(String.eq(h, name), flag(t, name))
+      flag.step(String.eq(h, name), _u => flag(t, name))
 
 # `ez test [--js-only] [--full]`: every test in the tree, on every lane. The
 # end-to-end tests are never cached: what they read is the world outside this

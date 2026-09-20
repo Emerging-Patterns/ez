@@ -46,6 +46,16 @@ def cut.put(h: String, m: Msg) -> Msg:
     case MFull{head, body}:
       MFull{h <> head, body}
 
+# one step of the split, with the answer to "is this the blank line" in hand.
+# Under a `Bool.pick` the blank line that ends the head still cost a walk of
+# every line of the body, and a `cut.put` rebuilt over each of them.
+def cut.step(blank: Bool, t: List<&2, String>, rest: Unit -> Msg) -> Msg:
+  match blank:
+    case True{}:
+      MFull{[], String.join(t, "\n")}
+    case False{}:
+      rest(Unit{})
+
 # a request's lines split at the blank one. The body is joined back with the
 # newlines it was split on, so nothing in it is lost or invented.
 def cut(ls: List<&2, String>) -> Msg:
@@ -53,9 +63,8 @@ def cut(ls: List<&2, String>) -> Msg:
     case []:
       MPartial{}
     case +h <> +t:
-      Bool.pick(Msg, Bool.or(String.is_empty(h), String.eq(h, "\r")),
-        MFull{[], String.join(t, "\n")},
-        cut.put(h, cut(t)))
+      cut.step(Bool.or(String.is_empty(h), String.eq(h, "\r")), t,
+        _u => cut.put(h, cut(t)))
 
 # a request whose head came out empty has not arrived: nothing has been read
 # yet, and the one blank line that split it was the whole of it

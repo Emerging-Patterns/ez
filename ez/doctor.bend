@@ -189,13 +189,24 @@ def note.line(n: Note) -> String:
   Note{_w, l} = n
   l
 
+# one step of the scan, with the head's answer in hand. `Bool.or` reduces both
+# of its sides, so the first problem found still cost a walk of every note
+# after it. The rest arrives as a thunk and only the arm that wants it applies
+# it.
+def wrong.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
 # whether anything found was a problem
 def wrong(ns: List<&2, Note>) -> Bool:
   match ns:
     case []:
       False{}
     case h <> t:
-      Bool.or(note.wrong(h), wrong(t))
+      wrong.step(note.wrong(h), _u => wrong(t))
 
 # the report, a note a line
 def text(ns: List<&2, Note>) -> String:
