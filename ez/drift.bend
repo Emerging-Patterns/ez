@@ -5,6 +5,7 @@
 # rewriting anyone's source.
 import Base
 import ../manifest/manifest.bend as M
+import ./sorted.bend as Sort
 
 # the first of a list of strings, or ""
 def head(ps: List<&2, String>) -> String:
@@ -64,7 +65,7 @@ def uniq(ss: List<&2, String>) -> List<&2, String>:
 # every distinct hash the import lines name, sorted, so a report reads the same
 # twice over whatever order the lines arrived in
 def imported(ls: List<&2, String>) -> List<&2, String>:
-  uniq(List.sort(~String, ~String.is_le, hashes(ls)))
+  uniq(Sort.sort(hashes(ls)))
 
 # whether a list holds this string
 def has(ss: List<&2, String>, +x: String) -> Bool:

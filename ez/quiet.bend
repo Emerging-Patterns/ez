@@ -65,10 +65,19 @@ def tail.out(st: Tail) -> List<&2, String>:
   Tail{_live, out} = st
   out
 
+# the fold from the right, written out. Base's List.foldr takes its step as an
+# erased argument, and the termination check cannot read through one.
+def tail.walk(ls: List<&2, String>) -> Tail:
+  match ls:
+    case []:
+      Tail{False{}, []}
+    case h <> t:
+      tail.step(h, tail.walk(t))
+
 # the lines with the blank ones at the end dropped, the way a shell's `$(...)`
 # drops a trailing newline, so a comparison never turns on one
 def chomp.lines(ls: List<&2, String>) -> List<&2, String>:
-  tail.out(List.foldr(~&2, ~String, ~Tail, ~tail.step, ls, Tail{False{}, []}))
+  tail.out(tail.walk(ls))
 
 # the text with its trailing blank lines dropped
 def chomp(text: String) -> String:
