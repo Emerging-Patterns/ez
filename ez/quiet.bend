@@ -1,10 +1,26 @@
-# ez/quiet: bend's check report dropped from a run's output, so a test sees only
+# ez/quiet: bend's own chatter dropped from a run's output, so a test sees only
 # what its program printed. The wording changed between releases: 2.0.16 says
 # `All terms check, with N unsafe annotations.` on one line, 2.0.18 says
 # `All terms check, but N defs rely on unsafe or foreign code:` and then a
 # `- <name>` line each. Both go. A test asserting its own output never starts a
 # line with `- `.
+#
+# bend also nags about its own updates: `bend 2.0.21 is available: run bend
+# update`, printed whenever a newer release exists and the network can be
+# reached. That line is not the program's output either, and leaving it in
+# fails every test in the tree the day upstream cuts a release. It is worth
+# being precise about how bad that is: the gate went from green to 33 of 52
+# here without a line of ez changing, and it did it the moment a laptop
+# regained its network, so it is invisible offline and arrives looking like a
+# regression someone just introduced. It goes too.
 import Base
+
+# whether this line is bend telling us a newer bend exists. Anchored at both
+# ends rather than matched loosely: a test that legitimately prints the words
+# `bend update` in prose should still be compared on them.
+def is_nag(+line: String) -> Bool:
+  Bool.and(String.starts_with(line, "bend "),
+    String.ends_with(line, " is available: run bend update"))
 
 # a trailing run of blank lines, being dropped from the right. `live` turns true
 # at the first line that survives, after which nothing is dropped.
@@ -16,6 +32,7 @@ type Tail is Data:
 def in_report(report: Bool, +line: String) -> Bool:
   Bool.or(String.starts_with(line, "All terms check"),
     Bool.and(report, String.starts_with(line, "- ")))
+
 
 # a line kept or dropped
 def put(drop: Bool, h: String, rest: List<&2, String>) -> List<&2, String>:
@@ -34,8 +51,8 @@ def go(ls: List<&2, String>, report: Bool) -> List<&2, String>:
     case []:
       []
     case +h <> t:
-      +drop = in_report(report, h)
-      put(drop, h, go(t, drop))
+      +rep = in_report(report, h)
+      put(Bool.or(rep, is_nag(h)), h, go(t, rep))
 
 # a blank line: kept once something after it has survived, dropped while the
 # run of trailing blanks is still open
