@@ -9,8 +9,10 @@ import ./path.bend as Path
 # LAW: a file set that names the same file twice in a row holds it once, so
 # the manifest a repeated file produces is the manifest without the repeat.
 # This is the half of the canonical form that dedup owns; the other half, that
-# the order files were found in does not matter, is Base's List.sort and is
-# stated but not proved (see PROOF.bend).
+# the order files were found in does not matter, belongs to this package's own
+# file.sort and is stated but not proved (see PROOF.bend). It moved here from
+# Base's List.sort, which no proof could reach, so it is now reachable: what it
+# wants is a permutation lemma over file.ins.
 law dedup_dup:
   for +f: P.File
   for t: List<&2, P.File>

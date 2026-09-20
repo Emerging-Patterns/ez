@@ -1,19 +1,14 @@
-# fetch: the client against a real server. tests/fetch.sh stands one up, writes
-# its port into .gate/netport, and runs this on both lanes. It is under tests/
-# rather than net/tests/ because the gate runs net/tests/*.bend with nothing
-# listening.
+# fetch: the client against a real server. The server is check/framing.bend,
+# started here on a port of this test's own and stopped again at the end, so
+# the test is answered by the server it started and never by a stranger's.
+#
+# It is under tests/ rather than net/tests/ because it drives a socket, and the
+# unit tests beside the code are about what can be said without one.
 import Base
 import ../net/client.bend as Client
-import ../io/file.bend as File
 import ../run/run.bend as R
 import ../check/kit.bend as Check
-
-# the port the server was given, without the newline it was written with
-def port() -> IO(String):
-  do IO<String>:
-    m : Maybe<&2, String> <- File.read(".gate/netport")
-    +text : String <- IO.pure(String, File.text_of(m))
-    return String.take(text, Nat.sub(String.length(text), 1n))
+import ../check/world.bend as W
 
 # a url on that server
 def at(+port: String, path: String) -> String:
@@ -23,9 +18,9 @@ def at(+port: String, path: String) -> String:
 def show(+out: String) -> String:
   R.code(out) ++ " " ++ R.text(out)
 
-def main() -> IO(Unit):
+# every fetch, once the server is up
+def fetch(+p: String) -> IO(Unit):
   do IO<Unit>:
-    +p : String <- port()
     +plain : String <- Client.get(at(p, "/plain"))
     Check.eq_str("a Content-Length body comes back whole", show(plain),
       "0 a manifest line\n")
@@ -42,6 +37,25 @@ def main() -> IO(Unit):
     Check.eq_str("a url that is not one never reaches a socket", show(bad),
       "22 nonsense: has no //")
 
+# the server started, driven and stopped
+def go(+here: String, +port: String) -> IO(Unit):
+  do IO<Unit>:
+    +pid : String <- W.spawn(["env", "BEND_LIB=" ++ here ++ "/.ez/lib",
+      "bend", here ++ "/check/framing.bend", port])
+    up : Bool <- W.ready(["curl", "-fsS", "--max-time", "5",
+      "http://127.0.0.1:" ++ port ++ "/"])
+    Check.eq_str("the server answers",
+      Bool.pick(String, up, "yes", "no"), "yes")
+    fetch(port)
+    W.stop(pid)
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    here : String <- W.here()
+    port : String <- W.port()
+    go(here, port)
+
+#|ok the server answers
 #|ok a Content-Length body comes back whole
 #|ok a chunked body is put back together
 #|ok a 404 is a status, never a body

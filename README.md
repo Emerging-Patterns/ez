@@ -172,7 +172,7 @@ does not depend on the order the walk found the files in. The first two need a
 decidable char equality. The third was a property of Base's `List.sort` and is
 now a property of `pkg/pkg.bend`'s own `file.sort`, so it is reachable rather
 than out of hand: it needs a permutation lemma over the insertion, which
-nothing here carries yet. `tests/publish.sh` holds it down against real
+nothing here carries yet. `tests/publish.bend` holds it down against real
 `bend --publish` in the meantime.
 
 ## Written in Bend
@@ -227,8 +227,8 @@ no proxy, because the hub asks for none of those.
 The client does one thing: GET a url and answer with the body. `net/url.bend`
 and `net/http.bend` are pure, so the request format, the status line, the header
 lookup and both body framings are tested with no server anywhere;
-`tests/fetch.sh` stands a plaintext one up and drives the socket half on both
-lanes. Two things are worth knowing. Content-Length and chunk lengths count
+`tests/fetch.bend` starts one — `check/framing.bend`, which is Bend too — and
+drives the socket half against it. Two things are worth knowing. Content-Length and chunk lengths count
 bytes while a Bend String counts code points, so the framing counts UTF-8 bytes
 rather than `String.length`; a page with one accented character exposed this
 immediately. And a body arrives through the runtime's UTF-8 decode, which is
@@ -436,7 +436,9 @@ the build then runs with the hub unreachable.
     nix/bend-lib.nix    ez.lock.toml -> a BEND_LIB store path
     check/kit.bend      what a test asserts with
     check/world.bend    a scratch directory, a free port, a server to stop again
+    check/serve.bend    the plaintext HTTP the two test servers share
     check/oracle.bend   a local stand-in for the hub, so --publish can be run
+    check/framing.bend  a server about framing alone, written seven bytes a write
     tests/fixture/      a package with a nested module, a foreign body and a `..`
     tests/check.bend    the built binary against this repo's own ledger
     tests/cli.bend      every subcommand, through a project built from nothing
@@ -445,4 +447,3 @@ the build then runs with the hub unreachable.
     tests/git.bend      an unpublished repo, vendored and rebuilt through nix
     tests/nix.bend      the hub path through nix-build
     tests/fetch.bend    the client against a server it starts itself
-    tests/fetch.sh      fetch.bend's driver: the last shell script in the repo
