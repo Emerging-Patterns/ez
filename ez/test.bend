@@ -82,8 +82,15 @@ def head(text: String) -> String:
 
 # a test whose header says so is not run on the JS lane, which overflows its
 # stack on a string over about 65 KB. The native lane has no such limit.
+#
+# The header is a line and is matched as one. A whole-file substring search
+# reads `# lanes: native` inside a string literal as a header — which is
+# exactly what a test of a tool that reads headers carries — and drops the
+# file from the lane. Nothing fails, the run is simply one comparison
+# shorter, and a green count over fewer tests than the tree holds is the
+# worst answer a gate can give.
 def js_lane(+text: String) -> Bool:
-  Bool.not(String.contains(text, "# lanes: native"))
+  Bool.not(G.headed(text, "# lanes: native"))
 
 # whether a test is one of the unit tests, which live in a `tests/` beside the
 # code they are about. The end-to-end tests are the top-level `tests/`, and
@@ -162,10 +169,34 @@ def progress() -> IO(Bool):
     +v : String <- Env.var("EZ_PROGRESS", "")
     return Bool.not(String.is_empty(v))
 
-# a project's tests as one program, written beside them
+# a test the JS lane will not take, named. A lane that drops a file says so
+# out loud: the count alone cannot tell a run of every test from a run of
+# fewer, and the header that dropped it is a line in a file someone wrote by
+# hand and may have written by accident.
+def dropped(taken: Bool, +path: String) -> IO(Unit):
+  match taken:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      IO.print("skip: " ++ path ++ " (js): its header hands it to the " ++
+        "native lane alone")
+
+# every test of a project the JS lane will not take
+def drops(ts: List<&2, String>, +js: List<&2, String>) -> IO(Unit):
+  match ts:
+    case Nil{}:
+      IO.pure(Unit, Unit{})
+    case Con{+h, t}:
+      do IO<Unit>:
+        dropped(G.holds(js, h), h)
+        drops(t, js)
+
+# a project's tests as one program, written into the project's place in the
+# shadow. The shadow makes the project's directory; the one the aggregates
+# themselves sit in is theirs and is made here.
 def made(+dir: String, +name: String, +ts: List<&2, String>) -> IO(Bool):
   do IO<Bool>:
-    _mk : String <- R.exec(["mkdir", "-p", G.at(dir)])
+    _mk : String <- R.exec(["mkdir", "-p", G.agg.at(dir)])
     F.write(G.src(dir, name), G.agg(dir, ts))
 
 # what a test observed: its slice of the run, or the reason it could not have
@@ -347,6 +378,7 @@ def project(+dir: String, +ts: List<&2, String>, +cap: Bool, +on: Bool,
   do IO<Tally>:
     saying(loud, dir)
     +jts : List<&2, String> <- js_of(ts)
+    drops(ts, jts)
     _wj : Bool <- made(dir, "all.js", jts)
     _wn : Bool <- made(dir, "all", ts)
     +kj : String <- C.key.on(any(jts), "js", tool, G.src(dir, "all.js"))
@@ -431,16 +463,82 @@ def proofs(ps: List<&2, String>, +cap: Bool, +full: Bool, +tool: String,
 
 # every file of a kind in the tree, sorted, so a run's report is the same twice
 # over. Base has no readdir, so this is `find`. `.claude` is skipped along with
-# the build directories: an agent's worktree is a whole second copy of the repo
-# living inside it, and running its tests would double the gate to test nothing
-# new. A `.gate` is skipped wherever it is, since that is where the aggregates
-# this runner writes for itself land.
+# `.ez`: an agent's worktree is a whole second copy of the repo living inside
+# it, and running its tests would double the gate to test nothing new.
+#
+# Skipping `.ez` is also what keeps the shadow from being walked. Every test
+# stands in it a second time, under a symlink, and a gate that counted both
+# would double itself and learn nothing; `find` does not follow symlinks
+# unless asked, and `./.ez/*` rules out the shadow's own paths besides.
 def find.at(+what: String, +how: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     out : String <- R.exec(["find", ".", how, what,
-      "-not", "-path", "./.ez/*", "-not", "-path", "*/.gate/*",
+      "-not", "-path", "./.ez/*",
       "-not", "-path", "./.git/*", "-not", "-path", "./.claude/*"])
     return Sort.sort(Args.nonempty(String.lines(R.text(out))))
+
+# where the repo is, absolutely. The shadow's links point at it: a relative
+# target would have to count the levels of the link that carries it, and an
+# absolute one reads the same from every depth of the shadow.
+def here() -> IO(String):
+  do IO<String>:
+    +out : String <- R.exec(["pwd"])
+    return String.trim(R.text(out))
+
+# what one directory of the repo holds, one level down. `.ez` is left out
+# because the shadow lives there and must not stand inside itself, `.git` and
+# `.claude` because no import ever reaches through them.
+def entries(+dir: String) -> IO(List<&2, String>):
+  do IO<List<&2, String>>:
+    out : String <- R.exec(["find", G.of(dir), "-mindepth", "1", "-maxdepth", "1",
+      "-not", "-name", ".ez", "-not", "-name", ".git", "-not", "-name", ".claude"])
+    return Sort.sort(Args.nonempty(String.lines(R.text(out))))
+
+# the paths as the shadow's links have to name them
+def abs(+repo: String, es: List<&2, String>) -> List<&2, String>:
+  match es:
+    case Nil{}:
+      Nil{}
+    case Con{+h, t}:
+      (repo ++ "/" ++ G.rel(h)) <> abs(repo, t)
+
+# a link in one shadow directory to each of these, under the name the repo
+# gives it. `ln` takes them all at once, so a level costs one program run
+# however wide it is, and an empty level costs none.
+def link(+repo: String, +at: String, es: List<&2, String>) -> IO(Unit):
+  match es:
+    case Nil{}:
+      IO.pure(Unit, Unit{})
+    case Con{h, t}:
+      do IO<Unit>:
+        _o : String <- R.exec(List.append(&2, String, ["ln", "-s"],
+          List.append(&2, String, abs(repo, h <> t), [at])))
+        return Unit{}
+
+# one level of the shadow: the directory made, and a link in it to every entry
+# of the real directory that no project needs carved out of it
+def level(+repo: String, +dir: String, ds: List<&2, String>) -> IO(Unit):
+  do IO<Unit>:
+    _mk : String <- R.exec(["mkdir", "-p", G.at(dir)])
+    es : List<&2, String> <- entries(dir)
+    link(repo, G.at(dir), G.linked(es, ds))
+
+# every level, in order
+def levels(ls: List<&2, String>, +repo: String, +ds: List<&2, String>) -> IO(Unit):
+  match ls:
+    case Nil{}:
+      IO.pure(Unit, Unit{})
+    case Con{+h, t}:
+      do IO<Unit>:
+        level(repo, h, ds)
+        levels(t, repo, ds)
+
+# the shadow the aggregates are compiled in, built from nothing so that a file
+# deleted since the last run leaves no link behind
+def shadow(+repo: String, +ds: List<&2, String>) -> IO(Unit):
+  do IO<Unit>:
+    _rm : String <- R.exec(["rm", "-rf", G.root()])
+    levels(G.levels(ds), repo, ds)
 
 # every test file
 def find() -> IO(List<&2, String>):
@@ -484,8 +582,8 @@ def flag(as: List<&2, String>, +name: String) -> Bool:
 # repo, and no key made of file contents says whether that changed.
 def run(+as: List<&2, String>) -> IO(Unit):
   do IO<Unit>:
-    _mk : String <- R.exec(["mkdir", "-p", ".gate"])
     C.make()
+    +repo : String <- here()
     +cap : Bool <- Cap.ok()
     Cap.warn(cap)
     +loud : Bool <- progress()
@@ -495,6 +593,7 @@ def run(+as: List<&2, String>) -> IO(Unit):
     +ts : List<&2, String> <- find()
     +us : List<&2, String> <- IO.pure(List<&2, String>, some(ts, True{}))
     es : List<&2, String> <- IO.pure(List<&2, String>, some(ts, False{}))
+    shadow(repo, projs(us))
     t : Tally <- projects(projs(us), us, cap, on, full, tool, loud, Tally{0n, 0n})
     e : Tally <- each(es, cap, loud, t)
     ps : List<&2, String> <- find.proofs()
