@@ -8,6 +8,7 @@
 import Base
 import ./pkg.bend as P
 import ../check/eq.bend as Eq
+import ./path.bend as Path
 import ./LAWS.bend as Laws
 
 # LAW: one step of the deduplication, with the branch the pick takes given as
@@ -82,3 +83,24 @@ def dedup_keeps.head(h, r):
 
 def Laws.dedup_keeps(h, t):
   dedup_keeps.head(h, P.dedup(t))
+
+# LAW: the walk carries a component only until another follows it
+law base_last.go:
+  for ps: List<&2, String>
+  for +h: String
+  for +x: String
+  {Path.base.go(List.append(&2, String, ps, [x]), h) == x : String}
+
+def base_last.go(ps, h, x):
+  match ps:
+    case []:
+      {==}
+    case +a <> t:
+      base_last.go(t, a, x)
+
+def Laws.base_last(ps, x):
+  match ps:
+    case []:
+      {==}
+    case +h <> t:
+      base_last.go(t, h, x)

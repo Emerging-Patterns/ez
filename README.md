@@ -123,8 +123,8 @@ back exactly, which is the framing the client rests on; that a parsed url's
 path is absolute; that whatever the TOML writer quotes the reader takes back
 out of the quotes unchanged; that a table answers a key with the value written
 for it; that `ez add` and `ez remove` are idempotent; that a file named twice
-in a row is published once; and that a package resolves to the origin recorded
-for it.
+in a row is published once; that the base of a path is its last component; and
+that a package resolves to the origin recorded for it.
 
 What is not, and stays an example: that `parse` and `render` are inverses on a
 whole document, that `trim` and `norm` are idempotent, and that `manifest_of`

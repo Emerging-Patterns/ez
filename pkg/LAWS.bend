@@ -4,6 +4,7 @@
 # computes is not the hash the hub serves.
 import Base
 import ./pkg.bend as P
+import ./path.bend as Path
 
 # LAW: a file set that names the same file twice in a row holds it once, so
 # the manifest a repeated file produces is the manifest without the repeat.
@@ -21,3 +22,10 @@ law dedup_keeps:
   for +h: P.File
   for t: List<&2, P.File>
   {List.is_empty(&2, P.File, P.dedup(h <> t)) == False{} : Bool}
+
+# LAW: the base of a path is its last component, whatever comes before it.
+# The walk keeps the one it is carrying only when nothing follows.
+law base_last:
+  for ps: List<&2, String>
+  for +x: String
+  {Path.base.last(List.append(&2, String, ps, [x])) == x : String}

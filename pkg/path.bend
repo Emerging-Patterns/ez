@@ -92,15 +92,22 @@ def norm(+p: String) -> String:
   norm.fin(List.foldl(~&2, ~String, ~Walk, ~norm.step, String.split(p, '/'),
     Walk{String.starts_with(p, "/"), []}))
 
+# the component carried so far, kept when nothing follows it. The list is the
+# first argument because that is the one the walk shrinks.
+def base.go(ps: List<&2, String>, +h: String) -> String:
+  match ps:
+    case []:
+      h
+    case +h2 <> t:
+      base.go(t, h2)
+
 # the last component of a path
 def base.last(ps: List<&2, String>) -> String:
   match ps:
     case []:
       ""
-    case Con{h, Nil{}}:
-      h
-    case Con{_h, t}:
-      base.last(t)
+    case +h <> t:
+      base.go(t, h)
 
 # the last component of a path
 def base(p: String) -> String:
