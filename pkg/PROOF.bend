@@ -143,38 +143,6 @@ def tri(x: Cmp, y: Cmp, z: Cmp) -> Bool:
     case _ _:
       True{}
 
-# a bit is one thing or the other, never both
-def bit.emp(b: Bool) -> Type:
-  match b:
-    case False{}:
-      Unit
-    case True{}:
-      Empty
-
-def bit.clash(e: {False{} == True{} : Bool}) -> Empty:
-  %e : bit.emp(_)
-  Unit{}
-
-def bit.gone(a, -A: Kind(a), e: Empty) -> A:
-  match e:
-
-def bit.absurd(a, -A: Kind(a), e: {False{} == True{} : Bool}) -> A:
-  bit.gone(a, A, bit.clash(e))
-
-def bit.emp2(b: Bool) -> Type:
-  match b:
-    case False{}:
-      Empty
-    case True{}:
-      Unit
-
-def bit.clash2(e: {True{} == False{} : Bool}) -> Empty:
-  %e : bit.emp2(_)
-  Unit{}
-
-def bit.absurd2(a, -A: Kind(a), e: {True{} == False{} : Bool}) -> A:
-  bit.gone(a, A, bit.clash2(e))
-
 # LAW: comparing two bits the other way round flips the answer
 law bool.flip:
   for +x: Bool
@@ -321,7 +289,7 @@ def fin.tri(ab, bb, cb, x, y, z, ok):
         case LT{}:
           {==}
         case EQ{}:
-          bit.absurd(&2, {Cmp.is_lt(Bool.cmp(ab, cb)) == True{} : Bool}, ok)
+          Eq.bit.absurd(&2, {Cmp.is_lt(Bool.cmp(ab, cb)) == True{} : Bool}, ok)
         case GT{}:
           ok
     case LT{} EQ{}:
@@ -329,33 +297,33 @@ def fin.tri(ab, bb, cb, x, y, z, ok):
         case LT{}:
           tri.lt.free(Bool.cmp(bb, cb))
         case EQ{}:
-          bit.absurd(&2,
+          Eq.bit.absurd(&2,
             {tri(LT{}, Bool.cmp(bb, cb), Bool.cmp(ab, cb)) == True{} : Bool},
             ok)
         case GT{}:
-          bit.absurd(&2,
+          Eq.bit.absurd(&2,
             {tri(LT{}, Bool.cmp(bb, cb), GT{}) == True{} : Bool}, ok)
     case EQ{} LT{}:
       match z:
         case LT{}:
           tri.free.lt(Bool.cmp(ab, bb))
         case EQ{}:
-          bit.absurd(&2,
+          Eq.bit.absurd(&2,
             {tri(Bool.cmp(ab, bb), LT{}, Bool.cmp(ab, cb)) == True{} : Bool},
             ok)
         case GT{}:
-          bit.absurd(&2,
+          Eq.bit.absurd(&2,
             {tri(Bool.cmp(ab, bb), LT{}, GT{}) == True{} : Bool}, ok)
     case EQ{} EQ{}:
       match z:
         case LT{}:
-          bit.absurd(&2,
+          Eq.bit.absurd(&2,
             {tri(Bool.cmp(ab, bb), Bool.cmp(bb, cb), LT{}) == True{} : Bool},
             ok)
         case EQ{}:
           bool.tri(ab, bb, cb)
         case GT{}:
-          bit.absurd(&2,
+          Eq.bit.absurd(&2,
             {tri(Bool.cmp(ab, bb), Bool.cmp(bb, cb), GT{}) == True{} : Bool},
             ok)
     case LT{} GT{}:
@@ -528,7 +496,7 @@ def lex.tri(u, v, w, r1, r2, r3, tu, tr):
         case LT{}:
           {==}
         case EQ{}:
-          bit.absurd(&2, {Cmp.is_lt(r3) == True{} : Bool}, tu)
+          Eq.bit.absurd(&2, {Cmp.is_lt(r3) == True{} : Bool}, tu)
         case GT{}:
           tu
     case LT{} EQ{}:
@@ -536,25 +504,25 @@ def lex.tri(u, v, w, r1, r2, r3, tu, tr):
         case LT{}:
           tri.lt.free(r2)
         case EQ{}:
-          bit.absurd(&2, {tri(LT{}, r2, r3) == True{} : Bool}, tu)
+          Eq.bit.absurd(&2, {tri(LT{}, r2, r3) == True{} : Bool}, tu)
         case GT{}:
-          bit.absurd(&2, {tri(LT{}, r2, GT{}) == True{} : Bool}, tu)
+          Eq.bit.absurd(&2, {tri(LT{}, r2, GT{}) == True{} : Bool}, tu)
     case EQ{} LT{}:
       match w:
         case LT{}:
           tri.free.lt(r1)
         case EQ{}:
-          bit.absurd(&2, {tri(r1, LT{}, r3) == True{} : Bool}, tu)
+          Eq.bit.absurd(&2, {tri(r1, LT{}, r3) == True{} : Bool}, tu)
         case GT{}:
-          bit.absurd(&2, {tri(r1, LT{}, GT{}) == True{} : Bool}, tu)
+          Eq.bit.absurd(&2, {tri(r1, LT{}, GT{}) == True{} : Bool}, tu)
     case EQ{} EQ{}:
       match w:
         case LT{}:
-          bit.absurd(&2, {tri(r1, r2, LT{}) == True{} : Bool}, tu)
+          Eq.bit.absurd(&2, {tri(r1, r2, LT{}) == True{} : Bool}, tu)
         case EQ{}:
           tr
         case GT{}:
-          bit.absurd(&2, {tri(r1, r2, GT{}) == True{} : Bool}, tu)
+          Eq.bit.absurd(&2, {tri(r1, r2, GT{}) == True{} : Bool}, tu)
     case LT{} GT{}:
       {==}
     case EQ{} GT{}:
@@ -748,11 +716,11 @@ def le.trans.go(u, v, w, ok, eu, ev):
         case GT{}:
           ok
     case LT{} GT{}:
-      bit.absurd(&2, {Cmp.is_le(w) == True{} : Bool}, ev)
+      Eq.bit.absurd(&2, {Cmp.is_le(w) == True{} : Bool}, ev)
     case EQ{} GT{}:
-      bit.absurd(&2, {Cmp.is_le(w) == True{} : Bool}, ev)
+      Eq.bit.absurd(&2, {Cmp.is_le(w) == True{} : Bool}, ev)
     case GT{} _:
-      bit.absurd(&2, {Cmp.is_le(w) == True{} : Bool}, eu)
+      Eq.bit.absurd(&2, {Cmp.is_le(w) == True{} : Bool}, eu)
 
 # LAW: the order files are written in is transitive, as a total order is
 law le.trans:
@@ -799,7 +767,7 @@ def le.excl.go(u, eu):
     case LT{}:
       {==}
     case EQ{}:
-      bit.absurd2(&2,
+      Eq.bit.absurd2(&2,
         {Cmp.is_le(EQ{}) == Bool.not(Cmp.is_le(cmp.flip(EQ{}))) : Bool}, eu)
     case GT{}:
       {==}
@@ -980,7 +948,7 @@ law ins.swap.tf:
 def ins.swap.tf(h, t, a, b, ba, eba, eA, eB):
   match ba:
     case True{}:
-      bit.absurd2(&2,
+      Eq.bit.absurd2(&2,
         {P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b)
           == P.file.ins(P.file.ins.put(False{}, b, h, t, P.file.ins(t, b)), a)
           : List<&2, P.File>},
@@ -1031,7 +999,7 @@ law ins.swap.ft:
 def ins.swap.ft(h, t, a, b, ab, eab, eA, eB):
   match ab:
     case True{}:
-      bit.absurd2(&2,
+      Eq.bit.absurd2(&2,
         {P.file.ins(P.file.ins.put(False{}, a, h, t, P.file.ins(t, a)), b)
           == P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a)
           : List<&2, P.File>},
@@ -1152,47 +1120,6 @@ def ins.swap(xs, a, b, ne):
       ins.swap.arm(h, t, a, b, P.file.le(a, h), {==}, P.file.le(b, h), {==},
         le.excl(a, b, ne), ins.swap(t, a, b, ne))
 
-# LAW: the left half of an `and` that answered True
-law and.left:
-  for u: Bool
-  for v: Bool
-  for e: {Bool.and(u, v) == True{} : Bool}
-  {u == True{} : Bool}
-
-def and.left(u, _v, e):
-  match u:
-    case True{}:
-      {==}
-    case False{}:
-      e
-
-# LAW: the right half of an `and` that answered True
-law and.right:
-  for u: Bool
-  for v: Bool
-  for e: {Bool.and(u, v) == True{} : Bool}
-  {v == True{} : Bool}
-
-def and.right(u, v, e):
-  match u:
-    case True{}:
-      e
-    case False{}:
-      bit.absurd(&2, {v == True{} : Bool}, e)
-
-# LAW: what a negation that answered True was told
-law not.true:
-  for u: Bool
-  for e: {Bool.not(u) == True{} : Bool}
-  {u == False{} : Bool}
-
-def not.true(u, e):
-  match u:
-    case True{}:
-      bit.absurd(&2, {True{} == False{} : Bool}, e)
-    case False{}:
-      {==}
-
 # LAW: a path that is none of a list's paths is none of the paths of that
 # list with one more file put in it, as long as it is not that file's either
 law fresh.ins_at:
@@ -1227,11 +1154,11 @@ def fresh.ins_at(n, x, y, xs, nxy, fx):
           v => Bool.and(Bool.not(String.eq(P.file.at(x), P.file.at(h))), v),
           Laws.fresh(x, Laws.perm.ins_at(p, y, t)), True{},
           fresh.ins_at(p, x, y, t, nxy,
-            and.right(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
+            Eq.and.right(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
               Laws.fresh(x, t), fx))),
         Equal.cong(Bool, Bool, u => Bool.and(u, True{}),
           Bool.not(String.eq(P.file.at(x), P.file.at(h))), True{},
-          and.left(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
+          Eq.and.left(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
             Laws.fresh(x, t), fx)))
 
 # LAW: rearranging a list does not put a path in it that was not there
@@ -1252,11 +1179,11 @@ def fresh.perm(x, ns, xs, fx):
       {==}
     case Con{+n, +ms} Con{+h, +t}:
       fresh.ins_at(n, x, h, Laws.perm(ms, t),
-        not.true(String.eq(P.file.at(x), P.file.at(h)),
-          and.left(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
+        Eq.not.true(String.eq(P.file.at(x), P.file.at(h)),
+          Eq.and.left(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
             Laws.fresh(x, t), fx)),
         fresh.perm(x, ms, t,
-          and.right(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
+          Eq.and.right(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
             Laws.fresh(x, t), fx)))
 
 # LAW: sorting a list with one more file put anywhere in it is sorting the
@@ -1286,11 +1213,11 @@ def sort.ins_at(n, x, xs, fr):
           P.file.sort(Laws.perm.ins_at(p, x, t)),
           P.file.ins(P.file.sort(t), x),
           sort.ins_at(p, x, t,
-            and.right(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
+            Eq.and.right(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
               Laws.fresh(x, t), fr))),
         ins.swap(P.file.sort(t), x, h,
-          not.true(String.eq(P.file.at(x), P.file.at(h)),
-            and.left(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
+          Eq.not.true(String.eq(P.file.at(x), P.file.at(h)),
+            Eq.and.left(Bool.not(String.eq(P.file.at(x), P.file.at(h))),
               Laws.fresh(x, t), fr))))
 
 def Laws.sort_perm(ns, xs, dis):
@@ -1308,12 +1235,12 @@ def Laws.sort_perm(ns, xs, dis):
         P.file.ins(P.file.sort(t), h),
         sort.ins_at(n, h, Laws.perm(ms, t),
           fresh.perm(h, ms, t,
-            and.left(Laws.fresh(h, t), Laws.distinct(t), dis))),
+            Eq.and.left(Laws.fresh(h, t), Laws.distinct(t), dis))),
         Equal.cong(List<&2, P.File>, List<&2, P.File>,
           r => P.file.ins(r, h),
           P.file.sort(Laws.perm(ms, t)), P.file.sort(t),
           Laws.sort_perm(ms, t,
-            and.right(Laws.fresh(h, t), Laws.distinct(t), dis))))
+            Eq.and.right(Laws.fresh(h, t), Laws.distinct(t), dis))))
 
 def Laws.manifest_perm(ns, xs, dis):
   Equal.cong(List<&2, P.File>, String,
@@ -1497,19 +1424,6 @@ def Laws.seen_has_agrees(xs, s):
 # left, so an equation read the other way round does not reach the goal. The
 # rest is induction, on a string for the split and on a list for the walk.
 
-# LAW: every string starts with the empty string. Needed wherever a prefix
-# runs out before the string does.
-law starts_nil:
-  for s: String
-  {String.starts_with(s, "") == True{} : Bool}
-
-def starts_nil(s):
-  match s:
-    case SNil{}:
-      {==}
-    case SCon{h, t}:
-      {==}
-
 # The three tests `comp_of` makes, refused one after another: an empty
 # component, then `.`, then `..`. What is left is the arm that keeps the text.
 def Laws.comp_name(c, e0, e1, e2):
@@ -1560,10 +1474,10 @@ def Laws.split_plain(p, e):
     case SCon{+h, +t}:
       split_plain.step(h, t,
         Equal.sym(Bool, Char.is_eq(h, '/'), False{},
-          not.true(Char.is_eq(h, '/'),
-            and.left(Bool.not(Char.is_eq(h, '/')), Laws.slashless(t), e))),
+          Eq.not.true(Char.is_eq(h, '/'),
+            Eq.and.left(Bool.not(Char.is_eq(h, '/')), Laws.slashless(t), e))),
         Laws.split_plain(t,
-          and.right(Bool.not(Char.is_eq(h, '/')), Laws.slashless(t), e)))
+          Eq.and.right(Bool.not(Char.is_eq(h, '/')), Laws.slashless(t), e)))
 
 # One component is the last component.
 def Laws.base_plain(p, e):
@@ -1642,9 +1556,9 @@ def fin_abs(w, e):
     case Path.Walk{abs, out}:
       match abs:
         case True{}:
-          starts_nil(String.join(List.reverse(&2, String, out), "/"))
+          Eq.starts_nil(String.join(List.reverse(&2, String, out), "/"))
         case False{}:
-          bit.absurd(&2,
+          Eq.bit.absurd(&2,
             {String.starts_with(Path.norm.fin(Path.Walk{False{}, out}), "/")
               == True{} : Bool}, e)
 
@@ -1673,9 +1587,9 @@ def abs_append.arm(h, t, x, b, eb, e):
   match b:
     case True{}:
       %eb : {String.starts_with.if(String.append(t, x), "", _) == True{} : Bool}
-      starts_nil(String.append(t, x))
+      Eq.starts_nil(String.append(t, x))
     case False{}:
-      bit.absurd2(&2,
+      Eq.bit.absurd2(&2,
         {String.starts_with(String.append(SCon{h, t}, x), "/") == True{}
           : Bool}, e)
 
@@ -1689,7 +1603,7 @@ law abs_append:
 def abs_append(p, x, e):
   match p:
     case SNil{}:
-      bit.absurd2(&2,
+      Eq.bit.absurd2(&2,
         {String.starts_with(String.append(SNil{}, x), "/") == True{} : Bool}, e)
     case SCon{+h, +t}:
       abs_append.arm(h, t, x, Char.is_eq(h, '/'), {==}, e)
