@@ -1,16 +1,16 @@
-# Cuts a vX.Y.Z tag and GitHub Release from workflow_dispatch
-# (a GITHUB_TOKEN tag does not start release.yml).
+# workflow_dispatch: resolve X.Y.Z from flake.nix, optionally bump it, publish
+# ez/main.bend to bendhub, then create the GitHub Release (and tag) via
+# softprops/action-gh-release. Release name is `vX.Y.Z 0x…` (tag stays vX.Y.Z).
+# A GITHUB_TOKEN tag push does not start release.yml.
 #
 # How to cut a release
-#   1. Land the version on master in flake.nix (`version = "X.Y.Z"` on the ez package).
+#   1. Land the version on master in flake.nix (or use bump below).
 #   2. Actions → Tag → Run workflow, from master:
 #        - leave version empty and bump=none → tag what flake.nix says
 #        - version=X.Y.Z → tag that (fails if flake.nix differs)
-#        - bump=patch|minor|major → rewrite flake.nix, commit, tag the new X.Y.Z
+#        - bump=patch|minor|major → rewrite flake.nix, commit, tag
 #   3. Or tag locally: `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`
-#      (release.yml then opens the GitHub Release).
-#
-# Does not attach a nix binary. Does not `bend --publish`.
+#      (release.yml then publishes and opens the GitHub Release).
 
 name: tag
 
@@ -43,6 +43,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+
       - name: Resolve version
         id: ver
         env:
@@ -97,6 +101,19 @@ jobs:
 
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           echo "bump_files=$bump_files" >> "$GITHUB_OUTPUT"
+          notes=false
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$ver" '
+              $0 ~ "^##[ \\[ ]+v?" ver {found=1; print; next}
+              found && /^## / {exit}
+              found {print}
+            ' CHANGELOG.md > /tmp/release-notes.md
+            if [ -s /tmp/release-notes.md ]; then
+              notes=true
+            fi
+          fi
+          echo "notes=${notes}" >> "$GITHUB_OUTPUT"
+
       - name: Commit version bump
         id: commit
         if: steps.ver.outputs.bump_files == '1'
@@ -107,9 +124,37 @@ jobs:
           branch: ${{ github.ref_name }}
           disable_globbing: true
           commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
-      - name: GitHub Release
-        uses: softprops/action-gh-release@v3
+
+      - id: hub
+        run: |
+          set -euo pipefail
+          hash=$(nix develop -c bun -e 'import { pkg_of } from "./bin/pkg.ts"; console.log(pkg_of("ez/main.bend").hash)')
+          if ! echo "$hash" | grep -qxE '0x[0-9a-f]+'; then
+            echo "bad package hash: ${hash}"
+            exit 1
+          fi
+          echo "hash=${hash}" >> "$GITHUB_OUTPUT"
+          nix develop -c bend ez/main.bend --publish | tee /tmp/bend-publish.log
+          if ! grep -q "$hash" /tmp/bend-publish.log; then
+            echo "publish output did not mention ${hash}"
+            cat /tmp/bend-publish.log
+            exit 1
+          fi
+
+      - name: Release (changelog notes)
+        if: steps.ver.outputs.notes == 'true'
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }} ${{ steps.hub.outputs.hash }}
+          body_path: /tmp/release-notes.md
+          target_commitish: ${{ steps.commit.outputs.commit_hash || github.sha }}
+
+      - name: Release (generated notes)
+        if: steps.ver.outputs.notes != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }} ${{ steps.hub.outputs.hash }}
           generate_release_notes: true
           target_commitish: ${{ steps.commit.outputs.commit_hash || github.sha }}
