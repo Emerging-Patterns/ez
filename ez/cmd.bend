@@ -173,6 +173,18 @@ def ignore() -> String:
 def init.rules(+name: String) -> List<&2, String>:
   [".ez/", build.named(name)]
 
+# one step of a scan that is looking for one hit, with the head's answer in
+# hand. `Bool.or` is an ordinary function and reduces both of its sides, so a
+# scan written with it reads the whole list even when the first line answers.
+# The rest of the scan arrives as a thunk and only the arm that wants it
+# applies it.
+def stated.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
 # whether a file already states this rule, on a line of its own. A rule buried
 # in a longer line is not the rule, so the comparison is against whole lines.
 def stated(ls: List<&2, String>, +rule: String) -> Bool:
@@ -180,7 +192,7 @@ def stated(ls: List<&2, String>, +rule: String) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, t}:
-      Bool.or(String.eq(String.trim(h), rule), stated(t, rule))
+      stated.step(String.eq(String.trim(h), rule), _u => stated(t, rule))
 
 # the rules a file does not already state, in order
 def init.missing(rs: List<&2, String>, +ls: List<&2, String>) -> List<&2, String>:
@@ -281,14 +293,22 @@ def add.go(+url: String, +ref: String, +entry: String) -> IO(Unit):
     r : M.Read <- load()
     add.write(r, add.dep(g))
 
+# the command, with the missing-argument question already answered. Under a
+# `Bool.pick` the whole vendor-and-record action was built for a call that was
+# about to be refused for saying nothing.
+def add.step(bare: Bool, +as: List<&2, String>, at: String) -> IO(Unit):
+  match bare:
+    case True{}:
+      IO.die(Unit, 1, "usage: ez add <url> <rev|tag|branch> <entry.bend>")
+    case False{}:
+      add.go(Args.at(as, 0n), Args.at(as, 1n), at)
+
 # `ez add <url> <rev|tag|branch> <entry.bend>`. All three are wanted: the
 # entry is what the package's hash is computed from, and guessing it would
 # name a different package.
 def add(+as: List<&2, String>) -> IO(Unit):
   +at = Args.at(as, 2n)
-  Bool.pick(IO(Unit), String.is_empty(at),
-    IO.die(Unit, 1, "usage: ez add <url> <rev|tag|branch> <entry.bend>"),
-    add.go(Args.at(as, 0n), Args.at(as, 1n), at))
+  add.step(String.is_empty(at), as, at)
 
 # the ledger with a dependency dropped
 def remove.write(r: M.Read, name: String) -> IO(Unit):

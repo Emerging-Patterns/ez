@@ -52,6 +52,7 @@ def body.go(n: Nat, +one: String) -> String:
     case 1n+p:
       one ++ body.go(p, one)
 
+# a chunked body of `n` chunks, built once so both modes frame the same bytes
 def body(n: Nat) -> String:
   body.go(n, chunk())
 
@@ -64,6 +65,7 @@ def run.at(raw: Bool, n: Nat) -> String:
     case False{}:
       "decoded " ++ Nat.show(String.length(Http.dechunk(body(n))))
 
+# the mode named on the command line, answered
 def run(mode: String, n: Nat) -> String:
   run.at(String.eq(mode, "raw"), n)
 

@@ -54,6 +54,18 @@ def clone(+work: String, +url: String, +rev: String) -> IO(Unit):
     run("fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", url, rev])
     run("checkout", ["git", "-C", work, "checkout", "-q", rev])
 
+# one step of a scan looking for one hit, with the head's answer in hand.
+# `Bool.or` is an ordinary function and reduces both of its sides, so the
+# alphabet was read to its end for every char of every ref. The rest of the
+# scan arrives as a thunk, which is a value, and only the arm that wants it
+# applies it.
+def among.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
 # whether a char is one of these. Base has `Char.is_digit` and `Char.is_alpha`
 # and nothing between, and a commit name is written with neither alphabet but
 # with sixteen characters of its own, so the sixteen are named.
@@ -62,11 +74,21 @@ def among(+c: Char, cs: List<&2, Char>) -> Bool:
     case []:
       False{}
     case +h <> t:
-      Bool.or(Char.is_eq(h, c), among(c, t))
+      among.step(Char.is_eq(h, c), _u => among(c, t))
 
 # a char a commit name may hold
 def hex.at(c: Char) -> Bool:
   among(c, String.to_list("0123456789abcdef"))
+
+# one step of the walk, and `among.step` turned around: `Bool.and` reduces
+# both of its sides too, so the first char that is not hex still cost a walk
+# of the rest of the ref
+def hex.all.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      False{}
 
 # whether every char of a ref is one. Base's `List.all` applies an erased
 # function parameter, which falls outside the termination check; this walk is
@@ -76,7 +98,7 @@ def hex.all(cs: List<&2, Char>) -> Bool:
     case []:
       True{}
     case +h <> t:
-      Bool.and(hex.at(h), hex.all(t))
+      hex.all.step(hex.at(h), _u => hex.all(t))
 
 # a ref that is already the commit it names, which is what `git rev-parse`
 # prints: forty hex characters and nothing else. Such a ref needs no remote
@@ -111,13 +133,24 @@ def rows(ls: List<&2, String>) -> List<&2, Row>:
     case h <> t:
       List.append(&2, Row, row.put(h), rows(t))
 
+# one step of the search, with the head's answer in hand. A recursive call in
+# an arm of a `Bool.pick` is not an arm at all: it is built whatever the
+# condition says, so the first peeled row still cost a walk of every row after
+# it.
+def peeled.step(here: Bool, rev: String, rest: Unit -> String) -> String:
+  match here:
+    case True{}:
+      rev
+    case False{}:
+      rest(Unit{})
+
 # the first peeled row's commit, or "" when no row is peeled
 def peeled(rs: List<&2, Row>) -> String:
   match rs:
     case []:
       ""
     case +h <> t:
-      Bool.pick(String, row.peeled(h), row.rev(h), peeled(t))
+      peeled.step(row.peeled(h), row.rev(h), _u => peeled(t))
 
 # the first row's commit, or "" when there are none
 def unpeeled(rs: List<&2, Row>) -> String:
@@ -159,12 +192,21 @@ def resolve.ask(+url: String, +ref: String) -> IO(Ref):
       "refs/tags/" ++ ref ++ "^{}"])
     resolve.said(R.ok(out), url, ref, R.text(out))
 
+# a ref that is already a commit needs no remote, with that question already
+# answered. Under a `Bool.pick` the whole `git ls-remote` action was built for
+# a ref that was never going to ask anything.
+def resolve.step(pinned: Bool, url: String, ref: String) -> IO(Ref):
+  match pinned:
+    case True{}:
+      IO.pure(Ref, Ref{ref, ""})
+    case False{}:
+      resolve.ask(url, ref)
+
 # the commit a ref pins. A tag or a branch is what a person asks for and a
 # commit is what gets written down, so both are kept: the commit pins the
 # build, and the tag says what an upgrade would re-resolve.
 def resolve(+url: String, +ref: String) -> IO(Ref):
-  Bool.pick(IO(Ref), is_rev(ref), IO.pure(Ref, Ref{ref, ""}),
-    resolve.ask(url, ref))
+  resolve.step(is_rev(ref), url, ref)
 
 # what a run said about the tree it weighed
 def nar.said(ok: Bool, +text: String) -> IO(String):

@@ -111,3 +111,92 @@ law hash_perm:
   for +xs: List<&2, P.File>
   for +dis: {distinct(xs) == True{} : Bool}
   {P.hash_of(perm(ns, xs)) == P.hash_of(xs) : String}
+
+# The shapes pkg/ had before this pass rewrote them for cost, kept here so
+# that the rewrites' one real risk can be stated rather than sampled: that the
+# fast definitions answer exactly what the slow ones answered, on every input.
+# These are the specification and pkg/ is the implementation, the way
+# net/LAWS.bend keeps the shapes net/http.bend had before its dechunk
+# rewrite. Nothing but the laws below reads them.
+#
+# What was wrong with them is not what they answer, it is what they cost.
+# `Bool.pick` is an ordinary function, so both of its arms are reduced before
+# it picks one: an arm holding a recursive call is unconditional recursion,
+# and an arm holding real work is work done for the branch not taken.
+
+# the join, before: both arms normalise, so every join walked the components
+# twice and concatenated once for nothing
+def old.join(+a: String, +b: String) -> String:
+  Bool.pick(String, String.is_empty(a), Path.norm(b),
+    Path.norm(a ++ "/" ++ b))
+
+# the module line, before
+def old.mod_of(+ws: List<&2, String>) -> P.Stmt:
+  Bool.pick(P.Stmt,
+    Bool.and(Nat.is_ge(List.length(&2, String, ws), 4n),
+      Bool.and(String.eq(P.word(ws, 0n), "import"),
+        String.eq(P.word(ws, 2n), "as"))),
+    P.SMod{P.word(ws, 1n)}, P.SBody{})
+
+# the prelude line, before
+def old.base_of(+ws: List<&2, String>) -> P.Stmt:
+  Bool.pick(P.Stmt,
+    Bool.and(Nat.is_eq(List.length(&2, String, ws), 2n),
+      Bool.and(String.eq(P.word(ws, 0n), "import"),
+        String.eq(P.word(ws, 1n), "Base"))),
+    P.SNone{}, old.mod_of(ws))
+
+# the line classifier, before: `words(s)` sat in an arm, so every blank line
+# and every comment line of every source file ez scans was split into words
+def old.stmt_of(+s: String) -> P.Stmt:
+  Bool.pick(P.Stmt,
+    Bool.and(String.starts_with(s, "import \""), String.ends_with(s, "\"")),
+    P.SForeign{String.take(String.drop(s, 8n), Nat.sub(String.length(s), 9n))},
+    Bool.pick(P.Stmt, P.quiet(s), P.SNone{}, old.base_of(P.words(s))))
+
+# the escaping-path search, before: the recursive call sat in an arm, so the
+# first escaping path still cost a walk of every file after it
+def old.escaped(fs: List<&2, P.File>) -> String:
+  match fs:
+    case []:
+      ""
+    case +h <> t:
+      Bool.pick(String, P.escapes(P.file.at(h)), P.file.at(h), old.escaped(t))
+
+# the "have I read this file" scan, before: `Bool.or` runs both sides, so the
+# scan read the whole list even when the first name matched
+def old.seen.has(xs: List<&2, String>, +s: String) -> Bool:
+  match xs:
+    case []:
+      False{}
+    case +h <> t:
+      Bool.or(String.eq(h, s), old.seen.has(t, s))
+
+# LAW: the join that normalises once answers what the join that normalised
+# twice answered, on every directory and every path. This and the four laws
+# under it are the whole risk of the rewrites: a cheaper definition is only a
+# fix if it is the same definition.
+law join_agrees:
+  for +a: String
+  for +b: String
+  {old.join(a, b) == Path.join(a, b) : String}
+
+# LAW: and the same for the line classifier, which is the one with the
+# measurable cost: pkg/bench/scan.bend puts the saving at 1.54x over a scan
+# of two million lines.
+law stmt_of_agrees:
+  for +s: String
+  {old.stmt_of(s) == P.stmt_of(s) : P.Stmt}
+
+# LAW: and for the search that now really does stop at the first escaping path
+law escaped_agrees:
+  for fs: List<&2, P.File>
+  {old.escaped(fs) == P.escaped(fs) : String}
+
+# LAW: and for the scan that now really does stop at the name it was looking
+# for. This one is the inner half of a quadratic: the list grows by one with
+# every file the package walk reaches.
+law seen_has_agrees:
+  for xs: List<&2, String>
+  for +s: String
+  {old.seen.has(xs, s) == P.seen.has(xs, s) : Bool}

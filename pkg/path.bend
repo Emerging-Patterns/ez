@@ -127,10 +127,21 @@ def base(p: String) -> String:
 def dir(+p: String) -> String:
   norm(p ++ "/..")
 
+# the path before it is normalised: the second alone when there is no
+# directory to take it relative to, the two spliced otherwise. Split out so
+# that `norm` runs once. Under a `Bool.pick` both arms were built, so every
+# join paid two full component walks and one concatenation it threw away.
+def join.at(bare: Bool, a: String, b: String) -> String:
+  match bare:
+    case True{}:
+      b
+    case False{}:
+      a ++ "/" ++ b
+
 # a path taken relative to a directory. An empty directory means the path is
 # already where it should be, and never that it starts at the root.
 def join(+a: String, +b: String) -> String:
-  Bool.pick(String, String.is_empty(a), norm(b), norm(a ++ "/" ++ b))
+  norm(join.at(String.is_empty(a), a, b))
 
 # the last `n` components of a path
 def tail(p: String, n: Nat) -> String:

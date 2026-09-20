@@ -61,31 +61,73 @@ def word(ws: List<&2, String>, n: Nat) -> String:
     case Con{_h, t} 1n+p:
       word(t, p)
 
+# the line named a module, or it did not, with the answer already in hand.
+# `Bool.pick` is an ordinary function and builds both of its arms before it
+# picks one, so under it `word(ws, 1n)` walked the words of every line of
+# every source file ez scans. An arm of a `match` is not built until it is
+# taken.
+def mod_of.step(named: Bool, ws: List<&2, String>) -> Stmt:
+  match named:
+    case True{}:
+      SMod{word(ws, 1n)}
+    case False{}:
+      SBody{}
+
 # an `import <spec> as <Name>` line names a module; anything else does not
 def mod_of(+ws: List<&2, String>) -> Stmt:
-  Bool.pick(Stmt,
+  mod_of.step(
     Bool.and(Nat.is_ge(List.length(&2, String, ws), 4n),
       Bool.and(String.eq(word(ws, 0n), "import"), String.eq(word(ws, 2n), "as"))),
-    SMod{word(ws, 1n)}, SBody{})
+    ws)
+
+# the prelude decided. The prelude arm does no work at all, and the other arm
+# is the only place `mod_of` has anything to say, so this is where the rest of
+# the classification hangs rather than in an argument that always runs.
+def base_of.step(prelude: Bool, ws: List<&2, String>) -> Stmt:
+  match prelude:
+    case True{}:
+      SNone{}
+    case False{}:
+      mod_of(ws)
 
 # `import Base` brings in the prelude, which is no part of any package
 def base_of(+ws: List<&2, String>) -> Stmt:
-  Bool.pick(Stmt,
+  base_of.step(
     Bool.and(Nat.is_eq(List.length(&2, String, ws), 2n),
       Bool.and(String.eq(word(ws, 0n), "import"), String.eq(word(ws, 1n), "Base"))),
-    SNone{}, mod_of(ws))
+    ws)
 
 # a line that neither opens nor ends the header
 def quiet(+s: String) -> Bool:
   Bool.or(String.is_empty(s), String.starts_with(s, "#"))
 
+# a line that says nothing about the header, decided. `words` is a
+# `String.split` and a filter over its result, and this is the arm it hangs
+# from: every blank line and every comment line of every `.bend` file of the
+# project and of every package it resolves used to be split into words and
+# classified, which is most of the lines ez ever reads.
+def stmt_of.quiet(skip: Bool, +s: String) -> Stmt:
+  match skip:
+    case True{}:
+      SNone{}
+    case False{}:
+      base_of(words(s))
+
+# the foreign import decided. The rest of the cascade hangs off the False arm
+# rather than sitting in an argument, so a line that is a foreign import pays
+# for nothing below it.
+def stmt_of.foreign(here: Bool, +s: String) -> Stmt:
+  match here:
+    case True{}:
+      SForeign{String.take(String.drop(s, 8n), Nat.sub(String.length(s), 9n))}
+    case False{}:
+      stmt_of.quiet(quiet(s), s)
+
 # a trimmed line classified. A foreign import is tested first: it lives in a
 # def's body, long after the header has ended.
 def stmt_of(+s: String) -> Stmt:
-  Bool.pick(Stmt,
-    Bool.and(String.starts_with(s, "import \""), String.ends_with(s, "\"")),
-    SForeign{String.take(String.drop(s, 8n), Nat.sub(String.length(s), 9n))},
-    Bool.pick(Stmt, quiet(s), SNone{}, base_of(words(s))))
+  stmt_of.foreign(
+    Bool.and(String.starts_with(s, "import \""), String.ends_with(s, "\"")), s)
 
 # a module named after the header has ended is not part of the header, so the
 # line is ignored rather than followed
@@ -261,6 +303,19 @@ def visit.go(hit: Bool, file: String, ns: String, eb: String,
     case False{}:
       visit.read(file, ns, eb, seen, out)
 
+# one step of the scan, with the head's answer in hand. `Bool.or` is an
+# ordinary function and so reduces both of its sides, which means a scan
+# written with it never stops at the name it was looking for. The rest of the
+# scan arrives as a thunk and only the arm that wants it applies it. This list
+# grows by one with every file the walk reaches, so the scan is the inner half
+# of a quadratic and stopping early halves it.
+def seen.has.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
 # whether a name is already among the ones the walk has reached. Base's
 # `List.contains` applies an erased equality, which falls outside the
 # termination check; this scan is structural.
@@ -269,7 +324,7 @@ def seen.has(xs: List<&2, String>, +s: String) -> Bool:
     case []:
       False{}
     case +h <> t:
-      Bool.or(String.eq(h, s), seen.has(t, s))
+      seen.has.step(String.eq(h, s), _u => seen.has(t, s))
 
 # one file of the walk: what it adds to the package, and what it asks for next
 def visit(eb: String, tk: Task, st: State) -> IO(Step):
@@ -433,13 +488,25 @@ def files_of(fs: List<&2, File>) -> List<&2, File>:
 def escapes(+at: String) -> Bool:
   Bool.or(String.starts_with(at, "/"), String.starts_with(at, ".."))
 
+# one step of the search, with the head's answer in hand. A search that puts
+# its recursion in an arm of a `Bool.pick` is not a search: the arm is built
+# whatever the answer, so the first escaping path still costs a walk of every
+# file after it. The thunk is what makes the stop a stop.
+def escaped.step(here: Bool, at: String, rest: Unit -> String) -> String:
+  match here:
+    case True{}:
+      at
+    case False{}:
+      rest(Unit{})
+
 # the first file whose path leaves the package, or "" when none does
 def escaped(fs: List<&2, File>) -> String:
   match fs:
     case []:
       ""
     case +h <> t:
-      Bool.pick(String, escapes(file.at(h)), file.at(h), escaped(t))
+      +at = file.at(h)
+      escaped.step(escapes(at), at, _u => escaped(t))
 
 # one `<sha256> <path>` line
 def manifest.line(f: File) -> String:
@@ -463,12 +530,21 @@ def manifest_of(fs: List<&2, File>) -> String:
 def hash_of(fs: List<&2, File>) -> String:
   "0x" ++ String.take(Sha.hex(manifest_of(fs)), 32n)
 
+# the verdict, with the escaping path's name already found. `hash_of` is a
+# sha256 over the whole package manifest; under a `Bool.pick` a package that
+# escapes its root paid for that hash before being refused for it.
+def pkg.judge.step(ok: Bool, bad: String, root: String,
+  +fs: List<&2, File>) -> IO(Pkg):
+  match ok:
+    case True{}:
+      IO.pure(Pkg, Pkg{hash_of(fs), root, files_of(fs)})
+    case False{}:
+      IO.die(Pkg, 1, "ez: " ++ bad ++ " escapes the package")
+
 # a file set that stays inside its package becomes one; one that does not stops
 # the command
 def pkg.judge(+bad: String, root: String, +fs: List<&2, File>) -> IO(Pkg):
-  Bool.pick(IO(Pkg), String.is_empty(bad),
-    IO.pure(Pkg, Pkg{hash_of(fs), root, files_of(fs)}),
-    IO.die(Pkg, 1, "ez: " ++ bad ++ " escapes the package"))
+  pkg.judge.step(String.is_empty(bad), bad, root, fs)
 
 # the found files, placed under the package root and judged
 def pkg.place(root: String, pre: String, fs: List<&2, Found>) -> IO(Pkg):

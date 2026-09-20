@@ -56,13 +56,28 @@ def nth(ls: List<&2, String>, n: Nat) -> String:
     case Con{_h, t} 1n+p:
       nth(t, p)
 
+# one step of a search for the first line that answers. Both searches here
+# want it, so it is stated once.
+#
+# A recursive call in an arm of a `Bool.pick` is not an arm: `Bool.pick` is an
+# ordinary function, so both arms are built before it picks one and the line
+# found first still costs a walk of every line after it. The rest of the
+# search arrives as a thunk, which is a value, and only the arm that wants it
+# applies it.
+def first.step(here: Bool, h: String, rest: Unit -> String) -> String:
+  match here:
+    case True{}:
+      h
+    case False{}:
+      rest(Unit{})
+
 # the first line that starts with this, or "" when none does
 def starting(ls: List<&2, String>, +pre: String) -> String:
   match ls:
     case []:
       ""
     case +h <> t:
-      Bool.pick(String, String.starts_with(h, pre), h, starting(t, pre))
+      first.step(String.starts_with(h, pre), h, _u => starting(t, pre))
 
 # the first line that holds this anywhere in it, or "" when none does
 def containing(ls: List<&2, String>, +sub: String) -> String:
@@ -70,7 +85,7 @@ def containing(ls: List<&2, String>, +sub: String) -> String:
     case []:
       ""
     case +h <> t:
-      Bool.pick(String, String.contains(h, sub), h, containing(t, sub))
+      first.step(String.contains(h, sub), h, _u => containing(t, sub))
 
 # the last line that starts with this, or "" when none does. A build's answer
 # is the last thing it says, because its log arrives on the same stream.

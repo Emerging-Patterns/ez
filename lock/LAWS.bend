@@ -26,3 +26,26 @@ law origin_agrees:
   for cache: List<&2, L.Origin>
   {L.origin(L.origins.all([L.Origin{h, s}], cache), h)
     == L.origin(L.origins.all([], [L.Origin{h, s}]), h) : L.Src}
+
+# The shape lock/lock.bend's "have I read this file" scan had before this pass
+# rewrote it for cost, kept here so the rewrite's risk can be stated rather
+# than sampled, the way net/LAWS.bend keeps the shapes net/http.bend had
+# before its dechunk rewrite. Nothing but the law below reads it.
+#
+# `Bool.or` is an ordinary function and reduces both of its sides, so a scan
+# written with it reads the whole list even when the head answers. This list
+# grows by one with every file the project walk reads, which makes the scan
+# the inner half of a quadratic.
+def old.seen.holds(xs: List<&2, String>, +s: String) -> Bool:
+  match xs:
+    case []:
+      False{}
+    case +h <> t:
+      Bool.or(String.eq(h, s), old.seen.holds(t, s))
+
+# LAW: the scan that stops at the name it was looking for answers what the
+# scan that read past it answered, on every list and every name.
+law seen_holds_agrees:
+  for xs: List<&2, String>
+  for +s: String
+  {old.seen.holds(xs, s) == L.seen.holds(xs, s) : Bool}

@@ -59,14 +59,38 @@ def chunked() -> String:
   "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n" ++
     chunked.go(chunks())
 
+# the root, and the unknown path under it
+def reply.root(hit: Bool) -> String:
+  match hit:
+    case True{}:
+      S.response("200 OK", "ok")
+    case False{}:
+      S.response("404 Not Found", "")
+
+# the chunked fixture, which is the one arm worth branching for: the whole
+# chunked body was framed for every request, including the ones that never
+# asked for it, because `Bool.pick` is an ordinary function and builds both of
+# its arms before it picks one
+def reply.chunked(hit: Bool, +path: String) -> String:
+  match hit:
+    case True{}:
+      chunked()
+    case False{}:
+      reply.root(String.eq(path, "/"))
+
+# the plain fixture
+def reply.plain(hit: Bool, +path: String) -> String:
+  match hit:
+    case True{}:
+      S.response("200 OK", plain())
+    case False{}:
+      reply.chunked(String.eq(path, "/chunked"), path)
+
 # what a path is answered with. `/` answers so a caller can wait for the server
 # on the socket itself rather than on a pipe it would have to drain, and every
 # other unknown path is a status with no body at all.
 def reply(+path: String) -> String:
-  Bool.pick(String, String.eq(path, "/plain"), S.response("200 OK", plain()),
-    Bool.pick(String, String.eq(path, "/chunked"), chunked(),
-      Bool.pick(String, String.eq(path, "/"), S.response("200 OK", "ok"),
-        S.response("404 Not Found", ""))))
+  reply.plain(String.eq(path, "/plain"), path)
 
 # a request's first line taken apart, and its path answered
 def serve.req(sock: Socket, first: String) -> IO(Unit):

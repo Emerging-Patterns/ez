@@ -66,7 +66,7 @@ def divide.go(s: String, +pat: String, +n: Nat) -> Cut:
       NoCut{}
     case SCon{+h, +t}:
       divide.step(String.starts_with(SCon{h, t}, pat), h, t, n,
-        u => divide.go(t, pat, n))
+        _u => divide.go(t, pat, n))
 
 # a string in two halves, around the first occurrence of a pattern. The pattern
 # itself belongs to neither half.
@@ -103,7 +103,7 @@ def hex.go(s: String, +acc: Nat) -> Nat:
     case SCon{+h, t}:
       +v = hex.val(h)
       hex.step(U32.is_ge(v, 16), acc,
-        u => hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v))))
+        _u => hex.go(t, Nat.add(Nat.mul(acc, 16n), U32.to_nat(v))))
 
 # the length a chunk header states. Anything after a `;` is an extension, and
 # no extension ez could meet changes the length.
@@ -147,7 +147,7 @@ def utf8.take(s: String, +n: Nat) -> String:
       SNil{}
     case SCon{+h, t}:
       +w = utf8.width(Char.to_u32(h))
-      utf8.take.step(Nat.is_lt(n, w), h, u => utf8.take(t, Nat.sub(n, w)))
+      utf8.take.step(Nat.is_lt(n, w), h, _u => utf8.take(t, Nat.sub(n, w)))
 
 # one step of the drop, the same shape and for the same reason as take's
 def utf8.drop.step(short: Bool, h: Char, t: String,
@@ -165,7 +165,7 @@ def utf8.drop(s: String, +n: Nat) -> String:
       SNil{}
     case SCon{+h, +t}:
       +w = utf8.width(Char.to_u32(h))
-      utf8.drop.step(Nat.is_lt(n, w), h, t, u => utf8.drop(t, Nat.sub(n, w)))
+      utf8.drop.step(Nat.is_lt(n, w), h, t, _u => utf8.drop(t, Nat.sub(n, w)))
 
 # a chunked body put back together. One pass: a chunk header has been divided
 # off, its length says how much of what follows is body, and the rest is the

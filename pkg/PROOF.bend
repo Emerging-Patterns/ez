@@ -1326,3 +1326,167 @@ def Laws.hash_perm(ns, xs, dis):
     m => "0x" ++ String.take(Sha.hex(m), 32n),
     P.manifest_of(Laws.perm(ns, xs)), P.manifest_of(xs),
     Laws.manifest_perm(ns, xs, dis))
+
+# The four agreement laws at the foot of LAWS.bend, which say that this pass's
+# rewrites for cost did not change an answer. Each is the same argument: a
+# `match` may not scrutinise a computed value, so the branch is lifted into a
+# parameter and the law is then applied to the branch the code computes.
+
+# LAW: one arm of the join, with the branch given as a parameter
+law join_agrees.arm:
+  for a: String
+  for b: String
+  for p: Bool
+  {Bool.pick(String, p, Path.norm(b), Path.norm(a ++ "/" ++ b))
+    == Path.norm(Path.join.at(p, a, b)) : String}
+
+def join_agrees.arm(_a, _b, p):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.join_agrees(a, b):
+  join_agrees.arm(a, b, String.is_empty(a))
+
+# LAW: one arm of the module line, with the branch given as a parameter
+law mod_of_agrees.arm:
+  for ws: List<&2, String>
+  for p: Bool
+  {Bool.pick(P.Stmt, p, P.SMod{P.word(ws, 1n)}, P.SBody{})
+    == P.mod_of.step(p, ws) : P.Stmt}
+
+def mod_of_agrees.arm(_ws, p):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# LAW: and so the module line agrees
+law mod_of_agrees:
+  for +ws: List<&2, String>
+  {Laws.old.mod_of(ws) == P.mod_of(ws) : P.Stmt}
+
+def mod_of_agrees(ws):
+  mod_of_agrees.arm(ws,
+    Bool.and(Nat.is_ge(List.length(&2, String, ws), 4n),
+      Bool.and(String.eq(P.word(ws, 0n), "import"),
+        String.eq(P.word(ws, 2n), "as"))))
+
+# LAW: one arm of the prelude line, with the branch given as a parameter and
+# the module line's agreement alongside
+law base_of_agrees.arm:
+  for ws: List<&2, String>
+  for p: Bool
+  for ih: {Laws.old.mod_of(ws) == P.mod_of(ws) : P.Stmt}
+  {Bool.pick(P.Stmt, p, P.SNone{}, Laws.old.mod_of(ws))
+    == P.base_of.step(p, ws) : P.Stmt}
+
+def base_of_agrees.arm(_ws, p, ih):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+# LAW: and so the prelude line agrees
+law base_of_agrees:
+  for +ws: List<&2, String>
+  {Laws.old.base_of(ws) == P.base_of(ws) : P.Stmt}
+
+def base_of_agrees(ws):
+  base_of_agrees.arm(ws,
+    Bool.and(Nat.is_eq(List.length(&2, String, ws), 2n),
+      Bool.and(String.eq(P.word(ws, 0n), "import"),
+        String.eq(P.word(ws, 1n), "Base"))),
+    mod_of_agrees(ws))
+
+# LAW: one arm of the quiet test, with the branch given as a parameter. This
+# is the arm the whole rewrite was for: the False side is where `words(s)`
+# runs, and the True side no longer reaches it.
+law stmt_of_agrees.quiet:
+  for +s: String
+  for p: Bool
+  {Bool.pick(P.Stmt, p, P.SNone{}, Laws.old.base_of(P.words(s)))
+    == P.stmt_of.quiet(p, s) : P.Stmt}
+
+def stmt_of_agrees.quiet(s, p):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      base_of_agrees(P.words(s))
+
+# LAW: one arm of the foreign test, with the branch given as a parameter and
+# the quiet test's agreement alongside
+law stmt_of_agrees.arm:
+  for +s: String
+  for p: Bool
+  for ih: {Bool.pick(P.Stmt, P.quiet(s), P.SNone{},
+    Laws.old.base_of(P.words(s))) == P.stmt_of.quiet(P.quiet(s), s) : P.Stmt}
+  {Bool.pick(P.Stmt, p,
+    P.SForeign{String.take(String.drop(s, 8n), Nat.sub(String.length(s), 9n))},
+    Bool.pick(P.Stmt, P.quiet(s), P.SNone{}, Laws.old.base_of(P.words(s))))
+    == P.stmt_of.foreign(p, s) : P.Stmt}
+
+def stmt_of_agrees.arm(_s, p, ih):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+def Laws.stmt_of_agrees(s):
+  stmt_of_agrees.arm(s,
+    Bool.and(String.starts_with(s, "import \""), String.ends_with(s, "\"")),
+    stmt_of_agrees.quiet(s, P.quiet(s)))
+
+# LAW: one step of the escaping-path search, with the head's answer given as a
+# parameter and the rest of the search's agreement alongside
+law escaped_agrees.arm:
+  for +h: P.File
+  for t: List<&2, P.File>
+  for p: Bool
+  for ih: {Laws.old.escaped(t) == P.escaped(t) : String}
+  {Bool.pick(String, p, P.file.at(h), Laws.old.escaped(t))
+    == P.escaped.step(p, P.file.at(h), _u => P.escaped(t)) : String}
+
+def escaped_agrees.arm(_h, _t, p, ih):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+def Laws.escaped_agrees(fs):
+  match fs:
+    case []:
+      {==}
+    case +h <> +t:
+      escaped_agrees.arm(h, t, P.escapes(P.file.at(h)), Laws.escaped_agrees(t))
+
+# LAW: one step of the scan, with the head's answer given as a parameter and
+# the rest of the scan's agreement alongside
+law seen_has_agrees.arm:
+  for t: List<&2, String>
+  for +s: String
+  for p: Bool
+  for ih: {Laws.old.seen.has(t, s) == P.seen.has(t, s) : Bool}
+  {Bool.or(p, Laws.old.seen.has(t, s))
+    == P.seen.has.step(p, _u => P.seen.has(t, s)) : Bool}
+
+def seen_has_agrees.arm(_t, _s, p, ih):
+  match p:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+def Laws.seen_has_agrees(xs, s):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      seen_has_agrees.arm(t, s, String.eq(h, s), Laws.seen_has_agrees(t, s))

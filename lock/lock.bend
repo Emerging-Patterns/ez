@@ -313,13 +313,28 @@ def pack.hash(p: Pack) -> String:
   Pack{h, _s, _f} = p
   h
 
+# one step of a scan that is looking for one hit. Both scans in this file want
+# it, so it is stated once here.
+#
+# `Bool.or` is an ordinary function and reduces both of its sides, so a scan
+# written with it reads the whole list even when the head answers. The rest of
+# the scan arrives as a thunk, which is a value, and only the arm that wants
+# it applies it; handed in as an ordinary argument it would be reduced before
+# this def could decline it.
+def any.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
 # whether a package is already resolved
 def has(ds: List<&2, Pack>, +h: String) -> Bool:
   match ds:
     case []:
       False{}
     case x <> t:
-      Bool.or(String.eq(pack.hash(x), h), has(t, h))
+      any.step(String.eq(pack.hash(x), h), _u => has(t, h))
 
 # a package resolved, and every package it imports queued behind what is left
 def resolve.done(b: Body, hash: String, src: Src, rest: List<&2, String>,
@@ -428,12 +443,16 @@ def seen.hits(st: Seen) -> List<&2, String>:
 # whether a name is already among the ones a walk has read. Base's
 # `List.contains` applies an erased equality, which Bend's termination check
 # cannot see through; this scan is structural.
+#
+# The list grows by one with every file the project walk reads, so this scan
+# is the inner half of a quadratic; `any.step` is what lets it stop at the
+# name it was looking for instead of reading past it.
 def seen.holds(xs: List<&2, String>, +s: String) -> Bool:
   match xs:
     case []:
       False{}
     case +h <> t:
-      Bool.or(String.eq(h, s), seen.holds(t, s))
+      any.step(String.eq(h, s), _u => seen.holds(t, s))
 
 # one file off the queue, skipped when it has been read already
 def root.next(+at: String, +st: Seen,

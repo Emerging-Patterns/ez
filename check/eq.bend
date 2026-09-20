@@ -9,6 +9,7 @@ law bool_cmp_self:
   for +b: Bool
   {Bool.cmp(b, b) == EQ{} : Cmp}
 
+# the two bits, each compared with itself
 def bool_cmp_self(b):
   match b:
     case False{}:
@@ -22,6 +23,7 @@ law word_cmp_self:
   for +w: Word(n)
   {Word.cmp(n, w, w) == EQ{} : Cmp}
 
+# by induction on the width: a word of no bits and a bit carried over one
 def word_cmp_self(n, w):
   match n:
     case 0n:
@@ -42,6 +44,7 @@ law u32_cmp_self:
   for +u: U32
   {U32.cmp(u, u) == EQ{} : Cmp}
 
+# a number is a word of thirty-two bits, so the word's law answers for it
 def u32_cmp_self(u):
   match u:
     case U32{+w}:
@@ -52,6 +55,7 @@ law char_cmp_self:
   for +c: Char
   {Char.cmp(c, c) == ((c, c), EQ{}) : (Char & Char) & Cmp}
 
+# a char is a code point, and the pair it is compared inside rides along
 def char_cmp_self(c):
   match c:
     case Chr{+x}:
@@ -63,6 +67,8 @@ law string_cmp_self:
   for +s: String
   {String.cmp(s, s) == ((s, s), EQ{}) : (String & String) & Cmp}
 
+# by induction on the string: the head's law and the tail's, composed the
+# way String.cmp composes them
 def string_cmp_self(s):
   match s:
     case SNil{}:
@@ -84,6 +90,7 @@ law string_eq_self:
   for +s: String
   {String.eq(s, s) == True{} : Bool}
 
+# equality is the comparison read as a bit, so the comparison's law answers
 def string_eq_self(s):
   Equal.cong((String & String) & Cmp, Bool, r => String.eq.fin(r),
     String.cmp(s, s), ((s, s), EQ{}), string_cmp_self(s))
@@ -93,6 +100,7 @@ law char_eq_self:
   for +c: Char
   {Char.is_eq(c, c) == True{} : Bool}
 
+# and the same for a char
 def char_eq_self(c):
   match c:
     case Chr{+x}:
