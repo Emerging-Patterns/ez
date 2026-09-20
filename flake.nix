@@ -27,7 +27,7 @@
 
       # the BEND_LIB tree ez's own ledger asks for, built from the lock with no
       # network in the sandbox beyond the lock's own fixed-output fetches
-      bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.json;
+      bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.toml;
 
       # the `ez` binary, with everything it shells out to on its PATH. The
       # TypeScript helpers live beside it under libexec until they are Bend,

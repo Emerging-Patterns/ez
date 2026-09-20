@@ -6,6 +6,8 @@ import ../run/run.bend as R
 import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ../manifest/render.bend as Rend
+import ../lock/lock.bend as Lock
+import ../lock/restore.bend as Restore
 import ./args.bend as Args
 
 # where ez was installed, so it finds its own helpers wherever it is run from
@@ -109,30 +111,21 @@ def sources() -> IO(List<&2, String>):
       "-not", "-path", "./.ez/*", "-not", "-path", "./.gate/*"])
     return Args.nonempty(String.lines(R.text(out)))
 
-# truncates a good lock
-def lock.written(ok: Bool, +text: String) -> IO(Unit):
-  match ok:
-    case False{}:
-      IO.die(Unit, 1, "ez: " ++ text)
-    case True{}:
-      do IO<Unit>:
-        wrote : Bool <- F.write("ez.lock.json", text)
-        report.exit(wrote)
+# the lock's path, which is fixed
+def lockfile() -> String:
+  "ez.lock.toml"
 
 # the lock, rewritten from every root in the tree
 def lock() -> IO(Unit):
   do IO<Unit>:
     srcs : List<&2, String> <- sources()
-    at : String <- root()
-    +out : String <- R.exec(List.append(&2, String, ["bun", tool(at, "ez-lock.ts")], srcs))
-    lock.written(R.ok(out), R.text(out))
+    text : String <- Lock.lock(srcs)
+    wrote : Bool <- F.write(lockfile(), text)
+    report.exit(wrote)
 
 # BEND_LIB filled from the lock, with nothing re-resolved
 def fetch() -> IO(Unit):
-  do IO<Unit>:
-    at : String <- root()
-    +out : String <- R.exec(["bun", tool(at, "ez-restore.ts")])
-    report(out)
+  Restore.restore(lockfile())
 
 # the name a new ledger takes: what was asked for, or `app`
 def init.name(+at: String) -> String:

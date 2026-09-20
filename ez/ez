@@ -3,7 +3,7 @@
 #   ez init [name] [entry.bend]     write an ez.toml for a new project
 #   ez add <url> <ref> <entry>      vendor a git package and record it
 #   ez remove <name>                drop a package from the ledger
-#   ez lock                         resolve every import, write ez.lock.json
+#   ez lock                         resolve every import, write ez.lock.toml
 #   ez fetch                        fill BEND_LIB from the lock
 #   ez check                        check the entry, without running it
 #   ez build [out]                  build the entry to a native binary

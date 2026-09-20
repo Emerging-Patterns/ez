@@ -8,7 +8,7 @@ sandbox, where there is no network.
 ez init myapp main.bend             write an ez.toml for a new project
 ez add <url> <ref> <entry.bend>     vendor a git package and record it
 ez remove <name>                    drop a package from the ledger
-ez lock                             resolve every import, write ez.lock.json
+ez lock                             resolve every import, write ez.lock.toml
 ez fetch                            fill BEND_LIB from the lock
 ez check                            check the entry, without running it
 ez build [out]                      build the entry to a native binary
@@ -27,7 +27,7 @@ A native Bend binary takes no arguments of its own, so the subcommand rides in
 In Nix:
 
 ```nix
-bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.json;
+bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.toml;
 # ... buildPhase = "BEND_LIB=${bendLib} bend main.bend -o app";
 ```
 
@@ -49,7 +49,7 @@ published package would have given you, so if upstream publishes that exact tree
 later, the hash matches and the hub just starts serving it. Nothing in your
 source changes.
 
-`ez.lock.json` records the git url and rev instead of the hub for that package,
+`ez.lock.toml` records the git url and rev instead of the hub for that package,
 and `nix/bend-lib.nix` rebuilds it with `fetchgit`. `tests/git.sh` runs the whole
 path against a served fixture repo and checks the nix tree byte for byte against
 the vendored one.
@@ -225,7 +225,7 @@ the build then runs with the hub unreachable.
 ## Layout
 
     ez.toml             the ledger: every package this repo imports
-    ez.lock.json        the resolved closure, with each file's sha256
+    ez.lock.toml        the resolved closure, with each file's sha256
     flake.nix           bend, bun, the BEND_LIB from the lock, and the checks
     manifest/           ez.toml, read in Bend
     sha/                sha256, from a vendored package ez pins in its own ledger
@@ -237,10 +237,10 @@ the build then runs with the hub unreachable.
     io/                 a whole file read or written, over Base's chunked handles
     build.sh            bin/ez.bin, linked into ~/.local/bin as `ez`
     bin/pkg.ts          the package and hash `bend --publish` would produce
-    bin/ez-lock.ts      walks the import graph, writes ez.lock.json
+    bin/ez-lock.ts      walks the import graph, writes ez.lock.toml
     bin/ez-git.ts       vendors an unpublished git repo under its would-be hash
     bin/ez-restore.ts   fills BEND_LIB from the lock, without re-resolving
-    nix/bend-lib.nix    ez.lock.json -> a BEND_LIB store path
+    nix/bend-lib.nix    ez.lock.toml -> a BEND_LIB store path
     tests/oracle.ts     a local stand-in for the hub, so --publish can be run
     tests/publish.sh    ez's hash must equal the one bend mines
     tests/hub.sh        two-level fake hub; lock, then build offline

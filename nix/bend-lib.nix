@@ -1,25 +1,26 @@
-# A BEND_LIB tree built from ez.lock.json alone. The sandbox needs no network
+# A BEND_LIB tree built from ez.lock.toml alone. The sandbox needs no network
 # and `bend` never calls the hub.
 #
-#   bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.json;
+#   bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.toml;
 #   ... buildPhase = "BEND_LIB=${bendLib} bend main.bend -o app";
 #
 # A hub package is one fixed-output fetchurl per file, keyed by the sha256 its
 # manifest already records. A git package is one fetchgit of the pinned rev, and
 # its files are taken from the checkout at the paths the manifest names, which
-# are relative to the entry file's own directory.
+# are relative to the package's own root: the entry file's directory, unless a
+# module of it was reached through `..` and re-rooted the package above that.
 { lib, fetchurl, fetchgit, runCommand }:
 
 lockFile:
 
 let
-  lock = builtins.fromJSON (builtins.readFile lockFile);
+  doc = builtins.fromTOML (builtins.readFile lockFile);
 
   manifest = files:
     lib.concatStrings (map (p: "${files.${p}} ${p}\n") (lib.naturalSort (builtins.attrNames files)));
 
   hubFile = hash: at: sha256: fetchurl {
-    url = "${lock.hub}/${hash}/${at}";
+    url = "${doc.lock.hub}/${hash}/${at}";
     inherit sha256;
     name = "bend-${lib.removePrefix "0x" hash}-${builtins.baseNameOf at}";
   };
@@ -36,7 +37,7 @@ let
     let files = entry.files; in
     if entry.source.kind == "git" then ''
       mkdir -p "$out/${hash}"
-      from=${gitSrc hash entry.source}/${builtins.dirOf entry.source.entry}
+      from=${gitSrc hash entry.source}/${entry.source.root}
       ${lib.concatStrings (lib.mapAttrsToList (at: sha256: ''
         mkdir -p "$out/${hash}/$(dirname ${lib.escapeShellArg at})"
         cp "$from/${at}" "$out/${hash}/${at}"
@@ -51,5 +52,5 @@ let
       '') files)}
     '';
 in
-runCommand "bend-lib" { passthru = { inherit lock; }; }
-  (lib.concatStrings ([ "mkdir -p $out\n" ] ++ lib.mapAttrsToList pkg lock.packages))
+runCommand "bend-lib" { passthru = { lock = doc; }; }
+  (lib.concatStrings ([ "mkdir -p $out\n" ] ++ lib.mapAttrsToList pkg doc.packages))

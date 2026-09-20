@@ -402,15 +402,20 @@ def roots(fuel: Nat, queue: List<&2, String>, st: Seen) -> IO(List<&2, String>):
       root.pop(queue, st, h => t => s =>
         root.next(h, s, more => s2 => roots(f, List.append(&2, String, more, t), s2)))
 
+# a key worth writing, or nothing at all when its value is empty, so an absent
+# tag leaves no trace
+def kv(key: String, +val: String) -> List<&2, T.Kv>:
+  Bool.pick(List<&2, T.Kv>, String.is_empty(val), [], [T.Kv{key, val}])
+
 # the keys a source contributes to the lock
 def src.pairs(s: Src) -> List<&2, T.Kv>:
   match s:
     case Hub{}:
       [T.Kv{"kind", "hub"}]
     case Git{url, rev, entry, root, nar, tag}:
-      [T.Kv{"kind", "git"}, T.Kv{"url", url}, T.Kv{"rev", rev},
-       T.Kv{"entry", entry}, T.Kv{"root", root}, T.Kv{"narHash", nar},
-       T.Kv{"tag", tag}]
+      List.concat(&2, T.Kv,
+        [[T.Kv{"kind", "git"}], kv("url", url), kv("rev", rev), kv("entry", entry),
+         kv("root", root), kv("narHash", nar), kv("tag", tag)])
 
 # a file of a package as a `"<path>" = "<sha256>"` pair
 def file.pair(f: K.File) -> T.Kv:
