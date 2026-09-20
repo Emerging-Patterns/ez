@@ -58,7 +58,8 @@ def count(ls: List<&2, String>) -> Nat:
     case Nil{}:
       0n
     case Con{_h, t}:
-      (1n + count(t) : Nat)
+      +rest = count(t)
+      (1n + rest : Nat)
 
 # one job as the effect wants it: how many arguments, then each of them. The
 # count is what lets an argument hold anything a line may hold, so no separator
