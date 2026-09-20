@@ -1,0 +1,23 @@
+# On a pushed v* tag (`git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`):
+# open a GitHub Release. Tag + GitHub Release only.
+# No native package attach. GitHub already ships a source archive on the release.
+# Notes are GitHub-generated from commits since the previous tag.
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

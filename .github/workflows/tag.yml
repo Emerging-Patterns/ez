@@ -1,0 +1,115 @@
+# Cuts a vX.Y.Z tag and GitHub Release from workflow_dispatch
+# (a GITHUB_TOKEN tag does not start release.yml).
+#
+# How to cut a release
+#   1. Land the version on master in flake.nix (`version = "X.Y.Z"` on the ez package).
+#   2. Actions → Tag → Run workflow, from master:
+#        - leave version empty and bump=none → tag what flake.nix says
+#        - version=X.Y.Z → tag that (fails if flake.nix differs)
+#        - bump=patch|minor|major → rewrite flake.nix, commit, tag the new X.Y.Z
+#   3. Or tag locally: `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`
+#      (release.yml then opens the GitHub Release).
+#
+# Tag and GitHub Release only; GitHub ships the source archive.
+
+name: tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "X.Y.Z to tag (empty = version in flake.nix)"
+        required: false
+        type: string
+        default: ""
+      bump:
+        description: "If version is empty, bump flake.nix then tag"
+        required: false
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+        default: none
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Resolve version
+        id: ver
+        env:
+          VERSION_IN: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+
+          flake_ver=$(grep -oE 'version = "[0-9]+\.[0-9]+\.[0-9]+"' flake.nix \
+            | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          if [ -z "$flake_ver" ]; then
+            echo "could not read version from flake.nix"
+            exit 1
+          fi
+          file_ver="$flake_ver"
+
+          ver=$(printf '%s' "$VERSION_IN" | tr -d '[:space:]')
+          ver="${ver#v}"
+          bump_files=0
+          if [ -n "$ver" ]; then
+            :
+          elif [ "${BUMP:-none}" != none ]; then
+            IFS=. read -r maj min pat <<< "$file_ver"
+            case "$BUMP" in
+              major) ver="$((maj + 1)).0.0" ;;
+              minor) ver="$maj.$((min + 1)).0" ;;
+              patch) ver="$maj.$min.$((pat + 1))" ;;
+              *) echo "unknown bump: $BUMP"; exit 1 ;;
+            esac
+            bump_files=1
+          else
+            ver="$file_ver"
+          fi
+
+          if ! echo "$ver" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "version must be X.Y.Z, got: $ver"
+            exit 1
+          fi
+          if [ "$bump_files" -eq 0 ] && [ "$ver" != "$file_ver" ]; then
+            echo "asked to tag v$ver but flake.nix is $file_ver"
+            echo "bump flake.nix first, or use bump="
+            exit 1
+          fi
+
+          if [ "$bump_files" -eq 1 ]; then
+            sed -i -E 's/version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$ver"'"/' flake.nix
+            if ! grep -q "version = \"$ver\"" flake.nix; then
+              echo "failed to write flake.nix version $ver"
+              exit 1
+            fi
+          fi
+
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "bump_files=$bump_files" >> "$GITHUB_OUTPUT"
+      - name: Commit version bump
+        id: commit
+        if: steps.ver.outputs.bump_files == '1'
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: Release v${{ steps.ver.outputs.version }}
+          file_pattern: flake.nix
+          branch: ${{ github.ref_name }}
+          disable_globbing: true
+          commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          target_commitish: ${{ steps.commit.outputs.commit_hash || github.sha }}
