@@ -1,10 +1,11 @@
 # pkg: the proofs. `bend PROOF.bend` is the gate.
 #
 # What is not here: that `files_of` answers the same list whatever order the
-# walk found the files in. That is a property of Base's `List.sort`, a fuelled
-# bottom-up merge sort, and stating it needs lemmas about `List.merge` that
-# Base does not carry. `tests/publish.sh` holds that end down instead, by
-# running the real `bend --publish` against a local hub.
+# walk found the files in. It is now a property of this project's own
+# `file.sort` rather than of Base's `List.sort`, so it is in reach — but it
+# needs a permutation lemma over `file.ins` that nothing here carries yet.
+# `tests/publish.sh` holds that end down instead, by running the real
+# `bend --publish` against a local hub.
 import Base
 import ./pkg.bend as P
 import ../check/eq.bend as Eq
