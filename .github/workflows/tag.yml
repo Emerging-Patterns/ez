@@ -1,6 +1,6 @@
-# Cuts an annotated vX.Y.Z tag and the GitHub Release (a GITHUB_TOKEN
-# tag push does not start release.yml). Version lives in flake.nix only
-# (`version = "X.Y.Z"` on the ez package).
+# workflow_dispatch: cut an annotated vX.Y.Z from the flake.nix version
+# (the only version file) and open a GitHub Release. A GITHUB_TOKEN
+# tag push does not start release.yml, so this job creates the release.
 #
 # How to cut a release
 #   1. Land the version on master in flake.nix.
@@ -11,9 +11,6 @@
 #          new X.Y.Z
 #   3. Or tag locally: `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`
 #      (release.yml then opens the GitHub Release).
-#
-# Does not attach a nix binary. Does not `bend --publish`. Does not
-# publish to hub/marketplace.
 
 name: tag
 
@@ -46,13 +43,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check version, tag, and release
+      - name: Resolve flake.nix version
+        id: ver
         env:
-          GH_TOKEN: ${{ github.token }}
           VERSION_IN: ${{ inputs.version }}
           BUMP: ${{ inputs.bump }}
         run: |
           set -euo pipefail
+          echo "notes=false" >> "$GITHUB_OUTPUT"
 
           flake_ver=$(grep -oE 'version = "[0-9]+\.[0-9]+\.[0-9]+"' flake.nix \
             | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
@@ -96,10 +94,9 @@ jobs:
             exit 1
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           if [ "$bump_files" -eq 1 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             sed -i -E 's/version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$ver"'"/' flake.nix
             if ! grep -q "version = \"$ver\"" flake.nix; then
               echo "failed to write flake.nix version $ver"
@@ -110,8 +107,7 @@ jobs:
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
-          git tag -a "v$ver" -m "v$ver"
-          git push origin "v$ver"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
 
           if [ -f CHANGELOG.md ]; then
             awk -v ver="$ver" '
@@ -121,7 +117,11 @@ jobs:
             ' CHANGELOG.md > /tmp/release-notes.md
           fi
           if [ -s /tmp/release-notes.md ]; then
-            gh release create "v$ver" --title "v$ver" --notes-file /tmp/release-notes.md
-          else
-            gh release create "v$ver" --title "v$ver" --generate-notes
+            echo "notes=true" >> "$GITHUB_OUTPUT"
           fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }}
+          body_path: ${{ steps.ver.outputs.notes == 'true' && '/tmp/release-notes.md' || '' }}
+          generate_release_notes: ${{ steps.ver.outputs.notes != 'true' }}

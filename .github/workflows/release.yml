@@ -1,11 +1,7 @@
-# Annotated vX.Y.Z tag → GitHub Release. No nix binary attach (GitHub
-# already ships a source archive). No hub/marketplace. No `bend --publish`.
-#
-# Runs on a pushed v* tag (a human `git tag -a && git push`, or tag.yml).
-# Skips if the release already exists.
-#
-# Notes: CHANGELOG.md section for this version if present, else GitHub's
-# generated notes from commits since the previous tag.
+# Push of a v* tag → GitHub Release. Skip if the tag is not vX.Y.Z
+# (optional prerelease suffix) or the release already exists. Notes
+# from CHANGELOG.md when present, otherwise generated notes. No
+# binary attach.
 
 name: release
 
@@ -24,25 +20,31 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Create GitHub Release
+      - name: Release metadata
+        id: meta
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          echo "notes=false" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           if ! echo "$tag" | grep -qxE 'v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?'; then
             echo "skip: $tag is not a vX.Y.Z tag"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "release $tag already exists"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          ver="${tag#v}"
-          extra=()
           case "$tag" in
-            *-*) extra+=(--prerelease) ;;
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
           esac
+          ver="${tag#v}"
           if [ -f CHANGELOG.md ]; then
             awk -v ver="$ver" '
               $0 ~ "^##[ \\[]+v?" ver {found=1; print; next}
@@ -51,7 +53,13 @@ jobs:
             ' CHANGELOG.md > /tmp/release-notes.md
           fi
           if [ -s /tmp/release-notes.md ]; then
-            gh release create "$tag" --title "$tag" --notes-file /tmp/release-notes.md "${extra[@]}"
-          else
-            gh release create "$tag" --title "$tag" --generate-notes "${extra[@]}"
+            echo "notes=true" >> "$GITHUB_OUTPUT"
           fi
+      - uses: softprops/action-gh-release@v2
+        if: steps.meta.outputs.skip != 'true'
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          body_path: ${{ steps.meta.outputs.notes == 'true' && '/tmp/release-notes.md' || '' }}
+          generate_release_notes: ${{ steps.meta.outputs.notes != 'true' }}
