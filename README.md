@@ -13,7 +13,7 @@ ez fetch                            fill BEND_LIB from the lock
 ez check                            check the entry, without running it
 ez build [out]                      build the entry to a native binary
 ez run [args..]                     check and run the entry
-ez test [--js-only]                 run every */tests/*.bend, on both lanes
+ez test [--js-only] [--full]        run every */tests/*.bend, on both lanes
 ez doctor                           report on the toolchain and the project
 ```
 
@@ -305,10 +305,64 @@ fixes it. Vendoring under `0x<hash>/` sidesteps it, since a hash has no hyphen.
 ## The test runner
 
 Bend has no `bend test`, so `ez test` is one. It finds every `*/tests/*.bend`,
-reads the `#|` trailer that says what the run must print, runs the file on the
-JS lane and then compiled to a native CPU binary, and compares. `--js-only`
-skips the native lane, which spends a C compile per test. Anything that
-disagrees fails the command, and the last line is always `PASS: n / total`.
+reads the `#|` trailer that says what the run must print, runs it on the JS
+lane and then compiled to a native CPU binary, and compares. `--js-only` skips
+the native lane, which spends a C compile. Anything that disagrees fails the
+command, and the last line is always `PASS: n / total`.
+
+### One binary a project
+
+A lane is one `bend` a project, not one a test. bend has no incremental
+compile, so every build pays for the whole import closure, and a project's
+tests import nearly the same one. So `ez/gate.bend` writes
+`<project>/.gate/all.bend`: every test of the project imported, each `main`
+called behind a marker line. The runner cuts the run's output on the markers
+and gives each slice to the test that asked for it, so each test is still its
+own pass or fail and only the compiling is shared. The aggregate sits beside
+the tests it imports, and reaches them as `../tests/<name>.bend`, so no
+directory name ever appears in an import path — a hyphen in one breaks the JS
+backend.
+
+Measured here, on this repo's 18 unit tests over 9 projects: the native lane's
+19 builds became 9 and 222 s became 137 s, and the JS lane's 19 runs became 9
+and 123 s became 75 s. The peak barely moved — 2.31 GB for the worst single
+test against 2.56 GB for the worst aggregate — because an aggregate costs
+about the *worst* of its tests rather than their sum: the shared closure is
+compiled once. Every `bend` still runs inside the memory cap `ez/cap.bend`
+sets, and an aggregate is the larger compile, so that is where the cap bites
+first; a build the kernel kills exits 137, and `Cap.why` says so rather than
+letting it read as the success bend already printed.
+
+Two things follow from tests sharing a binary. A test that runs as a `main` can
+still fail to *import* — a do-block binder sharing a name with a def in the
+same file is enough, and so are two tests of one project spelling a shared
+import differently, which is two namespaces for one file. Then nothing of the
+project ran, and the run reaches no marker at all: the runner fails every test
+of the project by name and prints what the build said, rather than skipping
+them quietly. And tests in one binary share a command line, so a test that
+reads `IO.args()` is failed with that as its observed output instead of being
+compared against a run it could not have had. None does; the environment, which
+`io/tests/roundtrip.bend` does read, is the same either way.
+
+### Nothing run twice
+
+A lane's answer is a function of what it reads, so `ez/cache.bend` keys it on
+exactly that: the aggregate, every module it reaches through a relative import,
+the foreign C and JS bodies beside them, each by sha256, plus `bend --version`
+and `$CC`. The walk is `pkg/pkg.bend`, the one `bend <entry> --publish` uses,
+so the test list and every trailer are inside the key too. A lane whose key is
+already under `.gate/cache` is counted as the passes it made last time and not
+run; `--full` reads none of it.
+
+A key is written only when every test of the lane held. A cache that went green
+on stale evidence would be worse than no cache, so a lane that failed is never
+remembered, and running it again fails it again.
+
+Measured: a cold `--js-only` run is 162 s and a warm one 60 s, of which the
+end-to-end tests are nearly all — they are never cached, because what they read
+is the world outside this repo and no key over file contents says whether that
+changed. Touching one file re-ran exactly the one project whose closure holds
+it, and putting it back made that project's old key current again.
 
 A failure prints what was expected and what was observed, both in full, rather
 than a diff. A diff is real work in Bend and a test's trailer is a handful of
@@ -434,6 +488,8 @@ the build then runs with the hub unreachable.
     ez/args.bend        the command line, as IO.args() hands it over
     ez/env.bend         BEND_LIB and EZ_ROOT, and how a child process is told
     ez/test.bend        the test runner: every */tests/*.bend, on both lanes
+    ez/gate.bend        a project's tests as one binary, and the run cut back up
+    ez/cache.bend       a lane keyed on everything it reads, so it runs once
     ez/quiet.bend       bend's check report dropped, the way bin/quiet.awk does
     ez/drift.bend       the hashes in ez.toml against the ones the source imports
     ez/doctor.bend      the toolchain and the project, reported on

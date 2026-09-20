@@ -5,12 +5,35 @@
 # calls each `main` behind a marker line. Each test still answers for its own
 # `#|` trailer — the runner cuts the run's output on the markers and hands each
 # slice to the test that asked for it — so only the compiling is shared.
+#
+# The trailer walk lives here too, and this file imports nothing but Base, so a
+# test of the runner's own text machinery costs a compile of that and no more.
 import Base
 
 # the line an aggregate prints before it calls a test's main. The output is cut
 # on it, so it is a line no test would print itself.
 def mark() -> String:
   "@@ez@@ "
+
+# a trailer line kept, with its `#|` dropped, or a source line ignored
+def want.put(is_want: Bool, h: String, rest: List<&2, String>) -> List<&2, String>:
+  match is_want:
+    case True{}:
+      String.drop(h, 2n) <> rest
+    case False{}:
+      rest
+
+# the `#|` lines of a source file, in order
+def want(ls: List<&2, String>) -> List<&2, String>:
+  match ls:
+    case []:
+      []
+    case +h <> t:
+      want.put(String.starts_with(h, "#|"), h, want(t))
+
+# what a test file says its run must print
+def trailer(text: String) -> String:
+  String.join(want(String.lines(text)), "\n")
 
 # the last of a list of strings, or "" when there is none
 def last(ls: List<&2, String>) -> String:

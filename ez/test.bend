@@ -8,39 +8,23 @@
 # compile, so every build pays for the whole import closure, and a project's
 # tests import nearly the same one; `ez/gate.bend` writes the aggregate that
 # pays it once, and this splits the run's output back up so each test still
-# answers for its own trailer.
+# answers for its own trailer. A lane that has already held over exactly the
+# files it reads is not run again either, which `ez/cache.bend` keys and
+# `--full` ignores.
 import Base
 import ../run/run.bend as R
 import ../io/file.bend as F
 import ./args.bend as Args
 import ./env.bend as Env
 import ./cap.bend as Cap
+import ./cache.bend as C
 import ./gate.bend as G
+import ./sorted.bend as Sort
 import ./quiet.bend as Q
 
 # how many comparisons were made, and how many of them held
 type Tally is Data:
   Tally{pass: Nat, total: Nat}
-
-# a trailer line kept, with its `#|` dropped, or a source line ignored
-def want.put(is_want: Bool, h: String, rest: List<&2, String>) -> List<&2, String>:
-  match is_want:
-    case True{}:
-      String.drop(h, 2n) <> rest
-    case False{}:
-      rest
-
-# the `#|` lines of a source file, in order
-def want(ls: List<&2, String>) -> List<&2, String>:
-  match ls:
-    case []:
-      []
-    case +h <> t:
-      want.put(String.starts_with(h, "#|"), h, want(t))
-
-# what a test file says its run must print
-def trailer(text: String) -> String:
-  String.join(want(String.lines(text)), "\n")
 
 # every line of a block, indented under the heading that introduces it
 def indent.go(ls: List<&2, String>) -> List<&2, String>:
@@ -199,7 +183,7 @@ def section(+path: String, +lane: String, +text: String, t: Tally) -> IO(Tally):
   do IO<Tally>:
     src : Maybe<&2, String> <- F.read(path)
     +body : String <- IO.pure(String, F.text_of(src))
-    check(path ++ " (" ++ lane ++ ")", trailer(body),
+    check(path ++ " (" ++ lane ++ ")", G.trailer(body),
       observed(G.solitary(body), text, path), t)
 
 # every test of a project, each against its own slice
@@ -217,7 +201,7 @@ def sections(ts: List<&2, String>, +lane: String, +text: String,
 def miss(+path: String, +lane: String, +why: String, t: Tally) -> IO(Tally):
   do IO<Tally>:
     src : Maybe<&2, String> <- F.read(path)
-    check(path ++ " (" ++ lane ++ ")", trailer(F.text_of(src)), why, t)
+    check(path ++ " (" ++ lane ++ ")", G.trailer(F.text_of(src)), why, t)
 
 # every test of a project that never ran. They are failed one by one rather
 # than skipped: a project whose binary will not build has answered for nothing.
@@ -255,18 +239,52 @@ def answer(ok: Bool, ts: List<&2, String>, +dir: String, +lane: String,
         blame(dir, lane, text)
         missed(ts, lane, unran(dir), t)
 
+# how many comparisons did not hold
+def flops(t: Tally) -> Nat:
+  Tally{p, n} = t
+  Nat.sub(n, p)
+
+# a lane's answer remembered, and only when every test of it held. A cache that
+# went green on stale evidence would be worse than no cache at all, so nothing
+# is written for a lane that failed, and `--full` reads none of it.
+def remember(+before: Tally, +after: Tally, +k: String, +what: String) -> IO(Tally):
+  do IO<Tally>:
+    C.keep(Nat.is_eq(flops(before), flops(after)), k, what)
+    return after
+
+# a lane's tests counted without being run, because this exact evidence — every
+# test, everything they import, the bodies beside those, and the toolchain —
+# has already held
+def hit(ts: List<&2, String>, t: Tally) -> Tally:
+  match ts:
+    case Nil{}:
+      t
+    case Con{_h, rest}:
+      hit(rest, tally(True{}, t))
+
 # the JS lane: one `bend` over the project's aggregate, interpreted
-def js(cap: Bool, +dir: String, ts: List<&2, String>, t: Tally) -> IO(Tally):
+def js.run(cap: Bool, +dir: String, ts: List<&2, String>, +k: String,
+  +t: Tally) -> IO(Tally):
   do IO<Tally>:
     +g : String <- Cap.gb()
     +out : String <- Cap.run(cap, ["bend", G.src(dir, "all.js")])
     +text : String <- IO.pure(String, Cap.why(out, g) ++ Q.filter(R.text(out)))
-    answer(G.started(text), ts, dir, "js", text, t)
+    after : Tally <- answer(G.started(text), ts, dir, "js", text, t)
+    remember(t, after, k, dir ++ " (js)")
+
+# the JS lane, unless it has already held over this same evidence
+def js(hot: Bool, cap: Bool, +dir: String, ts: List<&2, String>, +k: String,
+  +t: Tally) -> IO(Tally):
+  match hot:
+    case True{}:
+      IO.pure(Tally, hit(ts, t))
+    case False{}:
+      js.run(cap, dir, ts, k, t)
 
 # the native lane, once the project's binary is either built or not. A build
 # that failed is itself the failure, and its output is what is reported.
 def built(ok: Bool, +why: String, +dir: String, ts: List<&2, String>,
-  t: Tally) -> IO(Tally):
+  +k: String, +t: Tally) -> IO(Tally):
   match ok:
     case False{}:
       do IO<Tally>:
@@ -276,57 +294,78 @@ def built(ok: Bool, +why: String, +dir: String, ts: List<&2, String>,
       do IO<Tally>:
         out : String <- R.exec([G.bin(dir), "--gpu", "off"])
         +text : String <- IO.pure(String, Q.chomp(R.text(out)))
-        answer(G.started(text), ts, dir, "cpu", text, t)
+        after : Tally <- answer(G.started(text), ts, dir, "cpu", text, t)
+        remember(t, after, k, dir ++ " (cpu)")
 
 # the native CPU lane: the project compiled once, then the binary run. An
 # aggregate is a larger compile than any one of its tests, so this is where the
 # cap bites first; `Cap.why` turns the kernel's 137 into a sentence, because
 # bend prints that all terms check before it emits any C.
-def cpu(on: Bool, cap: Bool, +dir: String, ts: List<&2, String>,
+def cpu.run(cap: Bool, +dir: String, ts: List<&2, String>, +k: String,
   t: Tally) -> IO(Tally):
+  do IO<Tally>:
+    +g : String <- Cap.gb()
+    +out : String <- Cap.run(cap, ["bend", G.src(dir, "all"), "-o", G.bin(dir)])
+    built(R.ok(out), Cap.why(out, g) ++ Q.filter(R.text(out)), dir, ts, k, t)
+
+# the native lane, unless `--js-only` turned it off or it has already held over
+# this same evidence
+def cpu.hot(hot: Bool, cap: Bool, +dir: String, ts: List<&2, String>,
+  +k: String, +t: Tally) -> IO(Tally):
+  match hot:
+    case True{}:
+      IO.pure(Tally, hit(ts, t))
+    case False{}:
+      cpu.run(cap, dir, ts, k, t)
+
+# the native lane, unless `--js-only` turned it off
+def cpu(on: Bool, hot: Bool, cap: Bool, +dir: String, ts: List<&2, String>,
+  +k: String, t: Tally) -> IO(Tally):
   match on:
     case False{}:
       IO.pure(Tally, t)
     case True{}:
-      do IO<Tally>:
-        +g : String <- Cap.gb()
-        +out : String <- Cap.run(cap, ["bend", G.src(dir, "all"), "-o", G.bin(dir)])
-        built(R.ok(out), Cap.why(out, g) ++ Q.filter(R.text(out)), dir, ts, t)
+      cpu.hot(hot, cap, dir, ts, k, t)
 
 # whether a lane has any test to run at all
 def any(ts: List<&2, String>) -> Bool:
   Bool.not(List.is_empty(&2, String, ts))
 
 # the JS lane of a project, unless every test of it is native-only
-def js.on(on: Bool, cap: Bool, +dir: String, ts: List<&2, String>,
-  t: Tally) -> IO(Tally):
+def js.on(on: Bool, hot: Bool, cap: Bool, +dir: String, ts: List<&2, String>,
+  +k: String, t: Tally) -> IO(Tally):
   match on:
     case False{}:
       IO.pure(Tally, t)
     case True{}:
-      js(cap, dir, ts, t)
+      js(hot, cap, dir, ts, k, t)
 
-# one project, on both lanes, one `bend` each
+# one project, on both lanes, one `bend` each — and neither of them at all when
+# nothing either lane reads has changed since it last held
 def project(+dir: String, +ts: List<&2, String>, +cap: Bool, +on: Bool,
-  +loud: Bool, t: Tally) -> IO(Tally):
+  +full: Bool, +tool: String, +loud: Bool, t: Tally) -> IO(Tally):
   do IO<Tally>:
     saying(loud, dir)
     +jts : List<&2, String> <- js_of(ts)
     _wj : Bool <- made(dir, "all.js", jts)
     _wn : Bool <- made(dir, "all", ts)
-    first : Tally <- js.on(any(jts), cap, dir, jts, t)
-    cpu(on, cap, dir, ts, first)
+    +kj : String <- C.key.on(any(jts), "js", tool, G.src(dir, "all.js"))
+    +kn : String <- C.key.on(on, "cpu", tool, G.src(dir, "all"))
+    +hj : Bool <- C.fresh(Bool.not(full), kj)
+    +hn : Bool <- C.fresh(Bool.not(full), kn)
+    first : Tally <- js.on(any(jts), hj, cap, dir, jts, kj, t)
+    cpu(on, hn, cap, dir, ts, kn, first)
 
 # every project with unit tests, in order
 def projects(ds: List<&2, String>, +ts: List<&2, String>, +cap: Bool,
-  +on: Bool, +loud: Bool, t: Tally) -> IO(Tally):
+  +on: Bool, +full: Bool, +tool: String, +loud: Bool, t: Tally) -> IO(Tally):
   match ds:
     case Nil{}:
       IO.pure(Tally, t)
     case Con{+h, rest}:
       do IO<Tally>:
-        next : Tally <- project(h, in_proj(ts, h), cap, on, loud, t)
-        projects(rest, ts, cap, on, loud, next)
+        next : Tally <- project(h, in_proj(ts, h), cap, on, full, tool, loud, t)
+        projects(rest, ts, cap, on, full, tool, loud, next)
 
 # one end-to-end test, on the JS lane alone. These drive git, nix and bend
 # itself, so each one is its own process and its own `bend`.
@@ -336,7 +375,7 @@ def one(+path: String, cap: Bool, loud: Bool, t: Tally) -> IO(Tally):
     src : Maybe<&2, String> <- F.read(path)
     +text : String <- IO.pure(String, F.text_of(src))
     out : String <- Cap.run(cap, ["bend", path])
-    check(path ++ " (js)", trailer(text), Q.filter(R.text(out)), t)
+    check(path ++ " (js)", G.trailer(text), Q.filter(R.text(out)), t)
 
 # every end-to-end test, in order. The list comes first because a self-call
 # must shrink an argument before it changes one.
@@ -354,21 +393,41 @@ def each(ts: List<&2, String>, +cap: Bool, +loud: Bool, t: Tally) -> IO(Tally):
 # `All terms check, but N defs rely on unsafe or foreign code:` exit 0, so a
 # gate reading the status alone goes green on a claim that leans on code
 # nothing proved. Only the bare line means every term was proved outright.
-def proof(+path: String, cap: Bool, loud: Bool, t: Tally) -> IO(Tally):
+def proof.run(+path: String, cap: Bool, +k: String, +t: Tally) -> IO(Tally):
+  do IO<Tally>:
+    +out : String <- Cap.run(cap, ["bend", path])
+    after : Tally <- check(path, "All terms check.", head(R.text(out)), t)
+    remember(t, after, k, path)
+
+# a proof, unless it has already held over this same evidence. A proof reads
+# its own closure and nothing else, so it keys the way a lane does.
+def proof.hot(hot: Bool, +path: String, cap: Bool, +k: String,
+  +t: Tally) -> IO(Tally):
+  match hot:
+    case True{}:
+      IO.pure(Tally, tally(True{}, t))
+    case False{}:
+      proof.run(path, cap, k, t)
+
+# one proof, keyed on what it reads
+def proof(+path: String, cap: Bool, +full: Bool, +tool: String, loud: Bool,
+  t: Tally) -> IO(Tally):
   do IO<Tally>:
     saying(loud, path)
-    +out : String <- Cap.run(cap, ["bend", path])
-    check(path, "All terms check.", head(R.text(out)), t)
+    +k : String <- C.key("proof", tool, path)
+    +hot : Bool <- C.fresh(Bool.not(full), k)
+    proof.hot(hot, path, cap, k, t)
 
 # every proof in the tree, checked
-def proofs(ps: List<&2, String>, +cap: Bool, +loud: Bool, t: Tally) -> IO(Tally):
+def proofs(ps: List<&2, String>, +cap: Bool, +full: Bool, +tool: String,
+  +loud: Bool, t: Tally) -> IO(Tally):
   match ps:
     case []:
       IO.pure(Tally, t)
     case h <> rest:
       do IO<Tally>:
-        next : Tally <- proof(h, cap, loud, t)
-        proofs(rest, cap, loud, next)
+        next : Tally <- proof(h, cap, full, tool, loud, t)
+        proofs(rest, cap, full, tool, loud, next)
 
 # every file of a kind in the tree, sorted, so a run's report is the same twice
 # over. Base has no readdir, so this is `find`. `.claude` is skipped along with
@@ -381,7 +440,7 @@ def find.at(+what: String, +how: String) -> IO(List<&2, String>):
     out : String <- R.exec(["find", ".", how, what,
       "-not", "-path", "./.ez/*", "-not", "-path", "*/.gate/*",
       "-not", "-path", "./.git/*", "-not", "-path", "./.claude/*"])
-    return List.sort(~String, ~String.is_le, Args.nonempty(String.lines(R.text(out))))
+    return Sort.sort(Args.nonempty(String.lines(R.text(out))))
 
 # every test file
 def find() -> IO(List<&2, String>):
@@ -412,19 +471,32 @@ def done(t: Tally) -> IO(Unit):
   Tally{p, n} = t
   done.go(p, n)
 
-# `ez test [--js-only]`: every test in the tree, on every lane
-def run(as: List<&2, String>) -> IO(Unit):
+# whether a flag was given, wherever among the arguments it sits
+def flag(as: List<&2, String>, +name: String) -> Bool:
+  match as:
+    case Nil{}:
+      False{}
+    case Con{h, t}:
+      Bool.or(String.eq(h, name), flag(t, name))
+
+# `ez test [--js-only] [--full]`: every test in the tree, on every lane. The
+# end-to-end tests are never cached: what they read is the world outside this
+# repo, and no key made of file contents says whether that changed.
+def run(+as: List<&2, String>) -> IO(Unit):
   do IO<Unit>:
     _mk : String <- R.exec(["mkdir", "-p", ".gate"])
+    C.make()
     +cap : Bool <- Cap.ok()
     Cap.warn(cap)
     +loud : Bool <- progress()
+    +tool : String <- C.tool()
+    +full : Bool <- IO.pure(Bool, flag(as, "--full"))
+    +on : Bool <- IO.pure(Bool, Bool.not(flag(as, "--js-only")))
     +ts : List<&2, String> <- find()
     +us : List<&2, String> <- IO.pure(List<&2, String>, some(ts, True{}))
     es : List<&2, String> <- IO.pure(List<&2, String>, some(ts, False{}))
-    t : Tally <- projects(projs(us), us, cap,
-      Bool.not(String.eq(Args.at(as, 0n), "--js-only")), loud, Tally{0n, 0n})
+    t : Tally <- projects(projs(us), us, cap, on, full, tool, loud, Tally{0n, 0n})
     e : Tally <- each(es, cap, loud, t)
     ps : List<&2, String> <- find.proofs()
-    every : Tally <- proofs(ps, cap, loud, e)
+    every : Tally <- proofs(ps, cap, full, tool, loud, e)
     done(every)
