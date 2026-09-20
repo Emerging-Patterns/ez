@@ -22,13 +22,7 @@ upstream publishes that tree later the hub simply starts serving it.
 
 ## Install
 
-With nix:
-
-```bash
-nix profile install github:Emerging-Patterns/ez
-```
-
-Without nix — install Bend, then build ez with it:
+Install Bend, then build ez with it:
 
 ```bash
 curl -fsSL https://bend-lang.com/install.sh | sh
@@ -46,6 +40,12 @@ helper scripts beside it, nothing to point an environment variable at. Every
 subcommand needs `bend` and `git`, and `ez add` also wants `nix` on PATH,
 because the NAR hash it records for a vendored repo is `nix hash path`'s to
 give.
+
+Or with nix:
+
+```bash
+nix profile install github:Emerging-Patterns/ez
+```
 
 `nix develop` gives a shell with bend, git, openssl and `BEND_LIB` already set.
 
