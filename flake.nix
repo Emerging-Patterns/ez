@@ -86,6 +86,10 @@
         '';
     in {
       packages.${system} = { inherit ez bend bend-cc bendLib; default = ez; };
+      # what another project's flake needs from this one: its own lock turned
+      # into a BEND_LIB store path. `bendLib` above is this applied to ez's own
+      # lock, which is no use to anyone else.
+      lib.${system}.bendLib = lock: pkgs.callPackage ./nix/bend-lib.nix { } lock;
       apps.${system}.default = { type = "app"; program = "${ez}/bin/ez"; };
       checks.${system} = { inherit tests ez; };
       devShells.${system}.default = pkgs.mkShellNoCC {

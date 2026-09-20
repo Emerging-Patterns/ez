@@ -81,14 +81,19 @@ entry = "src/lib.bend"
 A dependency with no `git` key lives on the hub. `ez doctor` reports when the
 ledger and the repo's import lines disagree; it never rewrites your source.
 
-In a flake:
+In a flake — ez's own flake turns your lock into a `BEND_LIB` store path, so
+there is nothing to copy into your repo:
 
 ```nix
-bendLib = pkgs.callPackage ./nix/bend-lib.nix { } ./ez.lock.toml;
+inputs.ez.url = "github:Emerging-Patterns/ez";
+
+# ...
+bendLib = inputs.ez.lib.${system}.bendLib ./ez.lock.toml;
 # ... buildPhase = "BEND_LIB=${bendLib} bend main.bend -o app";
 ```
 
+Every file comes from a fixed-output derivation keyed by the sha256 the lock
+already records, so the build needs no network and `bend` never reaches the hub.
+
 `ez test` is the gate: `EZ_PROGRESS=1` to see it work, `EZ_CAP` to change the
 memory cap each `bend` runs under.
-
-MIT.
