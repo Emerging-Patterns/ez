@@ -246,14 +246,20 @@ def add.alias(+at: String) -> String:
 
 # a vendoring's answer as a ledger entry. The entry file is read twice, once
 # for the name and once for itself, so it arrives through a parameter.
+#
+# `root` and the NAR hash are in the ledger because `ez lock` needs them and a
+# clone, which never sees .ez/origins.toml, would otherwise have to guess. They
+# come straight off the vendoring that computed them: it weighed the tree for
+# the NAR hash and worked the root out from where the entry sat, so asking the
+# cache it just wrote would be reading back our own answer.
 def add.dep.go(hash: String, url: String, rev: String, +at: String,
-  tag: String) -> M.Dep:
-  M.Dep{add.alias(at), hash, at, M.Git{url, rev, tag}}
+  tag: String, root: String, nar: String) -> M.Dep:
+  M.Dep{add.alias(at), hash, at, M.Git{url, rev, tag, root, nar}}
 
 # what a vendoring answered, as the ledger records it
 def add.dep(g: Git.Got) -> M.Dep:
-  Git.Got{h, u, v, e, t} = g
-  add.dep.go(h, u, v, e, t)
+  Git.Got{h, u, v, e, t, r, n} = g
+  add.dep.go(h, u, v, e, t, r, n)
 
 # the ledger with this dependency written into it
 def add.write(r: M.Read, d: M.Dep) -> IO(Unit):

@@ -14,8 +14,9 @@ def source(s: M.Source) -> String:
   match s:
     case M.Hub{}:
       ""
-    case M.Git{url, rev, tag}:
-      line("git", url) ++ line("rev", rev) ++ line("tag", tag)
+    case M.Git{url, rev, tag, root, nar}:
+      line("git", url) ++ line("rev", rev) ++ line("tag", tag) ++
+      line("root", root) ++ line("narHash", nar)
 
 # one `[deps.<name>]` section
 def dep(d: M.Dep) -> String:

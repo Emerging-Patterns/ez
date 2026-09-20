@@ -7,10 +7,13 @@ import ./toml.bend as T
 
 # where a package's bytes come from. A hub package needs nothing else; a git one
 # pins a commit, and remembers the tag that was asked for so an upgrade knows
-# what to re-resolve.
+# what to re-resolve. It also carries the two facts nothing can work out again
+# without the checkout: the directory inside it the package's paths are written
+# from, and the NAR hash nix rebuilds it by. They live here, in the file that is
+# committed, because a clone gets the ledger and not the vendoring cache.
 type Source is Data:
   Hub{}
-  Git{url: String, rev: String, tag: String}
+  Git{url: String, rev: String, tag: String, root: String, nar: String}
 
 # one tracked dependency
 type Dep is Data:
@@ -43,17 +46,25 @@ def pairs_of(ss: List<&2, T.Sect>, +name: String) -> List<&2, T.Kv>:
       pairs.at(h, pairs_of(t, name), name)
 
 # no `git` key means the package lives on the hub
-def source.go(hub: Bool, url: String, rev: String, tag: String) -> Source:
+def source.go(hub: Bool, url: String, rev: String, tag: String, root: String,
+  nar: String) -> Source:
   match hub:
     case True{}:
       Hub{}
     case False{}:
-      Git{url, rev, tag}
+      Git{url, rev, tag, root, nar}
+
+# a git section that names no root was written from the top of its checkout,
+# which is the root a lock already spells out as "." and the only one a ledger
+# written before this key existed can have meant
+def root.or(+r: String) -> String:
+  Bool.pick(String, String.is_empty(r), ".", r)
 
 # where a dependency's section says its bytes come from
 def source_of(+pairs: List<&2, T.Kv>) -> Source:
   source.go(String.is_empty(value(pairs, "git")), value(pairs, "git"),
-    value(pairs, "rev"), value(pairs, "tag"))
+    value(pairs, "rev"), value(pairs, "tag"), root.or(value(pairs, "root")),
+    value(pairs, "narHash"))
 
 # a `[deps.<name>]` section as a dependency
 def dep_of(+full: String, +pairs: List<&2, T.Kv>) -> Dep:
@@ -63,6 +74,17 @@ def dep_of(+full: String, +pairs: List<&2, T.Kv>) -> Dep:
 def dep.name(d: Dep) -> String:
   Dep{n, _h, _e, _s} = d
   n
+
+# a dependency's hash, which is the `0x` name its import line carries
+def dep.hash(d: Dep) -> String:
+  Dep{_n, h, _e, _s} = d
+  h
+
+# the file inside the package a dependency was added by, which is the file its
+# hash was computed from
+def dep.entry(d: Dep) -> String:
+  Dep{_n, _h, e, _s} = d
+  e
 
 # a section joins the dependencies only when it is a `[deps.<name>]`
 def deps.put(is_dep: Bool, s: T.Sect, rest: List<&2, Dep>) -> List<&2, Dep>:
@@ -146,7 +168,7 @@ def show.source(s: Source) -> String:
   match s:
     case Hub{}:
       "hub"
-    case Git{_url, _rev, _tag}:
+    case Git{_url, _rev, _tag, _root, _nar}:
       "git"
 
 # `<name>=<hash>@<hub|git>`
@@ -211,7 +233,7 @@ def source.rev(s: Source) -> String:
   match s:
     case Hub{}:
       ""
-    case Git{_url, rev, _tag}:
+    case Git{_url, rev, _tag, _root, _nar}:
       rev
 
 # the tag a dependency was asked for, or "" when it was pinned by commit
@@ -219,8 +241,40 @@ def source.tag(s: Source) -> String:
   match s:
     case Hub{}:
       ""
-    case Git{_url, _rev, tag}:
+    case Git{_url, _rev, tag, _root, _nar}:
       tag
+
+# the repo a dependency was vendored from, or "" when it is a hub package
+def source.url(s: Source) -> String:
+  match s:
+    case Hub{}:
+      ""
+    case Git{url, _rev, _tag, _root, _nar}:
+      url
+
+# the directory inside the checkout a dependency's paths are written from
+def source.root(s: Source) -> String:
+  match s:
+    case Hub{}:
+      ""
+    case Git{_url, _rev, _tag, root, _nar}:
+      root
+
+# the NAR hash nix rebuilds a dependency's checkout by
+def source.nar(s: Source) -> String:
+  match s:
+    case Hub{}:
+      ""
+    case Git{_url, _rev, _tag, _root, nar}:
+      nar
+
+# whether a dependency names a repo rather than the hub
+def source.is_git(s: Source) -> Bool:
+  match s:
+    case Hub{}:
+      False{}
+    case Git{_url, _rev, _tag, _root, _nar}:
+      True{}
 
 # the source of a dependency that was found
 def source.dep(d: Dep) -> Source:

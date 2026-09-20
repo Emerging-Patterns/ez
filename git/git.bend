@@ -26,7 +26,8 @@ type Row is Data:
 # package's `0x` name, where it came from, the commit pinned, the ref asked
 # for, and the entry the hash was computed from
 type Got is Data:
-  Got{hash: String, url: String, rev: String, entry: String, tag: String}
+  Got{hash: String, url: String, rev: String, entry: String, tag: String,
+    root: String, nar: String}
 
 # a git command that failed stops the command, with whatever git said. Read
 # here rather than in `lock/restore.bend`, because both halves of ez's git
@@ -358,10 +359,10 @@ def vendor.tree(+lib: String, +work: String, +url: String, +rev: String,
     +p : K.Pkg <- K.pkg_of(at)
     +hash : String <- IO.pure(String, K.pkg.hash(p))
     lay(lib, hash, K.pkg.root(p), K.pkg.files(p))
-    note(lib, origin(hash, url, rev, entry,
-      root.rel(at, K.pkg.root(p), entry), nh, tag))
+    +rt : String <- IO.pure(String, root.rel(at, K.pkg.root(p), entry))
+    note(lib, origin(hash, url, rev, entry, rt, nh, tag))
     said(hash, entry, tag, rev)
-    return Got{hash, url, rev, entry, tag}
+    return Got{hash, url, rev, entry, tag, rt, nh}
 
 # the repo checked out at the pinned commit, and everything that follows from
 # it. The `.git` goes before the tree is weighed, because `fetchgit`'s hash is

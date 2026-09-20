@@ -26,7 +26,17 @@ def text() -> String:
   "git = \"https://github.com/owner/repo\"\n" ++
   "rev = \"16773c0aa9914b5f04d062469d50100111eb9c9c\"\n" ++
   "tag = \"v1.0\"\n" ++
+  "root = \".\"\n" ++
+  "narHash = \"sha256-zz\"\n" ++
   "entry = \"src/lib.bend\"\n"
+
+# a ledger written before the `root` key existed. Nothing but the top of a
+# checkout was expressible then, so that is what an absent root means, and a
+# ledger that says nothing has to lock the same as one that says ".".
+def old() -> String:
+  "[package]\nname = \"a\"\nentry = \"m.bend\"\n\n[deps.x]\n" ++
+  "hash = \"0xabc\"\ngit = \"https://h/r\"\nrev = \"c0ffee\"\n" ++
+  "entry = \"l.bend\"\n"
 
 # a ledger edited, then rendered, then read back and rendered again, which is
 # what `ez add` and `ez remove` do to the file on disk
@@ -36,6 +46,8 @@ def edited(m: M.Manifest) -> String:
 def main() -> IO(Unit):
   do IO<Unit>:
     Check.eq_str("what was read renders back to itself", R.render(M.parse(text())), text())
+    Check.eq_str("a ledger that names no root means the top of the checkout",
+      M.source.root(M.source.dep(M.dep(M.parse(old()), "x"))), ".")
     Check.eq_str("a ledger that would not parse renders as nothing",
       R.render(M.parse("[package\n")), "")
     +one : M.Manifest <- IO.pure(M.Manifest, M.Manifest{"a", "m.bend", []})
@@ -61,6 +73,7 @@ def main() -> IO(Unit):
       "lock hub=https://hub.bend-lang.com packages.\"0xaa\".files src/lib.bend=ab")
 
 #|ok what was read renders back to itself
+#|ok a ledger that names no root means the top of the checkout
 #|ok a ledger that would not parse renders as nothing
 #|ok a ledger with no dependencies
 #|ok a dependency added
