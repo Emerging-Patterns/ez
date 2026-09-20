@@ -7,7 +7,7 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import * as path from "node:path";
 
-export type Pkg = { hash: string; files: Record<string, string> };
+export type Pkg = { hash: string; root: string; files: Record<string, string> };
 
 export function sha256(text: string): string {
   return new Bun.CryptoHasher("sha256").update(text).digest("hex");
@@ -54,10 +54,12 @@ function walk(
   const src = readFileSync(real, "utf8");
   const { mods, foreign } = scan(src);
   out.push({ raw: ns === "" ? path.basename(entry) : ns + ".bend", real });
-  const dir = path.dirname(real) + "/";
+  // a foreign body is named the way its importing module is, from that module's
+  // own directory: `bend --publish` writes src/util/beep.c for a body imported
+  // by src/util/math.bend
   for (const at of foreign) {
     const to = path.resolve(path.dirname(real), at);
-    if (existsSync(to)) out.push({ raw: to.startsWith(dir) ? to.slice(dir.length) : at, real: to });
+    if (existsSync(to)) out.push({ raw: path.posix.join(path.posix.dirname(ns), at), real: to });
   }
   for (const rel of mods) {
     if (/^0x[0-9a-f]+\//.test(rel)) continue;
@@ -72,7 +74,11 @@ export function pkg_of(entry: string): Pkg {
   // a module reached through `..` re-roots the package under that many trailing
   // components of the entry's own directory, so no path escapes the package
   const ups = raws.map((r) => r.raw.split("/").filter((s) => s === "..").length);
-  const anc = realpathSync(path.dirname(entry)).split("/").slice(-Math.max(0, ...ups) || Infinity);
+  const up = Math.max(0, ...ups);
+  const anc = realpathSync(path.dirname(entry)).split("/").slice(-up || Infinity);
+  // the directory the file keys are written from, which is the entry's own only
+  // when nothing climbed above it
+  const root = path.posix.join(path.dirname(entry), ...Array(up).fill(".."));
   const files: Record<string, string> = {};
   for (const { raw, real } of raws) {
     const at = path.posix.join(...anc, raw);
@@ -81,7 +87,7 @@ export function pkg_of(entry: string): Pkg {
     }
     files[at] = sha256(readFileSync(real, "utf8"));
   }
-  return { hash: hash_of(files), files };
+  return { hash: hash_of(files), root, files };
 }
 
 // the manifest text is the package's identity; bend checks a fetched manifest

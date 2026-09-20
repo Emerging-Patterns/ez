@@ -62,7 +62,9 @@ function main() {
   // lay the package out the way the hub serves it, so bend finds it with no fetch
   const dst = path.join(LIB, pkg.hash);
   rmSync(dst, { recursive: true, force: true });
-  const from = path.dirname(at);
+  // a package's paths are written from its root, which is the entry's own
+  // directory only when no module of it was reached through `..`
+  const from = pkg.root;
   for (const p of Object.keys(pkg.files)) {
     mkdirSync(path.join(dst, path.dirname(p)), { recursive: true });
     cpSync(path.join(from, p), path.join(dst, p));
@@ -71,7 +73,10 @@ function main() {
   rmSync(work, { recursive: true, force: true });
 
   const origins = existsSync(ORIGINS) ? JSON.parse(readFileSync(ORIGINS, "utf8")) : {};
-  origins[pkg.hash] = { kind: "git", url, rev, entry, narHash, ...(tag === undefined ? {} : { tag }) };
+  origins[pkg.hash] = {
+    kind: "git", url, rev, entry, root: path.relative(work, pkg.root) || ".", narHash,
+    ...(tag === undefined ? {} : { tag }),
+  };
   mkdirSync(path.dirname(ORIGINS), { recursive: true });
   writeFileSync(ORIGINS, JSON.stringify(origins, null, 2) + "\n");
 
