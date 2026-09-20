@@ -146,7 +146,12 @@ Term ezrun_par_run(Env e, Term* f, IoWork* w) {
       snprintf(path, sizeof(path), "%s/%zu", dir, next);
       pid_t pid = fork();
       if (pid == 0) {
+        // a child that cannot have its own file would otherwise inherit this
+        // program's stdout and print a job's output into the run's verdict
         int out = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (out < 0) {
+          _exit(127);
+        }
         int nul = open("/dev/null", O_RDONLY);
         dup2(nul, 0);
         dup2(out, 1);
@@ -166,11 +171,14 @@ Term ezrun_par_run(Env e, Term* f, IoWork* w) {
       if (done < 0) {
         break;
       }
+      // only a child of this batch's counts against the width. `wait` reaps
+      // whatever finished, and giving up a slot to someone else's child would
+      // let this return while jobs of its own were still writing their files.
       int slot = ezrun_par_slot(pids, (int)jobs, done);
       if (slot >= 0) {
         codes[slot] = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+        live--;
       }
-      live--;
     }
   }
 
