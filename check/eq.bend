@@ -220,3 +220,40 @@ def starts_append(a, b):
           x => String.starts_with.if(String.append(t, b), t, x),
           Char.is_eq(h, h), True{}, char_eq_self(h)),
         starts_append(t, b))
+
+# LAW: nothing appended to a string leaves the string. This and the law
+# under it were written out in net/PROOF.bend first.
+law append_nil:
+  for s: String
+  {String.append(s, SNil{}) == s : String}
+
+# by induction on the string, with each character carried over the tail's law
+def append_nil(s):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      Equal.cong(String, String, x => SCon{h, x},
+        String.append(t, SNil{}), t, append_nil(t))
+
+# LAW: where the brackets fall in a run of appends does not change the run.
+# This is what lets the chunk loop drop its accumulator: appending each chunk
+# onto what came before it and appending each chunk onto what comes after it
+# give the same string, and only the second is linear in the body.
+law append_assoc:
+  for a: String
+  for b: String
+  for c: String
+  {String.append(String.append(a, b), c)
+    == String.append(a, String.append(b, c)) : String}
+
+# by induction on the left string, which is the one both runs copy
+def append_assoc(a, b, c):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      Equal.cong(String, String, x => SCon{h, x},
+        String.append(String.append(t, b), c),
+        String.append(t, String.append(b, c)),
+        append_assoc(t, b, c))

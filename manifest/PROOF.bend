@@ -293,3 +293,258 @@ def Laws.bare_all_agrees(cs):
       {==}
     case +h <> +t:
       bare_all_agrees.arm(t, T.bare.at(h), Laws.bare_all_agrees(t))
+
+# The rest of the ledger begins here. Most of these laws are a hypothesis
+# rewritten into the one place the code branches, or a destructure the law
+# states and the proof has to reach by matching, since a `match` may not
+# scrutinise a computed value. The boolean facts they end on are in
+# check/eq.bend.
+
+# LAW: a list reversed onto something is never empty
+law reverse_onto_nonempty:
+  for ys: List<&2, String>
+  for x: String
+  for xs: List<&2, String>
+  {List.is_empty(&2, String, List.reverse.go(&2, String, ys, x <> xs))
+    == False{} : Bool}
+
+def reverse_onto_nonempty(ys, x, xs):
+  match ys:
+    case []:
+      {==}
+    case +y <> +t:
+      reverse_onto_nonempty(t, y, x <> xs)
+
+# LAW: nothing taken off the front of a string leaves the string
+law drop_zero:
+  for s: String
+  {String.drop(s, 0n) == s : String}
+
+def drop_zero(s):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      {==}
+
+# A leading space is dropped by the first pass and never reaches the second,
+# so both passes compute down to the passes over the rest of the line.
+def Laws.trim_drops_leading_space(_s):
+  {==}
+
+def Laws.first_error_wins(bad, why, e):
+  %e : {Bool.pick(String, _, why, bad) == bad : String}
+  {==}
+
+def Laws.flush_skips_unnamed(_pairs, _done):
+  {==}
+
+def Laws.flush_keeps_named(name, pairs, done, e):
+  %e : {T.flush.put(_, name, pairs, done)
+    == T.Sect{name, List.reverse(&2, T.Kv, pairs)} <> done : List<&2, T.Sect>}
+  {==}
+
+def Laws.put_outside_section_is_bad(_bad, _pairs, _done, _key, _val):
+  {==}
+
+def Laws.put_in_section(bad, name, pairs, done, key, val, e):
+  %e : {T.put.go(_, bad, name, pairs, done, key, val)
+    == T.Toml{bad, name, T.Kv{key, val} <> pairs, done} : T.Toml}
+  {==}
+
+# A blank line trims to a blank line, which `line_of` answers on its first
+# question; the state is then handed back field for field, which is the state
+# only once it is matched.
+def Laws.step_skips_blank(st):
+  match st:
+    case T.Toml{bad, name, pairs, done}:
+      {==}
+
+# LAW: whatever a walk left open, the flush at the end closes
+law parse_closes_sections.fin:
+  for r: T.Toml
+  {Laws.toml.open(T.parse.fin(r)) == "" : String}
+
+def parse_closes_sections.fin(r):
+  match r:
+    case T.Toml{bad, name, pairs, done}:
+      {==}
+
+def Laws.parse_closes_sections(text):
+  parse_closes_sections.fin(
+    T.parse.walk(String.lines(text), T.Toml{"", "", [], []}))
+
+def Laws.sects_is_done(_bad, _name, _pairs, _done):
+  {==}
+
+# LAW: a finished header walk always has a segment to close
+law segments_never_empty.fin:
+  for st: T.Split
+  {List.is_empty(&2, String, T.seg.fin(st)) == False{} : Bool}
+
+def segments_never_empty.fin(st):
+  match st:
+    case T.Split{quoted, cur, out}:
+      reverse_onto_nonempty(out, T.seg.done(cur), [])
+
+def Laws.segments_never_empty(s):
+  segments_never_empty.fin(
+    T.seg.walk(String.to_list(s), T.Split{False{}, [], []}))
+
+# A quote is answered by `seg.sym` on the character alone, and the two
+# togglings cancel before the rest of the header is read.
+def Laws.segments_quotes_toggle(_s):
+  {==}
+
+def Laws.bare_needs_a_char(s, e):
+  %e : {Bool.and(Bool.not(_), T.bare.all(String.to_list(s))) == False{}
+    : Bool}
+  {==}
+
+def Laws.key_is_bare_when_it_can(s, e):
+  %e : {Bool.pick(String, _, s, T.quote(s)) == s : String}
+  {==}
+
+def Laws.key_is_quoted_when_it_must(s, e):
+  %e : {Bool.pick(String, _, s, T.quote(s)) == T.quote(s) : String}
+  {==}
+
+# One table is joined with nothing after it, so the separator is never
+# written.
+def Laws.render_one_table(_n, _ps):
+  {==}
+
+# The ledger's lookup is the table's, and the table answers a key it just
+# wrote.
+def Laws.value_first_in_section(k, v, ps):
+  Equal.cong(Bool, String, b => Bool.pick(String, b, v, T.value(ps, k)),
+    String.eq(k, k), True{}, Eq.string_eq_self(k))
+
+def Laws.pairs_of_first(name, ps, ss):
+  Equal.cong(Bool, List<&2, T.Kv>,
+    b => Bool.pick(List<&2, T.Kv>, b, ps, M.pairs_of(ss, name)),
+    String.eq(name, name), True{}, Eq.string_eq_self(name))
+
+def Laws.source_of_hub(pairs, e):
+  %e : {M.source.go(_, M.value(pairs, "git"), M.value(pairs, "rev"),
+    M.value(pairs, "tag"), M.root.or(M.value(pairs, "root")),
+    M.value(pairs, "narHash")) == M.Hub{} : M.Source}
+  {==}
+
+# `deps.` is five literal characters, so the drop steps through all five and
+# what is left is the name with nothing taken off it.
+def Laws.dep_of_drops_prefix(name, _pairs):
+  drop_zero(name)
+
+def Laws.name_of_sect(_n, _ps):
+  {==}
+
+# The section's name opens with the prefix because it was built from it.
+def Laws.deps_takes_dep_sections(name, ps, ss):
+  Equal.cong(Bool, List<&2, M.Dep>,
+    b => M.deps.put(b, T.Sect{String.append("deps.", name), ps}, M.deps(ss)),
+    String.starts_with(String.append("deps.", name), "deps."), True{},
+    Eq.starts_append("deps.", name))
+
+def Laws.deps_skips_other_sections(n, ps, ss, e):
+  %e : {M.deps.put(_, T.Sect{n, ps}, M.deps(ss)) == M.deps(ss)
+    : List<&2, M.Dep>}
+  {==}
+
+def Laws.missing_finds_first(n, ps, ss, e0, e1):
+  %e0 : {M.missing.at(Bool.and(_, String.is_empty(M.value(ps, "hash"))), n,
+    M.missing(ss)) == n : String}
+  %e1 : {M.missing.at(Bool.and(True{}, _), n, M.missing(ss)) == n : String}
+  {==}
+
+def Laws.problem_syntax_first(bad, miss, e):
+  %e : {Bool.pick(String, _,
+    Bool.pick(String, String.is_empty(miss), "", miss ++ " has no hash"), bad)
+    == bad : String}
+  {==}
+
+def Laws.build_is_good(_ss):
+  {==}
+
+def Laws.read_refuses_a_problem(bad, ss, e):
+  %e : {M.read.go(_, M.problem(bad, M.missing(ss)), ss)
+    == M.Bad{M.problem(bad, M.missing(ss))} : M.Read}
+  {==}
+
+def Laws.parse_reads_the_sections(_text, _bad, _name, _pairs, sects, e):
+  %e : {M.parse.go(_) == M.read(_bad, sects) : M.Read}
+  {==}
+
+# `error: ` is a literal, so the comparison computes down to the reason
+# against the empty prefix; a name is not, so it is the append law.
+def Laws.show_bad_is_marked(why):
+  Eq.starts_nil(why)
+
+def Laws.show_good_opens_with_name(n, e, ds):
+  Eq.starts_append(n,
+    " " ++ e ++ " " ++ String.join(M.show.deps(ds), " "))
+
+def Laws.find_first(n, h, en, s, t):
+  Equal.cong(Bool, M.Dep,
+    b => M.find.pick(b, M.Dep{n, h, en, s}, M.find(t, n)),
+    String.eq(n, n), True{}, Eq.string_eq_self(n))
+
+def Laws.dep_of_unread_is_blank(_why, _name):
+  {==}
+
+def Laws.rev_of_names_the_commit(_mn, _me, n, h, en, url, rev, tag, root, nar, t):
+  Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)),
+    M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}} <> t, n),
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}},
+    Laws.find_first(n, h, en, M.Git{url, rev, tag, root, nar}, t))
+
+def Laws.tag_of_names_the_tag(_mn, _me, n, h, en, url, rev, tag, root, nar, t):
+  Equal.cong(M.Dep, String, d => M.source.tag(M.source.dep(d)),
+    M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}} <> t, n),
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}},
+    Laws.find_first(n, h, en, M.Git{url, rev, tag, root, nar}, t))
+
+def Laws.line_absent(_key):
+  {==}
+
+# The tag's line is the empty string, and nothing appended in front of a run
+# of appends changes the run.
+def Laws.source_omits_absent_tag(_url, _rev, _root, _nar):
+  {==}
+
+def Laws.dep_opens_its_section(n, h, e, s):
+  Eq.starts_append(n, "]\n" ++ R.line("hash", h) ++ R.source(s) ++ R.line("entry", e))
+
+# By induction on the first list, with the associativity of append carrying
+# each step.
+def Laws.deps_splits(as, bs):
+  match as:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.trans(String,
+        String.append(R.dep(h), R.deps(List.append(&2, M.Dep, t, bs))),
+        String.append(R.dep(h), String.append(R.deps(t), R.deps(bs))),
+        String.append(String.append(R.dep(h), R.deps(t)), R.deps(bs)),
+        Equal.cong(String, String, x => String.append(R.dep(h), x),
+          R.deps(List.append(&2, M.Dep, t, bs)),
+          String.append(R.deps(t), R.deps(bs)), Laws.deps_splits(t, bs)),
+        Equal.sym(String,
+          String.append(String.append(R.dep(h), R.deps(t)), R.deps(bs)),
+          String.append(R.dep(h), String.append(R.deps(t), R.deps(bs))),
+          Eq.append_assoc(R.dep(h), R.deps(t), R.deps(bs))))
+
+def Laws.show_opens_with_package(n, e, ds):
+  Eq.starts_nil(R.line("name", n) ++ R.line("entry", e) ++ R.deps(ds))
+
+def Laws.render_of_unread_is_blank(_why):
+  {==}
+
+# Removing twice is the inner list dropped twice, which is `without_idem`.
+def Laws.remove_idem(m, name):
+  match m:
+    case M.Manifest{n, e, ds}:
+      Equal.cong(List<&2, M.Dep>, M.Manifest,
+        xs => M.Manifest{n, e, xs},
+        R.without(R.without(ds, name), name), R.without(ds, name),
+        Laws.without_idem(ds, name))

@@ -299,40 +299,6 @@ def Laws.hex_agrees(s, acc):
         Laws.hex_agrees(t, Nat.add(Nat.mul(acc, 16n),
           U32.to_nat(Http.hex.val(h)))))
 
-# LAW: nothing appended to a string leaves the string
-law append_nil:
-  for s: String
-  {String.append(s, SNil{}) == s : String}
-
-def append_nil(s):
-  match s:
-    case SNil{}:
-      {==}
-    case SCon{h, t}:
-      Equal.cong(String, String, x => SCon{h, x},
-        String.append(t, SNil{}), t, append_nil(t))
-
-# LAW: where the brackets fall in a run of appends does not change the run.
-# This is what lets the chunk loop drop its accumulator: appending each chunk
-# onto what came before it and appending each chunk onto what comes after it
-# give the same string, and only the second is linear in the body.
-law append_assoc:
-  for a: String
-  for b: String
-  for c: String
-  {String.append(String.append(a, b), c)
-    == String.append(a, String.append(b, c)) : String}
-
-def append_assoc(a, b, c):
-  match a:
-    case SNil{}:
-      {==}
-    case SCon{h, t}:
-      Equal.cong(String, String, x => SCon{h, x},
-        String.append(String.append(t, b), c),
-        String.append(t, String.append(b, c)),
-        append_assoc(t, b, c))
-
 # LAW: the loop with an accumulator is the loop without one, with whatever the
 # accumulator held in front of it. The law is stated for every accumulator and
 # not only the empty one, because that is what the induction needs: one pass
@@ -347,9 +313,9 @@ law chunks_agrees:
 def chunks_agrees(fuel, c, acc):
   match fuel c:
     case 0n _:
-      Equal.sym(String, String.append(acc, SNil{}), acc, append_nil(acc))
+      Equal.sym(String, String.append(acc, SNil{}), acc, Eq.append_nil(acc))
     case 1n+f Http.NoCut{}:
-      Equal.sym(String, String.append(acc, SNil{}), acc, append_nil(acc))
+      Equal.sym(String, String.append(acc, SNil{}), acc, Eq.append_nil(acc))
     case 1n+f Http.Cut{before, +after}:
       Equal.trans(String,
         Laws.old.chunks(f,
@@ -368,7 +334,7 @@ def chunks_agrees(fuel, c, acc):
           Http.divide(Http.utf8.drop(after,
             Nat.add(Http.hexlen(before), 2n)), "\r\n"),
           String.append(acc, Http.utf8.take(after, Http.hexlen(before)))),
-        append_assoc(acc, Http.utf8.take(after, Http.hexlen(before)),
+        Eq.append_assoc(acc, Http.utf8.take(after, Http.hexlen(before)),
           Http.chunks(f, Http.divide(Http.utf8.drop(after,
             Nat.add(Http.hexlen(before), 2n)), "\r\n"))))
 
