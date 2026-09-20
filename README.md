@@ -104,7 +104,14 @@ Every file comes from a fixed-output derivation keyed by the sha256 the lock
 already records, so the build needs no network and `bend` never reaches the hub.
 
 `ez test` is the gate. It compiles a project's tests into one binary rather
-than one each, and caches a lane on the content of everything it reads, so a
-second run of an unchanged tree is seconds. `--full` ignores the cache,
-`EZ_PROGRESS=1` shows it working, and `EZ_CAP` changes the memory cap each
-`bend` runs under.
+than one each, runs every project, end-to-end test and proof at once rather
+than in turn, and caches a lane on the content of everything it reads, so a
+second run of an unchanged tree is seconds. A whole run has five minutes to
+finish in, and one that takes longer fails on that the way a test that printed
+the wrong line fails.
+
+`--full` ignores the cache and `EZ_PROGRESS=1` shows the run being planned.
+`EZ_CAP` sets the memory cap each `bend` runs under, `EZ_JOBS` how many run at
+once, and `EZ_DEADLINE` the budget in seconds, or `0` for no budget. `EZ_JOBS`
+defaults to your cores, and never to more of them than the memory cap divides
+the machine into, since any one `bend` may claim the whole cap.

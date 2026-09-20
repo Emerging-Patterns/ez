@@ -1,0 +1,72 @@
+# ez/clock: the wall-clock budget a run has to finish inside.
+#
+# `ez test` is the gate, and a gate nobody waits for is not one. The budget is
+# a comparison like any other: it is checked, it is counted, and a run that
+# overran fails on it the way a test that printed the wrong line fails. That is
+# the difference between a number in a readme and a number something enforces.
+#
+# Base has no clock and no arithmetic over what `date` prints, and neither is
+# needed. `date -d` works out the deadline at the start, and `test -gt` does
+# the one comparison at the end, so nothing here parses a number. Both are
+# programs ez already runs the way it runs `find` and `mkdir`, with no shell
+# between.
+import Base
+import ../run/run.bend as R
+import ./env.bend as Env
+
+# how many seconds a whole run may take. Five minutes is what the gate is held
+# to; a tree that honestly needs longer says so in EZ_DEADLINE, and "0" turns
+# the budget off for someone bisecting with the cache cold.
+def seconds() -> IO(String):
+  Env.var("EZ_DEADLINE", "300")
+
+# whether a budget is being kept at all
+def on(+s: String) -> Bool:
+  Bool.not(Bool.or(String.is_empty(s), String.eq(s, "0")))
+
+# the second the run must be finished by, worked out once at the start so that
+# nothing later has to add anything up
+def by(+s: String) -> IO(String):
+  do IO<String>:
+    +out : String <- R.exec(["date", "-d", "+" ++ s ++ " seconds", "+%s"])
+    return String.trim(R.text(out))
+
+# the deadline, or "" when there is none
+def start.go(keep: Bool, +s: String) -> IO(String):
+  match keep:
+    case False{}:
+      IO.pure(String, "")
+    case True{}:
+      by(s)
+
+# the deadline, or "" when there is none
+def start(+s: String) -> IO(String):
+  start.go(on(s), s)
+
+# whether the deadline has gone by
+def over.now(+deadline: String) -> IO(Bool):
+  do IO<Bool>:
+    +now : String <- R.exec(["date", "+%s"])
+    +cmp : String <- R.exec(["test", String.trim(R.text(now)), "-gt", deadline])
+    return R.ok(cmp)
+
+# whether the run has outstayed its budget, which a run with no budget never
+# has
+def over.go(none: Bool, +deadline: String) -> IO(Bool):
+  match none:
+    case True{}:
+      IO.pure(Bool, False{})
+    case False{}:
+      over.now(deadline)
+
+# whether the run has outstayed its budget, which a run with no budget never
+# has
+def over(+deadline: String) -> IO(Bool):
+  over.go(String.is_empty(deadline), deadline)
+
+# what a job may still have, so that one that hangs cannot outlast the budget
+# on its own. `timeout` kills it at the deadline and answers 124, which reads
+# as any other failing build does.
+def bound(+deadline: String, +s: String) -> List<&2, String>:
+  Bool.pick(List<&2, String>, String.is_empty(deadline), [],
+    ["timeout", "--kill-after=10", s])

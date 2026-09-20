@@ -37,13 +37,18 @@ def pre(on: Bool, +g: String) -> List<&2, String>:
     case False{}:
       []
 
-# a program run under the cap, with this project's BEND_LIB set for it. The
-# cap goes outside `env`, so the variable is set inside the cgroup.
+# a program's arguments dressed the way the cap wants them, for a caller that
+# is not going to run it here. The cap goes outside `env`, so the variable is
+# set inside the cgroup.
+def argv(on: Bool, +g: String, +at: String, args: List<&2, String>) -> List<&2, String>:
+  List.append(&2, String, pre(on, g), Env.line(at, args))
+
+# a program run under the cap, with this project's BEND_LIB set for it
 def run(on: Bool, args: List<&2, String>) -> IO(String):
   do IO<String>:
     +g : String <- gb()
     at : String <- Env.lib()
-    R.exec(List.append(&2, String, pre(on, g), Env.line(at, args)))
+    R.exec(argv(on, g, at, args))
 
 # the status the kernel leaves on a process it killed for memory
 def killed(+out: String) -> Bool:
