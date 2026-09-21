@@ -392,6 +392,35 @@ law sha256_allowlist:
   {U.reallow(sha.ignore(), "0x0a5c2c95283e42e081da247c84debe18", "0xnew")
     == ".ez/*\n!.ez/lib\n.ez/lib/*\n!.ez/lib/0xnew\n" : String}
 
+# a source file that names sha256 twice, names another package, and also
+# carries the same digits where they are not that import
+def imports.before() -> String:
+  "import Base\n" ++
+  "import 0x0a5c2c95283e42e081da247c84debe18/sha256.bend as S\n" ++
+  "import 0x0a5c2c95283e42e081da247c84debe18/sha256.bend as T\n" ++
+  "import 0x1111111111111111111111111111aaaa/json.bend as J\n" ++
+  "import 0x0a5c2c95283e42e081da247c84debe18ff/no.bend as N\n" ++
+  "import ./local.bend as L\n" ++
+  "# import 0x0a5c2c95283e42e081da247c84debe18/sha256.bend as S\n"
+
+# the same file once sha256 and json have moved
+def imports.after() -> String:
+  "import Base\n" ++
+  "import 0xnew/sha256.bend as S\n" ++
+  "import 0xnew/sha256.bend as T\n" ++
+  "import 0xabc/json.bend as J\n" ++
+  "import 0x0a5c2c95283e42e081da247c84debe18ff/no.bend as N\n" ++
+  "import ./local.bend as L\n" ++
+  "# import 0x0a5c2c95283e42e081da247c84debe18/sha256.bend as S\n"
+
+# LAW: import lines that name a hash that moved name the new one. A longer
+# hash, a local import and a comment stay.
+law imports_follow_hash:
+  {U.reimport.many(
+    [U.Swap{"0x0a5c2c95283e42e081da247c84debe18", "0xnew"},
+     U.Swap{"0x1111111111111111111111111111aaaa", "0xabc"}],
+    imports.before()) == imports.after() : String}
+
 # LAW: a body that hashed wrong is the hub disagreeing with git. A miss
 # that never produced a body is not.
 law hub_digest_disagrees:

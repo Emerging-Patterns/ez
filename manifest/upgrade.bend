@@ -4,7 +4,8 @@
 # with no tag fast-forwards to the default branch tip when the commit is an
 # ancestor of it, and stays a commit pin. A hub package is the hash itself.
 # `vend` says the tree under `.ez/lib/<hash>` is committed, so a move rewrites
-# the gitignore allowlist that names it.
+# the gitignore allowlist that names it. The same move rewrites an
+# `import 0x<hash>` line that names the old hash.
 import Base
 import ./manifest.bend as M
 
@@ -215,3 +216,64 @@ def reallow.many(ss: List<&2, Swap>, +text: String) -> String:
       text
     case Swap{+old, +new} <> t:
       reallow.many(t, reallow(text, old, new))
+
+# the first of a list of strings, or ""
+def reimport.head(ps: List<&2, String>) -> String:
+  match ps:
+    case []:
+      ""
+    case h <> _t:
+      h
+
+# the package hash an import line names, or "" when the line names none.
+# `import 0x<hash>/<file>.bend as P` is the only shape bend has.
+def reimport.hash.go(named: Bool, +line: String) -> String:
+  match named:
+    case True{}:
+      reimport.head(String.split(String.drop(line, 7n), '/'))
+    case False{}:
+      ""
+
+def reimport.hash(+line: String) -> String:
+  reimport.hash.go(String.starts_with(line, "import 0x"), line)
+
+# an empty hash matches every line that names none, so it rewrites nothing
+def reimport.hit(empty: Bool, +line: String, +old: String) -> Bool:
+  match empty:
+    case True{}:
+      False{}
+    case False{}:
+      String.eq(reimport.hash(line), old)
+
+# one line, with the branch already chosen. A match cannot scrutinise a call.
+def reimport.line.go(hit: Bool, +line: String, +old: String, +new: String) -> String:
+  match hit:
+    case True{}:
+      "import " ++ new ++ String.drop(line, Nat.add(7n, String.length(old)))
+    case False{}:
+      line
+
+# one line, with its import hash rewritten when the line names the old one
+def reimport.line(+line: String, +old: String, +new: String) -> String:
+  reimport.line.go(reimport.hit(String.is_empty(old), line, old), line, old, new)
+
+# every line, in order
+def reimport.lines(ls: List<&2, String>, +old: String, +new: String) -> List<&2, String>:
+  match ls:
+    case []:
+      []
+    case +h <> t:
+      reimport.line(h, old, new) <> reimport.lines(t, old, new)
+
+# a source file with one import hash replaced by another. A line that does
+# not name it is left as it was, including the newline `String.lines` keeps.
+def reimport(+text: String, +old: String, +new: String) -> String:
+  String.join(reimport.lines(String.lines(text), old, new), "\n")
+
+# every replacement, in order
+def reimport.many(ss: List<&2, Swap>, +text: String) -> String:
+  match ss:
+    case []:
+      text
+    case Swap{+old, +new} <> t:
+      reimport.many(t, reimport(text, old, new))
