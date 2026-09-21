@@ -1,12 +1,13 @@
 # ez: the laws. The human states them; PROOF.bend must prove them. The string
 # and path facts a test run turns on live here: what bend's own chatter is,
 # what a `#|` trailer asks for, which `0x` name an import line wrote, and
-# where a test sits in the shadow. The OS half of the clock is not among
-# them.
+# where a test sits in the shadow. The clock's on/off and by.effect
+# equalities live here too. The OS half of the clock is not among them.
 import Base
 import ./quiet.bend as Q
 import ./drift.bend as D
 import ./gate.bend as G
+import ./clock.bend as Clock
 import ../manifest/manifest.bend as M
 
 # a ledger naming two packages, the one the drift laws read
@@ -262,3 +263,28 @@ law solitary_reads_args:
 law solitary_comment_only:
   {G.solitary("# this one never reads IO.args\ndef main() -> U32:\n  1\n")
     == False{} : Bool}
+
+# clock: whether a budget is being kept, and the deadline the run
+# effect holds. `date` and `test` are not among them.
+
+# LAW: a budget of seconds is one that is being kept
+law on_budget:
+  {Clock.on("300") == True{} : Bool}
+
+# LAW: zero turns it off
+law on_zero:
+  {Clock.on("0") == False{} : Bool}
+
+# LAW: and so does nothing at all
+law on_empty:
+  {Clock.on("") == False{} : Bool}
+
+# LAW: the deadline the run effect keeps is the absolute second
+law by_effect_keeps:
+  for +d: String
+  for e: {False{} == String.is_empty(d) : Bool}
+  {Clock.by.effect(d) == d : String}
+
+# LAW: and no budget is a deadline of zero
+law by_effect_empty:
+  {Clock.by.effect("") == "0" : String}
