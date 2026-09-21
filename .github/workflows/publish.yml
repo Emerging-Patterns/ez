@@ -1,0 +1,19 @@
+# Send an existing tag to the hub (`ez publish`, under ez's 0x name).
+# Actions → Publish → Run workflow, tag=vX.Y.Z (the tag must already exist).
+# Does not run when a tag or GitHub Release is cut.
+
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish, e.g. v0.4.0"
+        required: true
+        type: string
+
+jobs:
+  publish:
+    uses: Emerging-Patterns/actions/.github/workflows/publish.yml@9523e8b294ae014fade5861c32d5ab911866acb2
+    with:
+      tag: ${{ inputs.tag }}
