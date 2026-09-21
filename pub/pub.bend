@@ -21,7 +21,7 @@
 # `is_name` is anchored at both ends, so a line that is not a bare `0x` name
 # is not an answer however it reads.
 import Base
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
 import ../git/git.bend as G

@@ -9,7 +9,7 @@
 # whatever the server answers with, and a Bend value threaded through a loop is
 # threaded by hand. Each server writes its own loop over `recv` and `send`.
 #
-# Plaintext only. bend speaks TLS to the real hub, and run/run.bend explains
+# Plaintext only. bend speaks TLS to the real hub, and net/wire.bend explains
 # why a Bend binary cannot.
 import Base
 

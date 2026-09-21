@@ -15,7 +15,7 @@
 # a commit that moved, and writes the link either way. A target, ledger,
 # fetch, build or link that fails exits 1.
 import Base
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ../git/git.bend as Git
 import ../lock/restore.bend as Restore

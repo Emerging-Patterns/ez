@@ -4,7 +4,7 @@
 # reports half the bends there are as missing, and writes a lock and a cache
 # key over an error message. Whichever bend is on the PATH, this holds.
 import Base
-import ../../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../../run/bend.bend as Bend
 import ../../check/kit.bend as Check
 

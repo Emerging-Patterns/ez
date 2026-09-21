@@ -2,15 +2,15 @@
 # joined to the socket in net/wire.bend, and nothing more: ez asks for one
 # thing, the body of a GET, and this answers that.
 #
-# The answer is shaped the way run/run.bend shapes one, a status on its own
-# first line and then the text, so `R.ok` and `R.text` read it and hub/hub.bend
-# keeps the contract it had when curl gave the same two lines.
+# The answer is a status on its own first line and then the text, so `R.ok`
+# and `R.text` read it and hub/hub.bend keeps the contract it had when curl
+# gave the same two lines.
 import Base
 import ./url.bend as Url
 import ./http.bend as Http
 import ./wire.bend as Wire
 import ../io/file.bend as File
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 
 # a status other than 200 is a miss with the number in it, never a body
 def get.status(ok: Bool, status: U32, body: String) -> IO(String):

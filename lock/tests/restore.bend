@@ -5,7 +5,7 @@ import Base
 import ../lock.bend as L
 import ../restore.bend as Restore
 import ../../io/file.bend as F
-import ../../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../../sha/sha.bend as Sha
 import ../../pkg/pkg.bend as K
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T

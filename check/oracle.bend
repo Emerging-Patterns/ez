@@ -11,7 +11,7 @@
 # sockets and the writing are below, and nothing in the upper half touches IO.
 # Reading a request off a socket and writing an answer back are check/serve.bend,
 # shared with check/framing.bend. Plaintext HTTP only; bend speaks TLS to the
-# real hub, and run/run.bend explains why a Bend binary cannot.
+# real hub, and net/wire.bend explains why a Bend binary cannot.
 #
 # `GET /` answers `ok`, so a script can wait for the oracle before it publishes.
 # One connection is served at a time, each answer states its length and closes
@@ -19,7 +19,7 @@
 import Base
 import ../sha/sha.bend as Sha
 import ../io/file.bend as F
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ./serve.bend as S
 
 # a list with its last element gone, the head held back one step so the walk can
@@ -542,7 +542,7 @@ def write.after(out: String, at: String, text: String) -> IO(Bool):
     return Bool.and(R.ok(out), ok)
 
 # one file written, with its parent directories made first. Base has no mkdir,
-# so run/run.bend runs one.
+# so a program is run for it.
 def write.file(+at: String, text: String) -> IO(Bool):
   do IO<Bool>:
     out : String <- R.exec(["mkdir", "-p", parent.of(at)])

@@ -11,7 +11,7 @@
 # programs ez already runs the way it runs `find` and `mkdir`, with no shell
 # between.
 import Base
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ./env.bend as Env
 
 # how many seconds a whole run may take. Five minutes is what the gate is held

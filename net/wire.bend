@@ -10,7 +10,7 @@
 import Base
 
 # the exchange: a spec in, and the status on its own first line then the raw
-# response, the same answer shape run/run.bend uses
+# response
 def ezwire.talk(spec: String) -> IO(String):
   import "./effs/wire.c"
   import "./effs/wire.js"

@@ -3,7 +3,7 @@
 # first 32 characters of its manifest's digest, so the check is a prefix test.
 import Base
 import ../net/client.bend as Client
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../sha/sha.bend as Sha
 
 # the body of a GET, from ez's own client (net/client.bend). The answer keeps

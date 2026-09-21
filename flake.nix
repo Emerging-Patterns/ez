@@ -79,12 +79,11 @@
       # it compiles the aggregates in, the cache and each run's output, and the
       # store path it comes from is read-only. `EZ_DEADLINE=0` turns off the
       # five minute budget, which is a number for a developer's machine and not
-      # for a builder of unknown speed with a cold cache. procps is for the
-      # test that asks which program a started pid turned out to be; the rest
-      # of what the runner shells out to rides on the `ez` wrapper's own PATH.
+      # for a builder of unknown speed with a cold cache. What the runner
+      # shells out to rides on the `ez` wrapper's own PATH.
       tests = pkgs.runCommand "ez-tests"
         {
-          nativeBuildInputs = [ ez pkgs.procps ];
+          nativeBuildInputs = [ ez ];
           BEND_LIB = bendLib;
           EZ_DEADLINE = "0";
         }

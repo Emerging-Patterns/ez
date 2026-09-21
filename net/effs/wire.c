@@ -5,8 +5,8 @@
 //
 // The spec arrives as four parts: the scheme, the host, the port, each on its
 // own line, and the rest of the string is the request verbatim. The answer is
-// the same shape run/exec.c answers with, a status on its own first line and
-// then the text: "0" and the raw response, or a non-zero code and the reason.
+// a status on its own first line and then the text: "0" and the raw response,
+// or a non-zero code and the reason.
 //
 // bend links its binaries with exactly `-std=c11 -O3 -lpthread -lm`, so -lssl
 // is not available to anything compiled here. OpenSSL is therefore opened at

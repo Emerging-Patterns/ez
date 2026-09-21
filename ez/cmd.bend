@@ -1,8 +1,8 @@
 # ez/cmd: what each subcommand does. Everything that touches the network or the
-# file system goes through run/run.bend, one process effect, because bend links
-# no TLS and Base has neither mkdir nor readdir.
+# file system goes through one process effect, because bend links no TLS and
+# Base has neither mkdir nor readdir.
 import Base
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ../manifest/render.bend as Rend

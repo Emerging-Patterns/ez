@@ -36,7 +36,7 @@ def old() -> String:
 # what 2.0.18 prints: the report, then a line per unsafe def
 def new() -> String:
   "ok one\nAll terms check, but 2 defs rely on unsafe or foreign code:\n" ++
-  "- ezrun.exec\n- Sha.hex\nok two\n"
+  "- snaprun.exec\n- Sha.hex\nok two\n"
 
 # what an aggregate of two tests prints
 def output() -> String:

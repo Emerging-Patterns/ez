@@ -8,7 +8,7 @@
 # the line.
 import Base
 import ../io/file.bend as F
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../manifest/manifest.bend as M
 import ../manifest/render.bend as Rend
 import ../manifest/upgrade.bend as U
