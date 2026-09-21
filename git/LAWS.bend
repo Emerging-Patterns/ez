@@ -16,6 +16,7 @@ import Base
 import ../manifest/toml.bend as T
 import ../lock/lock.bend as L
 import ../git/git.bend as G
+import ../pkg/path.bend as P
 
 # LAW: an origin written by this module is read back by the lock as the source
 # it was written from. Every key survives, none is shadowed by the pairs that
@@ -85,3 +86,66 @@ law hex_all_agrees:
 law peeled_agrees:
   for rs: List<&2, G.Row>
   {old.peeled(rs) == G.peeled(rs) : String}
+
+# The rest of a ref: whether it is already a commit, which table a
+# rewrite of origins.toml keeps, and the directory a package is rooted
+# at. A tag asked of the remote as if it were a commit fetches nothing,
+# and a rewrite that sat a second table behind the first leaves the
+# stale origin as the one the lock reads.
+
+# LAW: a ref that is not forty characters is not a commit name. A tag
+# or a branch is asked of the remote.
+law is_rev_needs_40:
+  for +ref: String
+  for e: {False{} == Nat.is_eq(String.length(ref), 40n) : Bool}
+  {G.is_rev(ref) == False{} : Bool}
+
+# LAW: nor is a name of the right length whose alphabet is not hex.
+law is_rev_needs_hex:
+  for +ref: String
+  for e0: {True{} == Nat.is_eq(String.length(ref), 40n) : Bool}
+  for e1: {False{} == G.hex.all(String.to_list(ref)) : Bool}
+  {G.is_rev(ref) == False{} : Bool}
+
+# LAW: forty hex characters are a commit name, and need no remote.
+law is_rev_hex40:
+  for +ref: String
+  for e0: {True{} == Nat.is_eq(String.length(ref), 40n) : Bool}
+  for e1: {True{} == G.hex.all(String.to_list(ref)) : Bool}
+  {G.is_rev(ref) == True{} : Bool}
+
+# LAW: a table of this name is dropped, so vendoring a package again
+# replaces what was written for it rather than sitting behind it.
+law but_drops:
+  for +n: String
+  for ps: List<&2, T.Kv>
+  for rest: List<&2, T.Sect>
+  {G.but(T.Sect{n, ps} <> rest, n) == G.but(rest, n) : List<&2, T.Sect>}
+
+# LAW: a table of another name is kept, in the order it was written.
+law but_keeps:
+  for +n: String
+  for +m: String
+  for ps: List<&2, T.Kv>
+  for rest: List<&2, T.Sect>
+  for e: {False{} == String.eq(n, m) : Bool}
+  {G.but(T.Sect{n, ps} <> rest, m)
+    == T.Sect{n, ps} <> G.but(rest, m) : List<&2, T.Sect>}
+
+# LAW: when the entry sits at the same depth as the checkout root, the
+# recorded root is a climb of nothing off the entry's own directory.
+law root_rel_here:
+  for +at: String
+  for +root: String
+  for +entry: String
+  for e: {Nat.is_eq(G.depth(P.dir(at)), G.depth(root)) == True{} : Bool}
+  {G.root.rel(at, root, entry) == P.climb(0n, P.dir(entry)) : String}
+
+# LAW: when the checkout root is one directory above the entry, the
+# recorded root is one climb off the entry's directory.
+law root_rel_up:
+  for +at: String
+  for +root: String
+  for +entry: String
+  for e: {Nat.is_eq(G.depth(P.dir(at)), 1n+G.depth(root)) == True{} : Bool}
+  {G.root.rel(at, root, entry) == P.climb(1n, P.dir(entry)) : String}

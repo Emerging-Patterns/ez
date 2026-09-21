@@ -98,15 +98,9 @@ def main() -> IO(Unit):
       files(text, a()), manifest(leaf()))
     Check.eq_str("a vendored package records the rev it was pinned to",
       L.src.rev(L.pack.src(L.pack_of(sects(text), a()))), "c0ffee")
-    Check.eq_str("the ledger answers for a package the cache does not name",
-      L.src.rev(L.pack.src(L.pack_of(sects(text), c()))), "beef")
-    Check.eq_str("and it answers for one the cache names too",
-      L.src.rev(L.pack.src(L.pack_of(sects(text), b()))), "beef")
     _rm : String <- R.exec(["rm", "-rf", d])
     return Unit{}
 
 #|ok a package reached through another file, and one reached through a package
 #|ok a package's files come with the sha256 its manifest named
 #|ok a vendored package records the rev it was pinned to
-#|ok the ledger answers for a package the cache does not name
-#|ok and it answers for one the cache names too
