@@ -8,7 +8,7 @@ import ../../io/file.bend as F
 import ../../run/run.bend as R
 import ../../sha/sha.bend as Sha
 import ../../pkg/pkg.bend as K
-import ../../manifest/toml.bend as T
+import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../../check/kit.bend as Check
 
 # the package name the fixture uses

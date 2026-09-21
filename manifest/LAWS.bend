@@ -3,24 +3,9 @@
 # with what was written for it, and that the two edits `ez add` and
 # `ez remove` make are the edits they claim to be.
 import Base
-import ./toml.bend as T
+import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./manifest.bend as M
 import ./render.bend as R
-
-# LAW: a table answers a key with the value written for it, whatever pairs
-# follow. A later pair of the same name never shadows an earlier one.
-law value_first:
-  for +k: String
-  for v: String
-  for ps: List<&2, T.Kv>
-  {T.value(T.Kv{k, v} <> ps, k) == v : String}
-
-# LAW: whatever a ledger quotes, the parser takes back out of the quotes
-# unchanged. `ez.lock.toml` writes every value quoted and a file path as a
-# quoted key, so this round trip is what makes a lock readable by the writer.
-law quote_strip:
-  for +s: String
-  {T.strip(T.quote(s), '"', '"') == s : String}
 
 # LAW: dropping a dependency drops every entry of that name, so dropping twice
 # is dropping once. `ez remove` on a ledger it already edited is a no-op.
@@ -36,63 +21,9 @@ law add_idem:
   for +d: M.Dep
   {R.add(R.add(m, d), d) == R.add(m, d) : M.Manifest}
 
-# The shapes manifest/toml.bend had before this pass rewrote them for cost,
-# kept here so that the rewrites' one real risk can be stated rather than
-# sampled: that the cheaper definitions answer exactly what the old ones
-# answered, on every input. These are the specification and toml.bend is the
-# implementation, the way net/LAWS.bend keeps the shapes net/http.bend had
-# before its dechunk rewrite. Nothing but the laws below reads them.
-#
-# What was wrong with them is not what they answer, it is what they cost.
-# `Bool.pick`, `Bool.and` and `Bool.or` are ordinary functions, so every arm
-# and both sides are reduced before the answer is chosen.
-
-# the line classifier, before: four picks nested, so `head_of(s, ...)` and
-# `pair_of(String.split(s, '='))` were built for every line of every manifest
-# and every lock ez reads, including the blanks and the comments the first two
-# arms exist to answer
-def old.line_of(+s: String) -> T.Line:
-  Bool.pick(T.Line, String.is_empty(s), T.LSkip{},
-    Bool.pick(T.Line, String.starts_with(s, "#"), T.LSkip{},
-      Bool.pick(T.Line, String.starts_with(s, "["),
-        T.head_of(s, String.ends_with(s, "]")),
-        Bool.pick(T.Line, String.contains(s, "="),
-          T.pair_of(String.split(s, '=')),
-          T.LBad{s ++ " is neither a section header nor a key"}))))
-
-# the bare-key walk, before: `Bool.and` runs both sides, so the first char a
-# bare key may not hold still cost a walk of the rest of the key
-def old.bare.all(cs: List<&2, Char>) -> Bool:
-  match cs:
-    case []:
-      True{}
-    case +h <> t:
-      Bool.and(T.bare.at(h), old.bare.all(t))
-
-# LAW: the cascade of matches answers what the nest of picks answered, on
-# every line. This is the whole risk of the rewrite, and it is not a
-# theoretical one: the nest tests for a blank line first, and a cascade that
-# dropped that test would call an empty line neither a header nor a key.
-# manifest/bench/parse.bend puts the saving at 1.95x over a lock of seven
-# hundred thousand lines.
-law line_of_agrees:
-  for +s: String
-  {old.line_of(s) == T.line_of(s) : T.Line}
-
-# LAW: and the walk that now really does stop at the first char a bare key
-# may not hold answers what the walk that did not stop answered
-law bare_all_agrees:
-  for cs: List<&2, Char>
-  {old.bare.all(cs) == T.bare.all(cs) : Bool}
-
-# The rest of the ledger: the slice of TOML under it, the reading of a parsed
-# document into a model, and the writing of that model back out. A ledger is a
-# file a person edits, so every one of these is a claim about what ez will do
-# with what they wrote.
-#
-# Two pieces of vocabulary the laws below need and nothing else uses: they
-# name, in a form Bend can walk, the one field of a half-read document and the
-# one bit of a read that says whether it is a ledger.
+# The rest of the ledger: the reading of a parsed document into a model, and
+# the writing of that model back out. A ledger is a file a person edits, so
+# every one of these is a claim about what ez will do with what they wrote.
 
 # whether a document was read into a ledger rather than into a reason
 def is_good(r: M.Read) -> Bool:
@@ -101,165 +32,6 @@ def is_good(r: M.Read) -> Bool:
       False{}
     case M.Good{m}:
       True{}
-
-# the section a half-read document is still filling
-def toml.open(t: T.Toml) -> String:
-  T.Toml{bad, name, pairs, done} = t
-  name
-
-# LAW: a space at the front of a line is not part of the line. The trim runs
-# before the line is classified, so a `[section]` indented by a space is still
-# a section header and a key indented by a space is still that key.
-law trim_drops_leading_space:
-  for s: String
-  {T.trim(SCon{' ', s}) == T.trim(s) : String}
-
-# LAW: the first error a document holds is the one it reports; a later one
-# never replaces it. A syntax error puts the parser in a state every line
-# after it is read in, so the last error is the least informative one there
-# is.
-law first_error_wins:
-  for +bad: String
-  for why: String
-  for e: {False{} == String.is_empty(bad) : Bool}
-  {T.first(bad, why) == bad : String}
-
-# LAW: the pairs written before the first header are not a section. TOML has
-# no top-level table here, and inventing one named "" would give `pairs_of` a
-# section to find.
-law flush_skips_unnamed:
-  for pairs: List<&2, T.Kv>
-  for done: List<&2, T.Sect>
-  {T.flush("", pairs, done) == done : List<&2, T.Sect>}
-
-# LAW: and a header that was written is a section whether or not anything was
-# written under it, with its pairs back in the order they were written.
-law flush_keeps_named:
-  for +name: String
-  for pairs: List<&2, T.Kv>
-  for done: List<&2, T.Sect>
-  for e: {False{} == String.is_empty(name) : Bool}
-  {T.flush(name, pairs, done)
-    == T.Sect{name, List.reverse(&2, T.Kv, pairs)} <> done : List<&2, T.Sect>}
-
-# LAW: a pair written before any header is an error and is not filed anywhere.
-# Silently keeping it would put it in whatever section came next.
-law put_outside_section_is_bad:
-  for bad: String
-  for pairs: List<&2, T.Kv>
-  for done: List<&2, T.Sect>
-  for +key: String
-  for val: String
-  {T.put(T.Toml{bad, "", pairs, done}, key, val)
-    == T.Toml{T.first(bad, key ++ " = is outside any section"), "", pairs, done}
-    : T.Toml}
-
-# LAW: and a pair written under a header joins that header's section, with the
-# key and the value it was written with.
-law put_in_section:
-  for bad: String
-  for +name: String
-  for pairs: List<&2, T.Kv>
-  for done: List<&2, T.Sect>
-  for key: String
-  for val: String
-  for e: {False{} == String.is_empty(name) : Bool}
-  {T.put(T.Toml{bad, name, pairs, done}, key, val)
-    == T.Toml{bad, name, T.Kv{key, val} <> pairs, done} : T.Toml}
-
-# LAW: a blank line changes nothing about a document being read. This is the
-# first question `line_of` asks and the reason it asks it first: an empty
-# string starts with nothing and holds nothing, so every later test would miss
-# it and the line would be called neither a header nor a key.
-law step_skips_blank:
-  for st: T.Toml
-  {T.step(st, "") == st : T.Toml}
-
-# LAW: a comment changes nothing about a document being read either. The
-# classifier answers a line that opens with `#` before anything is read
-# out of it, so a comment may hold anything and still leave the state as
-# it was.
-law step_skips_comment:
-  for st: T.Toml
-  for +s: String
-  for e: {True{} == String.starts_with(T.trim(s), "#") : Bool}
-  {T.step(st, s) == st : T.Toml}
-
-# LAW: a header that never shut is not a section, and the reason is the
-# line as it was written. A `[package` with no `]` is not half a section
-# and not a key; it is this error.
-law unclosed_header:
-  for +s: String
-  for e: {False{} == String.ends_with(s, "]") : Bool}
-  {T.head_of(s, String.ends_with(s, "]"))
-    == T.LBad{s ++ " is not a section header"} : T.Line}
-
-# LAW: a document leaves no section open. Whatever the last line did, `parse`
-# flushes what it was filling, so `sects` is every section the document held
-# and not every section but the last.
-law parse_closes_sections:
-  for text: String
-  {toml.open(T.parse(text)) == "" : String}
-
-# LAW: the sections a parse found are the ones it finished
-law sects_is_done:
-  for bad: String
-  for name: String
-  for pairs: List<&2, T.Kv>
-  for done: List<&2, T.Sect>
-  {T.sects(T.Toml{bad, name, pairs, done}) == done : List<&2, T.Sect>}
-
-# LAW: a header always cuts into at least one segment, so a lookup that reads
-# the first of them never reads off the end of the list.
-law segments_never_empty:
-  for s: String
-  {List.is_empty(&2, String, T.segments(s)) == False{} : Bool}
-
-# LAW: a quote is never part of a segment: it toggles the quoting and nothing
-# else, so a pair of them cuts nothing and leaves nothing behind. This is half
-# of why `packages."0x0a".files` is three segments rather than four.
-law segments_quotes_toggle:
-  for s: String
-  {T.segments(SCon{'"', SCon{'"', s}}) == T.segments(s) : List<&2, String>}
-
-# LAW: a quoted dot is kept as part of the segment being gathered, and
-# does not cut. This is the other half of why `packages."0x0a".files` is
-# three segments rather than four: the quotes toggle and the dot between
-# them is a character of the segment.
-law segments_quoted_dot:
-  for s: String
-  {T.segments(SCon{'"', SCon{'.', SCon{'"', s}}})
-    == T.seg.fin(T.seg.walk(String.to_list(s), T.Split{False{}, ['.'], []}))
-    : List<&2, String>}
-
-# LAW: a key with nothing in it is never bare, so it is written quoted and
-# reads back as the key it was rather than as the start of the next line.
-law bare_needs_a_char:
-  for +s: String
-  for e: {True{} == String.is_empty(s) : Bool}
-  {T.bare(s) == False{} : Bool}
-
-# LAW: a key that can be written without quotes is written without them
-law key_is_bare_when_it_can:
-  for +s: String
-  for e: {True{} == T.bare(s) : Bool}
-  {T.key(s) == s : String}
-
-# LAW: and one that cannot is quoted, whole. Nothing in between: a key is
-# never written half-escaped, which is what makes `quote_strip` reach every
-# key a ledger holds.
-law key_is_quoted_when_it_must:
-  for +s: String
-  for e: {False{} == T.bare(s) : Bool}
-  {T.key(s) == T.quote(s) : String}
-
-# LAW: a document of one table is that table's header and then its pairs, with
-# nothing before it and no separator after it.
-law render_one_table:
-  for +n: String
-  for ps: List<&2, T.Kv>
-  {T.render([T.Sect{n, ps}]) == "[" ++ n ++ "]\n" ++ T.render.pairs(ps)
-    : String}
 
 # LAW: a section answers a key with the value written for it, the way a table
 # does. `manifest.value` is the table lookup and not a second one.

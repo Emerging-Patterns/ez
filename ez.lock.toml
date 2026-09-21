@@ -3,6 +3,19 @@ version = "2"
 hub = "https://hub.bend-lang.com"
 bend = "2.0.24"
 
+[packages."0x04b9afdd6d6a56039c5ce6dfb1e55294".source]
+kind = "git"
+url = "https://github.com/Emerging-Patterns/eztoml"
+rev = "ea1a73f06cbc2700b5b45dc199b104969527e48a"
+entry = "eztoml/main.bend"
+root = "eztoml"
+narHash = "sha256-lSFpfmFwEHUHT9w0J16Dr6n0PbkKPEYNvVrUOZtMyI8="
+tag = "v0.1.0"
+
+[packages."0x04b9afdd6d6a56039c5ce6dfb1e55294".files]
+"main.bend" = "def1bf1385ed2be7e40d3021c7900df3fa69b7461d4ac2aed85c5c4fa6a33a4f"
+"toml.bend" = "6b35d002371ec519209f92448b3a8011930643a63333049dd11fc2b101bc7ab9"
+
 [packages."0x0a5c2c95283e42e081da247c84debe18".source]
 kind = "git"
 url = "https://github.com/Giulio2002/bend-sha256"
