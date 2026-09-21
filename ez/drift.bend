@@ -149,7 +149,7 @@ def deps_of(r: M.Read) -> List<&2, M.Dep>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, ds} = m
+      M.Manifest{_n, _e, _b, ds} = m
       ds
 
 # both directions of the disagreement: a hash the source imports that the

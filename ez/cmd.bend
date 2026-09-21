@@ -59,7 +59,7 @@ def named(r: M.Read) -> String:
     case M.Bad{_why}:
       "app"
     case M.Good{m}:
-      M.Manifest{n, _e, _ds} = m
+      M.Manifest{n, _e, _b, _ds} = m
       n
 
 # the entry file of a ledger that was read
@@ -68,7 +68,7 @@ def entry(r: M.Read) -> String:
     case M.Bad{_why}:
       "main.bend"
     case M.Good{m}:
-      M.Manifest{_n, e, _ds} = m
+      M.Manifest{_n, e, _b, _ds} = m
       entry.or(e)
 
 # a ledger that would not parse stops the command before it does damage
@@ -332,7 +332,7 @@ def init(+asked: String, +file: String) -> IO(Unit):
     +name : String <- IO.pure(String, init.name(asked))
     +at : String <- IO.pure(String, entry.or(file))
     wrote : Bool <- F.write(toml(),
-      Rend.show(M.Manifest{name, at, []}))
+      Rend.show(M.Manifest{name, at, "", []}))
     +kept : Bool <- init.ignore(name)
     +made : Bool <- init.entry(at)
     report.exit(Bool.and(wrote, Bool.and(kept, made)))

@@ -155,8 +155,9 @@ law show_bad_is_marked:
 law show_good_opens_with_name:
   for +n: String
   for e: String
+  for b: String
   for ds: List<&2, M.Dep>
-  {String.starts_with(M.show(M.Good{M.Manifest{n, e, ds}}), n) == True{}
+  {String.starts_with(M.show(M.Good{M.Manifest{n, e, b, ds}}), n) == True{}
     : Bool}
 
 # LAW: a lookup answers with the first dependency of that name, whole
@@ -181,6 +182,7 @@ law dep_of_unread_is_blank:
 law rev_of_names_the_commit:
   for mn: String
   for me: String
+  for mb: String
   for +n: String
   for h: String
   for en: String
@@ -191,7 +193,7 @@ law rev_of_names_the_commit:
   for nar: String
   for vend: Bool
   for t: List<&2, M.Dep>
-  {M.rev_of(M.Good{M.Manifest{mn, me,
+  {M.rev_of(M.Good{M.Manifest{mn, me, mb,
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t}}, n) == rev
     : String}
 
@@ -199,6 +201,7 @@ law rev_of_names_the_commit:
 law tag_of_names_the_tag:
   for mn: String
   for me: String
+  for mb: String
   for +n: String
   for h: String
   for en: String
@@ -209,7 +212,7 @@ law tag_of_names_the_tag:
   for nar: String
   for vend: Bool
   for t: List<&2, M.Dep>
-  {M.tag_of(M.Good{M.Manifest{mn, me,
+  {M.tag_of(M.Good{M.Manifest{mn, me, mb,
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t}}, n) == tag
     : String}
 
@@ -253,8 +256,9 @@ law deps_splits:
 law show_opens_with_package:
   for n: String
   for e: String
+  for b: String
   for ds: List<&2, M.Dep>
-  {String.starts_with(R.show(M.Manifest{n, e, ds}), "[package]\n") == True{}
+  {String.starts_with(R.show(M.Manifest{n, e, b, ds}), "[package]\n") == True{}
     : Bool}
 
 # LAW: a ledger that did not read renders as nothing. `ez add` and `ez remove`
@@ -277,6 +281,7 @@ def ledger() -> String:
   "[package]\n" ++
   "name = \"myapp\"\n" ++
   "entry = \"src/main.bend\"\n" ++
+  "bin = \"src/main.bend\"\n" ++
   "\n[deps.json]\n" ++
   "hash = \"0x1111111111111111111111111111aaaa\"\n" ++
   "\n[deps.wire]\n" ++

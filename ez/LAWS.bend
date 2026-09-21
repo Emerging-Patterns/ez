@@ -10,6 +10,7 @@ import ./drift.bend as D
 import ./gate.bend as G
 import ./clock.bend as Clock
 import ./args.bend as Args
+import ./target.bend as Tgt
 import ../manifest/manifest.bend as M
 
 # a ledger naming two packages, the one the drift laws read
@@ -312,3 +313,91 @@ law argv_of_other:
 # LAW: an empty line stays empty
 law argv_of_empty:
   {Args.argv.of([]) == [] : List<&2, String>}
+
+# LAW: `tool run` is parsed as the command and its target. The words after
+# the target are not flags of ez.
+law argv_of_tool:
+  {Args.argv.of(["tool", "run", "Emerging-Patterns/bolt", "--", "a"])
+    == ["tool", "run", "Emerging-Patterns/bolt"] : List<&2, String>}
+
+# LAW: `tool run` with no target is left that way, so the parse can say so
+law argv_of_tool_bare:
+  {Args.argv.of(["tool", "run"]) == ["tool", "run"] : List<&2, String>}
+
+# LAW: a leading `--` is not a word the program was given
+law tool_rest_dashes:
+  {Args.tool.rest(["tool", "run", "Emerging-Patterns/bolt", "--", "a", "--b"])
+    == ["a", "--b"] : List<&2, String>}
+
+# LAW: words after the target are forwarded when no separator was written
+law tool_rest_plain:
+  {Args.tool.rest(["tool", "run", "o/r", "a"]) == ["a"] : List<&2, String>}
+
+# LAW: `owner/repo` is that repository on GitHub, cached under the same path
+law target_github:
+  {Tgt.show(Tgt.classify("Emerging-Patterns/bolt"))
+    == "remote https://github.com/Emerging-Patterns/bolt github.com/Emerging-Patterns/bolt"
+    : String}
+
+# LAW: a URL is kept, and `.git` is not part of its cache directory
+law target_url:
+  {Tgt.show(Tgt.classify("https://github.com/Emerging-Patterns/bolt.git"))
+    == "remote https://github.com/Emerging-Patterns/bolt.git github.com/Emerging-Patterns/bolt"
+    : String}
+
+# LAW: `git@host:path` is a URL, cached as host/path
+law target_scp:
+  {Tgt.show(Tgt.classify("git@github.com:Emerging-Patterns/bolt.git"))
+    == "remote git@github.com:Emerging-Patterns/bolt.git github.com/Emerging-Patterns/bolt"
+    : String}
+
+# LAW: a path that says it is a path is a path
+law target_abs:
+  {Tgt.show(Tgt.classify("/tmp/bolt")) == "local /tmp/bolt" : String}
+
+# LAW: a relative path with a dot in it is a path, not a repository
+law target_file:
+  {Tgt.show(Tgt.classify("src/main.bend")) == "local src/main.bend" : String}
+
+# LAW: an explicit relative path is a path even when it has two plain segments
+law target_dot:
+  {Tgt.show(Tgt.classify("./Emerging-Patterns/bolt"))
+    == "local ./Emerging-Patterns/bolt" : String}
+
+# LAW: nothing was asked for
+law target_empty:
+  {Tgt.show(Tgt.classify("")) == "bad a target is needed" : String}
+
+# LAW: a slug that would leave the cache is refused
+law target_escapes:
+  {Tgt.show(Tgt.classify("https://example.com/../../tmp"))
+    == "bad not a repository" : String}
+
+# LAW: `~/…` expands under the home directory
+law expand_tilde:
+  {Tgt.expand("/home/u", "~/bolt") == "/home/u/bolt" : String}
+
+# LAW: a path that is not a tilde is unchanged
+law expand_plain:
+  {Tgt.expand("/home/u", "/tmp/bolt") == "/tmp/bolt" : String}
+
+# LAW: `bin` is the file that is built
+law file_bin:
+  {Tgt.file.of("ez/main.bend", "manifest/manifest.bend") == "ez/main.bend"
+    : String}
+
+# LAW: with no `bin`, the entry is built
+law file_entry:
+  {Tgt.file.of("", "bolt/main.bend") == "bolt/main.bend" : String}
+
+# LAW: with neither, the file is `main.bend`
+law file_default:
+  {Tgt.file.of("", "") == "main.bend" : String}
+
+# LAW: a package with no name builds `app`
+law out_name_empty:
+  {Tgt.out.name("") == "app" : String}
+
+# LAW: otherwise the binary is the package's name
+law out_name:
+  {Tgt.out.name("bolt") == "bolt" : String}

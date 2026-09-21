@@ -10,6 +10,7 @@ import ./cmd.bend as Cmd
 import ./test.bend as Test
 import ./doctor.bend as Doctor
 import ./env.bend as Env
+import ./tool.bend as Tool
 
 # a subcommand
 type Sub is Data:
@@ -24,6 +25,7 @@ type Sub is Data:
   CPublish{}
   CTest{}
   CDoctor{}
+  CTool{}
   CHelp{}
 
 # the program: every command, and the flags and positionals it binds
@@ -60,6 +62,13 @@ def spec() -> Shake.Cli:
           Shake.pos("out", "output path", False{}, None{}, [])
         ], []),
       Shake.sub("run", "check and run the entry", [], []),
+      Shake.sub("tool", "run another project's binary", [], [
+        Shake.sub("run", "fetch, build and run the binary a repo declares",
+          [
+            Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
+              [])
+          ], [])
+      ]),
       Shake.sub("publish", "send the entry to the hub, under ez's 0x name",
         [], []),
       Shake.sub("test", "run every */tests/*.bend, on both lanes",
@@ -86,10 +95,11 @@ def command(+name: String) -> Sub:
                   Bool.pick(Sub, String.eq(name, "publish"), CPublish{},
                     Bool.pick(Sub, String.eq(name, "test"), CTest{},
                       Bool.pick(Sub, String.eq(name, "doctor"), CDoctor{},
-                        CHelp{})))))))))))
+                        Bool.pick(Sub, String.eq(name, "tool/run"), CTool{},
+                          CHelp{}))))))))))))
 
 # what a subcommand runs
-def dispatch(sub: Sub, +m: Shake.Matched, as: List<&2, String>) -> IO(Unit):
+def dispatch(sub: Sub, +m: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
   match sub:
     case CInit{}:
       Cmd.init(Shake.get(m, "name"), Shake.get(m, "entry"))
@@ -106,7 +116,9 @@ def dispatch(sub: Sub, +m: Shake.Matched, as: List<&2, String>) -> IO(Unit):
     case CBuild{}:
       Cmd.build(Shake.get(m, "out"))
     case CRun{}:
-      Cmd.run(as)
+      Cmd.run(Args.rest(as))
+    case CTool{}:
+      Tool.run(Shake.get(m, "target"), Args.tool.rest(as))
     case CPublish{}:
       Cmd.publish()
     case CTest{}:
@@ -133,7 +145,7 @@ def fail(+app: Shake.Cli, e: Shake.ParseErr) -> IO(Unit):
 
 # a successful parse: the command named by the path, then its bindings
 def go.done(+as: List<&2, String>, +m: Shake.Matched) -> IO(Unit):
-  dispatch(command(String.join(Shake.path_of(m), "/")), m, Args.rest(as))
+  dispatch(command(String.join(Shake.path_of(m), "/")), m, as)
 
 # the parse result
 def go.parsed(+app: Shake.Cli, +as: List<&2, String>,

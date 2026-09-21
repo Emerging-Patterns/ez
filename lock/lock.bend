@@ -169,7 +169,7 @@ def ledger.read(r: M.Read) -> List<&2, Origin>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, ds} = m
+      M.Manifest{_n, _e, _b, ds} = m
       ledger.origins(ds)
 
 # the ledger first, the cache behind it. `origin` answers with the first record
