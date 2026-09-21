@@ -14,6 +14,7 @@ import ../pkg/path.bend as P
 import ./args.bend as Args
 import ./env.bend as Env
 import ./cap.bend as Cap
+import ./upgrade.bend as Up
 
 # the ledger's path, which is fixed
 def toml() -> String:
@@ -186,12 +187,37 @@ def lockfile() -> String:
   "ez.lock.toml"
 
 # the lock, rewritten from every root in the tree
-def lock() -> IO(Unit):
+def lock.now() -> IO(Unit):
   do IO<Unit>:
     srcs : List<&2, String> <- sources()
     text : String <- Lock.lock(srcs)
     wrote : Bool <- F.write(lockfile(), text)
     report.exit(wrote)
+
+# `--package` is only a filter on an upgrade
+def lock.plain(bare: Bool, +name: String) -> IO(Unit):
+  match bare:
+    case True{}:
+      lock.now()
+    case False{}:
+      IO.die(Unit, 1, "ez: --package needs --upgrade")
+
+# `ez lock`, or `ez lock --upgrade` which re-pins git deps first and then
+# resolves. The lock is written from the ledger either way. Fetch stays a
+# separate command; a `vendor = true` dependency is laid out by the upgrade
+# itself, because that tree is committed.
+def lock.up(up: Bool, +name: String) -> IO(Unit):
+  match up:
+    case False{}:
+      lock.plain(String.is_empty(name), name)
+    case True{}:
+      do IO<Unit>:
+        Up.run(name)
+        lock.now()
+
+# `ez lock` and `ez lock --upgrade [--package NAME]`
+def lock(up: Bool, +name: String) -> IO(Unit):
+  lock.up(up, name)
 
 # BEND_LIB filled from the lock, with nothing re-resolved
 def fetch() -> IO(Unit):
@@ -336,7 +362,7 @@ def add.alias(+at: String) -> String:
 # cache it just wrote would be reading back our own answer.
 def add.dep.go(hash: String, url: String, rev: String, +at: String,
   tag: String, root: String, nar: String) -> M.Dep:
-  M.Dep{add.alias(at), hash, at, M.Git{url, rev, tag, root, nar}}
+  M.Dep{add.alias(at), hash, at, M.Git{url, rev, tag, root, nar, False{}}}
 
 # what a vendoring answered, as the ledger records it
 def add.dep(g: Git.Got) -> M.Dep:

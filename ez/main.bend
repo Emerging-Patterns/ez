@@ -46,7 +46,13 @@ def spec() -> Shake.Cli:
         [
           Shake.pos("name", "package name", True{}, None{}, [])
         ], []),
-      Shake.sub("lock", "resolve every import, write ez.lock.toml", [], []),
+      Shake.sub("lock", "resolve every import, write ez.lock.toml",
+        [
+          Shake.flag("upgrade", None{}, Some{"upgrade"},
+            "re-pin git deps that moved, then write the lock"),
+          Shake.opt("package", None{}, Some{"package"},
+            "with --upgrade, only this dependency", False{}, None{}, [])
+        ], []),
       Shake.sub("fetch", "fill BEND_LIB from the lock", [], []),
       Shake.sub("check", "check the entry, without running it", [], []),
       Shake.sub("build", "build the entry to a native binary",
@@ -92,7 +98,7 @@ def dispatch(sub: Sub, +m: Shake.Matched, as: List<&2, String>) -> IO(Unit):
     case CRemove{}:
       Cmd.remove(Shake.get(m, "name"))
     case CLock{}:
-      Cmd.lock()
+      Cmd.lock(Shake.on(m, "upgrade"), Shake.get(m, "package"))
     case CFetch{}:
       Cmd.fetch()
     case CCheck{}:

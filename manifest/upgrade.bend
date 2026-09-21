@@ -1,0 +1,217 @@
+# manifest/upgrade: what `ez lock --upgrade` may do to one dependency, before
+# it talks to a remote. The ledger pins exact commits. A tag is the only
+# floating name a person wrote down, so that is what gets re-resolved. A pin
+# with no tag fast-forwards to the default branch tip when the commit is an
+# ancestor of it, and stays a commit pin. A hub package is the hash itself.
+# `vend` says the tree under `.ez/lib/<hash>` is committed, so a move rewrites
+# the gitignore allowlist that names it.
+import Base
+import ./manifest.bend as M
+
+# what an upgrade will ask the remote, once the ledger has been read
+type Aim is Data:
+  Hold{}
+  Follow{+ref: String}
+  Forward{}
+
+# what that answer means for the pin
+type Verdict is Data:
+  Keep{}
+  Drift{}
+  Off{}
+  Advance{rev: String, tag: String}
+
+# one committed hash the allowlist must stop naming, and the hash that
+# replaces it
+type Swap is Data:
+  Swap{old: String, new: String}
+
+# an empty `--package` is every dependency; a name is that one
+def chosen.go(all: Bool, +only: String, +name: String) -> Bool:
+  match all:
+    case True{}:
+      True{}
+    case False{}:
+      String.eq(only, name)
+
+# an empty `--package` is every dependency; a name is that one
+def chosen(+only: String, +name: String) -> Bool:
+  chosen.go(String.is_empty(only), only, name)
+
+# the rest of the scan only when this one was not it
+def known.step(hit: Bool, rest: Unit -> Bool) -> Bool:
+  match hit:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
+# whether the ledger names this dependency
+def known.in(ds: List<&2, M.Dep>, +name: String) -> Bool:
+  match ds:
+    case []:
+      False{}
+    case +h <> t:
+      known.step(String.eq(M.dep.name(h), name), _u => known.in(t, name))
+
+# `--package` with no such dependency is a mistake, and no filter is not
+def known.go(all: Bool, ds: List<&2, M.Dep>, +name: String) -> Bool:
+  match all:
+    case True{}:
+      True{}
+    case False{}:
+      known.in(ds, name)
+
+# whether the ledger names the dependency `--package` asked for
+def known(+only: String, ds: List<&2, M.Dep>) -> Bool:
+  known.go(String.is_empty(only), ds, only)
+
+# a selected git pin with no tag follows the default branch
+def aim.tag(bare: Bool, +tag: String) -> Aim:
+  match bare:
+    case True{}:
+      Forward{}
+    case False{}:
+      Follow{tag}
+
+# a selected hub pin has nothing to follow
+def aim.src(s: M.Source) -> Aim:
+  match s:
+    case M.Hub{}:
+      Hold{}
+    case M.Git{_url, _rev, +tag, _root, _nar, _vend}:
+      aim.tag(String.is_empty(tag), tag)
+
+# what this dependency is asked. Unselected dependencies are left alone,
+# including a git one, so `--package` does not move its neighbours.
+def aim(sel: Bool, s: M.Source) -> Aim:
+  match sel:
+    case False{}:
+      Hold{}
+    case True{}:
+      aim.src(s)
+
+# the same commit either still hashes to the pin or it does not
+def judge.same(agree: Bool) -> Verdict:
+  match agree:
+    case True{}:
+      Keep{}
+    case False{}:
+      Drift{}
+
+# a different commit is the upgrade only when it descends from the pin
+def judge.move(onward: Bool, +rev: String, +tag: String) -> Verdict:
+  match onward:
+    case True{}:
+      Advance{rev, tag}
+    case False{}:
+      Off{}
+
+# `same` is the resolved commit against the pin. `onward` is that commit
+# being a descendant of the pin. `agree` is the recomputed hash, NAR hash
+# and root against what the ledger recorded, and it only matters when the
+# commit did not move.
+def judge(same: Bool, onward: Bool, agree: Bool, rev: String, tag: String) -> Verdict:
+  match same:
+    case True{}:
+      judge.same(agree)
+    case False{}:
+      judge.move(onward, rev, tag)
+
+# the three fields a checkout can disagree on, each required
+def agree.nar(n: Bool, r: Bool) -> Bool:
+  match n:
+    case False{}:
+      False{}
+    case True{}:
+      r
+
+# whether a recomputed pin is the one the ledger already recorded
+def agree.go(h: Bool, n: Bool, r: Bool) -> Bool:
+  match h:
+    case False{}:
+      False{}
+    case True{}:
+      agree.nar(n, r)
+
+# whether a recomputed pin is the one the ledger already recorded
+def agree(+oh: String, +nh: String, +onar: String, +nnar: String,
+  +oroot: String, +nroot: String) -> Bool:
+  agree.go(String.eq(oh, nh), String.eq(onar, nnar), String.eq(oroot, nroot))
+
+# a hub miss is a different digest only when the body arrived and hashed
+# wrong. A package the hub has never seen is not that.
+def hub.bad(+why: String) -> Bool:
+  String.contains(why, "does not hash")
+
+# the dependency with a new commit written in, and the name, the entry, the
+# tag and the vendor bit left as they were
+def retarget.go(+n: String, +e: String, s: M.Source, +rev: String, +hash: String,
+  +root: String, +nar: String) -> M.Dep:
+  match s:
+    case M.Hub{}:
+      M.Dep{n, hash, e, M.Hub{}}
+    case M.Git{url, _rev, tag, _root, _nar, vend}:
+      M.Dep{n, hash, e, M.Git{url, rev, tag, root, nar, vend}}
+
+# the dependency with a new commit written in
+def retarget(d: M.Dep, +rev: String, +hash: String, +root: String,
+  +nar: String) -> M.Dep:
+  M.Dep{n, _h, e, s} = d
+  retarget.go(n, e, s, rev, hash, root, nar)
+
+# the gitignore line that keeps one committed tree
+def allow(+hash: String) -> String:
+  "!.ez/lib/" ++ hash
+
+# one line, with the old hash's exception rewritten when it is that line
+def reallow.line(+line: String, +old: String, +new: String) -> String:
+  Bool.pick(String, String.eq(String.trim(line), allow(old)), allow(new), line)
+
+# every line, in order
+def reallow.lines(ls: List<&2, String>, +old: String, +new: String) -> List<&2, String>:
+  match ls:
+    case []:
+      []
+    case +h <> t:
+      reallow.line(h, old, new) <> reallow.lines(t, old, new)
+
+# the rest of the scan only when this line was not the exception
+def listed.step(hit: Bool, rest: Unit -> Bool) -> Bool:
+  match hit:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
+# whether the allowlist already names this hash
+def listed(ls: List<&2, String>, +hash: String) -> Bool:
+  match ls:
+    case []:
+      False{}
+    case +h <> t:
+      listed.step(String.eq(String.trim(h), allow(hash)), _u => listed(t, hash))
+
+# the exception appended when the old hash was not in the file at all.
+# `String.lines` keeps the empty line a trailing newline is, so joining
+# those lines puts that newline back and a second one must not be added.
+def reallow.fin(present: Bool, +text: String, +hash: String) -> String:
+  match present:
+    case True{}:
+      text
+    case False{}:
+      text ++ allow(hash) ++ "\n"
+
+# the ignore file with one committed hash replaced by another
+def reallow(+text: String, +old: String, +new: String) -> String:
+  +ls = reallow.lines(String.lines(text), old, new)
+  reallow.fin(listed(ls, new), String.join(ls, "\n"), new)
+
+# every replacement, in order. The list is the first argument so the walk is
+# the thing that shrinks; the text is rebuilt as it goes.
+def reallow.many(ss: List<&2, Swap>, +text: String) -> String:
+  match ss:
+    case []:
+      text
+    case Swap{+old, +new} <> t:
+      reallow.many(t, reallow(text, old, new))

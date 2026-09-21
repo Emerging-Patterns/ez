@@ -11,9 +11,11 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 # without the checkout: the directory inside it the package's paths are written
 # from, and the NAR hash nix rebuilds it by. They live here, in the file that is
 # committed, because a clone gets the ledger and not the vendoring cache.
+# `vend` is the committed tree: the package is allowlisted under `.ez/lib` and
+# an upgrade that moves it lays the new hash there. Absent, it is not.
 type Source is Data:
   Hub{}
-  Git{url: String, rev: String, tag: String, root: String, nar: String}
+  Git{url: String, rev: String, tag: String, root: String, nar: String, vend: Bool}
 
 # one tracked dependency
 type Dep is Data:
@@ -45,14 +47,18 @@ def pairs_of(ss: List<&2, T.Sect>, +name: String) -> List<&2, T.Kv>:
     case h <> t:
       pairs.at(h, pairs_of(t, name), name)
 
+# `vendor = true`, bare or quoted, is the only spelling that commits the tree
+def flag(+s: String) -> Bool:
+  String.eq(s, "true")
+
 # no `git` key means the package lives on the hub
 def source.go(hub: Bool, url: String, rev: String, tag: String, root: String,
-  nar: String) -> Source:
+  nar: String, vend: Bool) -> Source:
   match hub:
     case True{}:
       Hub{}
     case False{}:
-      Git{url, rev, tag, root, nar}
+      Git{url, rev, tag, root, nar, vend}
 
 # a git section that names no root was written from the top of its checkout,
 # which is the root a lock already spells out as "." and the only one a ledger
@@ -64,7 +70,7 @@ def root.or(+r: String) -> String:
 def source_of(+pairs: List<&2, T.Kv>) -> Source:
   source.go(String.is_empty(value(pairs, "git")), value(pairs, "git"),
     value(pairs, "rev"), value(pairs, "tag"), root.or(value(pairs, "root")),
-    value(pairs, "narHash"))
+    value(pairs, "narHash"), flag(value(pairs, "vendor")))
 
 # a `[deps.<name>]` section as a dependency
 def dep_of(+full: String, +pairs: List<&2, T.Kv>) -> Dep:
@@ -168,7 +174,7 @@ def show.source(s: Source) -> String:
   match s:
     case Hub{}:
       "hub"
-    case Git{_url, _rev, _tag, _root, _nar}:
+    case Git{_url, _rev, _tag, _root, _nar, _vend}:
       "git"
 
 # `<name>=<hash>@<hub|git>`
@@ -233,7 +239,7 @@ def source.rev(s: Source) -> String:
   match s:
     case Hub{}:
       ""
-    case Git{_url, rev, _tag, _root, _nar}:
+    case Git{_url, rev, _tag, _root, _nar, _vend}:
       rev
 
 # the tag a dependency was asked for, or "" when it was pinned by commit
@@ -241,7 +247,7 @@ def source.tag(s: Source) -> String:
   match s:
     case Hub{}:
       ""
-    case Git{_url, _rev, tag, _root, _nar}:
+    case Git{_url, _rev, tag, _root, _nar, _vend}:
       tag
 
 # the repo a dependency was vendored from, or "" when it is a hub package
@@ -249,7 +255,7 @@ def source.url(s: Source) -> String:
   match s:
     case Hub{}:
       ""
-    case Git{url, _rev, _tag, _root, _nar}:
+    case Git{url, _rev, _tag, _root, _nar, _vend}:
       url
 
 # the directory inside the checkout a dependency's paths are written from
@@ -257,7 +263,7 @@ def source.root(s: Source) -> String:
   match s:
     case Hub{}:
       ""
-    case Git{_url, _rev, _tag, root, _nar}:
+    case Git{_url, _rev, _tag, root, _nar, _vend}:
       root
 
 # the NAR hash nix rebuilds a dependency's checkout by
@@ -265,7 +271,7 @@ def source.nar(s: Source) -> String:
   match s:
     case Hub{}:
       ""
-    case Git{_url, _rev, _tag, _root, nar}:
+    case Git{_url, _rev, _tag, _root, nar, _vend}:
       nar
 
 # whether a dependency names a repo rather than the hub
@@ -273,8 +279,16 @@ def source.is_git(s: Source) -> Bool:
   match s:
     case Hub{}:
       False{}
-    case Git{_url, _rev, _tag, _root, _nar}:
+    case Git{_url, _rev, _tag, _root, _nar, _vend}:
       True{}
+
+# whether an upgrade that moves this dependency also commits the new tree
+def source.vendor(s: Source) -> Bool:
+  match s:
+    case Hub{}:
+      False{}
+    case Git{_url, _rev, _tag, _root, _nar, vend}:
+      vend
 
 # the source of a dependency that was found
 def source.dep(d: Dep) -> Source:

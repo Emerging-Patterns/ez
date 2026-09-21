@@ -105,20 +105,24 @@ def Laws.pairs_of_first(name, ps, ss):
 def Laws.source_of_hub(pairs, e):
   %e : {M.source.go(_, M.value(pairs, "git"), M.value(pairs, "rev"),
     M.value(pairs, "tag"), M.root.or(M.value(pairs, "root")),
-    M.value(pairs, "narHash")) == M.Hub{} : M.Source}
+    M.value(pairs, "narHash"), M.flag(M.value(pairs, "vendor")))
+    == M.Hub{} : M.Source}
   {==}
 
 def Laws.source_of_absent_root(pairs, e0, e1):
   %e1 : {M.source.go(String.is_empty(M.value(pairs, "git")),
     M.value(pairs, "git"), M.value(pairs, "rev"),
     M.value(pairs, "tag"), Bool.pick(String, _, ".", M.value(pairs, "root")),
-    M.value(pairs, "narHash"))
+    M.value(pairs, "narHash"), M.flag(M.value(pairs, "vendor")))
     == M.Git{M.value(pairs, "git"), M.value(pairs, "rev"),
-      M.value(pairs, "tag"), ".", M.value(pairs, "narHash")} : M.Source}
+      M.value(pairs, "tag"), ".", M.value(pairs, "narHash"),
+      M.flag(M.value(pairs, "vendor"))} : M.Source}
   %e0 : {M.source.go(_, M.value(pairs, "git"), M.value(pairs, "rev"),
-    M.value(pairs, "tag"), ".", M.value(pairs, "narHash"))
+    M.value(pairs, "tag"), ".", M.value(pairs, "narHash"),
+    M.flag(M.value(pairs, "vendor")))
     == M.Git{M.value(pairs, "git"), M.value(pairs, "rev"),
-      M.value(pairs, "tag"), ".", M.value(pairs, "narHash")} : M.Source}
+      M.value(pairs, "tag"), ".", M.value(pairs, "narHash"),
+      M.flag(M.value(pairs, "vendor"))} : M.Source}
   {==}
 
 # `deps.` is five literal characters, so the drop steps through all five and
@@ -182,17 +186,17 @@ def Laws.find_first(n, h, en, s, t):
 def Laws.dep_of_unread_is_blank(_why, _name):
   {==}
 
-def Laws.rev_of_names_the_commit(_mn, _me, n, h, en, url, rev, tag, root, nar, t):
+def Laws.rev_of_names_the_commit(_mn, _me, n, h, en, url, rev, tag, root, nar, vend, t):
   Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)),
-    M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}} <> t, n),
-    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}},
-    Laws.find_first(n, h, en, M.Git{url, rev, tag, root, nar}, t))
+    M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n),
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}},
+    Laws.find_first(n, h, en, M.Git{url, rev, tag, root, nar, vend}, t))
 
-def Laws.tag_of_names_the_tag(_mn, _me, n, h, en, url, rev, tag, root, nar, t):
+def Laws.tag_of_names_the_tag(_mn, _me, n, h, en, url, rev, tag, root, nar, vend, t):
   Equal.cong(M.Dep, String, d => M.source.tag(M.source.dep(d)),
-    M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}} <> t, n),
-    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}},
-    Laws.find_first(n, h, en, M.Git{url, rev, tag, root, nar}, t))
+    M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n),
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}},
+    Laws.find_first(n, h, en, M.Git{url, rev, tag, root, nar, vend}, t))
 
 def Laws.line_absent(_key):
   {==}
@@ -242,4 +246,48 @@ def Laws.remove_idem(m, name):
 # Both sides are a known ledger, so they reduce to the same file and the
 # proof is the computation itself.
 def Laws.render_parse_roundtrip():
+  {==}
+
+# Each of these is a closed ledger, a closed remote answer, or a closed
+# verdict. Both sides reduce to the same value.
+def Laws.sha256_vendor_flag():
+  {==}
+
+def Laws.vendor_flag_true():
+  {==}
+
+def Laws.vendor_flag_absent():
+  {==}
+
+def Laws.sha256_aims_forward():
+  {==}
+
+def Laws.hub_holds():
+  {==}
+
+def Laws.tag_follows():
+  {==}
+
+def Laws.unselected_holds():
+  {==}
+
+def Laws.sha256_advances():
+  {==}
+
+def Laws.same_rev_keeps():
+  {==}
+
+def Laws.same_rev_drifts():
+  {==}
+
+def Laws.tag_moved_off():
+  {==}
+
+def Laws.sha256_retarget():
+  {==}
+
+def Laws.sha256_allowlist():
+  {==}
+
+def Laws.hub_digest_disagrees():
   {==}

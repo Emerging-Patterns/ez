@@ -9,14 +9,23 @@ import ./manifest.bend as M
 def line(key: String, +val: String) -> String:
   Bool.pick(String, String.is_empty(val), "", key ++ " = \"" ++ val ++ "\"\n")
 
+# `true` when the tree is committed, and nothing when it is not, so the key
+# is absent rather than written as an empty string
+def vendor.word(v: Bool) -> String:
+  match v:
+    case True{}:
+      "true"
+    case False{}:
+      ""
+
 # the keys a source contributes
 def source(s: M.Source) -> String:
   match s:
     case M.Hub{}:
       ""
-    case M.Git{url, rev, tag, root, nar}:
+    case M.Git{url, rev, tag, root, nar, vend}:
       line("git", url) ++ line("rev", rev) ++ line("tag", tag) ++
-      line("root", root) ++ line("narHash", nar)
+      line("root", root) ++ line("narHash", nar) ++ line("vendor", vendor.word(vend))
 
 # one `[deps.<name>]` section
 def dep(d: M.Dep) -> String:

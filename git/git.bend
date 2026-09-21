@@ -208,6 +208,81 @@ def resolve.step(pinned: Bool, url: String, ref: String) -> IO(Ref):
 def resolve(+url: String, +ref: String) -> IO(Ref):
   resolve.step(is_rev(ref), url, ref)
 
+# what `git ls-remote --symref` said HEAD was: the commit, and the branch
+# that commit is the tip of
+type Tip is Data:
+  Tip{rev: String, branch: String}
+
+# the rest of the scan only when this row said nothing. A recursive call
+# written as an argument of `Bool.pick` would run for a row that already
+# answered.
+def tip.step(empty: Bool, +got: String, rest: Unit -> String) -> String:
+  match empty:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      got
+
+# a HEAD row whose first field is already a commit
+def tip.rev.hex(hex: Bool, rev: String) -> String:
+  match hex:
+    case True{}:
+      rev
+    case False{}:
+      ""
+
+# a HEAD row's commit, or "" when the row is the symref or not HEAD
+def tip.rev.pick(head: Bool, hex: Bool, rev: String) -> String:
+  match head:
+    case False{}:
+      ""
+    case True{}:
+      tip.rev.hex(hex, rev)
+
+# this row's commit when it is HEAD's commit
+def tip.rev.at(r: Row) -> String:
+  Row{+rev, name} = r
+  tip.rev.pick(String.eq(name, "HEAD"), is_rev(rev), rev)
+
+# the commit HEAD names, from the rows `ls-remote --symref` wrote
+def tip.rev(rs: List<&2, Row>) -> String:
+  match rs:
+    case []:
+      ""
+    case +h <> t:
+      tip.step(String.is_empty(tip.rev.at(h)), tip.rev.at(h), _u => tip.rev(t))
+
+# the prefix taken off when it is there, and "" when it is not, so a commit
+# line is not mistaken for a branch name
+def tip.strip(+s: String, +pre: String) -> String:
+  Bool.pick(String, String.starts_with(s, pre),
+    String.drop(s, String.length(pre)), "")
+
+# `ref: refs/heads/main` is `main`. Anything else is no branch.
+def tip.sym(+rev: String) -> String:
+  tip.strip(tip.strip(rev, "ref: "), "refs/heads/")
+
+# the symref only, so the commit row that follows it contributes nothing
+def tip.branch.pick(head: Bool, rev: String) -> String:
+  match head:
+    case False{}:
+      ""
+    case True{}:
+      tip.sym(rev)
+
+# this row's branch when it is the symref for HEAD
+def tip.branch.at(r: Row) -> String:
+  Row{rev, name} = r
+  tip.branch.pick(String.eq(name, "HEAD"), rev)
+
+# the branch HEAD is, or "" when the remote did not say
+def tip.branch(rs: List<&2, Row>) -> String:
+  match rs:
+    case []:
+      ""
+    case +h <> t:
+      tip.step(String.is_empty(tip.branch.at(h)), tip.branch.at(h), _u => tip.branch(t))
+
 # what a run said about the tree it weighed
 def nar.said(ok: Bool, +text: String) -> IO(String):
   match ok:
@@ -429,3 +504,77 @@ def vendor(+lib: String, +url: String, +ref: String, +entry: String) -> IO(Got):
   do IO<Got>:
     r : Ref <- resolve(url, ref)
     vendor.at(lib, url, r, entry)
+
+# a remote with no HEAD is not a repo an upgrade can move
+def remote.got(empty: Bool, +rev: String, +branch: String, +url: String) -> IO(Tip):
+  match empty:
+    case True{}:
+      IO.die(Tip, 1, "ez: " ++ url ++ " has no HEAD")
+    case False{}:
+      IO.pure(Tip, Tip{rev, branch})
+
+# what ls-remote said, or why it said nothing
+def remote.said(ok: Bool, +url: String, +text: String) -> IO(Tip):
+  match ok:
+    case False{}:
+      IO.die(Tip, 1, "ez: git ls-remote " ++ url ++ ": " ++ text)
+    case True{}:
+      +rs = rows(String.lines(text))
+      remote.got(String.is_empty(tip.rev(rs)), tip.rev(rs), tip.branch(rs), url)
+
+# HEAD on the remote: the commit the default branch tips, and that branch's
+# name. `--symref` is what puts the branch on the line in front of the commit.
+def remote(+url: String) -> IO(Tip):
+  do IO<Tip>:
+    +out : String <- R.exec(["git", "ls-remote", "--symref", url, "HEAD"])
+    remote.said(R.ok(out), url, R.text(out))
+
+# a bare clone, blobs left behind. Ancestry only needs the commits.
+def clone.bare(+work: String, +url: String) -> IO(Unit):
+  run("clone", ["git", "clone", "--bare", "--filter=blob:none", "-q", url, work])
+
+# merge-base answers 0 for a descendant, 1 for anything else, and some other
+# status when the question itself could not be asked
+def descendant.no(no: Bool, +text: String) -> IO(Bool):
+  match no:
+    case True{}:
+      IO.pure(Bool, False{})
+    case False{}:
+      IO.die(Bool, 1, "ez: git merge-base: " ++ text)
+
+# the status, read
+def descendant.pick(yes: Bool, no: Bool, text: String) -> IO(Bool):
+  match yes:
+    case True{}:
+      IO.pure(Bool, True{})
+    case False{}:
+      descendant.no(no, text)
+
+# the status a merge-base answered with
+def descendant.code(+code: String, +text: String) -> IO(Bool):
+  descendant.pick(String.eq(code, "0"), String.eq(code, "1"), text)
+
+# the clone, the question, the clone gone. The same commit is a descendant
+# of itself and needs no clone to say so.
+def descendant.clone(+work: String, +url: String, +pin: String,
+  +tip: String) -> IO(Bool):
+  do IO<Bool>:
+    _rm : String <- R.exec(["rm", "-rf", work])
+    clone.bare(work, url)
+    +out : String <- R.exec(["git", "-C", work, "merge-base", "--is-ancestor",
+      pin, tip])
+    _cl : String <- R.exec(["rm", "-rf", work])
+    descendant.code(R.code(out), R.text(out))
+
+# whether `tip` descends from `pin`, the same commit included
+def descendant.go(same: Bool, work: String, url: String, pin: String,
+  tip: String) -> IO(Bool):
+  match same:
+    case True{}:
+      IO.pure(Bool, True{})
+    case False{}:
+      descendant.clone(work, url, pin, tip)
+
+# whether `tip` descends from `pin`. `work` is a directory the clone may use.
+def descendant.at(+work: String, +url: String, +pin: String, +tip: String) -> IO(Bool):
+  descendant.go(String.eq(pin, tip), work, url, pin, tip)

@@ -6,6 +6,7 @@ import Base
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./manifest.bend as M
 import ./render.bend as R
+import ./upgrade.bend as U
 
 # LAW: dropping a dependency drops every entry of that name, so dropping twice
 # is dropping once. `ez remove` on a ledger it already edited is a no-op.
@@ -67,7 +68,8 @@ law source_of_absent_root:
   for e1: {True{} == String.is_empty(M.value(pairs, "root")) : Bool}
   {M.source_of(pairs)
     == M.Git{M.value(pairs, "git"), M.value(pairs, "rev"),
-      M.value(pairs, "tag"), ".", M.value(pairs, "narHash")} : M.Source}
+      M.value(pairs, "tag"), ".", M.value(pairs, "narHash"),
+      M.flag(M.value(pairs, "vendor"))} : M.Source}
 
 # LAW: a `[deps.<name>]` section is a dependency of that name, with the
 # prefix off and nothing else taken with it.
@@ -187,9 +189,10 @@ law rev_of_names_the_commit:
   for tag: String
   for root: String
   for nar: String
+  for vend: Bool
   for t: List<&2, M.Dep>
   {M.rev_of(M.Good{M.Manifest{mn, me,
-    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}} <> t}}, n) == rev
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t}}, n) == rev
     : String}
 
 # LAW: and the tag it was asked for is the tag its git section wrote
@@ -204,9 +207,10 @@ law tag_of_names_the_tag:
   for +tag: String
   for root: String
   for nar: String
+  for vend: Bool
   for t: List<&2, M.Dep>
   {M.tag_of(M.Good{M.Manifest{mn, me,
-    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar}} <> t}}, n) == tag
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t}}, n) == tag
     : String}
 
 # LAW: a key with no value leaves no trace in the file. An absent tag or entry
@@ -223,9 +227,9 @@ law source_omits_absent_tag:
   for rev: String
   for root: String
   for nar: String
-  {R.source(M.Git{url, rev, "", root, nar})
+  {R.source(M.Git{url, rev, "", root, nar, False{}})
     == R.line("git", url) ++ R.line("rev", rev) ++ R.line("root", root)
-      ++ R.line("narHash", nar) : String}
+      ++ R.line("narHash", nar) ++ R.line("vendor", "") : String}
 
 # LAW: a dependency's section is headed by that dependency's own name
 law dep_opens_its_section:
@@ -289,3 +293,102 @@ def ledger() -> String:
 # command is the file the next command will write again.
 law render_parse_roundtrip:
   {R.render(M.parse(ledger())) == ledger() : String}
+
+# sha256 as ez.toml pins it: a rev and no tag, and the tree is committed.
+# The tip below is `main` of Giulio2002/bend-sha256 as `ls-remote --symref`
+# reported it, which is a descendant of this rev. The latest tag on that
+# repo, v0.1.0, is 75741733dca8ba3610b116af5d74997a44c7e978, one commit
+# behind that tip. The ledger names no tag, so the upgrade follows the tip.
+def sha.toml() -> String:
+  "[package]\nname = \"ez\"\nentry = \"manifest/manifest.bend\"\n" ++
+  "\n[deps.sha256]\n" ++
+  "hash = \"0x0a5c2c95283e42e081da247c84debe18\"\n" ++
+  "git = \"https://github.com/Giulio2002/bend-sha256\"\n" ++
+  "rev = \"c16cd69cedff0e9e19251401dee1cd973458faef\"\n" ++
+  "root = \".\"\n" ++
+  "narHash = \"sha256-ZQdxgjNCSu3lXjupIRWD/Xp1+T+H8CyYxmUc/0XLj2s=\"\n" ++
+  "vendor = true\n" ++
+  "entry = \"sha256.bend\"\n"
+
+# the dependency that stanza reads as
+def sha.dep() -> M.Dep:
+  M.dep(M.parse(sha.toml()), "sha256")
+
+# `main` at the time the upgrade was written
+def sha.tip() -> String:
+  "5887e7cefa273ff7f90e3edfd6e90b815bbc79ed"
+
+# the allowlist as `.gitignore` writes it for the committed sha256 tree
+def sha.ignore() -> String:
+  ".ez/*\n!.ez/lib\n.ez/lib/*\n!.ez/lib/0x0a5c2c95283e42e081da247c84debe18\n"
+
+# LAW: `vendor = true`, bare, is the committed-tree bit
+law sha256_vendor_flag:
+  {M.source.vendor(M.source.dep(sha.dep())) == True{} : Bool}
+
+# LAW: a quoted true is the same bit. The renderer writes the quotes.
+law vendor_flag_true:
+  {M.flag("true") == True{} : Bool}
+
+# LAW: an absent vendor key is not a committed tree
+law vendor_flag_absent:
+  {M.flag("") == False{} : Bool}
+
+# LAW: sha256 has no tag, so an upgrade asks the default branch rather than
+# a ref the ledger never named
+law sha256_aims_forward:
+  {U.aim(True{}, M.source.dep(sha.dep())) == U.Forward{} : U.Aim}
+
+# LAW: a hub pin is not upgraded, even when it was the one asked for
+law hub_holds:
+  {U.aim(True{}, M.Hub{}) == U.Hold{} : U.Aim}
+
+# LAW: a tag is re-resolved, and a neighbour `--package` did not name is not
+law tag_follows:
+  {U.aim(True{}, M.Git{"https://github.com/Emerging-Patterns/shake",
+    "3424b39197335f0aa741e8928dbe5c27b3bde0ef", "v0.1.0", "shake",
+    "sha256-JXsEnp4NFlBxM7dNPSCU4TDBuF+d76h5bYgwOd6iu+0=", False{}})
+    == U.Follow{"v0.1.0"} : U.Aim}
+
+# LAW: and naming one dependency leaves the other where it was
+law unselected_holds:
+  {U.aim(False{}, M.source.dep(sha.dep())) == U.Hold{} : U.Aim}
+
+# LAW: sha256's pin, being an ancestor of main, advances to that tip and
+# does not grow a tag
+law sha256_advances:
+  {U.judge(False{}, True{}, True{}, sha.tip(), "")
+    == U.Advance{sha.tip(), ""} : U.Verdict}
+
+# LAW: the same commit, recomputed to the same hash, is not a rewrite
+law same_rev_keeps:
+  {U.judge(True{}, True{}, True{}, "c16cd69cedff0e9e19251401dee1cd973458faef", "")
+    == U.Keep{} : U.Verdict}
+
+# LAW: the same commit whose tree no longer hashes to the pin is drift
+law same_rev_drifts:
+  {U.judge(True{}, False{}, False{}, "c16cd69cedff0e9e19251401dee1cd973458faef", "")
+    == U.Drift{} : U.Verdict}
+
+# LAW: a tag that now names a commit the pin does not descend to has moved
+law tag_moved_off:
+  {U.judge(False{}, False{}, True{}, "75741733dca8ba3610b116af5d74997a44c7e978",
+    "v0.1.0") == U.Off{} : U.Verdict}
+
+# LAW: a move keeps the vendor bit and the entry, and writes the new commit
+law sha256_retarget:
+  {U.retarget(sha.dep(), sha.tip(), "0xnew", ".", "sha256-new")
+    == M.Dep{"sha256", "0xnew", "sha256.bend",
+      M.Git{"https://github.com/Giulio2002/bend-sha256", sha.tip(), "", ".",
+        "sha256-new", True{}}} : M.Dep}
+
+# LAW: the allowlist follows the new hash and leaves the rest of the file
+law sha256_allowlist:
+  {U.reallow(sha.ignore(), "0x0a5c2c95283e42e081da247c84debe18", "0xnew")
+    == ".ez/*\n!.ez/lib\n.ez/lib/*\n!.ez/lib/0xnew\n" : String}
+
+# LAW: a body that hashed wrong is the hub disagreeing with git. A miss
+# that never produced a body is not.
+law hub_digest_disagrees:
+  {U.hub.bad("https://hub.bend-lang.com/0xabc/manifest does not hash to what was asked for")
+    == True{} : Bool}

@@ -55,7 +55,8 @@ nix profile install github:Emerging-Patterns/ez
 ez init [name] [entry.bend]      scaffold a project: ez.toml, .gitignore, entry
 ez add <url> <ref> <entry.bend>  vendor a git package and record it
 ez remove <name>                 drop a package from the ledger
-ez lock                          resolve every import, write ez.lock.toml
+ez lock [--upgrade] [--package NAME]
+                                 resolve every import, write ez.lock.toml
 ez fetch                         fill BEND_LIB from the lock
 ez check                         check the entry, without running it
 ez build [out]                   build the entry to a native binary
@@ -86,8 +87,20 @@ narHash = "sha256-..."
 entry = "src/lib.bend"
 ```
 
-A dependency with no `git` key lives on the hub. `ez doctor` reports when the
-ledger and the repo's import lines disagree; it never rewrites your source.
+A dependency with no `git` key lives on the hub. `vendor = true` commits that
+dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.
+Without it, the tree is not committed: `ez fetch` fills `BEND_LIB` from the
+lock. `ez doctor` reports when the ledger and the repo's import lines
+disagree; it never rewrites your source.
+
+`ez lock --upgrade` re-pins git dependencies, then writes the lock.
+`--package NAME` limits that to one. A `tag` is re-resolved. A dependency
+with only a `rev` moves to the default branch tip when the pinned commit is
+an ancestor of it, and stays a commit pin. A hub dependency does not move.
+The upgrade does not fetch the rest of the lock. A dependency marked
+`vendor` is laid out again under the new hash, and the gitignore allowlist
+follows it. Import lines are left for you to edit; `ez doctor` names the ones
+that still carry the old hash.
 
 The ledger is enough on its own. `root` and `narHash` are there so that
 `ez lock` never has to consult anything a clone does not have, which is what
