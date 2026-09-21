@@ -4,7 +4,7 @@
 # without ever saying so.
 import Base
 import ./lock.bend as L
-import ../manifest/toml.bend as T
+import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../pkg/pkg.bend as K
 
 # LAW: a package resolves to the origin recorded for it, whatever origins
