@@ -29,6 +29,17 @@ law clen_exact:
   for +body: String
   {Http.parse.clen(st, Http.utf8.len(body), body) == Http.Reply{st, body} : Http.Reply}
 
+# LAW: a body shorter than the Content-Length it was framed with is
+# torn, so a cut connection is not a short file.
+law clen_short:
+  for st: U32
+  for +n: Nat
+  for +body: String
+  for e: {True{} == Nat.is_lt(Http.utf8.len(body), n) : Bool}
+  {Http.parse.clen(st, n, body)
+    == Http.Torn{"the response body stopped before its Content-Length"}
+    : Http.Reply}
+
 # The shapes net/http.bend had before the dechunk rewrite, kept here so that
 # the rewrite's one real risk can be stated rather than sampled: that the fast
 # definitions answer exactly what the slow ones answered, on every input.
@@ -135,6 +146,16 @@ law dechunk_agrees:
   for +s: String
   {old.dechunk(s) == Http.dechunk(s) : String}
 
+# LAW: a chunked body decodes the same however the reads fell. The
+# bytes taken and dropped at any offset are the same bytes, so the
+# decode of the join is the decode of the whole.
+law dechunk_split:
+  for +s: String
+  for +n: Nat
+  {Http.dechunk(s)
+    == Http.dechunk(String.append(Http.utf8.take(s, n), Http.utf8.drop(s, n)))
+    : String}
+
 # The rest of the text: what ez writes to a server, and how it cuts up what a
 # server writes back. A parser that reads the wrong field out of a line is
 # wrong the same way a miscounted body is wrong, so the cuts are stated too.
@@ -227,6 +248,34 @@ law parse_splits_at_blank_line:
   {Http.parse(raw) == Http.parse.head(String.lines(before), after)
     : Http.Reply}
 
+# LAW: with neither framing header the rest of the connection is the
+# body, whole. `Connection: close` asked for that frame, and a body
+# that was cut to nothing would be a different file.
+law unframed_is_rest:
+  for st: U32
+  for body: String
+  {Http.parse.len(st, None{}, body) == Http.Reply{st, body} : Http.Reply}
+
+# LAW: a header is found after the line is cased down, so the case
+# the server wrote it in does not hide it. The name is asked for in
+# lower case.
+law head_hit_ignores_case:
+  for +h: String
+  for +name: String
+  {Http.head.hit(h, name)
+    == String.starts_with(String.to_lower(h), name ++ ":") : Bool}
+
+# LAW: a head whose first line holds no status code is torn, and the
+# body after it is not read as a reply.
+law parse_needs_status:
+  for +ls: List<&2, String>
+  for body: String
+  for e: {None{} == U32.read(Http.second(String.split(Http.first(ls), ' ')))
+    : Maybe<&2, U32>}
+  {Http.parse.head(ls, body)
+    == Http.Torn{"the response has no status line"}
+    : Http.Reply}
+
 # LAW: a torn response says so before it says anything else, so a test reading
 # `show` cannot mistake the reason for a body.
 law show_torn_is_marked:
@@ -247,6 +296,12 @@ law dflt_plain:
   for e: {False{} == String.eq(scheme, "https") : Bool}
   {Url.dflt(scheme) == 80 : U32}
 
+# LAW: https implies 443. This is the one scheme that is not the
+# plain port, so a url that named no port still reaches the server
+# on the port TLS listens on.
+law dflt_https:
+  {Url.dflt("https") == 443 : U32}
+
 # LAW: the scheme is everything before the first colon, cased down, and the
 # colons after it survive, because the rest is joined back up before it is
 # read. A port, or a colon anywhere in the path, is therefore not a second
@@ -257,6 +312,26 @@ law parse_scheme_first:
   for t: List<&2, String>
   for e: {h <> t == String.split(url, ':') : List<&2, String>}
   {Url.parse(url) == Url.parse.rest(String.to_lower(h), String.join(t, ":"))
+    : Url.Loc}
+
+# LAW: a file url with an empty authority has no host and the
+# plain port. The empty authority is not a host ez invents one
+# for, and the scheme is not https, so the port is 80 and the
+# path is the path.
+law file_empty_host:
+  for path: String
+  {Url.parse.auth("file", [""], path)
+    == Url.Loc{"file", "", 80, path} : Url.Loc}
+
+# LAW: a url whose rest does not open with `//` is refused, and
+# the reason names the url as it was written. A scheme with no
+# slashes is not a host and a path; it is this error.
+law parse_needs_slashes:
+  for +scheme: String
+  for +rest: String
+  for e: {False{} == String.starts_with(rest, "//") : Bool}
+  {Url.parse.rest(scheme, rest)
+    == Url.Bad{scheme ++ ":" ++ rest ++ " has no //"}
     : Url.Loc}
 
 # LAW: a url that would not come apart says so before it says anything else

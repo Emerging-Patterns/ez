@@ -146,6 +146,14 @@ def Laws.clen_exact(st, body):
     Equal.cong(String, Http.Reply, x => Http.Reply{st, x},
       Http.utf8.take(body, Http.utf8.len(body)), body, take_all(body)))
 
+# The short-body verdict is the True arm of `parse.short`, and the
+# hypothesis is that arm.
+def Laws.clen_short(st, n, body, e):
+  %e : {Http.parse.short(st, n, body, _)
+    == Http.Torn{"the response body stopped before its Content-Length"}
+    : Http.Reply}
+  {==}
+
 # LAW: every string starts with nothing
 law starts_nil:
   for s: String
@@ -341,6 +349,15 @@ def chunks_agrees(fuel, c, acc):
 def Laws.dechunk_agrees(s):
   chunks_agrees(String.length(s), Http.divide(s, "\r\n"), SNil{})
 
+# The partition is the same bytes, so the decode of the join is the
+# decode of the whole.
+def Laws.dechunk_split(s, n):
+  Equal.cong(String, String, x => Http.dechunk(x),
+    s, String.append(Http.utf8.take(s, n), Http.utf8.drop(s, n)),
+    Equal.sym(String,
+      String.append(Http.utf8.take(s, n), Http.utf8.drop(s, n)),
+      s, Laws.utf8_split(s, n)))
+
 # The rest of the text begins here. Every one of these laws is either a split
 # walked one character at a time, or a hypothesis rewritten into the one place
 # the code branches. The boolean facts each of them ends on -- that an `and`
@@ -461,6 +478,24 @@ def Laws.parse_splits_at_blank_line(_raw, before, after, e):
     : Http.Reply}
   {==}
 
+# Neither header means the None arm, which is the rest of the
+# connection as the body.
+def Laws.unframed_is_rest(_st, _body):
+  {==}
+
+# The name is compared after the line is cased down, which is the
+# definition.
+def Laws.head_hit_ignores_case(_h, _name):
+  {==}
+
+# The missing status is the None arm of `parse.status`, and the
+# hypothesis is that arm.
+def Laws.parse_needs_status(ls, body, e):
+  %e : {Http.parse.status(_, ls, body)
+    == Http.Torn{"the response has no status line"}
+    : Http.Reply}
+  {==}
+
 # `torn ` and `bad ` are literals, so each comparison computes down to the
 # reason against the empty prefix; a status or a scheme is not, so each of
 # those is the append law.
@@ -479,6 +514,23 @@ def Laws.url_show_opens_with_scheme(scheme, host, port, path):
 # The port a scheme implies is one test, and the hypothesis answers it.
 def Laws.dflt_plain(_scheme, e):
   %e : {Bool.pick(U32, _, 443, 80) == 80 : U32}
+  {==}
+
+# https is the True arm of that same test.
+def Laws.dflt_https():
+  {==}
+
+# The empty authority is no host and the plain port, which is 80
+# because the scheme is not https.
+def Laws.file_empty_host(_path):
+  {==}
+
+# The missing slashes are the False arm of `parse.body`, and the
+# hypothesis is that arm.
+def Laws.parse_needs_slashes(scheme, rest, e):
+  %e : {Url.parse.body(scheme, rest, _)
+    == Url.Bad{scheme ++ ":" ++ rest ++ " has no //"}
+    : Url.Loc}
   {==}
 
 # The scheme cut is one match on the split, and the hypothesis says which arm.
