@@ -12,6 +12,7 @@
 # not accept, and that no disagreement can ever be read as agreement.
 import Base
 import ./pub.bend as P
+import ../git/git.bend as G
 
 # whether any line of a list is a `0x` name. This is the vocabulary
 # `answer_is_a_name` needs and nothing else uses: it says here what "bend
@@ -97,3 +98,55 @@ law untracked_is_dirty:
   for path: String
   for rest: List<&2, String>
   {P.dirty.lines(("?? " ++ path) <> rest) == True{} : Bool}
+
+# The rest of a name, and of a porcelain line: whether a line is a `0x`
+# name at all, and whether a status that names a path is dirty. A name
+# one character short, or written in the wrong case, or holding a
+# character no digest holds, is not an answer, and a modified or staged
+# file is a change the same way an untracked one is.
+
+# LAW: a line that does not open `0x` is not a name. The prefix is
+# lowercase; an upper-case `0X` is already not one.
+law is_name_needs_0x:
+  for +s: String
+  for e: {False{} == String.starts_with(s, "0x") : Bool}
+  {P.is_name(s) == False{} : Bool}
+
+# LAW: nor is a line of the right prefix whose length is not
+# `name.length`. One character short is enough.
+law is_name_needs_length:
+  for +s: String
+  for e0: {True{} == String.starts_with(s, "0x") : Bool}
+  for e1: {False{} == Nat.is_eq(String.length(s), P.name.length()) : Bool}
+  {P.is_name(s) == False{} : Bool}
+
+# LAW: nor is a name of the right prefix and length whose alphabet is
+# not lowercase hex. A character no digest holds is enough.
+law is_name_needs_hex:
+  for +s: String
+  for e0: {True{} == String.starts_with(s, "0x") : Bool}
+  for e1: {True{} == Nat.is_eq(String.length(s), P.name.length()) : Bool}
+  for e2: {False{} == G.hex.all(String.to_list(String.drop(s, 2n))) : Bool}
+  {P.is_name(s) == False{} : Bool}
+
+# LAW: a `0x` prefix, the exact length, and a lowercase hex digest are
+# a name, and nothing else of the line is read.
+law is_name_hex34:
+  for +s: String
+  for e0: {True{} == String.starts_with(s, "0x") : Bool}
+  for e1: {True{} == Nat.is_eq(String.length(s), P.name.length()) : Bool}
+  for e2: {True{} == G.hex.all(String.to_list(String.drop(s, 2n))) : Bool}
+  {P.is_name(s) == True{} : Bool}
+
+# LAW: and the modified case said out loud. A porcelain ` M` line names
+# a path, so the tree is dirty.
+law modified_is_dirty:
+  for path: String
+  for rest: List<&2, String>
+  {P.dirty.lines((" M " ++ path) <> rest) == True{} : Bool}
+
+# LAW: and a staged addition too. `A ` is a path the same way `??` is.
+law staged_is_dirty:
+  for path: String
+  for rest: List<&2, String>
+  {P.dirty.lines(("A  " ++ path) <> rest) == True{} : Bool}
