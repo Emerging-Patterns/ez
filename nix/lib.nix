@@ -57,6 +57,12 @@ let
     let file = lockOf src lock; in
     if file == null then null else bendLib file;
 
+  # An explicit BEND_LIB store path wins. Otherwise the tree of `lock`, or of
+  # src/ez.lock.toml when that file is present. Otherwise null, and BEND_LIB
+  # is unset.
+  bendLibFor = given: src: lock:
+    if given != null then given else bendLibOf src lock;
+
   withBendLib = tree: attrs:
     attrs // lib.optionalAttrs (tree != null) { BEND_LIB = tree; };
 
@@ -128,27 +134,47 @@ in
     });
 
   # `ez test` in a writable copy of src. EZ_DEADLINE defaults to 0.
-  # extraFlags are further arguments (`--js-only`, `--unit-only`).
-  # When src has ez.lock.toml, BEND_LIB is that tree.
+  # extraFlags are further arguments. Omit `--js-only` when the host
+  # `/usr/bin/ld` is usable under the check. Flags only: there is no
+  # separate native helper.
+  # `lock` is an explicit lock path, as in mkPackage. `bendLib`, when non-null,
+  # is the store path used as BEND_LIB. Precedence: `bendLib`, else
+  # `bendLibOf src lock`, else no BEND_LIB.
+  #
+  #   checks.${system}.test = inputs.ez.lib.${system}.mkProofs {
+  #     ez = inputs.ez.packages.${system}.default;
+  #     src = self;
+  #     name = "…-test";
+  #     extraFlags = [ "--unit-only" ]; # add "--js-only" when host ld unavailable in sandbox
+  #   };
   mkProofs = {
     ez,
     src,
     name ? "proofs",
     extraFlags ? [ ],
     deadline ? "0",
+    lock ? null,
+    bendLib ? null,
   }:
     pkgs.runCommand name
-      (withBendLib (bendLibOf src null) {
+      (withBendLib (bendLibFor bendLib src lock) {
         nativeBuildInputs = [ ez ];
         EZ_DEADLINE = toString deadline;
       })
       (copyTree src "ez test ${lib.escapeShellArgs extraFlags}");
 
   # `bolt` in a writable copy of src.
-  # When src has ez.lock.toml, BEND_LIB is that tree.
-  mkLint = { bolt, src, name ? "lint" }:
+  # `lock` and `bendLib` match mkProofs: an explicit `bendLib` is BEND_LIB,
+  # else the lock's tree, else no BEND_LIB.
+  mkLint = {
+    bolt,
+    src,
+    name ? "lint",
+    lock ? null,
+    bendLib ? null,
+  }:
     pkgs.runCommand name
-      (withBendLib (bendLibOf src null) {
+      (withBendLib (bendLibFor bendLib src lock) {
         nativeBuildInputs = [ bolt ];
       })
       (copyTree src "bolt");
