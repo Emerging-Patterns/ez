@@ -1,0 +1,20 @@
+name: lock-upgrade
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Optional --package NAME"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  upgrade:
+    uses: Emerging-Patterns/actions/.github/workflows/lock-upgrade.yml@4963a78a6800f81dea5da54de675a6c3059cb065
+    with:
+      package: ${{ inputs.package }}
