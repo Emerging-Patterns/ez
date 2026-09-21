@@ -15,9 +15,4 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+    uses: Emerging-Patterns/actions/.github/workflows/github-release.yml@9523e8b294ae014fade5861c32d5ab911866acb2
