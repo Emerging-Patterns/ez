@@ -21,9 +21,10 @@ type Source is Data:
 type Dep is Data:
   Dep{name: String, hash: String, entry: String, source: Source}
 
-# the ledger: this package, and everything it depends on
+# the ledger: this package, the file `ez build` and `ez run` take, the file
+# `ez tool run` builds when one is named, and everything the package depends on
 type Manifest is Data:
-  Manifest{name: String, entry: String, deps: List<&2, Dep>}
+  Manifest{name: String, entry: String, bin: String, deps: List<&2, Dep>}
 
 # a manifest, or why it could not be read
 type Read is Data:
@@ -145,7 +146,8 @@ def problem(+bad: String, +miss: String) -> String:
 # the ledger, once the document is known to be sound
 def build(+ss: List<&2, T.Sect>) -> Read:
   Good{Manifest{value(pairs_of(ss, "package"), "name"),
-    value(pairs_of(ss, "package"), "entry"), deps(ss)}}
+    value(pairs_of(ss, "package"), "entry"),
+    value(pairs_of(ss, "package"), "bin"), deps(ss)}}
 
 # the ledger, or the problem that stopped it
 def read.go(ok: Bool, why: String, ss: List<&2, T.Sect>) -> Read:
@@ -193,7 +195,7 @@ def show.deps(ds: List<&2, Dep>) -> List<&2, String>:
 
 # the ledger on one line, for a test or a report
 def show.m(m: Manifest) -> String:
-  Manifest{n, e, ds} = m
+  Manifest{n, e, _b, ds} = m
   n ++ " " ++ e ++ " " ++ String.join(show.deps(ds), " ")
 
 # the ledger, or the error, on one line
@@ -231,7 +233,7 @@ def dep(r: Read, name: String) -> Dep:
     case Bad{_why}:
       Dep{"", "", "", Hub{}}
     case Good{m}:
-      Manifest{_n, _e, ds} = m
+      Manifest{_n, _e, _b, ds} = m
       find(ds, name)
 
 # the commit a dependency is pinned to, or "" when it is a hub package

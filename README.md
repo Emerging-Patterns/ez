@@ -33,11 +33,11 @@ BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
 
 Nothing is fetched: the one package ez builds itself with is vendored, and
 `bend` only needs telling where it is, since it looks in `~/.bend/lib`
-otherwise. Put `bin/ez.bin` on your PATH as `ez`.
+otherwise. Put `bin/ez.bin` on your PATH as `ez`. `bin/ezx` is `ez tool run`.
 
-ez is Bend and nothing else, so the binary is all there is: no runtime, no
-helper scripts beside it, nothing to point an environment variable at. Every
-subcommand needs `bend` and `git`, and `ez add` also wants `nix` on PATH,
+ez is Bend and nothing else: no runtime, nothing to point an environment
+variable at. `bin/ezx` only execs `ez tool run`. Every subcommand needs
+`bend` and `git`, and `ez add` also wants `nix` on PATH,
 because the NAR hash it records for a vendored repo is `nix hash path`'s to
 give.
 
@@ -61,6 +61,8 @@ ez fetch                         fill BEND_LIB from the lock
 ez check                         check the entry, without running it
 ez build [out]                   build the entry to a native binary
 ez run [args..]                  check and run the entry
+ez tool run <target> [-- args..] fetch, build and run a repo's binary
+ezx <target> [-- args..]         the same command
 ez publish                       send the entry to the hub, under ez's 0x name
 ez test [--js-only] [--full] [--unit-only]
                                  run every */tests/*.bend, on both lanes
@@ -76,6 +78,7 @@ A ledger, and a dependency vendored from a repo that never published:
 [package]
 name = "myapp"
 entry = "src/main.bend"
+bin = "src/main.bend"
 
 [deps.wire]
 hash = "0x7e63a5b990a375c304ed462c071214a6"
@@ -86,6 +89,15 @@ root = "."
 narHash = "sha256-..."
 entry = "src/lib.bend"
 ```
+
+`bin` is the file `ez tool run` and `ezx` build. With no `bin`, that is the
+entry. `owner/repo` is `https://github.com/owner/repo`. A git URL is kept.
+Any other target is a path (`/…`, `./…`, `../…`, `~/…`, or a word that is
+not `owner/repo`). The checkout and the binary are cached under
+`$XDG_CACHE_HOME/ez/tool/<slug>` (`~/.cache/ez/tool/<slug>` when that is
+unset) and reused while the remote still names the same commit. The built
+program's status is the status of the command. A target, ledger, fetch or
+build that fails exits 1.
 
 A dependency with no `git` key lives on the hub. `vendor = true` commits that
 dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.

@@ -247,3 +247,60 @@ def Laws.argv_of_other():
 
 def Laws.argv_of_empty():
   {==}
+
+def Laws.argv_of_tool():
+  {==}
+
+def Laws.argv_of_tool_bare():
+  {==}
+
+def Laws.tool_rest_dashes():
+  {==}
+
+def Laws.tool_rest_plain():
+  {==}
+
+def Laws.target_github():
+  {==}
+
+def Laws.target_url():
+  {==}
+
+def Laws.target_scp():
+  {==}
+
+def Laws.target_abs():
+  {==}
+
+def Laws.target_file():
+  {==}
+
+def Laws.target_dot():
+  {==}
+
+def Laws.target_empty():
+  {==}
+
+def Laws.target_escapes():
+  {==}
+
+def Laws.expand_tilde():
+  {==}
+
+def Laws.expand_plain():
+  {==}
+
+def Laws.file_bin():
+  {==}
+
+def Laws.file_entry():
+  {==}
+
+def Laws.file_default():
+  {==}
+
+def Laws.out_name_empty():
+  {==}
+
+def Laws.out_name():
+  {==}

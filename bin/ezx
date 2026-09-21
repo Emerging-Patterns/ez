@@ -1,0 +1,3 @@
+#!/bin/sh
+# ezx: run a remote ez project's binary. Same as `ez tool run`.
+exec ez tool run "$@"

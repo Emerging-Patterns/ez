@@ -51,6 +51,7 @@
             --prefix PATH : ${pkgs.lib.makeBinPath [
               bend pkgs.git pkgs.findutils pkgs.coreutils
             ]}
+          makeWrapper $out/bin/ez $out/bin/ezx --add-flags tool --add-flags run
         '';
       };
 

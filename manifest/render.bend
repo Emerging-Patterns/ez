@@ -4,8 +4,8 @@
 import Base
 import ./manifest.bend as M
 
-# a key line, or nothing at all when the value is empty, so an absent tag or
-# entry leaves no trace
+# a key line, or nothing at all when the value is empty, so an absent tag,
+# entry or bin leaves no trace
 def line(key: String, +val: String) -> String:
   Bool.pick(String, String.is_empty(val), "", key ++ " = \"" ++ val ++ "\"\n")
 
@@ -42,8 +42,8 @@ def deps(ds: List<&2, M.Dep>) -> String:
 
 # the ledger as an ez.toml
 def show(m: M.Manifest) -> String:
-  M.Manifest{n, e, ds} = m
-  "[package]\n" ++ line("name", n) ++ line("entry", e) ++ deps(ds)
+  M.Manifest{n, e, b, ds} = m
+  "[package]\n" ++ line("name", n) ++ line("entry", e) ++ line("bin", b) ++ deps(ds)
 
 # a ledger that was read, as an ez.toml; an unreadable one renders as nothing,
 # so a failed read can never overwrite a good file with a guess
@@ -73,10 +73,10 @@ def without(ds: List<&2, M.Dep>, +name: String) -> List<&2, M.Dep>:
 # the ledger with a dependency added, replacing any of the same name, so adding
 # twice is the same as adding once
 def add(m: M.Manifest, +d: M.Dep) -> M.Manifest:
-  M.Manifest{n, e, ds} = m
-  M.Manifest{n, e, List.append(&2, M.Dep, without(ds, M.dep.name(d)), [d])}
+  M.Manifest{n, e, b, ds} = m
+  M.Manifest{n, e, b, List.append(&2, M.Dep, without(ds, M.dep.name(d)), [d])}
 
 # the ledger with a dependency dropped
 def remove(m: M.Manifest, name: String) -> M.Manifest:
-  M.Manifest{n, e, ds} = m
-  M.Manifest{n, e, without(ds, name)}
+  M.Manifest{n, e, b, ds} = m
+  M.Manifest{n, e, b, without(ds, name)}

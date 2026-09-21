@@ -65,8 +65,56 @@ def rest(as: List<&2, String>) -> List<&2, String>:
     case Con{_h, t}:
       t
 
-# a `run` line is parsed as the command alone; every other line is parsed as
-# it arrived. `run` forwards the rest to the entry, and those words are not
-# a fixed set of positionals.
+# `n` words dropped. What remains when the list runs out first is nothing.
+def drop(xs: List<&2, String>, n: Nat) -> List<&2, String>:
+  match xs n:
+    case Nil{} _m:
+      Nil{}
+    case Con{+h, +t} 0n:
+      h <> t
+    case Con{_h, t} 1n+p:
+      drop(t, p)
+
+# a leading `--` is the separator, not a word the program was given
+def undash(xs: List<&2, String>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Bool.pick(List<&2, String>, String.eq(h, "--"), t, h <> t)
+
+# the words `ez tool run` forwards: everything after the target, with one
+# leading `--` taken off
+def tool.rest(as: List<&2, String>) -> List<&2, String>:
+  undash(drop(as, 3n))
+
+# `tool run` with its target, and without the words the program is given.
+# A missing target is left missing, so the parse can say so.
+def tool.line(+t: String) -> List<&2, String>:
+  Bool.pick(List<&2, String>, String.is_empty(t), ["tool", "run"],
+    ["tool", "run", t])
+
+# whether this line is `tool run`
+def is.tool.run(+as: List<&2, String>) -> Bool:
+  Bool.and(String.eq(at(as, 0n), "tool"), String.eq(at(as, 1n), "run"))
+
+# `tool run` parsed as the command and its target; any other line as itself
+def argv.tool(hit: Bool, +as: List<&2, String>) -> List<&2, String>:
+  match hit:
+    case True{}:
+      tool.line(at(as, 2n))
+    case False{}:
+      as
+
+# `run` parsed as the command alone, so the words it forwards are not flags
+def argv.run(hit: Bool, +as: List<&2, String>) -> List<&2, String>:
+  match hit:
+    case True{}:
+      ["run"]
+    case False{}:
+      argv.tool(is.tool.run(as), as)
+
+# a `run` line and a `tool run` line are parsed without the words they
+# forward. Every other line is parsed as it arrived.
 def argv.of(+as: List<&2, String>) -> List<&2, String>:
-  Bool.pick(List<&2, String>, String.eq(at(as, 0n), "run"), ["run"], as)
+  argv.run(String.eq(at(as, 0n), "run"), as)

@@ -1,6 +1,7 @@
 [package]
 name = "ez"
 entry = "manifest/manifest.bend"
+bin = "ez/main.bend"
 
 [deps.sha256]
 hash = "0x0a5c2c95283e42e081da247c84debe18"
