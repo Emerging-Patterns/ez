@@ -1,12 +1,12 @@
 result
 .ez/*
-# except the packages ez needs to build itself. ez's own Bend imports them
-# out of BEND_LIB, so a checkout with an empty BEND_LIB cannot check any
-# Bend here, let alone run `ez fetch` to fill it. Vendoring them is what
-# lets a clone build with no network.
+# except the one package ez needs to build itself. ez's own Bend imports
+# sha256 out of BEND_LIB, so a checkout with an empty BEND_LIB cannot check
+# any Bend here, let alone run `ez fetch` to fill it. Vendoring it is what the
+# README already advertises for a package that was never published, and it is
+# what lets a clone build with no network, no bun and no shell.
 !.ez/lib
 .ez/lib/*
 !.ez/lib/0x0a5c2c95283e42e081da247c84debe18
-!.ez/lib/0xebdf72b20ad527103f6efc0d2aa8f1ec
 bin/ez.bin
 .claude/

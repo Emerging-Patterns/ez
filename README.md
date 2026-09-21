@@ -31,8 +31,8 @@ cd ez
 BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
 ```
 
-Nothing is fetched: the packages ez builds itself with are vendored, and
-`bend` only needs telling where they are, since it looks in `~/.bend/lib`
+Nothing is fetched: the one package ez builds itself with is vendored, and
+`bend` only needs telling where it is, since it looks in `~/.bend/lib`
 otherwise. Put `bin/ez.bin` on your PATH as `ez`.
 
 ez is Bend and nothing else, so the binary is all there is: no runtime, no
