@@ -22,7 +22,8 @@ type Dep is Data:
   Dep{name: String, hash: String, entry: String, source: Source}
 
 # the ledger: this package, the file `ez build` and `ez run` take, the file
-# `ez tool run` builds when one is named, and everything the package depends on
+# `ez tool run`, `install` and `upgrade` build when one is named, and
+# everything the package depends on
 type Manifest is Data:
   Manifest{name: String, entry: String, bin: String, deps: List<&2, Dep>}
 
