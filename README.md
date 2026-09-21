@@ -33,11 +33,16 @@ BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
 
 Nothing is fetched: the one package ez builds itself with is vendored, and
 `bend` only needs telling where it is, since it looks in `~/.bend/lib`
-otherwise. Put `bin/ez.bin` on your PATH as `ez`. `bin/ezx` is `ez tool run`.
+otherwise. Put `bin/ez.bin` on your PATH as `ez`. The command is
+`ez tool run`. To name it `ezx`, put this next to that `ez`:
 
-ez is Bend and nothing else: no runtime, nothing to point an environment
-variable at. `bin/ezx` only execs `ez tool run`. Every subcommand needs
-`bend` and `git`, and `ez add` also wants `nix` on PATH,
+```sh
+printf '%s\n' '#!/bin/sh' 'exec ez tool run "$@"' > ezx && chmod +x ezx
+```
+
+ez is Bend and nothing else, so the binary is all there is: no runtime, no
+helper scripts beside it, nothing to point an environment variable at. Every
+subcommand needs `bend` and `git`, and `ez add` also wants `nix` on PATH,
 because the NAR hash it records for a vendored repo is `nix hash path`'s to
 give.
 
@@ -47,7 +52,8 @@ Or with nix:
 nix profile install github:Emerging-Patterns/ez
 ```
 
-`nix develop` gives a shell with bend, git, openssl and `BEND_LIB` already set.
+That install provides `ez` and `ezx`. `ezx` is `ez tool run`. `nix develop`
+gives a shell with bend, git, openssl and `BEND_LIB` already set.
 
 ## Usage
 
@@ -62,7 +68,7 @@ ez check                         check the entry, without running it
 ez build [out]                   build the entry to a native binary
 ez run [args..]                  check and run the entry
 ez tool run <target> [-- args..] fetch, build and run a repo's binary
-ezx <target> [-- args..]         the same command
+ezx <target> [-- args..]         ez tool run, when ezx is on PATH
 ez publish                       send the entry to the hub, under ez's 0x name
 ez test [--js-only] [--full] [--unit-only]
                                  run every */tests/*.bend, on both lanes
