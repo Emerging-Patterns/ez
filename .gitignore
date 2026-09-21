@@ -1,10 +1,10 @@
 result
 .ez/*
-# except the one package ez needs to build itself. ez's own Bend imports
+# except a dependency marked `vendor = true` in ez.toml. ez's own Bend imports
 # sha256 out of BEND_LIB, so a checkout with an empty BEND_LIB cannot check
-# any Bend here, let alone run `ez fetch` to fill it. Vendoring it is what the
-# README already advertises for a package that was never published, and it is
-# what lets a clone build with no network, no bun and no shell.
+# any Bend here, let alone run `ez fetch` to fill it. The allowlist line is
+# the hash of that tree. `ez lock --upgrade` rewrites the line when the pin
+# moves and lays the new tree beside it.
 !.ez/lib
 .ez/lib/*
 !.ez/lib/0x0a5c2c95283e42e081da247c84debe18

@@ -8,6 +8,7 @@ git = "https://github.com/Giulio2002/bend-sha256"
 rev = "c16cd69cedff0e9e19251401dee1cd973458faef"
 root = "."
 narHash = "sha256-ZQdxgjNCSu3lXjupIRWD/Xp1+T+H8CyYxmUc/0XLj2s="
+vendor = true
 entry = "sha256.bend"
 
 [deps.shake]

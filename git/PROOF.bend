@@ -175,6 +175,12 @@ def Laws.root_rel_here(at, root, entry, e):
           nat_eq_is(G.depth(P.dir(at)), G.depth(root), e))),
       sub_self(G.depth(P.dir(at)))))
 
+def Laws.sha256_remote_tip():
+  {==}
+
+def Laws.sha256_remote_branch():
+  {==}
+
 def Laws.root_rel_up(at, root, entry, e):
   Equal.cong(Nat, String,
     n => P.climb(n, P.dir(entry)),

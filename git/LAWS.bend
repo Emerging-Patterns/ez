@@ -141,6 +141,24 @@ law root_rel_here:
   for e: {Nat.is_eq(G.depth(P.dir(at)), G.depth(root)) == True{} : Bool}
   {G.root.rel(at, root, entry) == P.climb(0n, P.dir(entry)) : String}
 
+# What `git ls-remote --symref` printed for Giulio2002/bend-sha256 while
+# this was written. HEAD is main, one commit past tag v0.1.0, and the
+# commit ez.toml pins (c16cd69…) is an ancestor of both. The parser's job
+# is to find that tip and that branch; whether the pin may move is decided
+# in manifest/upgrade.bend.
+def sha.remote() -> String:
+  "ref: refs/heads/main\tHEAD\n" ++
+  "5887e7cefa273ff7f90e3edfd6e90b815bbc79ed\tHEAD\n"
+
+# LAW: the commit row, not the symref row, is the tip
+law sha256_remote_tip:
+  {G.tip.rev(G.rows(String.lines(sha.remote())))
+    == "5887e7cefa273ff7f90e3edfd6e90b815bbc79ed" : String}
+
+# LAW: and the symref row is the branch that tip belongs to
+law sha256_remote_branch:
+  {G.tip.branch(G.rows(String.lines(sha.remote()))) == "main" : String}
+
 # LAW: when the checkout root is one directory above the entry, the
 # recorded root is one climb off the entry's directory.
 law root_rel_up:
