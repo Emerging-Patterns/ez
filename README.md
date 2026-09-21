@@ -136,19 +136,28 @@ The ledger is enough on its own. `root` and `narHash` are there so that
 lets someone who has just cloned your repo run `ez lock` and get your lock
 back to the byte, without re-running `ez add`.
 
-In a flake — ez's own flake turns your lock into a `BEND_LIB` store path, so
-there is nothing to copy into your repo:
+In a flake — `lib.${system}` builds the program the ledger names and turns
+`ez.lock.toml` into a `BEND_LIB` store path, so there is nothing to copy
+into your repo:
 
 ```nix
 inputs.ez.url = "github:Emerging-Patterns/ez";
 
 # ...
-bendLib = inputs.ez.lib.${system}.bendLib ./ez.lock.toml;
-# ... buildPhase = "BEND_LIB=${bendLib} bend main.bend -o app";
+ep = inputs.ez.lib.${system};
+
+pkg = ep.mkPackage { inherit bend; src = self; };
+
+proofs = ep.mkProofs { inherit ez; src = self; };
+lint = ep.mkLint { inherit bolt; src = self; };
 ```
 
-Every file comes from a fixed-output derivation keyed by the sha256 the lock
-already records, so the build needs no network and `bend` never reaches the hub.
+`mkPackage` builds `bin` from `ez.toml` when that is set, otherwise `entry`,
+otherwise `main.bend`, and wraps the binary with `bend` on `PATH`. `BEND_LIB`
+comes from `ez.lock.toml`. `ep.bendLib ./ez.lock.toml` is that tree on its
+own. Every file comes from a fixed-output derivation keyed by the sha256 the
+lock already records, so the build needs no network and `bend` never reaches
+the hub.
 
 `ez test` is the gate. It compiles a project's tests into one binary rather
 than one each, runs every project, end-to-end test and proof at once rather
