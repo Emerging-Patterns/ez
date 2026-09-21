@@ -56,3 +56,17 @@ def at(xs: List<&2, String>, n: Nat) -> String:
       h
     case Con{_h, t} 1n+p:
       at(t, p)
+
+# every word after the first, which is what `run` forwards to the entry
+def rest(as: List<&2, String>) -> List<&2, String>:
+  match as:
+    case Nil{}:
+      Nil{}
+    case Con{_h, t}:
+      t
+
+# a `run` line is parsed as the command alone; every other line is parsed as
+# it arrived. `run` forwards the rest to the entry, and those words are not
+# a fixed set of positionals.
+def argv.of(+as: List<&2, String>) -> List<&2, String>:
+  Bool.pick(List<&2, String>, String.eq(at(as, 0n), "run"), ["run"], as)

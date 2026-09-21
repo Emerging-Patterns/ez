@@ -66,6 +66,9 @@ ez test [--js-only] [--full] [--unit-only]
 ez doctor                        report on the toolchain and the project
 ```
 
+`ez help` prints that list, and `ez help test` the flags of one command. The
+Bend runtime keeps `--help` for itself.
+
 A ledger, and a dependency vendored from a repo that never published:
 
 ```toml

@@ -144,15 +144,15 @@ def build.out(+at: String, +name: String) -> String:
 
 # a native binary, named after the package. This is the one command that
 # reaches bend's C backend, so it is the one that runs under the memory cap.
-def build(as: List<&2, String>) -> IO(Unit):
+def build(+out: String) -> IO(Unit):
   do IO<Unit>:
     +r : M.Read <- load()
     +cap : Bool <- Cap.ok()
     Cap.warn(cap)
     +g : String <- Cap.gb()
-    +out : String <- Cap.run(cap, ["bend", entry(r), "-o",
-      build.out(Args.at(as, 0n), named(r))])
-    report.capped(Cap.why(out, g), out)
+    +bin : String <- Cap.run(cap, ["bend", entry(r), "-o",
+      build.out(out, named(r))])
+    report.capped(Cap.why(bin, g), bin)
 
 # the entry run, which checks it first
 def run(as: List<&2, String>) -> IO(Unit):
@@ -301,10 +301,10 @@ def init.entry(+at: String) -> IO(Bool):
 # a new project: a ledger naming this directory and its entry file, the
 # ignore rules for what ez will generate beside them, and the entry itself
 # when the directory does not already hold one
-def init(+as: List<&2, String>) -> IO(Unit):
+def init(+asked: String, +file: String) -> IO(Unit):
   do IO<Unit>:
-    +name : String <- IO.pure(String, init.name(Args.at(as, 0n)))
-    +at : String <- IO.pure(String, entry.or(Args.at(as, 1n)))
+    +name : String <- IO.pure(String, init.name(asked))
+    +at : String <- IO.pure(String, entry.or(file))
     wrote : Bool <- F.write(toml(),
       Rend.show(M.Manifest{name, at, []}))
     +kept : Bool <- init.ignore(name)
@@ -363,22 +363,11 @@ def add.go(+url: String, +ref: String, +entry: String) -> IO(Unit):
     r : M.Read <- load()
     add.write(r, add.dep(g))
 
-# the command, with the missing-argument question already answered. Under a
-# `Bool.pick` the whole vendor-and-record action was built for a call that was
-# about to be refused for saying nothing.
-def add.step(bare: Bool, +as: List<&2, String>, at: String) -> IO(Unit):
-  match bare:
-    case True{}:
-      IO.die(Unit, 1, "usage: ez add <url> <rev|tag|branch> <entry.bend>")
-    case False{}:
-      add.go(Args.at(as, 0n), Args.at(as, 1n), at)
-
 # `ez add <url> <rev|tag|branch> <entry.bend>`. All three are wanted: the
 # entry is what the package's hash is computed from, and guessing it would
 # name a different package.
-def add(+as: List<&2, String>) -> IO(Unit):
-  +at = Args.at(as, 2n)
-  add.step(String.is_empty(at), as, at)
+def add(+url: String, +ref: String, +entry: String) -> IO(Unit):
+  add.go(url, ref, entry)
 
 # the ledger with a dependency dropped
 def remove.write(r: M.Read, name: String) -> IO(Unit):
@@ -391,7 +380,7 @@ def remove.write(r: M.Read, name: String) -> IO(Unit):
         report.exit(wrote)
 
 # `ez remove <name>`
-def remove(as: List<&2, String>) -> IO(Unit):
+def remove(+name: String) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- load()
-    remove.write(r, Args.at(as, 0n))
+    remove.write(r, name)
