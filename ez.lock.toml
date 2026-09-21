@@ -1,7 +1,7 @@
 [lock]
 version = "2"
 hub = "https://hub.bend-lang.com"
-bend = "2.0.21"
+bend = "2.0.24"
 
 [packages."0x0a5c2c95283e42e081da247c84debe18".source]
 kind = "git"
@@ -20,8 +20,14 @@ narHash = "sha256-ZQdxgjNCSu3lXjupIRWD/Xp1+T+H8CyYxmUc/0XLj2s="
 "sha256.bend" = "b77e36f3cb077c6648445a9d8112ce71a4f31fe9c532ca4aa7da33b1b5f6d8cd"
 "state.bend" = "24b4bb267fe94bd1615a8cff6aa090fff766c9009b5f9aa1c08a865b87d06230"
 
-[packages."0xebdf72b20ad527103f6efc0d2aa8f1ec".source]
-kind = "hub"
+[packages."0x97f80841c7cead966f244991e8de30e1".source]
+kind = "git"
+url = "https://github.com/Emerging-Patterns/shake"
+rev = "3424b39197335f0aa741e8928dbe5c27b3bde0ef"
+entry = "shake/main.bend"
+root = "shake"
+narHash = "sha256-JXsEnp4NFlBxM7dNPSCU4TDBuF+d76h5bYgwOd6iu+0="
+tag = "v0.1.0"
 
-[packages."0xebdf72b20ad527103f6efc0d2aa8f1ec".files]
-"main.bend" = "1ef15717b6f45d2a305952ee136850c2368b088d56b9203007e9685c41b50343"
+[packages."0x97f80841c7cead966f244991e8de30e1".files]
+"main.bend" = "55beca0b4279a6af51f342b4412ab904064876b95a1d40b248c18ed18e532061"

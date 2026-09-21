@@ -11,5 +11,10 @@ narHash = "sha256-ZQdxgjNCSu3lXjupIRWD/Xp1+T+H8CyYxmUc/0XLj2s="
 entry = "sha256.bend"
 
 [deps.shake]
-hash = "0xebdf72b20ad527103f6efc0d2aa8f1ec"
-entry = "main.bend"
+hash = "0x97f80841c7cead966f244991e8de30e1"
+git = "https://github.com/Emerging-Patterns/shake"
+rev = "3424b39197335f0aa741e8928dbe5c27b3bde0ef"
+tag = "v0.1.0"
+root = "shake"
+narHash = "sha256-JXsEnp4NFlBxM7dNPSCU4TDBuF+d76h5bYgwOd6iu+0="
+entry = "shake/main.bend"
