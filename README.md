@@ -145,20 +145,27 @@ inputs.ez.url = "github:Emerging-Patterns/ez";
 
 # ...
 ez = inputs.ez.lib.${system};
-ezBin = inputs.ez.packages.${system}.default;
 
 pkg = ez.mkPackage { inherit bend; src = self; };
 
-proofs = ez.mkProofs { ez = ezBin; src = self; };
+checks.${system}.test = ez.mkProofs {
+  ez = inputs.ez.packages.${system}.default;
+  src = self;
+  name = "…-test";
+  extraFlags = [ "--unit-only" ]; # add "--js-only" when host ld unavailable in sandbox
+};
 lint = ez.mkLint { inherit bolt; src = self; };
 ```
 
 `mkPackage` builds `bin` from `ez.toml` when that is set, otherwise `entry`,
-otherwise `main.bend`, and wraps the binary with `bend` on `PATH`. `BEND_LIB`
-comes from `ez.lock.toml`. `ez.bendLib ./ez.lock.toml` is that tree on its
-own. Every file comes from a fixed-output derivation keyed by the sha256 the
-lock already records, so the build needs no network and `bend` never reaches
-the hub.
+otherwise `main.bend`, and wraps the binary with `bend` on `PATH`. `lock` is
+an explicit lock path. `bendLib`, when set, is the store path used as
+`BEND_LIB` and wins over that lock. With neither, `BEND_LIB` comes from
+`src/ez.lock.toml` when that file is present. `ez.bendLib ./ez.lock.toml` is
+that tree on its own. Every file comes from a fixed-output derivation keyed
+by the sha256 the lock already records, so the build needs no network and
+`bend` never reaches the hub. Omit `--js-only` when the check can use
+`/usr/bin/ld`. This repo's own check passes `--js-only --unit-only`.
 
 `ez test` is the gate. It compiles a project's tests into one binary rather
 than one each, runs every project, end-to-end test and proof at once rather

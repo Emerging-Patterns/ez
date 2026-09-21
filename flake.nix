@@ -48,8 +48,8 @@
       # `--unit-only` leaves out the top-level `tests/`, which drive real git
       # daemons, a real `bend --publish` and `nix-build` — no network, no nix
       # daemon and no ports here. `--js-only` leaves out the native lane: that
-      # clang reaches for the system's `ld` and dynamic linker, and a sandbox
-      # has neither.
+      # clang reaches for the host `/usr/bin/ld` and dynamic linker, and a
+      # pure sandbox has neither. Flags only; there is no separate native helper.
       tests = ez.mkProofs {
         ez = ezBin;
         src = self;
@@ -67,14 +67,24 @@
       #   bendLib ./ez.lock.toml          lock path -> BEND_LIB
       #   mkPackage { bend, src, wrapFlags?, pname?, version?, entry?, lock?,
       #               wrapEnv?, defaultWrapEnv?, extraPath?, extraInstall? }
-      #   mkProofs { ez, src, name?, extraFlags?, deadline? }
-      #   mkLint { bolt, src, name? }
+      #   mkProofs { ez, src, name?, extraFlags?, deadline?, lock?, bendLib? }
+      #   mkLint { bolt, src, name?, lock?, bendLib? }
       #   mkShell { packages, extraHook? }
       # mkPackage builds `bin` from ez.toml, otherwise `entry`, otherwise
       # main.bend, and wraps $out/bin/<name> with bend on PATH. Version falls
-      # back to 0.1.0. mkProofs and mkLint set BEND_LIB from src/ez.lock.toml
-      # when that file is present. mkShell sets CC=bend-cc and
-      # BEND_LIB=$PWD/.ez/lib; put bend-cc in packages.
+      # back to 0.1.0. mkProofs and mkLint set BEND_LIB from an explicit
+      # bendLib, else from lock (or src/ez.lock.toml), else set none.
+      # A check:
+      #   checks.${system}.test = inputs.ez.lib.${system}.mkProofs {
+      #     ez = inputs.ez.packages.${system}.default;
+      #     src = self;
+      #     name = "…-test";
+      #     extraFlags = [ "--unit-only" ]; # add "--js-only" when host ld unavailable in sandbox
+      #   };
+      # Omit `--js-only` when host `/usr/bin/ld` is usable under the check.
+      # This flake keeps `--js-only --unit-only`: a pure sandbox has no system
+      # ld. Flags only. mkShell sets CC=bend-cc and BEND_LIB=$PWD/.ez/lib;
+      # put bend-cc in packages.
       lib.${system} = ez;
       apps.${system}.default = { type = "app"; program = "${ezBin}/bin/ez"; };
       checks.${system} = { inherit tests; ez = ezBin; };
