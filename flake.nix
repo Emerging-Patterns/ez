@@ -16,19 +16,19 @@
       pkgs = nixpkgs.legacyPackages.${system};
       llvm = pkgs.llvmPackages_19;
       bend = inputs.bend.packages.${system}.default;
-      ep = pkgs.callPackage ./nix/lib.nix { };
-      bend-cc = ep.bend-cc;
+      ez = import ./nix/lib.nix { inherit pkgs; };
+      bend-cc = ez.bend-cc;
 
       # the BEND_LIB tree ez's own ledger asks for, built from the lock with no
       # network in the sandbox beyond the lock's own fixed-output fetches
-      bendLib = ep.bendLib ./ez.lock.toml;
+      bendLib = ez.bendLib ./ez.lock.toml;
 
       # the `ez` binary, with everything it shells out to on its PATH. curl is
       # not among them: net/ speaks HTTP and HTTPS itself, and what it needs
       # instead is libssl by name (it opens it at run time, and no search path
       # reaches a Nix store path) and a CA bundle, which OpenSSL takes from
       # SSL_CERT_FILE. git stays, because `ez add` vendors a repo.
-      ez = ep.mkPackage {
+      ezBin = ez.mkPackage {
         inherit bend;
         src = self;
         version = "0.1.0";
@@ -50,14 +50,18 @@
       # daemon and no ports here. `--js-only` leaves out the native lane: that
       # clang reaches for the system's `ld` and dynamic linker, and a sandbox
       # has neither.
-      tests = ep.mkProofs {
-        inherit ez;
+      tests = ez.mkProofs {
+        ez = ezBin;
         src = self;
         name = "ez-tests";
         extraFlags = [ "--js-only" "--unit-only" ];
       };
     in {
-      packages.${system} = { inherit ez bend bend-cc bendLib; default = ez; };
+      packages.${system} = {
+        ez = ezBin;
+        inherit bend bend-cc bendLib;
+        default = ezBin;
+      };
       # lib.${system}:
       #   bend-cc
       #   bendLib ./ez.lock.toml          lock path -> BEND_LIB
@@ -71,10 +75,10 @@
       # back to 0.1.0. mkProofs and mkLint set BEND_LIB from src/ez.lock.toml
       # when that file is present. mkShell sets CC=bend-cc and
       # BEND_LIB=$PWD/.ez/lib; put bend-cc in packages.
-      lib.${system} = ep;
-      apps.${system}.default = { type = "app"; program = "${ez}/bin/ez"; };
-      checks.${system} = { inherit tests ez; };
-      devShells.${system}.default = ep.mkShell {
+      lib.${system} = ez;
+      apps.${system}.default = { type = "app"; program = "${ezBin}/bin/ez"; };
+      checks.${system} = { inherit tests; ez = ezBin; };
+      devShells.${system}.default = ez.mkShell {
         packages = [ bend bend-cc pkgs.git pkgs.openssl pkgs.cacert ];
         # EZ_LIBSSL and SSL_CERT_FILE are what the client in net/ needs: it
         # opens libssl by name at run time, and OpenSSL takes its trust store

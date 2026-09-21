@@ -144,17 +144,18 @@ into your repo:
 inputs.ez.url = "github:Emerging-Patterns/ez";
 
 # ...
-ep = inputs.ez.lib.${system};
+ez = inputs.ez.lib.${system};
+ezBin = inputs.ez.packages.${system}.default;
 
-pkg = ep.mkPackage { inherit bend; src = self; };
+pkg = ez.mkPackage { inherit bend; src = self; };
 
-proofs = ep.mkProofs { inherit ez; src = self; };
-lint = ep.mkLint { inherit bolt; src = self; };
+proofs = ez.mkProofs { ez = ezBin; src = self; };
+lint = ez.mkLint { inherit bolt; src = self; };
 ```
 
 `mkPackage` builds `bin` from `ez.toml` when that is set, otherwise `entry`,
 otherwise `main.bend`, and wraps the binary with `bend` on `PATH`. `BEND_LIB`
-comes from `ez.lock.toml`. `ep.bendLib ./ez.lock.toml` is that tree on its
+comes from `ez.lock.toml`. `ez.bendLib ./ez.lock.toml` is that tree on its
 own. Every file comes from a fixed-output derivation keyed by the sha256 the
 lock already records, so the build needs no network and `bend` never reaches
 the hub.

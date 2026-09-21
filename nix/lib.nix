@@ -1,7 +1,7 @@
 # Package builds and checks for a Bend flake. Taken from `lib.${system}`.
 #
-#   ep = inputs.ez.lib.${system};
-#   bolt = ep.mkPackage { inherit bend; src = self; wrapFlags = [ "--gpu" "off" ]; };
+#   ez = inputs.ez.lib.${system};
+#   bolt = ez.mkPackage { inherit bend; src = self; wrapFlags = [ "--gpu" "off" ]; };
 { pkgs }:
 
 let
