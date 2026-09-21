@@ -80,6 +80,15 @@ law differs_never_agrees:
   for e: {False{} == String.eq(ours, theirs) : Bool}
   {P.agreed(P.judge.at(ours, theirs)) == False{} : Bool}
 
+# LAW: the same name twice is agreement. The two hashes are the same
+# string and the answer is a name, so the verdict lets the command go on.
+law same_is_agreed:
+  for +ours: String
+  for +theirs: String
+  for e0: {True{} == P.is_name(theirs) : Bool}
+  for e1: {True{} == String.eq(ours, theirs) : Bool}
+  {P.agreed(P.judge.at(ours, theirs)) == True{} : Bool}
+
 # LAW: a tree is clean exactly when `git status --porcelain` named no path at
 # all. The two walks are written independently, one looking for a line that
 # says something and the other checking that every line says nothing, and this

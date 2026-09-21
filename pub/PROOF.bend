@@ -73,6 +73,14 @@ def differs_never_agrees.arm(_ours, theirs, p, e):
 def Laws.differs_never_agrees(ours, theirs, e):
   differs_never_agrees.arm(ours, theirs, P.is_name(theirs), e)
 
+# The happy path is the other arm of the same cascade: a recogniser that
+# said yes hands the goal to the comparison, and there the hypothesis
+# rewrites the comparison's True into place and leaves `Agreed{}`.
+def Laws.same_is_agreed(ours, theirs, e0, e1):
+  %e0 : {P.agreed(P.judge.said(_, ours, theirs)) == True{} : Bool}
+  %e1 : {P.agreed(P.judge.go(_, theirs)) == True{} : Bool}
+  {==}
+
 # LAW: one line of the status against both walks at once. A line that says
 # nothing hands each walk on to the rest of the status, which is the induction
 # hypothesis; a line that says something ends one walk at False and the other
