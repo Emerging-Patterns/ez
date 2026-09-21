@@ -68,6 +68,8 @@ ez check                         check the entry, without running it
 ez build [out]                   build the entry to a native binary
 ez run [args..]                  check and run the entry
 ez tool run <target> [-- args..] fetch, build and run a repo's binary
+ez tool install <target>         fetch the lock and build the binary
+ez tool upgrade <target>         rebuild when the resolved commit moved
 ezx <target> [-- args..]         ez tool run, when ezx is on PATH
 ez publish                       send the entry to the hub, under ez's 0x name
 ez test [--js-only] [--full] [--unit-only]
@@ -96,14 +98,24 @@ narHash = "sha256-..."
 entry = "src/lib.bend"
 ```
 
-`bin` is the file `ez tool run` and `ezx` build. With no `bin`, that is the
-entry. `owner/repo` is `https://github.com/owner/repo`. A git URL is kept.
-Any other target is a path (`/…`, `./…`, `../…`, `~/…`, or a word that is
-not `owner/repo`). The checkout and the binary are cached under
-`$XDG_CACHE_HOME/ez/tool/<slug>` (`~/.cache/ez/tool/<slug>` when that is
-unset) and reused while the remote still names the same commit. The built
-program's status is the status of the command. A target, ledger, fetch or
-build that fails exits 1.
+`bin` is the file `ez tool run`, `ez tool install`, `ez tool upgrade`, and
+`ezx` build. With no `bin`, that is the entry. `owner/repo` is
+`https://github.com/owner/repo`. A git URL is kept. Any other target is a
+path (`/…`, `./…`, `../…`, `~/…`, or a word that is not `owner/repo`). The
+checkout and the binary are cached under `$XDG_CACHE_HOME/ez/tool/<slug>`
+(`~/.cache/ez/tool/<slug>` when that is unset).
+
+A remote resolves to `git ls-remote <url> HEAD`. A path resolves to a clean
+`HEAD`. The checkout is reused while `rev` is that commit, and the binary
+is reused while it was built from that commit. A dirty worktree, or a path
+that is not a checkout, has no commit and is built every time.
+
+`ez tool install` fetches the lock and builds `<slug>/bin/<name>.out`, and
+does not run it. `ez tool upgrade` reads that commit again and rebuilds
+when it is not the one in `rev`, or when the binary is missing. The same
+commit is left in place. Neither command runs the binary. `ez tool run`
+does, and the built program's status is the status of the command. A
+target, ledger, fetch or build that fails exits 1.
 
 A dependency with no `git` key lives on the hub. `vendor = true` commits that
 dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.

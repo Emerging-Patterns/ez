@@ -25,7 +25,9 @@ type Sub is Data:
   CPublish{}
   CTest{}
   CDoctor{}
-  CTool{}
+  CToolRun{}
+  CToolInstall{}
+  CToolUpgrade{}
   CHelp{}
 
 # the program: every command, and the flags and positionals it binds
@@ -62,8 +64,18 @@ def spec() -> Shake.Cli:
           Shake.pos("out", "output path", False{}, None{}, [])
         ], []),
       Shake.sub("run", "check and run the entry", [], []),
-      Shake.sub("tool", "run another project's binary", [], [
+      Shake.sub("tool", "build or run another project's binary", [], [
         Shake.sub("run", "fetch, build and run the binary a repo declares",
+          [
+            Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
+              [])
+          ], []),
+        Shake.sub("install", "fetch the lock and build the binary",
+          [
+            Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
+              [])
+          ], []),
+        Shake.sub("upgrade", "rebuild when the resolved commit moved",
           [
             Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
               [])
@@ -95,8 +107,12 @@ def command(+name: String) -> Sub:
                   Bool.pick(Sub, String.eq(name, "publish"), CPublish{},
                     Bool.pick(Sub, String.eq(name, "test"), CTest{},
                       Bool.pick(Sub, String.eq(name, "doctor"), CDoctor{},
-                        Bool.pick(Sub, String.eq(name, "tool/run"), CTool{},
-                          CHelp{}))))))))))))
+                        Bool.pick(Sub, String.eq(name, "tool/run"), CToolRun{},
+                          Bool.pick(Sub, String.eq(name, "tool/install"),
+                            CToolInstall{},
+                            Bool.pick(Sub, String.eq(name, "tool/upgrade"),
+                              CToolUpgrade{},
+                              CHelp{}))))))))))))))
 
 # what a subcommand runs
 def dispatch(sub: Sub, +m: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
@@ -117,8 +133,12 @@ def dispatch(sub: Sub, +m: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
       Cmd.build(Shake.get(m, "out"))
     case CRun{}:
       Cmd.run(Args.rest(as))
-    case CTool{}:
+    case CToolRun{}:
       Tool.run(Shake.get(m, "target"), Args.tool.rest(as))
+    case CToolInstall{}:
+      Tool.install(Shake.get(m, "target"))
+    case CToolUpgrade{}:
+      Tool.upgrade(Shake.get(m, "target"))
     case CPublish{}:
       Cmd.publish()
     case CTest{}:

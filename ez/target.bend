@@ -1,4 +1,5 @@
-# ez/target: what `ez tool run` was asked to run, decided from the word
+# ez/target: what `ez tool run`, `install` and `upgrade` were asked for,
+# decided from the word
 # alone. `owner/repo` is GitHub. A URL is that URL. Anything else is a
 # path, and a path written `./…`, `../…`, `/…` or `~/…` is a path even
 # when it would otherwise read as a repository.

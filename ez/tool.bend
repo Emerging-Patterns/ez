@@ -1,12 +1,17 @@
-# ez/tool: `ez tool run` and `ezx`. A target is resolved, its ledger read,
-# its lock fetched, and the binary it names built and run.
+# ez/tool: `ez tool run`, `ez tool install`, `ez tool upgrade`, and `ezx`.
+# A target is resolved, its ledger read, its lock fetched, and the binary
+# it names built under `$XDG_CACHE_HOME/ez/tool/<slug>`
+# (`~/.cache/ez/tool/<slug>` when that variable is unset).
 #
-# The checkout and the binary live under `$XDG_CACHE_HOME/ez/tool/<slug>`
-# (`~/.cache/ez/tool/<slug>` when that variable is unset). A remote is
-# cloned again only when `git ls-remote` names a different commit than the
-# `rev` file, and the binary is built again only when that commit changed
-# or the binary is not there. The program's own status is this process's
-# status. A target, ledger, fetch or build that fails exits 1.
+# A remote is cloned again only when `git ls-remote <url> HEAD` names a
+# different commit than the `rev` file, and the binary is built again only
+# when that commit changed or the binary is not there. A path uses a clean
+# `HEAD`; a dirty worktree, or a directory that is not a checkout, has no
+# commit and is built every time. `run` then starts the binary and takes
+# its status. `install` stops once the binary is there. `upgrade` is that
+# same resolution: the commit is read again, a binary already built from
+# it is left in place, and a commit that moved is rebuilt. Neither runs
+# the binary. A target, ledger, fetch or build that fails exits 1.
 import Base
 import ../run/run.bend as R
 import ../io/file.bend as F
@@ -18,6 +23,12 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./cap.bend as Cap
 import ./env.bend as Env
 import ./target.bend as Tgt
+
+# what happens once the binary for this commit is in the cache. `Run`
+# starts it. `Hold` is `install` and `upgrade`: the binary stays put.
+type Act is Data:
+  Run{args: List<&2, String>}
+  Hold{}
 
 # the first line, or nothing
 def line0(ls: List<&2, String>) -> String:
@@ -211,6 +222,14 @@ def launch(+bin: String, args: List<&2, String>) -> IO(Unit):
     IO.write(R.text(out))
     code.of(U32.read(R.code(out)))
 
+# the binary, once it is current. Install and upgrade stop here.
+def finish(act: Act, +out: String) -> IO(Unit):
+  match act:
+    case Hold{}:
+      IO.pure(Unit, Unit{})
+    case Run{args}:
+      launch(out, args)
+
 # a checkout with no ledger
 def load.missing(+src: String) -> IO(M.Read):
   IO.die(M.Read, 1, "ez: " ++ src ++ "/ez.toml is not there")
@@ -243,55 +262,55 @@ def local.rev(+path: String) -> IO(String):
     return local.sha(R.ok(head), R.ok(st), String.trim(R.text(head)),
       String.trim(R.text(st)))
 
-# fetch, build, record the commit, run
+# fetch, build, record the commit, then start the binary or stop
 def miss(+src: String, +lib: String, +entry: String, +out: String,
-  +dir: String, +rev: String, args: List<&2, String>) -> IO(Unit):
+  +dir: String, +rev: String, act: Act) -> IO(Unit):
   do IO<Unit>:
     fetch(src, lib)
     compile(lib, entry, out)
     stamp(dir ++ "/rev", rev)
-    launch(out, args)
+    finish(act, out)
 
 # the binary when it is already this commit, otherwise a build
 def go.hit(hit: Bool, +src: String, +lib: String, +entry: String, +out: String,
-  +dir: String, +rev: String, args: List<&2, String>) -> IO(Unit):
+  +dir: String, +rev: String, act: Act) -> IO(Unit):
   match hit:
     case True{}:
-      launch(out, args)
+      finish(act, out)
     case False{}:
-      miss(src, lib, entry, out, dir, rev, args)
+      miss(src, lib, entry, out, dir, rev, act)
 
 # the package's name and file, then the cached binary
 def go.named(+name: String, +entry: String, +src: String, +lib: String,
-  +dir: String, +rev: String, args: List<&2, String>) -> IO(Unit):
+  +dir: String, +rev: String, act: Act) -> IO(Unit):
   +out = dir ++ "/bin/" ++ name ++ ".out"
   do IO<Unit>:
     +cached : String <- text(dir ++ "/rev")
     +bin_ok : Bool <- is.exec(out)
-    go.hit(reuse(cached, rev, bin_ok), src, lib, entry, out, dir, rev, args)
+    go.hit(reuse(cached, rev, bin_ok), src, lib, entry, out, dir, rev, act)
 
 # a ledger that read
 def go.good(m: M.Manifest, +src: String, +lib: String, +dir: String,
-  +rev: String, args: List<&2, String>) -> IO(Unit):
+  +rev: String, act: Act) -> IO(Unit):
   M.Manifest{+n, +e, +b, _ds} = m
   go.named(Tgt.out.name(n), P.join(src, Tgt.file.of(b, e)), src, lib, dir,
-    rev, args)
+    rev, act)
 
 # the ledger, or the reason it did not read
 def go.read(r: M.Read, +src: String, +lib: String, +dir: String, +rev: String,
-  args: List<&2, String>) -> IO(Unit):
+  act: Act) -> IO(Unit):
   match r:
     case M.Bad{why}:
       IO.die(Unit, 1, "ez: error: " ++ why)
     case M.Good{m}:
-      go.good(m, src, lib, dir, rev, args)
+      go.good(m, src, lib, dir, rev, act)
 
-# the checkout's ledger, built into `dir` and run
+# the checkout's ledger, built into `dir`. `Run` starts the binary.
 def go(+src: String, +lib: String, +dir: String, +rev: String,
-  args: List<&2, String>) -> IO(Unit):
+  act: Act) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- load(src)
-    go.read(r, src, lib, dir, rev, args)
+    go.read(r, src, lib, dir, rev, act)
 
 # a checkout replaced with this commit. The rev file is left alone until the
 # build has written a binary for it.
@@ -311,52 +330,60 @@ def sync(need: Bool, +src: String, +url: String, +rev: String) -> IO(Unit):
 # the checkout and the binary for one remote, once the cache root and the
 # commit are known
 def run.remote.at(+root: String, +url: String, +slug: String, +rev: String,
-  args: List<&2, String>) -> IO(Unit):
+  act: Act) -> IO(Unit):
   +dir = root ++ "/" ++ slug
   +src = dir ++ "/src"
   do IO<Unit>:
     +cached : String <- text(dir ++ "/rev")
     +src_ok : Bool <- is.file(src ++ "/ez.toml")
     sync(Bool.not(fresh(src_ok, cached, rev)), src, url, rev)
-    go(src, src ++ "/.ez/lib", dir, rev, args)
+    go(src, src ++ "/.ez/lib", dir, rev, act)
 
 # a remote: the cache holds the checkout and the binary
-def run.remote(+url: String, +slug: String, args: List<&2, String>) -> IO(Unit):
+def run.remote(+url: String, +slug: String, act: Act) -> IO(Unit):
   do IO<Unit>:
     +root : String <- cache.root()
     +rev : String <- head.ask(url)
-    run.remote.at(root, url, slug, rev, args)
+    run.remote.at(root, url, slug, rev, act)
 
 # a path, once it is absolute and its commit is known
-def run.local.at(+root: String, +abs: String, +rev: String,
-  args: List<&2, String>) -> IO(Unit):
+def run.local.at(+root: String, +abs: String, +rev: String, act: Act) -> IO(Unit):
   +dir = root ++ "/local" ++ abs
-  go(abs, dir ++ "/lib", dir, rev, args)
+  go(abs, dir ++ "/lib", dir, rev, act)
 
 # a path: nothing is cloned. Dependencies are fetched into the cache, not
 # into the tree.
-def run.local(+path: String, args: List<&2, String>) -> IO(Unit):
+def run.local(+path: String, act: Act) -> IO(Unit):
   do IO<Unit>:
     +home : String <- Env.var("HOME", "")
     +abs : String <- abs.of(Tgt.expand(home, path))
     +root : String <- cache.root()
     +rev : String <- local.rev(abs)
-    run.local.at(root, abs, rev, args)
+    run.local.at(root, abs, rev, act)
 
 # a target that did not resolve
 def run.bad(+why: String) -> IO(Unit):
   IO.die(Unit, 1, "ez: " ++ why)
 
 # a classified target
-def run.go(p: Tgt.Place, args: List<&2, String>) -> IO(Unit):
+def run.go(p: Tgt.Place, act: Act) -> IO(Unit):
   match p:
     case Tgt.Bad{why}:
       run.bad(why)
     case Tgt.Local{path}:
-      run.local(path, args)
+      run.local(path, act)
     case Tgt.Remote{url, slug}:
-      run.remote(url, slug, args)
+      run.remote(url, slug, act)
 
 # `ez tool run <target> [-- args…]`, and what `ezx` runs
 def run(+target: String, args: List<&2, String>) -> IO(Unit):
-  run.go(Tgt.classify(target), args)
+  run.go(Tgt.classify(target), Run{args})
+
+# `ez tool install <target>`: the lock fetched, the binary built, not run
+def install(+target: String) -> IO(Unit):
+  run.go(Tgt.classify(target), Hold{})
+
+# `ez tool upgrade <target>`: the same resolution `run` uses, and a rebuild
+# when that commit is not the one on record. The binary is not run.
+def upgrade(+target: String) -> IO(Unit):
+  run.go(Tgt.classify(target), Hold{})
