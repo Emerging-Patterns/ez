@@ -23,11 +23,14 @@ import ./args.bend as Args
 def gb() -> IO(String):
   Env.var("EZ_CAP", "8")
 
-# whether systemd-run is here to do the capping. A missing program fails the
-# exec rather than the run, so this asks once and the caller carries the answer.
+# whether a `bend` can be capped. The cap is `systemd-run --user`. That
+# fails when the program is absent, and it fails when the program is present
+# and the user bus is not. Either failure is no cap. A probe that would
+# wait on a password fails closed instead.
 def ok() -> IO(Bool):
   do IO<Bool>:
-    +out : String <- R.exec(["systemd-run", "--version"])
+    +out : String <- R.exec(["systemd-run", "--user", "--scope", "-q",
+      "--collect", "--no-ask-password", "true"])
     return R.ok(out)
 
 # the cgroup a capped run gets. `MemorySwapMax=0` matters: without it the
@@ -72,4 +75,4 @@ def warn(on: Bool) -> IO(Unit):
     case True{}:
       IO.pure(Unit, Unit{})
     case False{}:
-      IO.write("warning: systemd-run is not here, so no `bend` is capped\n")
+      IO.write("warning: systemd-run --user cannot cap `bend`, so no `bend` is capped\n")

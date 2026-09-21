@@ -68,8 +68,8 @@ ez check                         check the entry, without running it
 ez build [out]                   build the entry to a native binary
 ez run [args..]                  check and run the entry
 ez tool run <target> [-- args..] fetch, build and run a repo's binary
-ez tool install <target>         fetch the lock and build the binary
-ez tool upgrade <target>         rebuild when the resolved commit moved
+ez tool install <target>         build the binary and link it on PATH
+ez tool upgrade <target>         rebuild when the commit moved, refresh the link
 ezx <target> [-- args..]         ez tool run, when ezx is on PATH
 ez publish                       send the entry to the hub, under ez's 0x name
 ez test [--js-only] [--full] [--unit-only]
@@ -110,12 +110,17 @@ A remote resolves to `git ls-remote <url> HEAD`. A path resolves to a clean
 is reused while it was built from that commit. A dirty worktree, or a path
 that is not a checkout, has no commit and is built every time.
 
-`ez tool install` fetches the lock and builds `<slug>/bin/<name>.out`, and
-does not run it. `ez tool upgrade` reads that commit again and rebuilds
-when it is not the one in `rev`, or when the binary is missing. The same
-commit is left in place. Neither command runs the binary. `ez tool run`
-does, and the built program's status is the status of the command. A
-target, ledger, fetch or build that fails exits 1.
+`ez tool install` fetches the lock and builds `<slug>/bin/<name>.out`, then
+links that file onto PATH as `<name>`. `<name>` is the package name in the
+target's `ez.toml` (`bolt` for bolt), or `app` when the ledger names none.
+The link is `$EZ_TOOL_BIN/<name>` when `EZ_TOOL_BIN` is set, otherwise
+`$XDG_BIN_HOME/<name>`, otherwise `~/.local/bin/<name>`. The directory is
+created when it is missing. `ez tool upgrade` reads that commit again and
+rebuilds when it is not the one in `rev`, or when the binary is missing,
+and writes that link again. The same commit is left in place. Neither
+command runs the binary. `ez tool run` does, and the built program's status
+is the status of the command. A target, ledger, fetch, build or link that
+fails exits 1.
 
 `ez add` takes the same kind of target. With no ref, it pins the latest
 semver-ish tag on the remote. With no such tag, it pins `main`, or `master`

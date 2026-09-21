@@ -71,12 +71,12 @@ def spec() -> Shake.Cli:
             Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
               [])
           ], []),
-        Shake.sub("install", "fetch the lock and build the binary",
+        Shake.sub("install", "build the binary and link it on PATH",
           [
             Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
               [])
           ], []),
-        Shake.sub("upgrade", "rebuild when the resolved commit moved",
+        Shake.sub("upgrade", "rebuild when the commit moved, and refresh the link",
           [
             Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
               [])
