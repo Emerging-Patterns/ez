@@ -210,3 +210,22 @@ def Laws.solitary_reads_args():
 
 def Laws.solitary_comment_only():
   {==}
+
+# The clock's pure half: the closed on/off cases reduce, and a
+# non-empty deadline is rewritten into the pick that keeps it.
+
+def Laws.on_budget():
+  {==}
+
+def Laws.on_zero():
+  {==}
+
+def Laws.on_empty():
+  {==}
+
+def Laws.by_effect_keeps(d, e):
+  %e : {Bool.pick(String, _, "0", d) == d : String}
+  {==}
+
+def Laws.by_effect_empty():
+  {==}
