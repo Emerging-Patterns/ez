@@ -701,24 +701,6 @@ def done(t: Tally) -> IO(Unit):
   Tally{p, n} = t
   done.go(p, n)
 
-# one step of the scan, with the head's answer in hand. `Bool.or` reduces both
-# of its sides, so the flag found first still cost a walk of the arguments
-# after it. The rest arrives as a thunk.
-def flag.step(here: Bool, rest: Unit -> Bool) -> Bool:
-  match here:
-    case True{}:
-      True{}
-    case False{}:
-      rest(Unit{})
-
-# whether a flag was given, wherever among the arguments it sits
-def flag(as: List<&2, String>, +name: String) -> Bool:
-  match as:
-    case Nil{}:
-      False{}
-    case Con{h, t}:
-      flag.step(String.eq(h, name), _u => flag(t, name))
-
 # where the jobs of a run write what they print. One directory a wave, made
 # fresh, so nothing a run reads was written by the run before it.
 def out.at(+wave: String) -> String:
@@ -762,7 +744,7 @@ def fresh.dir(+at: String) -> IO(Unit):
 # directory and port, a lane its own cache key — so the only thing the old
 # one-at-a-time runner bought was the order of the report, and the report is
 # still walked in the tree's order whatever order the jobs finished in.
-def run(+as: List<&2, String>) -> IO(Unit):
+def run(+js_only: Bool, +full: Bool, +unit_only: Bool) -> IO(Unit):
   do IO<Unit>:
     C.make()
     +repo : String <- here()
@@ -773,9 +755,8 @@ def run(+as: List<&2, String>) -> IO(Unit):
     +secs : String <- Clock.seconds()
     +deadline : String <- Clock.start(secs)
 
-    +full : Bool <- IO.pure(Bool, flag(as, "--full"))
-    +on : Bool <- IO.pure(Bool, Bool.not(flag(as, "--js-only")))
-    +e2e : Bool <- IO.pure(Bool, Bool.not(flag(as, "--unit-only")))
+    +on : Bool <- IO.pure(Bool, Bool.not(js_only))
+    +e2e : Bool <- IO.pure(Bool, Bool.not(unit_only))
     +g : String <- Cap.gb()
     +at : String <- Env.lib()
     +jobs : String <- width()

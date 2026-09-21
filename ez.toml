@@ -9,3 +9,7 @@ rev = "c16cd69cedff0e9e19251401dee1cd973458faef"
 root = "."
 narHash = "sha256-ZQdxgjNCSu3lXjupIRWD/Xp1+T+H8CyYxmUc/0XLj2s="
 entry = "sha256.bend"
+
+[deps.shake]
+hash = "0xebdf72b20ad527103f6efc0d2aa8f1ec"
+entry = "main.bend"

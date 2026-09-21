@@ -19,3 +19,9 @@ narHash = "sha256-ZQdxgjNCSu3lXjupIRWD/Xp1+T+H8CyYxmUc/0XLj2s="
 "padding_proof.bend" = "ed0f9b4069d3bb2f956adb2d3c53ebe0880cf564beffa37a53b0ea02ba622eff"
 "sha256.bend" = "b77e36f3cb077c6648445a9d8112ce71a4f31fe9c532ca4aa7da33b1b5f6d8cd"
 "state.bend" = "24b4bb267fe94bd1615a8cff6aa090fff766c9009b5f9aa1c08a865b87d06230"
+
+[packages."0xebdf72b20ad527103f6efc0d2aa8f1ec".source]
+kind = "hub"
+
+[packages."0xebdf72b20ad527103f6efc0d2aa8f1ec".files]
+"main.bend" = "1ef15717b6f45d2a305952ee136850c2368b088d56b9203007e9685c41b50343"

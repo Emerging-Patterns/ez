@@ -229,3 +229,21 @@ def Laws.by_effect_keeps(d, e):
 
 def Laws.by_effect_empty():
   {==}
+
+# The command line as parse sees it. Each side is a known list, so the
+# proof is the computation itself.
+
+def Laws.rest_empty():
+  {==}
+
+def Laws.rest_tail():
+  {==}
+
+def Laws.argv_of_run():
+  {==}
+
+def Laws.argv_of_other():
+  {==}
+
+def Laws.argv_of_empty():
+  {==}

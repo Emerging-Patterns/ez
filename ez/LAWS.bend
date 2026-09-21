@@ -2,12 +2,14 @@
 # and path facts a test run turns on live here: what bend's own chatter is,
 # what a `#|` trailer asks for, which `0x` name an import line wrote, and
 # where a test sits in the shadow. The clock's on/off and by.effect
-# equalities live here too. The OS half of the clock is not among them.
+# equalities live here too, and the command line as parse sees it. The OS
+# half of the clock is not among them.
 import Base
 import ./quiet.bend as Q
 import ./drift.bend as D
 import ./gate.bend as G
 import ./clock.bend as Clock
+import ./args.bend as Args
 import ../manifest/manifest.bend as M
 
 # a ledger naming two packages, the one the drift laws read
@@ -288,3 +290,25 @@ law by_effect_keeps:
 # LAW: and no budget is a deadline of zero
 law by_effect_empty:
   {Clock.by.effect("") == "0" : String}
+
+# the command line as parse sees it, and the words `run` forwards
+
+# LAW: an empty line has no tail
+law rest_empty:
+  {Args.rest([]) == [] : List<&2, String>}
+
+# LAW: the tail is every word after the first
+law rest_tail:
+  {Args.rest(["run", "a", "b"]) == ["a", "b"] : List<&2, String>}
+
+# LAW: a `run` line is parsed as the command alone
+law argv_of_run:
+  {Args.argv.of(["run", "x", "--flag"]) == ["run"] : List<&2, String>}
+
+# LAW: every other line is parsed as it arrived
+law argv_of_other:
+  {Args.argv.of(["test", "--full"]) == ["test", "--full"] : List<&2, String>}
+
+# LAW: an empty line stays empty
+law argv_of_empty:
+  {Args.argv.of([]) == [] : List<&2, String>}
