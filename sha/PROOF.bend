@@ -5,11 +5,11 @@
 import Base
 import ./LAWS.bend as Laws
 
-def Laws.hex_empty:
+def Laws.hex_empty():
   {==}
 
-def Laws.hex_abc:
+def Laws.hex_abc():
   {==}
 
-def Laws.hex_manifest:
+def Laws.hex_manifest():
   {==}
