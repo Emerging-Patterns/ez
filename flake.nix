@@ -2,6 +2,7 @@
   # bend comes from Emerging-Patterns/bend via git+https; this one adds the clang the
   # native lane needs. Nothing else: ez is Bend, and what it shells out to is
   # git and coreutils.
+  # Seed is Bend 2.0.7 from https://bend-lang.com/dl/2.0.7.tar.gz, not the previous 2.0.24 GitHub-release pin. Noah may want a newer seed when one is recovered.
   description = "ez: dependency tracking, lockfile and vendoring tool for Bend 2, written in Bend";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
