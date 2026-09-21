@@ -1,24 +1,12 @@
 # ez
 
-Dependency tracking, lockfile and vendoring tool for [Bend 2](https://github.com/bendlang/bend), written in Bend.
+ez: project management for bend
 
-Bend 2 is already a package manager: `bend f.bend --publish` hashes a file and
-its local imports into a `0x<hash>` and serves them from a hub, and
-`import 0x<hash>/f.bend as P` fetches and checks them. ez adds the three things
-that leaves out.
-
-**A ledger.** An import line carries a bare hash and nothing else. `ez.toml`
-records what each one is, where it came from, and what a human asked for.
-
-**Nix.** `bend` resolves hub imports during the check, by fetching, which a
-sandbox cannot do. ez resolves the graph ahead of time into `ez.lock.toml`, and
-`nix/bend-lib.nix` turns that into a `BEND_LIB` store path of fixed-output
-derivations.
-
-**Repos that never published.** The `0x` hash is a pure function of the file
-set, so ez computes the hash a repo *would* get and vendors it under that name.
-The import line is the one a published package would have given you, so if
-upstream publishes that tree later the hub simply starts serving it.
+**ez** is a project manager for [Bend](https://github.com/bendlang/bend). Bend
+is already a package manager: `bend … --publish` hashes a file and its local
+imports into a `0x…` and serves them from a hub, and `import 0x…` fetches and
+checks them. ez sits on top of that — init, deps, lock, build, run, and
+install tools for a whole project.
 
 ## Install
 
