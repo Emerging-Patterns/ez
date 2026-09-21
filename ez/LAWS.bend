@@ -1,0 +1,264 @@
+# ez: the laws. The human states them; PROOF.bend must prove them. The string
+# and path facts a test run turns on live here: what bend's own chatter is,
+# what a `#|` trailer asks for, which `0x` name an import line wrote, and
+# where a test sits in the shadow. The OS half of the clock is not among
+# them.
+import Base
+import ./quiet.bend as Q
+import ./drift.bend as D
+import ./gate.bend as G
+import ../manifest/manifest.bend as M
+
+# a ledger naming two packages, the one the drift laws read
+def ledger() -> String:
+  "[package]\nname = \"app\"\nentry = \"main.bend\"\n" ++
+  "\n[deps.sha256]\nhash = \"0xaaaa\"\n" ++
+  "\n[deps.wire]\nhash = \"0xbbbb\"\n"
+
+# a test file, trailer and all
+def source() -> String:
+  "import Base\n" ++
+  "\n" ++
+  "def main() -> IO(Unit):\n" ++
+  "  IO.print(\"ok one\")\n" ++
+  "\n" ++
+  "#|ok one\n" ++
+  "#|ok two\n"
+
+# what 2.0.16 prints around a program's output
+def old() -> String:
+  "ok one\nAll terms check, with 3 unsafe annotations.\nok two\n"
+
+# what 2.0.18 prints: the report, then a line per unsafe def
+def new() -> String:
+  "ok one\nAll terms check, but 2 defs rely on unsafe or foreign code:\n" ++
+  "- ezrun.exec\n- Sha.hex\nok two\n"
+
+# what an aggregate of two tests prints
+def output() -> String:
+  G.mark() ++ "./ez/tests/one.bend\nok one\nok two\n" ++
+    G.mark() ++ "./ez/tests/two.bend\nok three"
+
+# two tests of one project, as one program
+def agg() -> String:
+  G.agg("ez", ["./ez/tests/one.bend", "./ez/tests/two.bend"])
+
+# quiet: bend's chatter is not the program's output
+
+# LAW: a line that does not open as bend's update nag is not one. The match
+# is anchored at the front, so a test that prints the words `bend update` in
+# prose is still compared on them.
+law nag_needs_prefix:
+  for +s: String
+  for e: {False{} == String.starts_with(s, "bend ") : Bool}
+  {Q.is_nag(s) == False{} : Bool}
+
+# LAW: the check report's first line is a report line even when nothing
+# before it was. Both wordings open with these words.
+law report_opens:
+  for +rest: String
+  {Q.in_report(False{}, "All terms check" ++ rest) == True{} : Bool}
+
+# LAW: a dash line is a report line only when the line before it was. This is
+# the 2.0.18 list; a program's own `- ` line is not in that list.
+law dash_follows_report:
+  for +rest: String
+  {Q.in_report(True{}, "- " ++ rest) == True{} : Bool}
+
+# LAW: and a dash line that is not after the report is the program's.
+law dash_alone_is_output:
+  for rest: String
+  {Q.in_report(False{}, "- " ++ rest) == False{} : Bool}
+
+# LAW: nothing printed is nothing
+law filter_empty:
+  {Q.filter("") == "" : String}
+
+# LAW: the 2.0.16 report goes
+law filter_old_report:
+  {Q.filter(old()) == "ok one\nok two" : String}
+
+# LAW: the 2.0.18 report and its list go
+law filter_new_report:
+  {Q.filter(new()) == "ok one\nok two" : String}
+
+# LAW: a program's own dash line survives
+law filter_keeps_own_dash:
+  {Q.filter("- mine\nok two\n") == "- mine\nok two" : String}
+
+# LAW: output with no report is untouched
+law filter_untouched:
+  {Q.filter("ok one\nok two\n") == "ok one\nok two" : String}
+
+# LAW: a trailing newline is not a difference
+law chomp_trailing:
+  {Q.chomp("a\nb\n\n\n") == "a\nb" : String}
+
+# LAW: a blank line inside the output stays
+law chomp_keeps_inner_blank:
+  {Q.chomp("a\n\nb\n") == "a\n\nb" : String}
+
+# trailer: what a test file states its run must print
+
+# LAW: a line that does not open with `#|` is not a trailer line
+law want_skips:
+  for +h: String
+  for +t: List<&2, String>
+  for e: {False{} == String.starts_with(h, "#|") : Bool}
+  {G.want(h <> t) == G.want(t) : List<&2, String>}
+
+# LAW: a trailer line is kept with the `#|` dropped
+law want_keeps:
+  for +rest: String
+  for +t: List<&2, String>
+  {G.want(("#|" ++ rest) <> t) == rest <> G.want(t) : List<&2, String>}
+
+# LAW: the trailer is the lines after each `#|`
+law trailer_extracts:
+  {G.trailer(source()) == "ok one\nok two" : String}
+
+# LAW: a file with no trailer wants nothing
+law trailer_empty:
+  {G.trailer("def main():\n  0\n") == "" : String}
+
+# LAW: a comment that is not a trailer is not one
+law trailer_ignores_note:
+  {G.trailer("# a note\n#|ok\n") == "ok" : String}
+
+# drift: the ledger against the import lines
+
+# LAW: a line that is not a hub import names no package
+law hash_of_local:
+  for +s: String
+  for e: {False{} == String.starts_with(s, "import 0x") : Bool}
+  {D.hash_of(s) == "" : String}
+
+# LAW: an import line names its package
+law hash_of_import:
+  {D.hash_of("import 0xaaaa/sha256.bend as S") == "0xaaaa" : String}
+
+# LAW: a local import names none
+law hash_of_relative:
+  {D.hash_of("import ./run.bend as R") == "" : String}
+
+# LAW: the same package imported twice counts once
+law imported_dedups:
+  {D.imported(["import 0xaaaa/a.bend as A", "import 0xaaaa/b.bend as B"])
+    == ["0xaaaa"] : List<&2, String>}
+
+# LAW: a ledger the source agrees with has no drift
+law report_agrees:
+  {D.report(["import 0xaaaa/s.bend as S", "import 0xbbbb/w.bend as W"],
+    M.parse(ledger())) == [] : List<&2, String>}
+
+# LAW: a hash the ledger does not name is drift, and so is a ledger entry
+# nobody imports
+law report_both_ways:
+  {D.report(["import 0xaaaa/s.bend as S", "import 0xcccc/x.bend as X"],
+    M.parse(ledger()))
+    == ["drift: 0xcccc is imported but ez.toml does not name it",
+      "drift: wire = 0xbbbb is in ez.toml but no import line uses it"]
+    : List<&2, String>}
+
+# LAW: a ledger entry nobody imports is drift
+law report_unused:
+  {D.report(["import 0xaaaa/s.bend as S"], M.parse(ledger()))
+    == ["drift: wire = 0xbbbb is in ez.toml but no import line uses it"]
+    : List<&2, String>}
+
+# gate: the shadow's paths, and the run cut back up
+
+# LAW: a path that does not open with `./` is already relative
+law rel_plain:
+  for +p: String
+  for e: {False{} == String.starts_with(p, "./") : Bool}
+  {G.rel(p) == p : String}
+
+# LAW: a path find printed with `./` drops those two characters
+law rel_dot:
+  for +rest: String
+  {G.rel("./" ++ rest) == rest : String}
+
+# LAW: the shadow's root is the repo's root
+law at_root:
+  {G.at("") == G.root() : String}
+
+# LAW: a directory of the shadow sits under the root
+law at_under:
+  for +d: String
+  for e: {False{} == String.is_empty(d) : Bool}
+  {G.at(d) == G.root() ++ "/" ++ d : String}
+
+# LAW: a test names the project it is of
+law proj_one:
+  {G.proj("./ez/tests/drift.bend") == "ez" : String}
+
+# LAW: a top-level test is of no project
+law proj_top:
+  {G.proj("./tests/cli.bend") == "" : String}
+
+# LAW: a project deeper than one directory keeps its path
+law proj_deep:
+  {G.proj("a/b/tests/x.bend") == "a/b" : String}
+
+# LAW: a project's aggregate sits under the project's own place
+law src_place:
+  {G.src("hub", "all") == ".ez/gate/hub/ez.gate/all.bend" : String}
+
+# LAW: the shadow carves out every project and every level above it
+law levels_of_two:
+  {G.levels(["a/b", "hub"]) == ["", "a", "a/b", "hub"] : List<&2, String>}
+
+# LAW: a directory holding no aggregate is reached with one link
+law linked_keeps_bin:
+  {G.linked(["./bin", "./hub", "./a"], ["a/b", "hub"]) == ["./bin"]
+    : List<&2, String>}
+
+# LAW: the aggregate reaches its tests without naming the project
+law agg_imports_local:
+  {String.contains(agg(), "import ../tests/two.bend as T2") == True{} : Bool}
+
+# LAW: every test's main is called behind its own marker
+law agg_calls_behind_mark:
+  {String.contains(agg(),
+    "IO.print(\"" ++ G.mark() ++ "./ez/tests/two.bend\")\n    T2.main()")
+    == True{} : Bool}
+
+# LAW: a test is given the lines behind its own marker
+law slice_first:
+  {G.slice(output(), "./ez/tests/one.bend") == "ok one\nok two" : String}
+
+# LAW: the last test is given the lines up to the end
+law slice_last:
+  {G.slice(output(), "./ez/tests/two.bend") == "ok three" : String}
+
+# LAW: a test the run never reached is given nothing
+law slice_miss:
+  {G.slice(output(), "./ez/tests/three.bend") == "" : String}
+
+# LAW: a run that printed a marker started
+law started_yes:
+  {G.started(output()) == True{} : Bool}
+
+# LAW: a run that printed none did not
+law started_no:
+  {G.started("error: unbound variable") == False{} : Bool}
+
+# LAW: a header is read where a header sits
+law headed_line:
+  {G.headed("import Base\n# lanes: native\n", "# lanes: native") == True{}
+    : Bool}
+
+# LAW: and not where a string literal merely quotes one
+law headed_quoted:
+  {G.headed("def h() -> String:\n  \"# lanes: native\"\n", "# lanes: native")
+    == False{} : Bool}
+
+# LAW: a test that calls the argument reader is kept out of one
+law solitary_reads_args:
+  {G.solitary("def main() -> IO(Unit):\n  IO.args()\n") == True{} : Bool}
+
+# LAW: a test whose comment only mentions it is not
+law solitary_comment_only:
+  {G.solitary("# this one never reads IO.args\ndef main() -> U32:\n  1\n")
+    == False{} : Bool}
