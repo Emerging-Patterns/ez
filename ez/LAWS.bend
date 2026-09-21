@@ -43,9 +43,7 @@ def output() -> String:
 def agg() -> String:
   G.agg("ez", ["./ez/tests/one.bend", "./ez/tests/two.bend"])
 
-# ---------------------------------------------------------------------------
 # quiet: bend's chatter is not the program's output
-# ---------------------------------------------------------------------------
 
 # LAW: a line that does not open as bend's update nag is not one. The match
 # is anchored at the front, so a test that prints the words `bend update` in
@@ -100,9 +98,7 @@ law chomp_trailing:
 law chomp_keeps_inner_blank:
   {Q.chomp("a\n\nb\n") == "a\n\nb" : String}
 
-# ---------------------------------------------------------------------------
 # trailer: what a test file states its run must print
-# ---------------------------------------------------------------------------
 
 # LAW: a line that does not open with `#|` is not a trailer line
 law want_skips:
@@ -129,9 +125,7 @@ law trailer_empty:
 law trailer_ignores_note:
   {G.trailer("# a note\n#|ok\n") == "ok" : String}
 
-# ---------------------------------------------------------------------------
 # drift: the ledger against the import lines
-# ---------------------------------------------------------------------------
 
 # LAW: a line that is not a hub import names no package
 law hash_of_local:
@@ -172,9 +166,7 @@ law report_unused:
     == ["drift: wire = 0xbbbb is in ez.toml but no import line uses it"]
     : List<&2, String>}
 
-# ---------------------------------------------------------------------------
 # gate: the shadow's paths, and the run cut back up
-# ---------------------------------------------------------------------------
 
 # LAW: a path that does not open with `./` is already relative
 law rel_plain:
