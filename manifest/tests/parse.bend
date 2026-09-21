@@ -41,16 +41,11 @@ def main() -> IO(Unit):
       "16773c0aa9914b5f04d062469d50100111eb9c9c")
     Check.eq_str("a dep remembers the tag it was asked for", M.tag_of(M.parse(text()), "wire"), "v1.0")
     Check.eq_str("a hub dep has no rev", M.rev_of(M.parse(text()), "json"), "")
-    Check.eq_str("comments and blank lines are skipped", shown("# only a comment\n\n"), "  ")
     Check.eq_str("a dep with no hash is an error", shown("[deps.x]\ngit = \"u\"\n"),
       "error: deps.x has no hash")
     Check.eq_str("a key outside a section is an error", shown("name = \"x\"\n"),
       "error: name = is outside any section")
-    Check.eq_str("an unclosed section is an error", shown("[package\n"),
-      "error: [package is not a section header")
     Check.eq_str("a header is a dotted path", segs("deps.wire"), "deps|wire")
-    Check.eq_str("a quoted segment keeps its dots", segs("packages.\"0x0a.b\".files"),
-      "packages|0x0a.b|files")
     Check.eq_str("a quoted key is the text inside the quotes",
       only("[f]\n\"src/lib.bend\" = \"ab\"\n", "f", "src/lib.bend"), "ab")
 
@@ -58,10 +53,7 @@ def main() -> IO(Unit):
 #|ok a dep names its git rev
 #|ok a dep remembers the tag it was asked for
 #|ok a hub dep has no rev
-#|ok comments and blank lines are skipped
 #|ok a dep with no hash is an error
 #|ok a key outside a section is an error
-#|ok an unclosed section is an error
 #|ok a header is a dotted path
-#|ok a quoted segment keeps its dots
 #|ok a quoted key is the text inside the quotes

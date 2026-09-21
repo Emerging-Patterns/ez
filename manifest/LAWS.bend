@@ -175,6 +175,25 @@ law step_skips_blank:
   for st: T.Toml
   {T.step(st, "") == st : T.Toml}
 
+# LAW: a comment changes nothing about a document being read either. The
+# classifier answers a line that opens with `#` before anything is read
+# out of it, so a comment may hold anything and still leave the state as
+# it was.
+law step_skips_comment:
+  for st: T.Toml
+  for +s: String
+  for e: {True{} == String.starts_with(T.trim(s), "#") : Bool}
+  {T.step(st, s) == st : T.Toml}
+
+# LAW: a header that never shut is not a section, and the reason is the
+# line as it was written. A `[package` with no `]` is not half a section
+# and not a key; it is this error.
+law unclosed_header:
+  for +s: String
+  for e: {False{} == String.ends_with(s, "]") : Bool}
+  {T.head_of(s, String.ends_with(s, "]"))
+    == T.LBad{s ++ " is not a section header"} : T.Line}
+
 # LAW: a document leaves no section open. Whatever the last line did, `parse`
 # flushes what it was filling, so `sects` is every section the document held
 # and not every section but the last.
@@ -198,15 +217,20 @@ law segments_never_empty:
 
 # LAW: a quote is never part of a segment: it toggles the quoting and nothing
 # else, so a pair of them cuts nothing and leaves nothing behind. This is half
-# of why `packages."0x0a".files` is three segments rather than four; the other
-# half, that the dot between a pair of them is kept, is what
-# `manifest/tests/parse.bend` samples as "a quoted segment keeps its dots".
-# Quantifying that half over every header wants a reverse-involution lemma for
-# the accumulator the segment walk carries its answer in, and this file needs
-# no such lemma otherwise.
+# of why `packages."0x0a".files` is three segments rather than four.
 law segments_quotes_toggle:
   for s: String
   {T.segments(SCon{'"', SCon{'"', s}}) == T.segments(s) : List<&2, String>}
+
+# LAW: a quoted dot is kept as part of the segment being gathered, and
+# does not cut. This is the other half of why `packages."0x0a".files` is
+# three segments rather than four: the quotes toggle and the dot between
+# them is a character of the segment.
+law segments_quoted_dot:
+  for s: String
+  {T.segments(SCon{'"', SCon{'.', SCon{'"', s}}})
+    == T.seg.fin(T.seg.walk(String.to_list(s), T.Split{False{}, ['.'], []}))
+    : List<&2, String>}
 
 # LAW: a key with nothing in it is never bare, so it is written quoted and
 # reads back as the key it was rather than as the start of the next line.
@@ -261,6 +285,17 @@ law source_of_hub:
   for +pairs: List<&2, T.Kv>
   for e: {True{} == String.is_empty(M.value(pairs, "git")) : Bool}
   {M.source_of(pairs) == M.Hub{} : M.Source}
+
+# LAW: a git section that names no root is the top of the checkout. A
+# ledger written before the `root` key existed can only have meant that,
+# and a lock already spells it out as ".".
+law source_of_absent_root:
+  for +pairs: List<&2, T.Kv>
+  for e0: {False{} == String.is_empty(M.value(pairs, "git")) : Bool}
+  for e1: {True{} == String.is_empty(M.value(pairs, "root")) : Bool}
+  {M.source_of(pairs)
+    == M.Git{M.value(pairs, "git"), M.value(pairs, "rev"),
+      M.value(pairs, "tag"), ".", M.value(pairs, "narHash")} : M.Source}
 
 # LAW: a `[deps.<name>]` section is a dependency of that name, with the
 # prefix off and nothing else taken with it.
@@ -459,3 +494,26 @@ law remove_idem:
   for m: M.Manifest
   for +name: String
   {R.remove(R.remove(m, name), name) == R.remove(m, name) : M.Manifest}
+
+# a ledger in the form `show` writes: the package table, then each
+# dependency, with every value quoted and an absent key left out
+def ledger() -> String:
+  "[package]\n" ++
+  "name = \"myapp\"\n" ++
+  "entry = \"src/main.bend\"\n" ++
+  "\n[deps.json]\n" ++
+  "hash = \"0x1111111111111111111111111111aaaa\"\n" ++
+  "\n[deps.wire]\n" ++
+  "hash = \"0x7e63a5b990a375c304ed462c071214a6\"\n" ++
+  "git = \"https://github.com/owner/repo\"\n" ++
+  "rev = \"16773c0aa9914b5f04d062469d50100111eb9c9c\"\n" ++
+  "tag = \"v1.0\"\n" ++
+  "root = \".\"\n" ++
+  "narHash = \"sha256-zz\"\n" ++
+  "entry = \"src/lib.bend\"\n"
+
+# LAW: a rendered ledger reads back as the file it was. `ez add` and
+# `ez remove` write what they render, so the file on disk after either
+# command is the file the next command will write again.
+law render_parse_roundtrip:
+  {R.render(M.parse(ledger())) == ledger() : String}

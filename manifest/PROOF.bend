@@ -360,6 +360,49 @@ def Laws.step_skips_blank(st):
     case T.Toml{bad, name, pairs, done}:
       {==}
 
+# LAW: a line that opens with `#` is a skip, whatever it holds. An empty
+# line is a skip too, so the emptiness question does not matter here.
+law line_of_comment:
+  for +s: String
+  for e: {True{} == String.starts_with(s, "#") : Bool}
+  {T.line_of(s) == T.LSkip{} : T.Line}
+
+# LAW: the same, with the emptiness question given as a parameter
+law line_of_comment.at:
+  for +s: String
+  for empty: Bool
+  for e: {True{} == String.starts_with(s, "#") : Bool}
+  {T.line_of.blank(empty, s) == T.LSkip{} : T.Line}
+
+def line_of_comment.at(s, empty, e):
+  match empty:
+    case True{}:
+      {==}
+    case False{}:
+      Equal.trans(T.Line,
+        T.line_of.comment(String.starts_with(s, "#"), s),
+        T.line_of.comment(True{}, s),
+        T.LSkip{},
+        Equal.cong(Bool, T.Line, b => T.line_of.comment(b, s),
+          String.starts_with(s, "#"), True{},
+          Equal.sym(Bool, True{}, String.starts_with(s, "#"), e)),
+        {==})
+
+def line_of_comment(s, e):
+  line_of_comment.at(s, String.is_empty(s), e)
+
+# A comment trims to a comment; the classifier skips it and the state
+# comes back field for field, the way a blank line does.
+def Laws.step_skips_comment(st, s, e):
+  match st:
+    case T.Toml{bad, name, pairs, done}:
+      Equal.cong(T.Line, T.Toml, line => T.step.go(T.Toml{bad, name, pairs, done}, line),
+        T.line_of(T.trim(s)), T.LSkip{}, line_of_comment(T.trim(s), e))
+
+def Laws.unclosed_header(s, e):
+  %e : {T.head_of(s, _) == T.LBad{s ++ " is not a section header"} : T.Line}
+  {==}
+
 # LAW: whatever a walk left open, the flush at the end closes
 law parse_closes_sections.fin:
   for r: T.Toml
@@ -396,6 +439,11 @@ def Laws.segments_never_empty(s):
 def Laws.segments_quotes_toggle(_s):
   {==}
 
+# A quote, a dot, a quote: the quotes toggle and the dot is kept, so the
+# rest of the header is read with that one character already gathered.
+def Laws.segments_quoted_dot(_s):
+  {==}
+
 def Laws.bare_needs_a_char(s, e):
   %e : {Bool.and(Bool.not(_), T.bare.all(String.to_list(s))) == False{}
     : Bool}
@@ -429,6 +477,19 @@ def Laws.source_of_hub(pairs, e):
   %e : {M.source.go(_, M.value(pairs, "git"), M.value(pairs, "rev"),
     M.value(pairs, "tag"), M.root.or(M.value(pairs, "root")),
     M.value(pairs, "narHash")) == M.Hub{} : M.Source}
+  {==}
+
+def Laws.source_of_absent_root(pairs, e0, e1):
+  %e1 : {M.source.go(String.is_empty(M.value(pairs, "git")),
+    M.value(pairs, "git"), M.value(pairs, "rev"),
+    M.value(pairs, "tag"), Bool.pick(String, _, ".", M.value(pairs, "root")),
+    M.value(pairs, "narHash"))
+    == M.Git{M.value(pairs, "git"), M.value(pairs, "rev"),
+      M.value(pairs, "tag"), ".", M.value(pairs, "narHash")} : M.Source}
+  %e0 : {M.source.go(_, M.value(pairs, "git"), M.value(pairs, "rev"),
+    M.value(pairs, "tag"), ".", M.value(pairs, "narHash"))
+    == M.Git{M.value(pairs, "git"), M.value(pairs, "rev"),
+      M.value(pairs, "tag"), ".", M.value(pairs, "narHash")} : M.Source}
   {==}
 
 # `deps.` is five literal characters, so the drop steps through all five and
@@ -548,3 +609,8 @@ def Laws.remove_idem(m, name):
         xs => M.Manifest{n, e, xs},
         R.without(R.without(ds, name), name), R.without(ds, name),
         Laws.without_idem(ds, name))
+
+# Both sides are a known ledger, so they reduce to the same file and the
+# proof is the computation itself.
+def Laws.render_parse_roundtrip():
+  {==}
