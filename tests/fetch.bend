@@ -6,7 +6,7 @@
 # unit tests beside the code are about what can be said without one.
 import Base
 import ../net/client.bend as Client
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../check/kit.bend as Check
 import ../check/world.bend as W
 

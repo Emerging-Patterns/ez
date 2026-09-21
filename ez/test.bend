@@ -12,7 +12,7 @@
 # files it reads is not run again either, which `ez/cache.bend` keys and
 # `--full` ignores.
 import Base
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ./args.bend as Args
 import ./env.bend as Env

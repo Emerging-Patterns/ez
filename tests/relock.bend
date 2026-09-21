@@ -4,7 +4,7 @@
 # has the first and never the second, and the lock it writes has to be the lock
 # that was committed. This test takes the cache away and asks again.
 import Base
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ../ez/quiet.bend as Q
 import ../check/kit.bend as Check

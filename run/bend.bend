@@ -9,7 +9,7 @@
 # report, the `bend = ` line of a lock, and the toolchain part of a cache key.
 # Asking both ways, current spelling first, is the whole of this module.
 import Base
-import ./run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 
 # the older spelling, tried only when the current one was not understood
 def version.older(ok: Bool, out: String) -> IO(String):

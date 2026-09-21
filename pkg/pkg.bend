@@ -5,7 +5,7 @@
 # at a local hub, so drift fails the gate rather than the ecosystem.
 import Base
 import ../io/file.bend as F
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../sha/sha.bend as Sha
 import ./path.bend as P
 

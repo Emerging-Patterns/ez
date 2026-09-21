@@ -29,3 +29,11 @@ tag = "v0.1.0"
 root = "eztoml"
 narHash = "sha256-lSFpfmFwEHUHT9w0J16Dr6n0PbkKPEYNvVrUOZtMyI8="
 entry = "eztoml/main.bend"
+
+[deps.snap]
+hash = "0x9bfd9d57916f3439316c2775fd1f10b4"
+git = "https://github.com/Emerging-Patterns/snap"
+rev = "0ce9a0fd709e5aa819b984b6bacbfb18729d94b0"
+root = "snap"
+narHash = "sha256-DmpBuSpjZ3WdPAEQzWcS/BjsNxiCXbxRb8tZB0pYh+Q="
+entry = "snap/main.bend"

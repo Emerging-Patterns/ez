@@ -3,7 +3,7 @@
 # the whole point of ez: bend resolves a hub import during the check, and a nix
 # sandbox has no network to do it with.
 import Base
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ../sha/sha.bend as Sha
 import ../ez/drift.bend as D

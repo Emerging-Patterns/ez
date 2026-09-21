@@ -10,7 +10,7 @@
 # the lane held, and read only as a pass. A cache that went green on stale
 # evidence would be worse than no cache at all, and `--full` ignores it.
 import Base
-import ../run/run.bend as R
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../run/bend.bend as Bend
 import ../io/file.bend as F
 import ../pkg/pkg.bend as K
