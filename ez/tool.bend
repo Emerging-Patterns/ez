@@ -8,10 +8,12 @@
 # when that commit changed or the binary is not there. A path uses a clean
 # `HEAD`; a dirty worktree, or a directory that is not a checkout, has no
 # commit and is built every time. `run` then starts the binary and takes
-# its status. `install` stops once the binary is there. `upgrade` is that
-# same resolution: the commit is read again, a binary already built from
-# it is left in place, and a commit that moved is rebuilt. Neither runs
-# the binary. A target, ledger, fetch or build that fails exits 1.
+# its status. `install` and `upgrade` do not run it. Both link the built
+# file onto PATH under the package's name: `$EZ_TOOL_BIN` when that is
+# set, otherwise `$XDG_BIN_HOME`, otherwise `~/.local/bin`. `upgrade` reads
+# the commit again, leaves a binary already built from it in place, rebuilds
+# a commit that moved, and writes the link either way. A target, ledger,
+# fetch, build or link that fails exits 1.
 import Base
 import ../run/run.bend as R
 import ../io/file.bend as F
@@ -132,6 +134,104 @@ def cache.root() -> IO(String):
     +home : String <- Env.var("HOME", "")
     cache.pick(String.is_empty(xdg), xdg, home)
 
+# `~/.local/bin`, when HOME is set
+def bin.home(no_home: Bool, +home: String) -> IO(String):
+  match no_home:
+    case True{}:
+      IO.die(String, 1, "ez: HOME is unset, so there is no bin directory")
+    case False{}:
+      IO.pure(String, home ++ "/.local/bin")
+
+# `XDG_BIN_HOME` when it is set, otherwise `~/.local/bin`
+def bin.xdg(no_xdg: Bool, +xdg: String, +home: String) -> IO(String):
+  match no_xdg:
+    case False{}:
+      IO.pure(String, xdg)
+    case True{}:
+      bin.home(String.is_empty(home), home)
+
+# `EZ_TOOL_BIN` when it is set, otherwise the bin home above
+def bin.pick(no_ez: Bool, +ez: String, +xdg: String, +home: String) -> IO(String):
+  match no_ez:
+    case False{}:
+      IO.pure(String, ez)
+    case True{}:
+      bin.xdg(String.is_empty(xdg), xdg, home)
+
+# where an installed command is linked
+def bin.dir() -> IO(String):
+  do IO<String>:
+    +ez : String <- Env.var("EZ_TOOL_BIN", "")
+    +xdg : String <- Env.var("XDG_BIN_HOME", "")
+    +home : String <- Env.var("HOME", "")
+    bin.pick(String.is_empty(ez), ez, xdg, home)
+
+# one trailing slash is the same directory
+def bare.go(slash: Bool, +s: String) -> String:
+  match slash:
+    case True{}:
+      String.take(s, Nat.sub(String.length(s), 1n))
+    case False{}:
+      s
+
+def bare(+s: String) -> String:
+  bare.go(String.ends_with(s, "/"), s)
+
+# one step of a scan that may stop at the first hit. `Bool.or` reduces both
+# sides, so the rest arrives as a thunk.
+def seen.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
+# whether this directory is one of the entries
+def seen(+dir: String, ps: List<&2, String>) -> Bool:
+  match ps:
+    case []:
+      False{}
+    case +h <> t:
+      seen.step(String.eq(bare(h), bare(dir)), _u => seen(dir, t))
+
+# whether `dir` is an entry of `PATH`
+def on.path(+dir: String, +path: String) -> Bool:
+  seen(dir, String.split(path, ':'))
+
+# a link that did not happen is a failure, and a directory that PATH does
+# not name is said once, the way a missing cap is
+def place.warn(there: Bool, +dir: String) -> IO(Unit):
+  match there:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      IO.write("warning: " ++ dir ++ " is not on PATH\n")
+
+def place.after(ok: Bool, +at: String, +text: String, +dir: String) -> IO(Unit):
+  match ok:
+    case False{}:
+      IO.die(Unit, 1, "ez: " ++ at ++ ": " ++ String.trim(text))
+    case True{}:
+      do IO<Unit>:
+        +path : String <- Env.var("PATH", "")
+        place.warn(on.path(dir, path), dir)
+
+# the absolute binary linked under `name` in this directory
+def place.at(+dir: String, +bin: String, +name: String) -> IO(Unit):
+  +at = dir ++ "/" ++ name
+  do IO<Unit>:
+    _mk : String <- R.exec(["mkdir", "-p", dir])
+    +ln : String <- R.exec(["ln", "-sfn", bin, at])
+    place.after(R.ok(ln), at, R.text(ln), dir)
+
+# the built file linked as the package's name. The link names the absolute
+# path, so it does not depend on the directory the command is run from.
+def place(+out: String, +name: String) -> IO(Unit):
+  do IO<Unit>:
+    +dir : String <- bin.dir()
+    +bin : String <- abs.of(out)
+    place.at(dir, bin, name)
+
 # the same commit, and a commit at all. An empty rev is a dirty tree or a
 # directory that is not a git checkout, and those are built every time.
 def same(+cached: String, +rev: String) -> Bool:
@@ -222,11 +322,11 @@ def launch(+bin: String, args: List<&2, String>) -> IO(Unit):
     IO.write(R.text(out))
     code.of(U32.read(R.code(out)))
 
-# the binary, once it is current. Install and upgrade stop here.
-def finish(act: Act, +out: String) -> IO(Unit):
+# the binary, once it is current. Install and upgrade link it and stop.
+def finish(act: Act, +out: String, +name: String) -> IO(Unit):
   match act:
     case Hold{}:
-      IO.pure(Unit, Unit{})
+      place(out, name)
     case Run{args}:
       launch(out, args)
 
@@ -262,23 +362,23 @@ def local.rev(+path: String) -> IO(String):
     return local.sha(R.ok(head), R.ok(st), String.trim(R.text(head)),
       String.trim(R.text(st)))
 
-# fetch, build, record the commit, then start the binary or stop
+# fetch, build, record the commit, then start the binary or link it
 def miss(+src: String, +lib: String, +entry: String, +out: String,
-  +dir: String, +rev: String, act: Act) -> IO(Unit):
+  +dir: String, +rev: String, +name: String, act: Act) -> IO(Unit):
   do IO<Unit>:
     fetch(src, lib)
     compile(lib, entry, out)
     stamp(dir ++ "/rev", rev)
-    finish(act, out)
+    finish(act, out, name)
 
 # the binary when it is already this commit, otherwise a build
 def go.hit(hit: Bool, +src: String, +lib: String, +entry: String, +out: String,
-  +dir: String, +rev: String, act: Act) -> IO(Unit):
+  +dir: String, +rev: String, +name: String, act: Act) -> IO(Unit):
   match hit:
     case True{}:
-      finish(act, out)
+      finish(act, out, name)
     case False{}:
-      miss(src, lib, entry, out, dir, rev, act)
+      miss(src, lib, entry, out, dir, rev, name, act)
 
 # the package's name and file, then the cached binary
 def go.named(+name: String, +entry: String, +src: String, +lib: String,
@@ -287,7 +387,7 @@ def go.named(+name: String, +entry: String, +src: String, +lib: String,
   do IO<Unit>:
     +cached : String <- text(dir ++ "/rev")
     +bin_ok : Bool <- is.exec(out)
-    go.hit(reuse(cached, rev, bin_ok), src, lib, entry, out, dir, rev, act)
+    go.hit(reuse(cached, rev, bin_ok), src, lib, entry, out, dir, rev, name, act)
 
 # a ledger that read
 def go.good(m: M.Manifest, +src: String, +lib: String, +dir: String,
@@ -379,11 +479,13 @@ def run.go(p: Tgt.Place, act: Act) -> IO(Unit):
 def run(+target: String, args: List<&2, String>) -> IO(Unit):
   run.go(Tgt.classify(target), Run{args})
 
-# `ez tool install <target>`: the lock fetched, the binary built, not run
+# `ez tool install <target>`: the lock fetched, the binary built, linked
+# onto PATH under the package's name, not run
 def install(+target: String) -> IO(Unit):
   run.go(Tgt.classify(target), Hold{})
 
 # `ez tool upgrade <target>`: the same resolution `run` uses, and a rebuild
-# when that commit is not the one on record. The binary is not run.
+# when that commit is not the one on record. The PATH link is written again.
+# The binary is not run.
 def upgrade(+target: String) -> IO(Unit):
   run.go(Tgt.classify(target), Hold{})
