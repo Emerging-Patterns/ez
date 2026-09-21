@@ -1,6 +1,7 @@
 # pub: the proofs. `bend PROOF.bend` is the gate.
 import Base
 import ./pub.bend as P
+import ../git/git.bend as G
 import ./LAWS.bend as Laws
 
 # LAW: one line of the search for bend's answer. A `match` may not scrutinise
@@ -72,6 +73,14 @@ def differs_never_agrees.arm(_ours, theirs, p, e):
 def Laws.differs_never_agrees(ours, theirs, e):
   differs_never_agrees.arm(ours, theirs, P.is_name(theirs), e)
 
+# The happy path is the other arm of the same cascade: a recogniser that
+# said yes hands the goal to the comparison, and there the hypothesis
+# rewrites the comparison's True into place and leaves `Agreed{}`.
+def Laws.same_is_agreed(ours, theirs, e0, e1):
+  %e0 : {P.agreed(P.judge.said(_, ours, theirs)) == True{} : Bool}
+  %e1 : {P.agreed(P.judge.go(_, theirs)) == True{} : Bool}
+  {==}
+
 # LAW: one line of the status against both walks at once. A line that says
 # nothing hands each walk on to the rest of the status, which is the induction
 # hypothesis; a line that says something ends one walk at False and the other
@@ -102,4 +111,42 @@ def Laws.clean_is_all_blank(ls):
 # lines after it are never read, which is the point: no status code is
 # consulted, so none can be exempt.
 def Laws.untracked_is_dirty(_path, _rest):
+  {==}
+
+# A name's prefix, length or alphabet is rewritten into `Bool.and`. A
+# porcelain line that names a path opens with a character, so
+# `String.is_empty` computes to False and the walk stops there.
+
+def Laws.is_name_needs_0x(s, e):
+  %e : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), P.name.length()),
+    G.hex.all(String.to_list(String.drop(s, 2n))))) == False{} : Bool}
+  {==}
+
+def Laws.is_name_needs_length(s, e0, e1):
+  %e0 : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), P.name.length()),
+    G.hex.all(String.to_list(String.drop(s, 2n))))) == False{} : Bool}
+  %e1 : {Bool.and(_, G.hex.all(String.to_list(String.drop(s, 2n))))
+    == False{} : Bool}
+  {==}
+
+def Laws.is_name_needs_hex(s, e0, e1, e2):
+  %e0 : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), P.name.length()),
+    G.hex.all(String.to_list(String.drop(s, 2n))))) == False{} : Bool}
+  %e1 : {Bool.and(_, G.hex.all(String.to_list(String.drop(s, 2n))))
+    == False{} : Bool}
+  %e2 : {_ == False{} : Bool}
+  {==}
+
+def Laws.is_name_hex34(s, e0, e1, e2):
+  %e0 : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), P.name.length()),
+    G.hex.all(String.to_list(String.drop(s, 2n))))) == True{} : Bool}
+  %e1 : {Bool.and(_, G.hex.all(String.to_list(String.drop(s, 2n))))
+    == True{} : Bool}
+  %e2 : {_ == True{} : Bool}
+  {==}
+
+def Laws.modified_is_dirty(_path, _rest):
+  {==}
+
+def Laws.staged_is_dirty(_path, _rest):
   {==}
