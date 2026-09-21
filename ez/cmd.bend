@@ -14,6 +14,7 @@ import ../pkg/path.bend as P
 import ./args.bend as Args
 import ./env.bend as Env
 import ./cap.bend as Cap
+import ./target.bend as Tgt
 import ./upgrade.bend as Up
 
 # the ledger's path, which is fixed
@@ -389,11 +390,38 @@ def add.go(+url: String, +ref: String, +entry: String) -> IO(Unit):
     r : M.Read <- load()
     add.write(r, add.dep(g))
 
-# `ez add <url> <rev|tag|branch> <entry.bend>`. All three are wanted: the
-# entry is what the package's hash is computed from, and guessing it would
-# name a different package.
-def add(+url: String, +ref: String, +entry: String) -> IO(Unit):
-  add.go(url, ref, entry)
+# a path, with `~` expanded the way `ez tool run` expands it
+def add.local(+path: String) -> IO(String):
+  do IO<String>:
+    +home : String <- Env.var("HOME", "")
+    return Tgt.expand(home, path)
+
+# the git url a target names
+def add.url(p: Tgt.Place) -> IO(String):
+  match p:
+    case Tgt.Bad{why}:
+      IO.die(String, 1, "ez: " ++ why)
+    case Tgt.Local{path}:
+      add.local(path)
+    case Tgt.Remote{url, _slug}:
+      IO.pure(String, url)
+
+# a ref that was asked for, or the latest tag, or `main`, or `master`
+def add.ref.at(given: Bool, +url: String, +ref: String) -> IO(String):
+  match given:
+    case True{}:
+      IO.pure(String, ref)
+    case False{}:
+      Git.default.ref(url)
+
+# `ez add <target> [rev|tag|branch] [entry.bend]`. The target is an
+# `owner/repo`, a git url, or a path, the same shapes `ez tool run` takes.
+# A missing ref is resolved, and a missing entry is read from the checkout.
+def add(+target: String, +ref: String, +entry: String) -> IO(Unit):
+  do IO<Unit>:
+    +url : String <- add.url(Tgt.classify(target))
+    +got : String <- add.ref.at(Bool.not(String.is_empty(ref)), url, ref)
+    add.go(url, got, entry)
 
 # the ledger with a dependency dropped
 def remove.write(r: M.Read, name: String) -> IO(Unit):

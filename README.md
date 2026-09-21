@@ -59,7 +59,7 @@ gives a shell with bend, git, openssl and `BEND_LIB` already set.
 
 ```
 ez init [name] [entry.bend]      scaffold a project: ez.toml, .gitignore, entry
-ez add <url> <ref> <entry.bend>  vendor a git package and record it
+ez add <target> [ref] [entry.bend]  vendor a git package and record it
 ez remove <name>                 drop a package from the ledger
 ez lock [--upgrade] [--package NAME]
                                  resolve every import, write ez.lock.toml
@@ -116,6 +116,12 @@ when it is not the one in `rev`, or when the binary is missing. The same
 commit is left in place. Neither command runs the binary. `ez tool run`
 does, and the built program's status is the status of the command. A
 target, ledger, fetch or build that fails exits 1.
+
+`ez add` takes the same kind of target. With no ref, it pins the latest
+semver-ish tag on the remote. With no such tag, it pins `main`, or `master`
+when `main` is absent. With no entry, it reads `[package] entry` from that
+revision's `ez.toml`, then `[package] bin` when `entry` is absent, then
+`main.bend`. A ref and an entry given on the command line are used as given.
 
 A dependency with no `git` key lives on the hub. `vendor = true` commits that
 dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.

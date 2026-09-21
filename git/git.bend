@@ -10,6 +10,7 @@ import Base
 import ../io/file.bend as F
 import ../run/run.bend as R
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
 
@@ -28,6 +29,28 @@ type Row is Data:
 type Got is Data:
   Got{hash: String, url: String, rev: String, entry: String, tag: String,
     root: String, nar: String}
+
+# how two versions compare. A release is greater than its prerelease, and a
+# numeric identifier is less than a word, which is the semver order.
+type Ord is Data:
+  Lt{}
+  Eq{}
+  Gt{}
+
+# one prerelease identifier
+type Id is Data:
+  IdNum{n: Nat}
+  IdWord{s: String}
+
+# a semver-ish tag, or a name that is not one. Build metadata is not kept:
+# it does not change which tag is newer.
+type Ver is Data:
+  No{}
+  Yes{nums: List<&2, Nat>, pre: List<&2, Id>}
+
+# a string split once, on the first time a char occurs
+type Cut is Data:
+  Cut{left: String, right: String}
 
 # a git command that failed stops the command, with whatever git said. Read
 # here rather than in `lock/restore.bend`, because both halves of ez's git
@@ -481,9 +504,72 @@ def vendor.tree(+lib: String, +work: String, +url: String, +rev: String,
     said(hash, entry, tag, rev)
     return Got{hash, url, rev, entry, tag, rt, nh}
 
+# `main.bend` when neither the entry nor the bin was named. That is the file
+# `ez init` writes when it is not told an entry.
+def entry.main(no: Bool, +b: String) -> String:
+  match no:
+    case False{}:
+      b
+    case True{}:
+      "main.bend"
+
+# `bin` only when the package named no entry. The bin is the file a tool
+# builds; it is not the entry unless the entry is absent.
+def entry.bin(no: Bool, +e: String, +b: String) -> String:
+  match no:
+    case False{}:
+      e
+    case True{}:
+      entry.main(String.is_empty(b), b)
+
+# the file a package is taken from: its entry, else its bin, else `main.bend`
+def entry.pick(+e: String, +b: String) -> String:
+  entry.bin(String.is_empty(e), e, b)
+
+# a document that did not parse has no entry to take
+def entry.sects(ok: Bool, ss: List<&2, T.Sect>) -> String:
+  match ok:
+    case False{}:
+      "main.bend"
+    case True{}:
+      +ps = M.pairs_of(ss, "package")
+      entry.pick(M.value(ps, "entry"), M.value(ps, "bin"))
+
+# the entry a parsed document names
+def entry.doc(t: T.Toml) -> String:
+  T.Toml{bad, _name, _pairs, sects} = t
+  entry.sects(String.is_empty(bad), sects)
+
+# the entry a parsed ez.toml names
+def entry.text(+text: String) -> String:
+  entry.doc(T.parse(text))
+
+# a missing ez.toml names `main.bend`, the same stub `ez init` uses
+def entry.maybe(m: Maybe<&2, String>) -> String:
+  match m:
+    case None{}:
+      "main.bend"
+    case Some{text}:
+      entry.text(text)
+
+# the checkout's ez.toml, read for the entry it names
+def entry.at(+work: String) -> IO(String):
+  do IO<String>:
+    m : Maybe<&2, String> <- F.read(work ++ "/ez.toml")
+    return entry.maybe(m)
+
+# the entry a vendoring is taken from. One that was asked for is that one.
+def entry.for(given: Bool, +entry: String, +work: String) -> IO(String):
+  match given:
+    case True{}:
+      IO.pure(String, entry)
+    case False{}:
+      entry.at(work)
+
 # the repo checked out at the pinned commit, and everything that follows from
 # it. The `.git` goes before the tree is weighed, because `fetchgit`'s hash is
-# over the working tree alone and nix has to be able to reproduce it.
+# over the working tree alone and nix has to be able to reproduce it. An entry
+# that was not asked for is read from this checkout before that.
 def vendor.at(+lib: String, +url: String, r: Ref, +entry: String) -> IO(Got):
   Ref{+rev, tag} = r
   +work = lib ++ "/.work-" ++ rev
@@ -491,8 +577,9 @@ def vendor.at(+lib: String, +url: String, r: Ref, +entry: String) -> IO(Got):
     _rm : String <- R.exec(["rm", "-rf", work])
     _mk : String <- R.exec(["mkdir", "-p", work])
     clone(work, url, rev)
+    +at : String <- entry.for(Bool.not(String.is_empty(entry)), entry, work)
     _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
-    g : Got <- vendor.tree(lib, work, url, rev, tag, entry)
+    g : Got <- vendor.tree(lib, work, url, rev, tag, at)
     _cl : String <- R.exec(["rm", "-rf", work])
     return g
 
@@ -578,3 +665,472 @@ def descendant.go(same: Bool, work: String, url: String, pin: String,
 # whether `tip` descends from `pin`. `work` is a directory the clone may use.
 def descendant.at(+work: String, +url: String, +pin: String, +tip: String) -> IO(Bool):
   descendant.go(String.eq(pin, tip), work, url, pin, tip)
+
+# A tag `ez add` may pin when no ref was asked for. It is semver-ish when,
+# after an optional `v`, it is dotted numbers, then an optional prerelease
+# of dot-separated identifiers, then optional `+` build metadata. Identifiers
+# are letters, digits and hyphens. Comparison is semver: numbers beat lexical
+# order, a longer prerelease beats a shorter one that matches up to there,
+# and a release beats its prerelease. Anything else is not a candidate.
+
+def ord.lt(lt: Bool) -> Ord:
+  match lt:
+    case True{}:
+      Lt{}
+    case False{}:
+      Gt{}
+
+def ord.nat(eq: Bool, lt: Bool) -> Ord:
+  match eq:
+    case True{}:
+      Eq{}
+    case False{}:
+      ord.lt(lt)
+
+def ord.str(eq: Bool, le: Bool) -> Ord:
+  match eq:
+    case True{}:
+      Eq{}
+    case False{}:
+      ord.lt(le)
+
+def ord.flip(o: Ord) -> Ord:
+  match o:
+    case Lt{}:
+      Gt{}
+    case Gt{}:
+      Lt{}
+    case Eq{}:
+      Eq{}
+
+def ord.pad.at(zero: Bool, rest: Unit -> Ord) -> Ord:
+  match zero:
+    case False{}:
+      Lt{}
+    case True{}:
+      rest(Unit{})
+
+def ord.pad(xs: List<&2, Nat>) -> Ord:
+  match xs:
+    case Nil{}:
+      Eq{}
+    case Con{+h, t}:
+      ord.pad.at(Nat.is_eq(h, 0n), _u => ord.pad(t))
+
+def ord.nums.at(o: Ord, rest: Unit -> Ord) -> Ord:
+  match o:
+    case Eq{}:
+      rest(Unit{})
+    case Lt{}:
+      Lt{}
+    case Gt{}:
+      Gt{}
+
+def ord.nums(a: List<&2, Nat>, b: List<&2, Nat>) -> Ord:
+  match a b:
+    case Nil{} Nil{}:
+      Eq{}
+    case Nil{} Con{+h, t}:
+      ord.pad(h <> t)
+    case Con{+h, t} Nil{}:
+      ord.flip(ord.pad(h <> t))
+    case Con{+ha, ta} Con{+hb, tb}:
+      ord.nums.at(ord.nat(Nat.is_eq(ha, hb), Nat.is_lt(ha, hb)),
+        _u => ord.nums(ta, tb))
+
+def ord.id(a: Id, b: Id) -> Ord:
+  match a b:
+    case IdNum{+n} IdNum{+m}:
+      ord.nat(Nat.is_eq(n, m), Nat.is_lt(n, m))
+    case IdNum{_n} IdWord{_s}:
+      Lt{}
+    case IdWord{_s} IdNum{_n}:
+      Gt{}
+    case IdWord{+s} IdWord{+t}:
+      ord.str(String.eq(s, t), String.is_le(s, t))
+
+def ord.ids(a: List<&2, Id>, b: List<&2, Id>) -> Ord:
+  match a b:
+    case Nil{} Nil{}:
+      Eq{}
+    case Nil{} Con{_h, _t}:
+      Lt{}
+    case Con{_h, _t} Nil{}:
+      Gt{}
+    case Con{ha, ta} Con{hb, tb}:
+      ord.nums.at(ord.id(ha, hb), _u => ord.ids(ta, tb))
+
+def ord.rel.at(ae: Bool, be: Bool, a: List<&2, Id>, b: List<&2, Id>) -> Ord:
+  match ae be:
+    case True{} True{}:
+      Eq{}
+    case True{} False{}:
+      Gt{}
+    case False{} True{}:
+      Lt{}
+    case False{} False{}:
+      ord.ids(a, b)
+
+def ord.rel(+a: List<&2, Id>, +b: List<&2, Id>) -> Ord:
+  ord.rel.at(List.is_empty(&2, Id, a), List.is_empty(&2, Id, b), a, b)
+
+def ord.ver.at(o: Ord, pa: List<&2, Id>, pb: List<&2, Id>) -> Ord:
+  ord.nums.at(o, _u => ord.rel(pa, pb))
+
+def ord.ver(a: Ver, b: Ver) -> Ord:
+  match a b:
+    case Yes{na, pa} Yes{nb, pb}:
+      ord.ver.at(ord.nums(na, nb), pa, pb)
+    case No{} _:
+      Eq{}
+    case Yes{_na, _pa} No{}:
+      Eq{}
+
+def dig(c: Char) -> Nat:
+  U32.to_nat(U32.sub(Char.to_u32(c), 48))
+
+def num.go(s: String, +acc: Nat) -> Nat:
+  match s:
+    case SNil{}:
+      acc
+    case SCon{+h, t}:
+      num.go(t, Nat.add(Nat.mul(acc, 10n), dig(h)))
+
+def flag.step(ok: Bool, rest: Unit -> Bool) -> Bool:
+  match ok:
+    case False{}:
+      False{}
+    case True{}:
+      rest(Unit{})
+
+def digits.go(s: String) -> Bool:
+  match s:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      flag.step(Char.is_digit(h), _u => digits.go(t))
+
+def digits.at(empty: Bool, +s: String) -> Bool:
+  match empty:
+    case True{}:
+      False{}
+    case False{}:
+      digits.go(s)
+
+def digits(+s: String) -> Bool:
+  digits.at(String.is_empty(s), s)
+
+def nums.cons(n: Nat, rest: Maybe<&2, List<&2, Nat>>) -> Maybe<&2, List<&2, Nat>>:
+  match rest:
+    case None{}:
+      None{}
+    case Some{ns}:
+      Some{n <> ns}
+
+def nums.put(ok: Bool, +h: String, rest: Maybe<&2, List<&2, Nat>>) ->
+  Maybe<&2, List<&2, Nat>>:
+  match ok:
+    case False{}:
+      None{}
+    case True{}:
+      nums.cons(num.go(h, 0n), rest)
+
+def nums.of(ps: List<&2, String>) -> Maybe<&2, List<&2, Nat>>:
+  match ps:
+    case Nil{}:
+      Some{[]}
+    case Con{+h, t}:
+      nums.put(digits(h), h, nums.of(t))
+
+def id.char(+c: Char) -> Bool:
+  Bool.or(Char.is_digit(c), Bool.or(Char.is_alpha(c), Char.is_eq(c, '-')))
+
+def id.chars(s: String) -> Bool:
+  match s:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      flag.step(id.char(h), _u => id.chars(t))
+
+def id.make(num: Bool, +s: String) -> Id:
+  match num:
+    case True{}:
+      IdNum{num.go(s, 0n)}
+    case False{}:
+      IdWord{s}
+
+def ids.cons(x: Id, rest: Maybe<&2, List<&2, Id>>) -> Maybe<&2, List<&2, Id>>:
+  match rest:
+    case None{}:
+      None{}
+    case Some{xs}:
+      Some{x <> xs}
+
+def ids.ok(ok: Bool, num: Bool, +h: String, rest: Maybe<&2, List<&2, Id>>) ->
+  Maybe<&2, List<&2, Id>>:
+  match ok:
+    case False{}:
+      None{}
+    case True{}:
+      ids.cons(id.make(num, h), rest)
+
+def ids.put(empty: Bool, ok: Bool, num: Bool, +h: String,
+  rest: Maybe<&2, List<&2, Id>>) -> Maybe<&2, List<&2, Id>>:
+  match empty:
+    case True{}:
+      None{}
+    case False{}:
+      ids.ok(ok, num, h, rest)
+
+def ids.of(ps: List<&2, String>) -> Maybe<&2, List<&2, Id>>:
+  match ps:
+    case Nil{}:
+      Some{[]}
+    case Con{+h, t}:
+      ids.put(String.is_empty(h), id.chars(h), digits(h), h, ids.of(t))
+
+def pre.parts(empty: Bool, +raw: String) -> Maybe<&2, List<&2, Id>>:
+  match empty:
+    case True{}:
+      None{}
+    case False{}:
+      ids.of(String.split(raw, '.'))
+
+def pre.of(had: Bool, +raw: String) -> Maybe<&2, List<&2, Id>>:
+  match had:
+    case False{}:
+      Some{[]}
+    case True{}:
+      pre.parts(String.is_empty(raw), raw)
+
+def split1.put(h: Char, c: Cut) -> Cut:
+  Cut{left, right} = c
+  Cut{SCon{h, left}, right}
+
+def split1.step(hit: Bool, h: Char, +t: String, rest: Unit -> Cut) -> Cut:
+  match hit:
+    case True{}:
+      Cut{"", t}
+    case False{}:
+      split1.put(h, rest(Unit{}))
+
+def split1(+c: Char, s: String) -> Cut:
+  match s:
+    case SNil{}:
+      Cut{"", ""}
+    case SCon{+h, +t}:
+      split1.step(Char.is_eq(h, c), h, t, _u => split1(c, t))
+
+def unv.step(drop: Bool, h: Char, t: String) -> String:
+  match drop:
+    case True{}:
+      t
+    case False{}:
+      SCon{h, t}
+
+def unv(s: String) -> String:
+  match s:
+    case SNil{}:
+      ""
+    case SCon{+h, t}:
+      unv.step(Bool.or(Char.is_eq(h, 'v'), Char.is_eq(h, 'V')), h, t)
+
+def ver.yes(empty: Bool, xs: List<&2, Nat>, ys: List<&2, Id>) -> Ver:
+  match empty:
+    case True{}:
+      No{}
+    case False{}:
+      Yes{xs, ys}
+
+def ver.pre(+xs: List<&2, Nat>, ps: Maybe<&2, List<&2, Id>>) -> Ver:
+  match ps:
+    case None{}:
+      No{}
+    case Some{ys}:
+      ver.yes(List.is_empty(&2, Nat, xs), xs, ys)
+
+def ver.nums(had: Bool, ns: Maybe<&2, List<&2, Nat>>, +pre: String) -> Ver:
+  match ns:
+    case None{}:
+      No{}
+    case Some{xs}:
+      ver.pre(xs, pre.of(had, pre))
+
+def ver.from(empty: Bool, had: Bool, +core: String, +pre: String) -> Ver:
+  match empty:
+    case True{}:
+      No{}
+    case False{}:
+      ver.nums(had, nums.of(String.split(core, '.')), pre)
+
+def ver.cut(had: Bool, c: Cut) -> Ver:
+  Cut{+core, +pre} = c
+  ver.from(String.is_empty(core), had, core, pre)
+
+def ver.main(+main: String) -> Ver:
+  ver.cut(String.contains(main, "-"), split1('-', main))
+
+def ver.core(c: Cut) -> Ver:
+  Cut{+main, _build} = c
+  ver.main(main)
+
+# a tag read as a version. A leading `v` is optional, and `+` metadata is dropped.
+def ver.of(+tag: String) -> Ver:
+  ver.core(split1('+', unv(tag)))
+
+# whether the first version is strictly newer
+def newer(o: Ord) -> Bool:
+  match o:
+    case Gt{}:
+      True{}
+    case Lt{}:
+      False{}
+    case Eq{}:
+      False{}
+
+def latest.cmp(take: Bool, +name: String, +rest: String) -> String:
+  match take:
+    case True{}:
+      name
+    case False{}:
+      rest
+
+def latest.have(empty: Bool, +name: String, +rest: String, v: Ver) -> String:
+  match empty:
+    case True{}:
+      name
+    case False{}:
+      latest.cmp(newer(ord.ver(v, ver.of(rest))), name, rest)
+
+def latest.step(v: Ver, +name: String, +rest: String) -> String:
+  match v:
+    case No{}:
+      rest
+    case Yes{ns, ps}:
+      latest.have(String.is_empty(rest), name, rest, Yes{ns, ps})
+
+# the newest semver-ish name, or "" when none of them is one
+def latest(names: List<&2, String>) -> String:
+  match names:
+    case Nil{}:
+      ""
+    case Con{+h, t}:
+      latest.step(ver.of(h), h, latest(t))
+
+
+# one row's tag name, or nothing when the row is peeled or not a tag
+def tag.put(hit: Bool, +name: String) -> List<&2, String>:
+  match hit:
+    case False{}:
+      []
+    case True{}:
+      [String.drop(name, String.length("refs/tags/"))]
+
+def tag.keep(peeled: Bool, +name: String) -> List<&2, String>:
+  match peeled:
+    case True{}:
+      []
+    case False{}:
+      tag.put(String.starts_with(name, "refs/tags/"), name)
+
+def tag.one(r: Row) -> List<&2, String>:
+  Row{_rev, +name} = r
+  tag.keep(String.ends_with(name, "^{}"), name)
+
+# every tag name `ls-remote --tags` wrote, peeled rows left out
+def tag.names(rs: List<&2, Row>) -> List<&2, String>:
+  match rs:
+    case Nil{}:
+      []
+    case Con{+h, t}:
+      List.append(&2, String, tag.one(h), tag.names(t))
+
+# a row's ref name
+def row.name(r: Row) -> String:
+  Row{_rev, name} = r
+  name
+
+def head.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
+# whether the remote advertised this exact ref
+def head.has(+want: String, rs: List<&2, Row>) -> Bool:
+  match rs:
+    case Nil{}:
+      False{}
+    case Con{+h, t}:
+      head.step(String.eq(row.name(h), want), _u => head.has(want, t))
+
+# `master` when it was advertised, and nothing when it was not
+def branch.master(has: Bool) -> String:
+  match has:
+    case True{}:
+      "master"
+    case False{}:
+      ""
+
+# `main` when it was advertised, otherwise `master`
+def branch.main(has: Bool, rs: List<&2, Row>) -> String:
+  match has:
+    case True{}:
+      "main"
+    case False{}:
+      branch.master(head.has("refs/heads/master", rs))
+
+# the branch a default pin uses: `main`, or `master` when `main` is absent
+def branch.pick(+rs: List<&2, Row>) -> String:
+  branch.main(head.has("refs/heads/main", rs), rs)
+
+def tags.said(ok: Bool, +url: String, +text: String) -> IO(List<&2, String>):
+  match ok:
+    case False{}:
+      IO.die(List<&2, String>, 1, "ez: git ls-remote " ++ url ++ ": " ++ text)
+    case True{}:
+      IO.pure(List<&2, String>, tag.names(rows(String.lines(text))))
+
+# every tag on the remote
+def tags(+url: String) -> IO(List<&2, String>):
+  do IO<List<&2, String>>:
+    +out : String <- R.exec(["git", "ls-remote", "--tags", url])
+    tags.said(R.ok(out), url, R.text(out))
+
+def branch.have(empty: Bool, +name: String, +url: String) -> IO(String):
+  match empty:
+    case True{}:
+      IO.die(String, 1, "ez: " ++ url ++ " has no main or master")
+    case False{}:
+      IO.pure(String, name)
+
+def heads.said(ok: Bool, +url: String, +text: String) -> IO(String):
+  match ok:
+    case False{}:
+      IO.die(String, 1, "ez: git ls-remote " ++ url ++ ": " ++ text)
+    case True{}:
+      +name = branch.pick(rows(String.lines(text)))
+      branch.have(String.is_empty(name), name, url)
+
+# `main` if the remote has it, otherwise `master`
+def heads(+url: String) -> IO(String):
+  do IO<String>:
+    +out : String <- R.exec(["git", "ls-remote", url, "refs/heads/main",
+      "refs/heads/master"])
+    heads.said(R.ok(out), url, R.text(out))
+
+def default.go(empty: Bool, +tag: String, +url: String) -> IO(String):
+  match empty:
+    case False{}:
+      IO.pure(String, tag)
+    case True{}:
+      heads(url)
+
+# the ref `ez add` pins when none was asked for: the latest semver-ish tag,
+# or `main`, or `master` when `main` is not there
+def default.ref(+url: String) -> IO(String):
+  do IO<String>:
+    names : List<&2, String> <- tags(url)
+    +best : String <- IO.pure(String, latest(names))
+    default.go(String.is_empty(best), best, url)
