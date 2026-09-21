@@ -42,9 +42,10 @@ def spec() -> Shake.Cli:
         ], []),
       Shake.sub("add", "vendor a git package and record it",
         [
-          Shake.pos("url", "git url", True{}, None{}, []),
-          Shake.pos("ref", "commit, tag or branch", True{}, None{}, []),
-          Shake.pos("entry", "entry file", True{}, None{}, [])
+          Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
+            []),
+          Shake.pos("ref", "commit, tag or branch", False{}, None{}, []),
+          Shake.pos("entry", "entry file", False{}, None{}, [])
         ], []),
       Shake.sub("remove", "drop a package from the ledger",
         [
@@ -120,7 +121,8 @@ def dispatch(sub: Sub, +m: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
     case CInit{}:
       Cmd.init(Shake.get(m, "name"), Shake.get(m, "entry"))
     case CAdd{}:
-      Cmd.add(Shake.get(m, "url"), Shake.get(m, "ref"), Shake.get(m, "entry"))
+      Cmd.add(Shake.get(m, "target"), Shake.get(m, "ref"),
+        Shake.get(m, "entry"))
     case CRemove{}:
       Cmd.remove(Shake.get(m, "name"))
     case CLock{}:
