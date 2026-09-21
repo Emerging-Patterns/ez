@@ -1,12 +1,12 @@
 {
-  # bend comes from bendlang/bend's own flake; this one adds the clang the
+  # bend comes from Emerging-Patterns/bend via git+https; this one adds the clang the
   # native lane needs. Nothing else: ez is Bend, and what it shells out to is
   # git and coreutils.
   description = "ez: dependency tracking, lockfile and vendoring tool for Bend 2, written in Bend";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.bend = {
-    url = "github:bendlang/bend";
+    url = "git+https://github.com/Emerging-Patterns/bend?ref=main";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 

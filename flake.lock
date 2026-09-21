@@ -7,17 +7,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1789966911,
-        "narHash": "sha256-LrevaMpvHUriYwdavzAVdPiY3cIwqtX5g+pg0Szz+UI=",
-        "owner": "bendlang",
-        "repo": "bend",
-        "rev": "99f9c6cd684f2d61bef8e4934d8a7218d0d4196e",
-        "type": "github"
+        "lastModified": 1790018721,
+        "narHash": "sha256-2RmuOuPXnyb8DUPxWpcc07FE5R01G5TlSosyymvJ+O0=",
+        "ref": "main",
+        "rev": "982ef5905199d57199564b5c9c4991e945c79384",
+        "revCount": 1,
+        "type": "git",
+        "url": "https://github.com/Emerging-Patterns/bend"
       },
       "original": {
-        "owner": "bendlang",
-        "repo": "bend",
-        "type": "github"
+        "ref": "main",
+        "type": "git",
+        "url": "https://github.com/Emerging-Patterns/bend"
       }
     },
     "nixpkgs": {
