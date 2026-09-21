@@ -5,6 +5,7 @@
 import Base
 import ./pkg.bend as P
 import ./path.bend as Path
+import ../sha/sha.bend as Sha
 
 # a file put at a chosen place in a list: as many files pass in front of it as
 # the number says, and it lands at the end when the list runs out first. This
@@ -268,9 +269,7 @@ law base_plain:
 
 # LAW: and asking for the last component of such a path, or for more
 # components than it has, gives all of it rather than the empty string a bad
-# `take` would give. `pkg/tests/path.bend` samples this as "fewer components
-# than asked for is all of them"; it holds for every such path and every
-# count.
+# `take` would give. It holds for every such path and every count.
 law tail_plain:
   for +p: String
   for q: Nat
@@ -324,3 +323,146 @@ law climb_absolute:
   for +p: String
   for e: {True{} == String.starts_with(p, "/") : Bool}
   {String.starts_with(Path.climb(n, p), "/") == True{} : Bool}
+
+# LAW: a `.` is not a component. The walk skips it, so `./` in a path is
+# never a name a module is published under.
+law comp_dot:
+  {Path.comp_of(".") == Path.CSkip{} : Path.Comp}
+
+# LAW: skipping a component leaves the walk as it was
+law skip_id:
+  for w: Path.Walk
+  {Path.norm.go(w, Path.CSkip{}) == w : Path.Walk}
+
+# LAW: so a leading `./` is the path without it, as long as the path did
+# not already begin at the root. Gluing `./` onto a rooted path makes it
+# relative, and that is a different path.
+law norm_dot:
+  for +p: String
+  for e: {False{} == String.starts_with(p, "/") : Bool}
+  {Path.norm("./" ++ p) == Path.norm(p) : String}
+
+# LAW: a relative path that kept nothing is here. A climb that cancelled
+# every component, or a path that was empty to start with, names the
+# current directory rather than the empty string.
+law empty_is_here:
+  {Path.norm("") == "." : String}
+
+# LAW: the directory of a single real component is here. A file with no
+# slash in its name sits in the current directory, so climbing it off
+# leaves `.` and not the empty string a join would write.
+law dir_plain:
+  for +p: String
+  for +e: {slashless(p) == True{} : Bool}
+  for +e0: {False{} == String.is_empty(p) : Bool}
+  for e1: {False{} == String.eq(p, ".") : Bool}
+  for e2: {False{} == String.eq(p, "..") : Bool}
+  {Path.dir(p) == "." : String}
+
+# LAW: a path taken relative to nowhere is the path. An empty directory
+# means the path is already where it should be, and `join` still
+# normalises, so this is `norm` and not the raw text.
+law join_bare:
+  for +p: String
+  {Path.join("", p) == Path.norm(p) : String}
+
+# LAW: climbing nothing leaves the path as `norm` left it. `pkg.place`
+# climbs by a count, and a count of zero is a no-op on the directory.
+law climb_zero:
+  for +p: String
+  {Path.climb(0n, p) == Path.norm(p) : String}
+
+# LAW: a module path that ends in `.bend` drops those five characters.
+# The strip is the suffix and nothing else, so a name that merely holds
+# those characters in the middle is left alone.
+law unbend_ext:
+  for +p: String
+  {Path.unbend(p ++ ".bend") == p : String}
+
+# LAW: a path that holds no separator and is not a climb has no climbs.
+# `pkg.place` re-roots by this count, so a file named in place does not
+# lift the package.
+law ups_plain:
+  for +p: String
+  for e: {slashless(p) == True{} : Bool}
+  for e2: {False{} == String.eq(p, "..") : Bool}
+  {Path.ups(p) == 0n : Nat}
+
+# LAW: the last component of a path is the tail of length one. `base` and
+# `tail` are written differently and this holds the one to the other.
+law tail_one:
+  for +p: String
+  {Path.tail(p, 1n) == Path.base(p) : String}
+
+# The header scan, which is what a package's file set is gathered from:
+# which lines of a source file are modules, which are foreign bodies, and
+# when the header has ended. A late import followed as if it were still
+# in the header is a file the package does not hold, and a hub import
+# followed as if it were a module is a walk that leaves the package.
+
+# LAW: a spec that does not open `0x` is not a hub import. A relative
+# path is a module of this package.
+law hub_needs_0x:
+  for +s: String
+  for e: {False{} == String.starts_with(s, "0x") : Bool}
+  {P.is_hub(s) == False{} : Bool}
+
+# LAW: and a spec that holds no `/` is not one either. A `0x` name has
+# no directory of its own, so the first `/` ends it; without one there
+# is no package to name.
+law hub_needs_slash:
+  for +s: String
+  for e: {False{} == String.contains(s, "/") : Bool}
+  {P.is_hub(s) == False{} : Bool}
+
+# LAW: a `0x` name followed by a path is a hub import, whatever the
+# hash and whatever the path. This is the one `is_hub` answers True
+# for, and it is the one the walk does not follow.
+law hub_named:
+  for +h: String
+  for +rest: String
+  {P.is_hub(("0x" ++ h) ++ ("/" ++ rest)) == True{} : Bool}
+
+# LAW: a module named after the header has ended is dropped. The walk
+# does not follow it.
+law late_mod:
+  for spec: String
+  for mods: List<&2, String>
+  for foreign: List<&2, String>
+  {P.scan.mod(False{}, spec, mods, foreign)
+    == P.Head{False{}, mods, foreign} : P.Head}
+
+# LAW: a module named while the header is still open is kept
+law header_mod:
+  for spec: String
+  for mods: List<&2, String>
+  for foreign: List<&2, String>
+  {P.scan.mod(True{}, spec, mods, foreign)
+    == P.Head{True{}, spec <> mods, foreign} : P.Head}
+
+# LAW: a body line ends the header, whatever it had gathered
+law body_ends:
+  for head: Bool
+  for mods: List<&2, String>
+  for foreign: List<&2, String>
+  {P.scan.go(P.Head{head, mods, foreign}, P.SBody{})
+    == P.Head{False{}, mods, foreign} : P.Head}
+
+# LAW: a foreign body is gathered wherever it sits. It lives in a def's
+# body, long after the header has ended, and the package still uploads
+# it.
+law foreign_keeps_head:
+  for head: Bool
+  for at: String
+  for mods: List<&2, String>
+  for foreign: List<&2, String>
+  {P.scan.go(P.Head{head, mods, foreign}, P.SForeign{at})
+    == P.Head{head, mods, at <> foreign} : P.Head}
+
+# LAW: the `0x` name a file set is published under is the first
+# thirty-two hex characters of the manifest's digest. A lock that pins
+# `0x<hash>` pins this prefix, and nothing else of the digest.
+law hash_is_prefix:
+  for xs: List<&2, P.File>
+  {P.hash_of(xs) == "0x" ++ String.take(Sha.hex(P.manifest_of(xs)), 32n)
+    : String}

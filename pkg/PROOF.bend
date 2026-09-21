@@ -1622,3 +1622,729 @@ def Laws.climb_absolute(n, p, e):
             Equal.sym(Bool,
               String.starts_with(String.append(p, "/.."), "/"), True{},
               abs_append(p, "/..", e)))))
+
+# The leftover path and scan equalities. The closed ones reduce; the rest
+# are a hypothesis rewritten into a pick, a split walked one character at
+# a time, or a suffix taken off a concatenation.
+
+def Laws.comp_dot():
+  {==}
+
+def Laws.skip_id(w):
+  match w:
+    case Path.Walk{_abs, _out}:
+      {==}
+
+def Laws.empty_is_here():
+  {==}
+
+def Laws.join_bare(_p):
+  {==}
+
+def Laws.climb_zero(_p):
+  {==}
+
+def Laws.late_mod(_spec, _mods, _foreign):
+  {==}
+
+def Laws.header_mod(_spec, _mods, _foreign):
+  {==}
+
+def Laws.body_ends(_head, _mods, _foreign):
+  {==}
+
+def Laws.foreign_keeps_head(_head, _at, _mods, _foreign):
+  {==}
+
+def Laws.hash_is_prefix(_xs):
+  {==}
+
+def Laws.hub_needs_0x(s, e):
+  %e : {Bool.and(_, String.contains(s, "/")) == False{} : Bool}
+  {==}
+
+# LAW: `and` with False on the right is False
+law and_false:
+  for b: Bool
+  {Bool.and(b, False{}) == False{} : Bool}
+
+def and_false(b):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.hub_needs_slash(s, e):
+  %e : {Bool.and(String.starts_with(s, "0x"), _) == False{} : Bool}
+  and_false(String.starts_with(s, "0x"))
+
+# LAW: a string that holds a `/` somewhere after a prefix contains `/`
+law contains_slash.arm:
+  for +h: Char
+  for t: String
+  for +rest: String
+  for b: Bool
+  for eb: {b == String.starts_with(SCon{h, String.append(t, SCon{'/', rest})},
+    "/") : Bool}
+  for ih: {String.contains(String.append(t, SCon{'/', rest}), "/") == True{}
+    : Bool}
+  {String.contains(SCon{h, String.append(t, SCon{'/', rest})}, "/") == True{}
+    : Bool}
+
+def contains_slash.arm(_h, t, rest, b, eb, ih):
+  match b:
+    case True{}:
+      %eb : {String.contains.if(String.append(t, SCon{'/', rest}), "/", _)
+        == True{} : Bool}
+      {==}
+    case False{}:
+      %eb : {String.contains.if(String.append(t, SCon{'/', rest}), "/", _)
+        == True{} : Bool}
+      ih
+
+law contains_slash:
+  for s: String
+  for +rest: String
+  {String.contains(String.append(s, SCon{'/', rest}), "/") == True{} : Bool}
+
+def contains_slash(s, rest):
+  match s:
+    case SNil{}:
+      Equal.trans(Bool,
+        String.contains.if(rest, "/", String.starts_with(SCon{'/', rest}, "/")),
+        String.contains.if(rest, "/", True{}),
+        True{},
+        Equal.cong(Bool, Bool,
+          x => String.contains.if(rest, "/", x),
+          String.starts_with(SCon{'/', rest}, "/"), True{},
+          Equal.trans(Bool,
+            String.starts_with.if(rest, "", Char.is_eq('/', '/')),
+            String.starts_with.if(rest, "", True{}),
+            True{},
+            Equal.cong(Bool, Bool,
+              x => String.starts_with.if(rest, "", x),
+              Char.is_eq('/', '/'), True{}, Eq.char_eq_self('/')),
+            Eq.starts_nil(rest))),
+        {==})
+    case SCon{+h, +t}:
+      contains_slash.arm(h, t, rest,
+        String.starts_with(SCon{h, String.append(t, SCon{'/', rest})}, "/"),
+        {==}, contains_slash(t, rest))
+
+def Laws.hub_named(h, rest):
+  Equal.trans(Bool,
+    Bool.and(
+      String.starts_with(String.append(String.append("0x", h), SCon{'/', rest}),
+        "0x"),
+      String.contains(String.append(String.append("0x", h), SCon{'/', rest}),
+        "/")),
+    Bool.and(True{}, True{}),
+    True{},
+    Equal.trans(Bool,
+      Bool.and(
+        String.starts_with(String.append(String.append("0x", h),
+          SCon{'/', rest}), "0x"),
+        String.contains(String.append(String.append("0x", h), SCon{'/', rest}),
+          "/")),
+      Bool.and(True{},
+        String.contains(String.append(String.append("0x", h), SCon{'/', rest}),
+          "/")),
+      Bool.and(True{}, True{}),
+      Equal.cong(Bool, Bool,
+        x => Bool.and(x,
+          String.contains(String.append(String.append("0x", h),
+            SCon{'/', rest}), "/")),
+        String.starts_with(String.append(String.append("0x", h),
+          SCon{'/', rest}), "0x"),
+        True{},
+        Equal.trans(Bool,
+          String.starts_with(String.append(String.append("0x", h),
+            SCon{'/', rest}), "0x"),
+          String.starts_with(String.append("0x",
+            String.append(h, SCon{'/', rest})), "0x"),
+          True{},
+          Equal.cong(String, Bool,
+            s => String.starts_with(s, "0x"),
+            String.append(String.append("0x", h), SCon{'/', rest}),
+            String.append("0x", String.append(h, SCon{'/', rest})),
+            Eq.append_assoc("0x", h, SCon{'/', rest})),
+          Eq.starts_append("0x", String.append(h, SCon{'/', rest})))),
+      Equal.cong(Bool, Bool, x => Bool.and(True{}, x),
+        String.contains(String.append(String.append("0x", h), SCon{'/', rest}),
+          "/"),
+        True{}, contains_slash(String.append("0x", h), rest))),
+    {==})
+
+# LAW: `./` plus a path splits into a skip and whatever the path splits into
+law split_dot:
+  for p: String
+  {String.split(SCon{'.', SCon{'/', p}}, '/') == "." <> String.split(p, '/')
+    : List<&2, String>}
+
+def split_dot(p):
+  Equal.trans(List<&2, String>,
+    String.split.fin('.', String.split(SCon{'/', p}, '/'), Char.is_eq('.', '/')),
+    String.split.fin('.', String.split(SCon{'/', p}, '/'), False{}),
+    "." <> String.split(p, '/'),
+    Equal.cong(Bool, List<&2, String>,
+      x => String.split.fin('.', String.split(SCon{'/', p}, '/'), x),
+      Char.is_eq('.', '/'), False{}, {==}),
+    Equal.cong(List<&2, String>, List<&2, String>,
+      r => String.split.fin('.', r, False{}),
+      String.split(SCon{'/', p}, '/'), SNil{} <> String.split(p, '/'),
+      Equal.cong(Bool, List<&2, String>,
+        x => String.split.fin('/', String.split(p, '/'), x),
+        Char.is_eq('/', '/'), True{}, Eq.char_eq_self('/'))))
+
+# LAW: walking a skip first is walking what follows
+law walk_skip_dot:
+  for cs: List<&2, String>
+  for w: Path.Walk
+  {Path.norm.walk("." <> cs, w) == Path.norm.walk(cs, w) : Path.Walk}
+
+def walk_skip_dot(cs, w):
+  Equal.trans(Path.Walk,
+    Path.norm.walk(cs, Path.norm.go(w, Path.comp_of("."))),
+    Path.norm.walk(cs, Path.norm.go(w, Path.CSkip{})),
+    Path.norm.walk(cs, w),
+    Equal.cong(Path.Comp, Path.Walk,
+      c => Path.norm.walk(cs, Path.norm.go(w, c)),
+      Path.comp_of("."), Path.CSkip{}, Laws.comp_dot()),
+    Equal.cong(Path.Walk, Path.Walk,
+      st => Path.norm.walk(cs, st),
+      Path.norm.go(w, Path.CSkip{}), w, Laws.skip_id(w)))
+
+def Laws.norm_dot(p, e):
+  Equal.trans(String,
+    Path.norm.fin(Path.norm.walk(String.split(SCon{'.', SCon{'/', p}}, '/'),
+      Path.Walk{String.starts_with(SCon{'.', SCon{'/', p}}, "/"), []})),
+    Path.norm.fin(Path.norm.walk(String.split(p, '/'), Path.Walk{False{}, []})),
+    Path.norm.fin(Path.norm.walk(String.split(p, '/'),
+      Path.Walk{String.starts_with(p, "/"), []})),
+    Equal.trans(String,
+      Path.norm.fin(Path.norm.walk(String.split(SCon{'.', SCon{'/', p}}, '/'),
+        Path.Walk{False{}, []})),
+      Path.norm.fin(Path.norm.walk("." <> String.split(p, '/'),
+        Path.Walk{False{}, []})),
+      Path.norm.fin(Path.norm.walk(String.split(p, '/'),
+        Path.Walk{False{}, []})),
+      Equal.cong(List<&2, String>, String,
+        cs => Path.norm.fin(Path.norm.walk(cs, Path.Walk{False{}, []})),
+        String.split(SCon{'.', SCon{'/', p}}, '/'),
+        "." <> String.split(p, '/'), split_dot(p)),
+      Equal.cong(Path.Walk, String,
+        st => Path.norm.fin(st),
+        Path.norm.walk("." <> String.split(p, '/'), Path.Walk{False{}, []}),
+        Path.norm.walk(String.split(p, '/'), Path.Walk{False{}, []}),
+        walk_skip_dot(String.split(p, '/'), Path.Walk{False{}, []}))),
+    Equal.cong(Bool, String,
+      abs => Path.norm.fin(Path.norm.walk(String.split(p, '/'),
+        Path.Walk{abs, []})),
+      False{}, String.starts_with(p, "/"), e))
+
+# LAW: one character before a slash, the same shape as net's split_cut
+law split_slash.step:
+  for +h: Char
+  for +t: String
+  for +r: String
+  for e: {False{} == Char.is_eq(h, '/') : Bool}
+  for ih: {String.split(String.append(t, SCon{'/', r}), '/')
+    == t <> String.split(r, '/') : List<&2, String>}
+  {String.split(String.append(SCon{h, t}, SCon{'/', r}), '/')
+    == SCon{h, t} <> String.split(r, '/') : List<&2, String>}
+
+def split_slash.step(h, t, r, e, ih):
+  %e : {String.split.fin(h, String.split(String.append(t, SCon{'/', r}), '/'), _)
+    == SCon{h, t} <> String.split(r, '/') : List<&2, String>}
+  Equal.cong(List<&2, String>, List<&2, String>,
+    x => String.split.fin(h, x, False{}),
+    String.split(String.append(t, SCon{'/', r}), '/'),
+    t <> String.split(r, '/'), ih)
+
+# LAW: a slashless prefix splits off at the first `/`
+law split_slash:
+  for +p: String
+  for +r: String
+  for +e: {Laws.slashless(p) == True{} : Bool}
+  {String.split(String.append(p, SCon{'/', r}), '/')
+    == p <> String.split(r, '/') : List<&2, String>}
+
+def split_slash(p, r, e):
+  match p:
+    case SNil{}:
+      Equal.cong(Bool, List<&2, String>,
+        x => String.split.fin('/', String.split(r, '/'), x),
+        Char.is_eq('/', '/'), True{}, Eq.char_eq_self('/'))
+    case SCon{+h, +t}:
+      split_slash.step(h, t, r,
+        Equal.sym(Bool, Char.is_eq(h, '/'), False{},
+          Eq.not.true(Char.is_eq(h, '/'),
+            Eq.and.left(Bool.not(Char.is_eq(h, '/')), Laws.slashless(t), e))),
+        split_slash(t, r,
+          Eq.and.right(Bool.not(Char.is_eq(h, '/')), Laws.slashless(t), e)))
+
+# LAW: a slashless non-empty path does not begin at the root, and appending
+# to it leaves that first character where it was
+law slashless_rel:
+  for +p: String
+  for +x: String
+  for +e: {Laws.slashless(p) == True{} : Bool}
+  for e0: {False{} == String.is_empty(p) : Bool}
+  {False{} == String.starts_with(String.append(p, x), "/") : Bool}
+
+def slashless_rel(p, x, e, e0):
+  match p:
+    case SNil{}:
+      Eq.bit.absurd(&2,
+        {False{} == String.starts_with(String.append(SNil{}, x), "/") : Bool},
+        e0)
+    case SCon{+h, +t}:
+      Equal.sym(Bool,
+        String.starts_with.if(String.append(t, x), "", Char.is_eq(h, '/')),
+        False{},
+        Equal.trans(Bool,
+          String.starts_with.if(String.append(t, x), "", Char.is_eq(h, '/')),
+          String.starts_with.if(String.append(t, x), "", False{}),
+          False{},
+          Equal.cong(Bool, Bool,
+            b => String.starts_with.if(String.append(t, x), "", b),
+            Char.is_eq(h, '/'), False{},
+            Eq.not.true(Char.is_eq(h, '/'),
+              Eq.and.left(Bool.not(Char.is_eq(h, '/')), Laws.slashless(t), e))),
+          {==}))
+
+# LAW: a name followed by a climb, from an empty relative walk, cancels
+law walk_name_up:
+  for +p: String
+  for e0: {False{} == String.is_empty(p) : Bool}
+  for e1: {False{} == String.eq(p, ".") : Bool}
+  for +e2: {False{} == String.eq(p, "..") : Bool}
+  {Path.norm.walk([p, ".."], Path.Walk{False{}, []})
+    == Path.Walk{False{}, []} : Path.Walk}
+
+# LAW: a climb off a kept name, once the name is known not to be a climb
+law walk_name_up.fin:
+  for +p: String
+  for e2: {False{} == String.eq(p, "..") : Bool}
+  {Path.norm.walk([".."], Path.Walk{False{}, p <> []})
+    == Path.Walk{False{}, []} : Path.Walk}
+
+def walk_name_up.fin(p, e2):
+  %e2 : {Path.Walk{False{}, Path.up.back(_, p, [])}
+    == Path.Walk{False{}, []} : Path.Walk}
+  {==}
+
+def walk_name_up(p, e0, e1, e2):
+  Equal.trans(Path.Walk,
+    Path.norm.walk([".."], Path.norm.go(Path.Walk{False{}, []}, Path.comp_of(p))),
+    Path.norm.walk([".."], Path.norm.go(Path.Walk{False{}, []}, Path.CName{p})),
+    Path.Walk{False{}, []},
+    Equal.cong(Path.Comp, Path.Walk,
+      c => Path.norm.walk([".."], Path.norm.go(Path.Walk{False{}, []}, c)),
+      Path.comp_of(p), Path.CName{p}, Laws.comp_name(p, e0, e1, e2)),
+    walk_name_up.fin(p, e2))
+
+def Laws.dir_plain(p, e, e0, e1, e2):
+  Equal.trans(String,
+    Path.norm.fin(Path.norm.walk(String.split(String.append(p, "/.."), '/'),
+      Path.Walk{String.starts_with(String.append(p, "/.."), "/"), []})),
+    Path.norm.fin(Path.norm.walk(p <> String.split("..", '/'),
+      Path.Walk{False{}, []})),
+    ".",
+    Equal.trans(String,
+      Path.norm.fin(Path.norm.walk(String.split(String.append(p, "/.."), '/'),
+        Path.Walk{String.starts_with(String.append(p, "/.."), "/"), []})),
+      Path.norm.fin(Path.norm.walk(String.split(String.append(p, "/.."), '/'),
+        Path.Walk{False{}, []})),
+      Path.norm.fin(Path.norm.walk(p <> String.split("..", '/'),
+        Path.Walk{False{}, []})),
+      Equal.cong(Bool, String,
+        abs => Path.norm.fin(Path.norm.walk(
+          String.split(String.append(p, "/.."), '/'), Path.Walk{abs, []})),
+        String.starts_with(String.append(p, "/.."), "/"), False{},
+        Equal.sym(Bool, False{},
+          String.starts_with(String.append(p, "/.."), "/"),
+          slashless_rel(p, "/..", e, e0))),
+      Equal.cong(List<&2, String>, String,
+        cs => Path.norm.fin(Path.norm.walk(cs, Path.Walk{False{}, []})),
+        String.split(String.append(p, "/.."), '/'),
+        p <> String.split("..", '/'), split_slash(p, "..", e))),
+    Equal.trans(String,
+      Path.norm.fin(Path.norm.walk(p <> [".."], Path.Walk{False{}, []})),
+      Path.norm.fin(Path.Walk{False{}, []}),
+      ".",
+      Equal.cong(Path.Walk, String, st => Path.norm.fin(st),
+        Path.norm.walk([p, ".."], Path.Walk{False{}, []}),
+        Path.Walk{False{}, []}, walk_name_up(p, e0, e1, e2)),
+      {==}))
+
+# LAW: a singleton that is not a climb counts as no climbs
+law ups_plain.go:
+  for +p: String
+  for e2: {False{} == String.eq(p, "..") : Bool}
+  {Path.ups.go([p]) == 0n : Nat}
+
+def ups_plain.go(_p, e2):
+  %e2 : {Nat.add(Bool.pick(Nat, _, 1n, 0n), Path.ups.go([])) == 0n : Nat}
+  {==}
+
+def Laws.ups_plain(p, e, e2):
+  Equal.trans(Nat,
+    Path.ups.go(String.split(p, '/')),
+    Path.ups.go([p]),
+    0n,
+    Equal.cong(List<&2, String>, Nat, ps => Path.ups.go(ps),
+      String.split(p, '/'), [p], Laws.split_plain(p, e)),
+    ups_plain.go(p, e2))
+
+# LAW: reversing a concatenation is concatenating the reverses
+law reverse_go_app:
+  for a: String
+  for +b: String
+  for +acc: String
+  {String.reverse.go(String.append(a, b), acc)
+    == String.reverse.go(b, String.reverse.go(a, acc)) : String}
+
+def reverse_go_app(a, b, acc):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      reverse_go_app(t, b, SCon{h, acc})
+
+# LAW: the accumulator of a reverse is appended after what was reversed
+law reverse_go_acc:
+  for s: String
+  for +acc: String
+  {String.reverse.go(s, acc)
+    == String.append(String.reverse.go(s, SNil{}), acc) : String}
+
+def reverse_go_acc(s, acc):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      Equal.trans(String,
+        String.reverse.go(t, SCon{h, acc}),
+        String.append(String.reverse.go(t, SNil{}), SCon{h, acc}),
+        String.append(String.reverse.go(SCon{h, t}, SNil{}), acc),
+        reverse_go_acc(t, SCon{h, acc}),
+        Equal.trans(String,
+          String.append(String.reverse.go(t, SNil{}), SCon{h, acc}),
+          String.append(String.append(String.reverse.go(t, SNil{}),
+            SCon{h, SNil{}}), acc),
+          String.append(String.reverse.go(t, SCon{h, SNil{}}), acc),
+          Equal.sym(String,
+            String.append(String.append(String.reverse.go(t, SNil{}),
+              SCon{h, SNil{}}), acc),
+            String.append(String.reverse.go(t, SNil{}), SCon{h, acc}),
+            Eq.append_assoc(String.reverse.go(t, SNil{}), SCon{h, SNil{}},
+              acc)),
+          Equal.cong(String, String, x => String.append(x, acc),
+            String.append(String.reverse.go(t, SNil{}), SCon{h, SNil{}}),
+            String.reverse.go(t, SCon{h, SNil{}}),
+            Equal.sym(String,
+              String.reverse.go(t, SCon{h, SNil{}}),
+              String.append(String.reverse.go(t, SNil{}), SCon{h, SNil{}}),
+              reverse_go_acc(t, SCon{h, SNil{}})))))
+
+law reverse_append:
+  for +a: String
+  for +b: String
+  {String.reverse(String.append(a, b))
+    == String.append(String.reverse(b), String.reverse(a)) : String}
+
+def reverse_append(a, b):
+  Equal.trans(String,
+    String.reverse.go(String.append(a, b), SNil{}),
+    String.reverse.go(b, String.reverse.go(a, SNil{})),
+    String.append(String.reverse.go(b, SNil{}), String.reverse.go(a, SNil{})),
+    reverse_go_app(a, b, SNil{}),
+    reverse_go_acc(b, String.reverse.go(a, SNil{})))
+
+# LAW: a string with `.bend` glued on ends with `.bend`
+law ends_bend:
+  for +p: String
+  {String.ends_with(p ++ ".bend", ".bend") == True{} : Bool}
+
+def ends_bend(p):
+  Equal.trans(Bool,
+    String.starts_with(String.reverse(p ++ ".bend"), String.reverse(".bend")),
+    String.starts_with(String.append(String.reverse(".bend"), String.reverse(p)),
+      String.reverse(".bend")),
+    True{},
+    Equal.cong(String, Bool,
+      s => String.starts_with(s, String.reverse(".bend")),
+      String.reverse(p ++ ".bend"),
+      String.append(String.reverse(".bend"), String.reverse(p)),
+      reverse_append(p, ".bend")),
+    Eq.starts_append(String.reverse(".bend"), String.reverse(p)))
+
+# LAW: taking as many characters as a prefix has leaves the prefix
+law take_prefix:
+  for +p: String
+  for +s: String
+  {String.take(String.append(p, s), String.length(p)) == p : String}
+
+def take_prefix(p, s):
+  match p:
+    case SNil{}:
+      match s:
+        case SNil{}:
+          {==}
+        case SCon{_h, _t}:
+          {==}
+    case SCon{+h, +t}:
+      Equal.cong(String, String, x => SCon{h, x},
+        String.take(String.append(t, s), String.length(t)), t,
+        take_prefix(t, s))
+
+# LAW: length adds over a concatenation
+law length_append:
+  for a: String
+  for +b: String
+  {String.length(String.append(a, b))
+    == Nat.add(String.length(a), String.length(b)) : Nat}
+
+def length_append(a, b):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{_h, +t}:
+      Equal.cong(Nat, Nat, n => 1n+n,
+        String.length(String.append(t, b)),
+        Nat.add(String.length(t), String.length(b)),
+        length_append(t, b))
+
+# LAW: subtracting zero leaves the number
+law sub_zero:
+  for n: Nat
+  {Nat.sub(n, 0n) == n : Nat}
+
+def sub_zero(n):
+  match n:
+    case 0n:
+      {==}
+    case 1n+_p:
+      {==}
+
+# LAW: a number less itself is zero
+law sub_self:
+  for n: Nat
+  {Nat.sub(n, n) == 0n : Nat}
+
+def sub_self(n):
+  match n:
+    case 0n:
+      {==}
+    case 1n+p:
+      sub_self(p)
+
+# LAW: adding a successor on the right is a successor
+law add_succ_right:
+  for n: Nat
+  for +m: Nat
+  {Nat.add(n, 1n+m) == 1n+Nat.add(n, m) : Nat}
+
+def add_succ_right(n, m):
+  match n:
+    case 0n:
+      {==}
+    case 1n+p:
+      Equal.cong(Nat, Nat, x => 1n+x,
+        Nat.add(p, 1n+m), 1n+Nat.add(p, m), add_succ_right(p, m))
+
+# LAW: subtracting from one more than `n+m` peels the same as subtracting
+# from `n+m`, plus one. Used to carry a successor across `add_sub`.
+law sub_add_succ:
+  for +p: Nat
+  for +m: Nat
+  {Nat.sub(1n+Nat.add(p, m), m) == 1n+Nat.sub(Nat.add(p, m), m) : Nat}
+
+def sub_add_succ(p, m):
+  match m:
+    case 0n:
+      Equal.cong(Nat, Nat, k => 1n+k,
+        Nat.add(p, 0n), Nat.sub(Nat.add(p, 0n), 0n),
+        Equal.sym(Nat, Nat.sub(Nat.add(p, 0n), 0n), Nat.add(p, 0n),
+          sub_zero(Nat.add(p, 0n))))
+    case 1n+q:
+      Equal.trans(Nat,
+        Nat.sub(Nat.add(p, 1n+q), q),
+        Nat.sub(1n+Nat.add(p, q), q),
+        1n+Nat.sub(Nat.add(p, 1n+q), 1n+q),
+        Equal.cong(Nat, Nat, k => Nat.sub(k, q),
+          Nat.add(p, 1n+q), 1n+Nat.add(p, q), add_succ_right(p, q)),
+        Equal.trans(Nat,
+          Nat.sub(1n+Nat.add(p, q), q),
+          1n+Nat.sub(Nat.add(p, q), q),
+          1n+Nat.sub(Nat.add(p, 1n+q), 1n+q),
+          sub_add_succ(p, q),
+          Equal.cong(Nat, Nat, k => 1n+k,
+            Nat.sub(Nat.add(p, q), q),
+            Nat.sub(Nat.add(p, 1n+q), 1n+q),
+            Equal.sym(Nat, Nat.sub(Nat.add(p, 1n+q), 1n+q),
+              Nat.sub(Nat.add(p, q), q),
+              Equal.trans(Nat,
+                Nat.sub(Nat.add(p, 1n+q), 1n+q),
+                Nat.sub(1n+Nat.add(p, q), 1n+q),
+                Nat.sub(Nat.add(p, q), q),
+                Equal.cong(Nat, Nat, k => Nat.sub(k, 1n+q),
+                  Nat.add(p, 1n+q), 1n+Nat.add(p, q),
+                  add_succ_right(p, q)),
+                {==})))))
+
+# LAW: adding a number and taking it off leaves the first
+law add_sub:
+  for +n: Nat
+  for +m: Nat
+  {Nat.sub(Nat.add(n, m), m) == n : Nat}
+
+def add_sub(n, m):
+  match n:
+    case 0n:
+      sub_self(m)
+    case 1n+p:
+      Equal.trans(Nat,
+        Nat.sub(1n+Nat.add(p, m), m),
+        1n+Nat.sub(Nat.add(p, m), m),
+        1n+p,
+        sub_add_succ(p, m),
+        Equal.cong(Nat, Nat, k => 1n+k,
+          Nat.sub(Nat.add(p, m), m), p, add_sub(p, m)))
+
+def Laws.unbend_ext(p):
+  Equal.trans(String,
+    Bool.pick(String, String.ends_with(p ++ ".bend", ".bend"),
+      String.take(p ++ ".bend", Nat.sub(String.length(p ++ ".bend"), 5n)),
+      p ++ ".bend"),
+    Bool.pick(String, True{},
+      String.take(p ++ ".bend", Nat.sub(String.length(p ++ ".bend"), 5n)),
+      p ++ ".bend"),
+    p,
+    Equal.cong(Bool, String,
+      x => Bool.pick(String, x,
+        String.take(p ++ ".bend", Nat.sub(String.length(p ++ ".bend"), 5n)),
+        p ++ ".bend"),
+      String.ends_with(p ++ ".bend", ".bend"), True{}, ends_bend(p)),
+    Equal.trans(String,
+      String.take(p ++ ".bend", Nat.sub(String.length(p ++ ".bend"), 5n)),
+      String.take(p ++ ".bend", String.length(p)),
+      p,
+      Equal.cong(Nat, String, n => String.take(p ++ ".bend", n),
+        Nat.sub(String.length(p ++ ".bend"), 5n), String.length(p),
+        Equal.trans(Nat,
+          Nat.sub(String.length(String.append(p, ".bend")), 5n),
+          Nat.sub(String.length(String.append(p, ".bend")),
+            String.length(".bend")),
+          String.length(p),
+          Equal.cong(Nat, Nat,
+            n => Nat.sub(String.length(String.append(p, ".bend")), n),
+            5n, String.length(".bend"), {==}),
+          Equal.trans(Nat,
+            Nat.sub(String.length(String.append(p, ".bend")),
+              String.length(".bend")),
+            Nat.sub(Nat.add(String.length(p), String.length(".bend")),
+              String.length(".bend")),
+            String.length(p),
+            Equal.cong(Nat, Nat, n => Nat.sub(n, String.length(".bend")),
+              String.length(String.append(p, ".bend")),
+              Nat.add(String.length(p), String.length(".bend")),
+              length_append(p, ".bend")),
+            add_sub(String.length(p), String.length(".bend"))))),
+      take_prefix(p, ".bend")))
+
+# LAW: taking nothing off a list is the empty list
+law take_zero:
+  for xs: List<&2, String>
+  {List.take(&2, String, xs, 0n) == [] : List<&2, String>}
+
+def take_zero(xs):
+  match xs:
+    case []:
+      {==}
+    case _h <> _t:
+      {==}
+
+# LAW: the first of a reversed list does not depend on what was already
+# behind the head of the accumulator
+law take_rev_go_acc:
+  for xs: List<&2, String>
+  for +a: String
+  for acc: List<&2, String>
+  {List.take(&2, String, List.reverse.go(&2, String, xs, a <> acc), 1n)
+    == List.take(&2, String, List.reverse.go(&2, String, xs, [a]), 1n)
+    : List<&2, String>}
+
+def take_rev_go_acc(xs, a, acc):
+  match xs:
+    case []:
+      Equal.trans(List<&2, String>,
+        a <> List.take(&2, String, acc, 0n),
+        a <> [],
+        [a],
+        Equal.cong(List<&2, String>, List<&2, String>, r => a <> r,
+          List.take(&2, String, acc, 0n), [], take_zero(acc)),
+        {==})
+    case +h <> +t:
+      Equal.trans(List<&2, String>,
+        List.take(&2, String, List.reverse.go(&2, String, t, h <> (a <> acc)),
+          1n),
+        List.take(&2, String, List.reverse.go(&2, String, t, [h]), 1n),
+        List.take(&2, String, List.reverse.go(&2, String, t, h <> [a]), 1n),
+        take_rev_go_acc(t, h, a <> acc),
+        Equal.sym(List<&2, String>,
+          List.take(&2, String, List.reverse.go(&2, String, t, h <> [a]), 1n),
+          List.take(&2, String, List.reverse.go(&2, String, t, [h]), 1n),
+          take_rev_go_acc(t, h, [a])))
+
+# LAW: taking one off a reversed list is the last component
+law take_rev_last:
+  for t: List<&2, String>
+  for +h: String
+  {List.take(&2, String, List.reverse.go(&2, String, t, [h]), 1n)
+    == [Path.base.go(t, h)] : List<&2, String>}
+
+def take_rev_last(t, h):
+  match t:
+    case []:
+      {==}
+    case +a <> +r:
+      Equal.trans(List<&2, String>,
+        List.take(&2, String, List.reverse.go(&2, String, r, a <> [h]), 1n),
+        List.take(&2, String, List.reverse.go(&2, String, r, [a]), 1n),
+        [Path.base.go(r, a)],
+        take_rev_go_acc(r, a, [h]),
+        take_rev_last(r, a))
+
+# LAW: taking the last component of a split list is `base.last` of it
+law tail_one.go:
+  for ps: List<&2, String>
+  {String.join(List.reverse(&2, String,
+    List.take(&2, String, List.reverse(&2, String, ps), 1n)), "/")
+    == Path.base.last(ps) : String}
+
+def tail_one.go(ps):
+  match ps:
+    case []:
+      {==}
+    case +h <> t:
+      Equal.trans(String,
+        String.join(List.reverse(&2, String,
+          List.take(&2, String, List.reverse(&2, String, h <> t), 1n)), "/"),
+        String.join(List.reverse(&2, String, [Path.base.go(t, h)]), "/"),
+        Path.base.go(t, h),
+        Equal.cong(List<&2, String>, String,
+          xs => String.join(List.reverse(&2, String, xs), "/"),
+          List.take(&2, String, List.reverse.go(&2, String, t, [h]), 1n),
+          [Path.base.go(t, h)], take_rev_last(t, h)),
+        Equal.trans(String,
+          String.join(List.reverse(&2, String, [Path.base.go(t, h)]), "/"),
+          String.join([Path.base.go(t, h)], "/"),
+          Path.base.go(t, h),
+          {==},
+          {==}))
+
+def Laws.tail_one(p):
+  tail_one.go(String.split(p, '/'))
