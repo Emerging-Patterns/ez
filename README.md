@@ -128,8 +128,8 @@ with only a `rev` moves to the default branch tip when the pinned commit is
 an ancestor of it, and stays a commit pin. A hub dependency does not move.
 The upgrade does not fetch the rest of the lock. A dependency marked
 `vendor` is laid out again under the new hash, and the gitignore allowlist
-follows it. Import lines are left for you to edit; `ez doctor` names the ones
-that still carry the old hash.
+follows it. An import line that names a hash that moved is rewritten to
+name the new one.
 
 The ledger is enough on its own. `root` and `narHash` are there so that
 `ez lock` never has to consult anything a clone does not have, which is what

@@ -5,7 +5,7 @@
 # fills BEND_LIB for everything else. A dependency with `vendor = true` is
 # the exception: its tree is committed under `.ez/lib/<hash>` and named in
 # the gitignore allowlist, so a move lays the new tree there and rewrites
-# the line.
+# the line. An import that names the old hash is rewritten to the new one.
 import Base
 import ../io/file.bend as F
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
@@ -15,15 +15,18 @@ import ../manifest/upgrade.bend as U
 import ../git/git.bend as Git
 import ../hub/hub.bend as Web
 import ../lock/lock.bend as L
+import ./args.bend as Args
 
-# what one dependency became, and the allowlist edit it needs. `old` is ""
-# when the committed tree did not move.
+# what one dependency became. `old` is the hash the allowlist must drop, ""
+# when the tree is not committed or the hash did not change. `prev` is the
+# content hash an import must stop naming, "" when that hash did not change.
 type Done is Data:
-  Done{dep: M.Dep, old: String, new: String, moved: Bool}
+  Done{dep: M.Dep, old: String, new: String, prev: String, moved: Bool}
 
-# the whole ledger after the walk
+# the whole ledger after the walk. `swaps` rename committed trees. `edits`
+# rename the hashes import lines carry.
 type Out is Data:
-  Out{deps: List<&2, M.Dep>, swaps: List<&2, U.Swap>, moved: Bool}
+  Out{deps: List<&2, M.Dep>, swaps: List<&2, U.Swap>, edits: List<&2, U.Swap>, moved: Bool}
 
 # where a committed tree is laid. The allowlist names this directory, not
 # whatever BEND_LIB a shell happened to export.
@@ -40,12 +43,13 @@ def work() -> String:
 
 # one dependency left as it was
 def stay(d: M.Dep) -> Done:
-  Done{d, "", "", False{}}
+  Done{d, "", "", "", False{}}
 
 # a moved pin. `old` is the hash the allowlist must drop, "" when the tree
-# is not committed or the hash did not change.
-def moved(d: M.Dep, +old: String, +new: String) -> Done:
-  Done{d, old, new, True{}}
+# is not committed or the hash did not change. `prev` is the content hash
+# the imports named, "" when that hash did not change.
+def moved(d: M.Dep, +old: String, +new: String, +prev: String) -> Done:
+  Done{d, old, new, prev, True{}}
 
 # the hash to drop from the allowlist, or "" when there is nothing to drop
 def swap.hash(same: Bool, +old: String) -> String:
@@ -133,10 +137,14 @@ def say.tree.go(empty: Bool, +name: String, +hash: String) -> IO(Unit):
     case False{}:
       say.tree(name, hash)
 
-# import lines are not rewritten. The ledger's new hash and the source's
-# old one are the drift `ez doctor` reports.
-def say.imports(+name: String, +hash: String) -> IO(Unit):
-  IO.print(name ++ ": imports still name " ++ hash)
+# a content hash that changed, said as the import rewrite. A pin whose
+# tree still hashes the same has no import to rewrite.
+def say.imports(same: Bool, +name: String, +old: String, +new: String) -> IO(Unit):
+  match same:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      IO.print(name ++ ": imports " ++ old ++ " -> " ++ new)
 
 # a pin that was already where the remote points
 def say.keep(+name: String, +rev: String) -> IO(Unit):
@@ -166,12 +174,13 @@ def advanced(+hub: String, +d: M.Dep, g: Git.Got, +branch: String) -> IO(Done):
   +src = M.source.dep(d)
   +old = M.dep.hash(d)
   +drop = swap.of(M.source.vendor(src), old, hash)
+  +prev = swap.hash(String.eq(old, hash), old)
   do IO<Done>:
     hub.check(hub, M.dep.name(d), hash)
     say.move(M.dep.name(d), M.source.rev(src), rev, branch)
-    say.imports(M.dep.name(d), old)
+    say.imports(String.is_empty(prev), M.dep.name(d), old, hash)
     say.tree.go(String.is_empty(drop), M.dep.name(d), hash)
-    return moved(U.retarget(d, rev, hash, root, nar), drop, hash)
+    return moved(U.retarget(d, rev, hash, root, nar), drop, hash, prev)
 
 # the word Off quotes: a branch name when we have one, otherwise the commit
 def tip.of(+branch: String, +tip: String) -> String:
@@ -267,15 +276,16 @@ def either(a: Bool, b: Bool) -> Bool:
 
 # one dependency in front of the rest of the ledger
 def join(a: Done, b: Out) -> Out:
-  Done{d, +old, new, moved} = a
-  Out{ds, ss, any} = b
-  Out{d <> ds, swaps.put(String.is_empty(old), old, new, ss), either(moved, any)}
+  Done{d, +old, +new, +prev, moved} = a
+  Out{ds, ss, es, any} = b
+  Out{d <> ds, swaps.put(String.is_empty(old), old, new, ss),
+    swaps.put(String.is_empty(prev), prev, new, es), either(moved, any)}
 
 # every dependency, in the order the ledger wrote them
 def walk(+lib: String, +hub: String, +only: String, ds: List<&2, M.Dep>) -> IO(Out):
   match ds:
     case []:
-      IO.pure(Out, Out{[], [], False{}})
+      IO.pure(Out, Out{[], [], [], False{}})
     case +h <> t:
       do IO<Out>:
         +a : Done <- one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)),
@@ -317,6 +327,72 @@ def write.ignore.go(empty: Bool, ss: List<&2, U.Swap>) -> IO(Unit):
 def write.ignore(+ss: List<&2, U.Swap>) -> IO(Unit):
   write.ignore.go(List.is_empty(&2, U.Swap, ss), ss)
 
+# a listing that did not happen is a failure
+def sources.got(ok: Bool, +text: String) -> IO(List<&2, String>):
+  match ok:
+    case False{}:
+      IO.die(List<&2, String>, 1, "ez: could not list sources")
+    case True{}:
+      IO.pure(List<&2, String>, Args.nonempty(String.lines(text)))
+
+# every Bend source of the project. Vendored trees and the gate's shadow
+# live under .ez, and a checkout's .git is not source, so neither is rewritten.
+def sources() -> IO(List<&2, String>):
+  do IO<List<&2, String>>:
+    +out : String <- R.exec(["find", ".", "-name", "*.bend",
+      "-not", "-path", "*/.ez/*", "-not", "-path", "*/.git/*"])
+    sources.got(R.ok(out), R.text(out))
+
+# a source left untouched when the rewrite changes nothing
+def rewrite.put(same: Bool, +at: String, +next: String) -> IO(Unit):
+  match same:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      do IO<Unit>:
+        ok : Bool <- F.write(at, next)
+        wrote(ok, at)
+
+def rewrite.body(+at: String, +text: String, +next: String) -> IO(Unit):
+  rewrite.put(String.eq(text, next), at, next)
+
+# a source that could not be read is a failure
+def rewrite.open(m: Maybe<&2, String>, +at: String, ss: List<&2, U.Swap>) -> IO(Unit):
+  match m:
+    case None{}:
+      IO.die(Unit, 1, "ez: " ++ at ++ " could not be read")
+    case Some{+text}:
+      rewrite.body(at, text, U.reimport.many(ss, text))
+
+# one source, with every hash that moved rewritten
+def rewrite.file(+at: String, ss: List<&2, U.Swap>) -> IO(Unit):
+  do IO<Unit>:
+    g : Maybe<&2, String> <- F.read(at)
+    rewrite.open(g, at, ss)
+
+# every source
+def rewrite.all(ps: List<&2, String>, +ss: List<&2, U.Swap>) -> IO(Unit):
+  match ps:
+    case []:
+      IO.pure(Unit, Unit{})
+    case +h <> t:
+      do IO<Unit>:
+        rewrite.file(h, ss)
+        rewrite.all(t, ss)
+
+# the project's imports, rewritten when a hash moved
+def write.imports.go(empty: Bool, ss: List<&2, U.Swap>) -> IO(Unit):
+  match empty:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      do IO<Unit>:
+        ps : List<&2, String> <- sources()
+        rewrite.all(ps, ss)
+
+def write.imports(+ss: List<&2, U.Swap>) -> IO(Unit):
+  write.imports.go(List.is_empty(&2, U.Swap, ss), ss)
+
 # one old tree, gone. The new one is already laid out beside it.
 def drop.one(+hash: String) -> IO(Unit):
   do IO<Unit>:
@@ -333,13 +409,14 @@ def drop(ss: List<&2, U.Swap>) -> IO(Unit):
         drop.one(old)
         drop(t)
 
-# pins rewritten, then the allowlist, then the old trees. The lock is the
-# caller's to write, from the ledger this just wrote.
+# pins rewritten, then the allowlist, then the imports, then the old trees.
+# The lock is the caller's to write, from the ledger this just wrote.
 def go.out(+name: String, +entry: String, +bin: String, o: Out) -> IO(Unit):
-  Out{+deps, +swaps, moved} = o
+  Out{+deps, +swaps, +edits, moved} = o
   do IO<Unit>:
     write.toml(moved, name, entry, bin, deps)
     write.ignore(swaps)
+    write.imports(edits)
     drop(swaps)
 
 def go(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>, +only: String) -> IO(Unit):
