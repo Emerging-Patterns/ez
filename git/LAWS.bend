@@ -141,11 +141,9 @@ law root_rel_here:
   for e: {Nat.is_eq(G.depth(P.dir(at)), G.depth(root)) == True{} : Bool}
   {G.root.rel(at, root, entry) == P.climb(0n, P.dir(entry)) : String}
 
-# What `git ls-remote --symref` printed for Giulio2002/bend-sha256 while
-# this was written. HEAD is main, one commit past tag v0.1.0, and the
-# commit ez.toml pins (c16cd69…) is an ancestor of both. The parser's job
-# is to find that tip and that branch; whether the pin may move is decided
-# in manifest/upgrade.bend.
+# What `git ls-remote --symref` printed for Giulio2002/bend-sha256. HEAD is
+# main, one commit past tag v0.1.0. The parser's job is to find that tip
+# and that branch; whether a pin may move is decided in manifest/upgrade.bend.
 def sha.remote() -> String:
   "ref: refs/heads/main\tHEAD\n" ++
   "5887e7cefa273ff7f90e3edfd6e90b815bbc79ed\tHEAD\n"

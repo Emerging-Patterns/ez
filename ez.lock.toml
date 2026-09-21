@@ -16,21 +16,19 @@ tag = "v0.1.0"
 "main.bend" = "def1bf1385ed2be7e40d3021c7900df3fa69b7461d4ac2aed85c5c4fa6a33a4f"
 "toml.bend" = "6b35d002371ec519209f92448b3a8011930643a63333049dd11fc2b101bc7ab9"
 
-[packages."0x0a5c2c95283e42e081da247c84debe18".source]
+[packages."0x33de775bd13bab25b3e2d6f5bbcb8776".source]
 kind = "git"
 url = "https://github.com/Giulio2002/bend-sha256"
-rev = "c16cd69cedff0e9e19251401dee1cd973458faef"
+rev = "5887e7cefa273ff7f90e3edfd6e90b815bbc79ed"
 entry = "sha256.bend"
 root = "."
-narHash = "sha256-ZQdxgjNCSu3lXjupIRWD/Xp1+T+H8CyYxmUc/0XLj2s="
+narHash = "sha256-FLTyFw5HkOrl/T6E8hbs/XVwL05oGmcJARW9I9eHdgA="
 
-[packages."0x0a5c2c95283e42e081da247c84debe18".files]
-"conformance.bend" = "ac73be1570a094e4c429c13f25d94dabd2cff52c072377cfeedd468c78522e47"
-"core.bend" = "ef5f953def72fd41776be1b477d8542ded7ee26b8d317f33714b9eccd9f36f40"
-"fips.bend" = "f11c04cc7e6c319ead48623f73ffb7353fedf3f8ce8751b9330be27aad541ba8"
-"list_proofs.bend" = "b71b8a1223944f86b31fce2e1c60fe31b15fc20b320e9fe2364c440c553cd75f"
-"padding_proof.bend" = "ed0f9b4069d3bb2f956adb2d3c53ebe0880cf564beffa37a53b0ea02ba622eff"
-"sha256.bend" = "b77e36f3cb077c6648445a9d8112ce71a4f31fe9c532ca4aa7da33b1b5f6d8cd"
+[packages."0x33de775bd13bab25b3e2d6f5bbcb8776".files]
+"buffer.bend" = "c01ad104fa1906c1952398c08245dcd8a38977f379a87bccf7f2da9881223c7d"
+"core.bend" = "a754ea9cf6f16eaceec17b7cd6a4ee89da621d6d623a5e2782a0359332d51a3f"
+"packed.bend" = "17e916ea93b7d0b028d06b0a626abc869d48ce879606908decbc68ff741c98e1"
+"sha256.bend" = "995cca1d2f9c8b4863de92ade74ccf91aa4f1f73ef613fd918aec2483bb5de20"
 "state.bend" = "24b4bb267fe94bd1615a8cff6aa090fff766c9009b5f9aa1c08a865b87d06230"
 
 [packages."0xebdf72b20ad527103f6efc0d2aa8f1ec".source]

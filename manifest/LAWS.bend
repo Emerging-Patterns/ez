@@ -294,7 +294,7 @@ def ledger() -> String:
 law render_parse_roundtrip:
   {R.render(M.parse(ledger())) == ledger() : String}
 
-# sha256 as ez.toml pins it: a rev and no tag, and the tree is committed.
+# a sha256 pin with a rev and no tag, and the tree committed.
 # The tip below is `main` of Giulio2002/bend-sha256 as `ls-remote --symref`
 # reported it, which is a descendant of this rev. The latest tag on that
 # repo, v0.1.0, is 75741733dca8ba3610b116af5d74997a44c7e978, one commit

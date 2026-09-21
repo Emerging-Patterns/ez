@@ -7,6 +7,6 @@ result
 # moves and lays the new tree beside it.
 !.ez/lib
 .ez/lib/*
-!.ez/lib/0x0a5c2c95283e42e081da247c84debe18
+!.ez/lib/0x33de775bd13bab25b3e2d6f5bbcb8776
 bin/ez.bin
 .claude/
