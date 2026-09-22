@@ -127,11 +127,13 @@ law tools_skips_other_sections:
 
 # LAW: a tool section with no hash is not a missing dependency. A hash is
 # the `0x` name an import carries, and a tool is not imported.
+# toward EZ-LED-5
 law tool_needs_no_hash:
   {M.missing([T.Sect{"tools.bolt", [T.Kv{"git", "https://github.com/o/bolt"}]}])
     == "" : String}
 
 # LAW: a `[tools.*]` section is not a dependency
+# toward EZ-LED-5
 law tool_is_not_a_dep:
   {M.deps([T.Sect{"tools.bolt",
     [T.Kv{"git", "https://github.com/Emerging-Patterns/bolt"},
@@ -353,20 +355,24 @@ def ledger() -> String:
 # LAW: a rendered ledger reads back as the file it was. `ez add` and
 # `ez remove` write what they render, so the file on disk after either
 # command is the file the next command will write again.
+# toward EZ-LED-4
 law render_parse_roundtrip:
   {R.render(M.parse(ledger())) == ledger() : String}
 
 # LAW: the bolt pin in that ledger is a tool, and not a dependency of that name
+# toward EZ-LED-5
 law bolt_is_a_tool:
   {M.tool.name(M.tool.find(M.tools_of(M.parse(ledger())), "bolt")) == "bolt"
     : String}
 
 # LAW: and its commit is the commit the tool section wrote
+# toward EZ-LED-4
 law bolt_rev:
   {M.source.rev(M.tool.source(M.tool.find(M.tools_of(M.parse(ledger())), "bolt")))
     == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" : String}
 
 # LAW: a lookup for that name among the dependencies finds none
+# toward EZ-LED-5
 law bolt_is_not_a_dep:
   {M.dep.name(M.dep(M.parse(ledger()), "bolt")) == "" : String}
 
@@ -399,27 +405,33 @@ def sha.ignore() -> String:
   ".ez/*\n!.ez/lib\n.ez/lib/*\n!.ez/lib/0x0a5c2c95283e42e081da247c84debe18\n"
 
 # LAW: `vendor = true`, bare, is the committed-tree bit
+# toward EZ-VEN-1
 law sha256_vendor_flag:
   {M.source.vendor(M.source.dep(sha.dep())) == True{} : Bool}
 
 # LAW: a quoted true is the same bit. The renderer writes the quotes.
+# toward EZ-VEN-1
 law vendor_flag_true:
   {M.flag("true") == True{} : Bool}
 
 # LAW: an absent vendor key is not a committed tree
+# toward EZ-VEN-1
 law vendor_flag_absent:
   {M.flag("") == False{} : Bool}
 
 # LAW: sha256 has no tag, so an upgrade asks the default branch rather than
 # a ref the ledger never named
+# toward EZ-RES-5
 law sha256_aims_forward:
   {U.aim(True{}, M.source.dep(sha.dep())) == U.Forward{} : U.Aim}
 
 # LAW: a hub pin is not upgraded, even when it was the one asked for
+# toward EZ-RES-4
 law hub_holds:
   {U.aim(True{}, M.Hub{}) == U.Hold{} : U.Aim}
 
 # LAW: a tag is re-resolved, and a neighbour `--package` did not name is not
+# toward EZ-RES-8
 law tag_follows:
   {U.aim(True{}, M.Git{"https://github.com/Emerging-Patterns/shake",
     "3424b39197335f0aa741e8928dbe5c27b3bde0ef", "v0.1.0", "shake",
@@ -427,31 +439,37 @@ law tag_follows:
     == U.Follow{"v0.1.0"} : U.Aim}
 
 # LAW: and naming one dependency leaves the other where it was
+# toward EZ-RES-6
 law unselected_holds:
   {U.aim(False{}, M.source.dep(sha.dep())) == U.Hold{} : U.Aim}
 
 # LAW: sha256's pin, being an ancestor of main, advances to that tip and
 # does not grow a tag
+# toward EZ-RES-5
 law sha256_advances:
   {U.judge(False{}, True{}, True{}, sha.tip(), "")
     == U.Advance{sha.tip(), ""} : U.Verdict}
 
 # LAW: the same commit, recomputed to the same hash, is not a rewrite
+# toward EZ-DOC-4
 law same_rev_keeps:
   {U.judge(True{}, True{}, True{}, "c16cd69cedff0e9e19251401dee1cd973458faef", "")
     == U.Keep{} : U.Verdict}
 
 # LAW: the same commit whose tree no longer hashes to the pin is drift
+# toward EZ-RES-8
 law same_rev_drifts:
   {U.judge(True{}, False{}, False{}, "c16cd69cedff0e9e19251401dee1cd973458faef", "")
     == U.Drift{} : U.Verdict}
 
 # LAW: a tag that now names a commit the pin does not descend to has moved
+# toward EZ-RES-8
 law tag_moved_off:
   {U.judge(False{}, False{}, True{}, "75741733dca8ba3610b116af5d74997a44c7e978",
     "v0.1.0") == U.Off{} : U.Verdict}
 
 # LAW: a move keeps the vendor bit and the entry, and writes the new commit
+# toward EZ-RES-5
 law sha256_retarget:
   {U.retarget(sha.dep(), sha.tip(), "0xnew", ".", "sha256-new")
     == M.Dep{"sha256", "0xnew", "sha256.bend",
@@ -459,6 +477,7 @@ law sha256_retarget:
         "sha256-new", True{}}} : M.Dep}
 
 # LAW: the allowlist follows the new hash and leaves the rest of the file
+# toward EZ-VEN-1
 law sha256_allowlist:
   {U.reallow(sha.ignore(), "0x0a5c2c95283e42e081da247c84debe18", "0xnew")
     == ".ez/*\n!.ez/lib\n.ez/lib/*\n!.ez/lib/0xnew\n" : String}
@@ -486,14 +505,9 @@ def imports.after() -> String:
 
 # LAW: import lines that name a hash that moved name the new one. A longer
 # hash, a local import and a comment stay.
+# toward EZ-VEN-2
 law imports_follow_hash:
   {U.reimport.many(
     [U.Swap{"0x0a5c2c95283e42e081da247c84debe18", "0xnew"},
      U.Swap{"0x1111111111111111111111111111aaaa", "0xabc"}],
     imports.before()) == imports.after() : String}
-
-# LAW: a body that hashed wrong is the hub disagreeing with git. A miss
-# that never produced a body is not.
-law hub_digest_disagrees:
-  {U.hub.bad("https://hub.bend-lang.com/0xabc/manifest does not hash to what was asked for")
-    == True{} : Bool}

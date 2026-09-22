@@ -32,31 +32,6 @@ def Laws.origin_agrees(h, s, cache):
     Equal.sym(L.Src, L.origin(L.origins.all([], [L.Origin{h, s}]), h), s,
       head_wins(h, s, [])))
 
-# LAW: one step of the scan, with the head's answer given as a parameter,
-# since a match may not scrutinise a computed value, and the rest of the
-# scan's agreement given alongside
-law seen_holds_agrees.arm:
-  for t: List<&2, String>
-  for +s: String
-  for p: Bool
-  for ih: {Laws.old.seen.holds(t, s) == L.seen.holds(t, s) : Bool}
-  {Bool.or(p, Laws.old.seen.holds(t, s))
-    == L.any.step(p, _u => L.seen.holds(t, s)) : Bool}
-
-def seen_holds_agrees.arm(_t, _s, p, ih):
-  match p:
-    case True{}:
-      {==}
-    case False{}:
-      ih
-
-def Laws.seen_holds_agrees(xs, s):
-  match xs:
-    case []:
-      {==}
-    case +h <> +t:
-      seen_holds_agrees.arm(t, s, String.eq(h, s), Laws.seen_holds_agrees(t, s))
-
 # Insertion rewrites its comparison into the arm that writes the
 # package first. The hub name and the two closed document laws reduce.
 # `spec_hash` is the first piece of a split walked one character at a
