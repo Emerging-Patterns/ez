@@ -13,6 +13,7 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
+import ../sha/nar.bend as Nar
 import ../ez/say.bend as Say
 
 # what a ref turned out to name: the commit that gets pinned, and the tag or
@@ -313,22 +314,11 @@ def tip.branch(rs: List<&2, Row>) -> String:
     case +h <> t:
       tip.step(String.is_empty(tip.branch.at(h)), tip.branch.at(h), _u => tip.branch(t))
 
-# what a run said about the tree it weighed
-def nar.said(ok: Bool, +text: String) -> IO(String):
-  match ok:
-    case False{}:
-      IO.die(String, 1, "ez: nix hash path: " ++ text)
-    case True{}:
-      IO.pure(String, String.trim(text))
-
 # the NAR hash nix rebuilds the checkout by. `fetchgit` hashes the working
 # tree with its `.git` taken off, so that is what is weighed here and the
-# caller strips `.git` before asking.
+# caller strips `.git` before asking. Computed in Bend; nix is not required.
 def nar(+work: String) -> IO(String):
-  do IO<String>:
-    +out : String <- R.exec(["nix", "hash", "path", "--type", "sha256",
-      "--sri", work])
-    nar.said(R.ok(out), R.text(out))
+  Nar.path(work)
 
 # the NAR hash of one commit. The checkout is weighed the way `fetchgit`
 # weighs it, then removed. Nothing is laid under BEND_LIB.
@@ -590,8 +580,8 @@ def entry.for(given: Bool, +entry: String, +work: String) -> IO(String):
 
 # the repo checked out at the pinned commit, and everything that follows from
 # it. The `.git` goes before the tree is weighed, because `fetchgit`'s hash is
-# over the working tree alone and nix has to be able to reproduce it. An entry
-# that was not asked for is read from this checkout before that.
+# over the working tree alone. An entry that was not asked for is read from
+# this checkout before that.
 def vendor.at(+lib: String, +url: String, r: Ref, +entry: String) -> IO(Got):
   Ref{+rev, tag} = r
   +work = lib ++ "/.work-" ++ rev

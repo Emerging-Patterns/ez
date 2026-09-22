@@ -30,9 +30,7 @@ printf '%s\n' '#!/bin/sh' 'exec ez tool run "$@"' > ezx && chmod +x ezx
 
 ez is Bend and nothing else, so the binary is all there is: no runtime, no
 helper scripts beside it, nothing to point an environment variable at. Every
-subcommand needs `bend` and `git`, and `ez add` also wants `nix` on PATH,
-because the NAR hash it records for a vendored repo is `nix hash path`'s to
-give.
+subcommand needs `bend` and `git` on PATH.
 
 Or with nix:
 
