@@ -29,11 +29,14 @@ def publish(+hub: String, +at: String, +text: String) -> IO(String):
     _m : Bool <- F.write(hub ++ "/" ++ h ++ "/manifest", man)
     return h
 
-# the lock nix reads, written from the entry against the hub that is up
+# the lock nix reads, written from the entry against the hub that is up, which
+# is the hub the ledger names
 def lock(+repo: String, +app: String, +hub: String) -> IO(String):
   do IO<String>:
-    _o : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
-      repo ++ "/bin/ez.bin", "lock"]))
+    _t : Bool <- F.write(app ++ "/ez.toml",
+      "[package]\nname = \"app\"\nhub = \"" ++ hub ++ "\"\n")
+    W.track(app)
+    _o : String <- R.exec(W.ez(repo, app, ["lock"]))
     +at : String <- W.only(app, "ez.lock.*")
     yes("the lock was written", Bool.not(String.is_empty(at)))
     return at

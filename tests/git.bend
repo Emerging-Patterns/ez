@@ -96,6 +96,7 @@ def local(+repo: String, +app: String, +hash: String, +rev: String) -> IO(Unit):
     _w : Bool <- F.write(app ++ "/main.bend",
       "import Base\nimport " ++ hash ++ "/lib.bend as Lib\n\n" ++
       "def main() -> U32:\n  Lib.quad(11)\n")
+    W.track(app)
     +out : String <- R.exec(W.inside(app, ["env", "BEND_HUB=http://127.0.0.1:1",
       "BEND_LIB=" ++ app ++ "/.ez/lib", "bend", "main.bend"]))
     Check.eq_str("the vendored package builds, with no hub at all",

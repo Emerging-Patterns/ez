@@ -11,6 +11,8 @@ import ./clock.bend as Clock
 import ./args.bend as Args
 import ./target.bend as Tgt
 import ../manifest/manifest.bend as M
+import ./pin.bend as Pin
+import ./cmd.bend as Cmd
 
 # a ledger naming two packages, the one the drift laws read
 def ledger() -> String:
@@ -224,3 +226,60 @@ law out_name_empty:
 # toward EZ-TOOL-7
 law out_name:
   {Tgt.out.name("bolt") == "bolt" : String}
+
+# cmd: the files a lock starts from are the ones git tracks
+
+# LAW: a tracked path under `.ez/` is never a root of the lock. The trees
+# there are packages, read as packages, and not the project's own sources.
+law root_skips_ez:
+  for +p: String
+  {Cmd.root.keep(".ez/" ++ p) == [] : List<&2, String>}
+
+# pin: a plain `ez lock` copies every `[tools.*]` pin as the ledger has it,
+# and refuses one it would have to fill. Filling is `--upgrade`'s alone.
+
+# LAW: a git pin with a commit and a NAR hash is copied as it is. Nothing
+# about it asks the lock to reach a remote, so nothing stops the lock.
+law gap_of_full_pin:
+  for n: String
+  for e: String
+  for b: String
+  for url: String
+  for +rev: String
+  for tag: String
+  for root: String
+  for +nar: String
+  for vend: Bool
+  for fr: {False{} == String.is_empty(rev) : Bool}
+  for fn: {False{} == String.is_empty(nar) : Bool}
+  {Pin.gap(M.Tool{n, e, b, M.Git{url, rev, tag, root, nar, vend}}) == "" : String}
+
+# LAW: a git pin with no commit is refused, whatever else it holds, and the
+# refusal names the upgrade that pins it
+law gap_of_revless_pin:
+  for +n: String
+  for e: String
+  for b: String
+  for url: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  {Pin.gap(M.Tool{n, e, b, M.Git{url, "", tag, root, nar, vend}})
+    == "ez: tools." ++ n ++ " has no rev; run `ez lock --upgrade --package " ++
+      n ++ "` to pin it" : String}
+
+# LAW: and one with a commit and no NAR hash is refused the same way
+law gap_of_narless_pin:
+  for +n: String
+  for e: String
+  for b: String
+  for url: String
+  for +rev: String
+  for tag: String
+  for root: String
+  for vend: Bool
+  for fr: {False{} == String.is_empty(rev) : Bool}
+  {Pin.gap(M.Tool{n, e, b, M.Git{url, rev, tag, root, "", vend}})
+    == "ez: tools." ++ n ++ " has no narHash; run `ez lock --upgrade --package " ++
+      n ++ "` to pin it" : String}

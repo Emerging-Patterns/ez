@@ -1,7 +1,8 @@
-# ez/pin: `ez lock` fills a `[tools.*]` pin, and `ez lock --upgrade` moves one.
-# A tag is re-resolved to a commit and the NAR hash is filled, the way a git
-# dependency is pinned. The checkout is weighed and removed. Nothing is laid
-# under `.ez/lib`, and no import line is rewritten: a tool is not a package.
+# ez/pin: `ez lock --upgrade` fills a `[tools.*]` pin or moves one, and a
+# plain `ez lock` refuses a pin it would have to fill. A tag is re-resolved to
+# a commit and the NAR hash is filled, the way a git dependency is pinned. The
+# checkout is weighed and removed. Nothing is laid under `.ez/lib`, and no
+# import line is rewritten: a tool is not a package.
 import Base
 import ../io/file.bend as F
 import ../manifest/manifest.bend as M
@@ -83,6 +84,7 @@ def write(
   +name: String,
   +entry: String,
   +bin: String,
+  +hub: String,
   ds: List<&2, M.Dep>,
   ts: List<&2, M.Tool>
 ) -> IO(Unit):
@@ -91,7 +93,7 @@ def write(
       IO.pure(Unit, Unit{})
     case True{}:
       do IO<Unit>:
-        ok : Bool <- F.write("ez.toml", Rend.show(M.Manifest{name, entry, bin, ds, ts}))
+        ok : Bool <- F.write("ez.toml", Rend.show(M.Manifest{name, entry, bin, hub, ds, ts}))
         wrote(ok, "ez.toml")
 
 # a tool with no repo cannot be pinned
@@ -161,17 +163,6 @@ def fill.one(+tool: M.Tool) -> IO(Touched):
     need.git(M.source.is_git(src), M.tool.name(tool))
     fill.gap(String.is_empty(M.source.rev(src)),
       String.is_empty(M.source.nar(src)), tool)
-
-# every tool, in the order the ledger wrote them
-def fill.walk(ts: List<&2, M.Tool>) -> IO(Bunch):
-  match ts:
-    case []:
-      IO.pure(Bunch, Bunch{[], False{}})
-    case +h <> t:
-      do IO<Bunch>:
-        +a : Touched <- fill.one(h)
-        +b : Bunch <- fill.walk(t)
-        return join(a, b)
 
 # the branch a rev-only pin followed, said when there is one
 def branch.of(+label: String) -> String:
@@ -291,13 +282,23 @@ def up.one(aim: U.Aim, +tool: M.Tool) -> IO(Touched):
     case U.Forward{}:
       forward(tool)
 
+# a selected pin with no commit or no NAR hash is filled, which is the only
+# place one is; a full one is asked whether it moved
+def up.fill(short: Bool, +tool: M.Tool, +src: M.Source) -> IO(Touched):
+  match short:
+    case True{}:
+      fill.one(tool)
+    case False{}:
+      up.one(U.aim(True{}, src), tool)
+
 # a selected tool names a repo, or it cannot be re-pinned
 def up.git(git: Bool, +tool: M.Tool, +src: M.Source) -> IO(Touched):
   match git:
     case False{}:
       IO.die(Touched, 1, "ez: tools." ++ M.tool.name(tool) ++ " has no git")
     case True{}:
-      up.one(U.aim(True{}, src), tool)
+      up.fill(Bool.or(String.is_empty(M.source.rev(src)),
+        String.is_empty(M.source.nar(src))), tool, src)
 
 # a selected tool is asked; the others are left
 def up.sel(sel: Bool, +tool: M.Tool, +src: M.Source) -> IO(Touched):
@@ -323,49 +324,97 @@ def up.walk(+only: String, ts: List<&2, M.Tool>) -> IO(Bunch):
         return join(a, b)
 
 # the walk, written when a pin moved
-def bunch.put(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>, tally: Bunch) -> IO(Unit):
+def bunch.put(+name: String, +entry: String, +bin: String, +hub: String, ds: List<&2, M.Dep>, tally: Bunch) -> IO(Unit):
   match tally:
     case Bunch{tools, mved}:
-      write(mved, name, entry, bin, ds, tools)
+      write(mved, name, entry, bin, hub, ds, tools)
 
-# a ledger that parsed, with every short pin filled
-def fill.good(manifest: M.Manifest) -> IO(Unit):
-  M.Manifest{+name, +entry, +bin, +ds, +ts} = manifest
-  do IO<Unit>:
-    b : Bunch <- fill.walk(ts)
-    bunch.put(name, entry, bin, ds, b)
-
-# a ledger that parsed, with every selected pin re-asked
+# a ledger that parsed, with every selected pin filled or re-asked
 def up.good(manifest: M.Manifest, +only: String) -> IO(Unit):
-  M.Manifest{+name, +entry, +bin, +ds, +ts} = manifest
+  M.Manifest{+name, +entry, +bin, +hub, +ds, +ts} = manifest
   do IO<Unit>:
     b : Bunch <- up.walk(only, ts)
-    bunch.put(name, entry, bin, ds, b)
-
-# a ledger that parsed
-def read.good(fill: Bool, manifest: M.Manifest, +only: String) -> IO(Unit):
-  match fill:
-    case True{}:
-      fill.good(manifest)
-    case False{}:
-      up.good(manifest, only)
+    bunch.put(name, entry, bin, hub, ds, b)
 
 # the ledger on disk, or the reason it was not one
-def read.go(ledger: M.Read, fill: Bool, +only: String) -> IO(Unit):
+def read.go(ledger: M.Read, +only: String) -> IO(Unit):
   match ledger:
     case M.Bad{why}:
       IO.die(Unit, 1, "ez: " ++ why)
     case M.Good{m}:
-      read.good(fill, m, only)
+      up.good(m, only)
 
-# `ez lock`, filling a rev or a NAR hash a tool does not have yet
-def fill() -> IO(Unit):
-  do IO<Unit>:
-    t : Maybe<&2, String> <- F.read("ez.toml")
-    read.go(M.parse(F.text_of(t)), True{}, "")
-
-# `ez lock --upgrade`, for every tool or for the one named
+# `ez lock --upgrade`, for every tool or for the one named. A pin with no
+# commit or no NAR hash is filled here and nowhere else.
 def upgrade(+only: String) -> IO(Unit):
   do IO<Unit>:
     t : Maybe<&2, String> <- F.read("ez.toml")
-    read.go(M.parse(F.text_of(t)), False{}, only)
+    read.go(M.parse(F.text_of(t)), only)
+
+# why a plain lock cannot copy a git pin as it stands, or "" when it can. The
+# lock copies `rev` and `narHash` out of the ledger and never asks a remote
+# for them, so a pin missing either is refused rather than filled, and the
+# upgrade that fills it is named.
+def gap.git(no_rev: Bool, no_nar: Bool, +name: String) -> String:
+  match no_rev:
+    case True{}:
+      "ez: tools." ++ name ++ " has no rev; run `ez lock --upgrade --package " ++
+        name ++ "` to pin it"
+    case False{}:
+      match no_nar:
+        case True{}:
+          "ez: tools." ++ name ++ " has no narHash; run `ez lock --upgrade --package " ++
+            name ++ "` to pin it"
+        case False{}:
+          ""
+
+# why a plain lock cannot copy a pin as it stands, or "" when it can. A pin
+# with no repo has nothing to pin, under a plain lock or an upgrade.
+def gap(pin: M.Tool) -> String:
+  M.Tool{n, _e, _b, s} = pin
+  match s:
+    case M.Hub{}:
+      "ez: tools." ++ n ++ " has no git"
+    case M.Git{_url, rev, _tag, _root, nar, _vend}:
+      gap.git(String.is_empty(rev), String.is_empty(nar), n)
+
+# this pin's gap when it has one, otherwise the rest's. The rest arrives as a
+# thunk and only the arm that wants it applies it, so the first gap stops the
+# scan.
+def gaps.step(none: Bool, here: String, rest: Unit -> String) -> String:
+  match none:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      here
+
+# the first pin, in ledger order, a plain lock cannot copy, or "" when it can
+# copy every one
+def gaps(ts: List<&2, M.Tool>) -> String:
+  match ts:
+    case []:
+      ""
+    case h <> t:
+      +here = gap(h)
+      gaps.step(String.is_empty(here), here, _u => gaps(t))
+
+# a gap stops the lock before anything is written
+def need.judge(+why: String) -> IO(Unit):
+  Bool.pick(IO(Unit), String.is_empty(why), IO.pure(Unit, Unit{}),
+    IO.die(Unit, 1, why))
+
+# the ledger's pins, each complete, or the reason one is not
+def need.go(ledger: M.Read) -> IO(Unit):
+  match ledger:
+    case M.Bad{why}:
+      IO.die(Unit, 1, "ez: " ++ why)
+    case M.Good{m}:
+      M.Manifest{_n, _e, _b, _h, _ds, ts} = m
+      need.judge(gaps(ts))
+
+# `ez lock`: every `[tools.*]` pin already has a commit and a NAR hash, or the
+# lock refuses. Nothing is resolved and ez.toml is not written.
+def need() -> IO(Unit):
+  do IO<Unit>:
+    t : Maybe<&2, String> <- F.read("ez.toml")
+    need.go(M.parse(F.text_of(t)))

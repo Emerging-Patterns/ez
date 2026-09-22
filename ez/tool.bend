@@ -459,7 +459,7 @@ def go.good(
   act: Act,
   +over: String
 ) -> IO(Unit):
-  M.Manifest{+n, +e, +b, _ds, _ts} = manifest
+  M.Manifest{+n, +e, +b, _h, _ds, _ts} = manifest
   go.named(Tgt.out.name(n), P.join(src, go.over(String.is_empty(over), over, b, e)),
     src, lib, dir, rev, act)
 
@@ -561,7 +561,7 @@ def project.read(ledger: M.Read) -> IO(M.Read):
 def project.go(got: Maybe<&2, String>) -> IO(M.Read):
   match got:
     case None{}:
-      IO.pure(M.Read, M.Good{M.Manifest{"", "", "", [], []}})
+      IO.pure(M.Read, M.Good{M.Manifest{"", "", "", "", [], []}})
     case Some{body}:
       project.read(M.parse(body))
 

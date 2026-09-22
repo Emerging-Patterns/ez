@@ -17,6 +17,7 @@ import ./cap.bend as Cap
 import ./target.bend as Tgt
 import ./upgrade.bend as Up
 import ./pin.bend as Pin
+import ./sorted.bend as Sorted
 import ../ez/say.bend as Say
 
 # the ledger's path, which is fixed
@@ -62,7 +63,7 @@ def named(ledger: M.Read) -> String:
     case M.Bad{_why}:
       "app"
     case M.Good{m}:
-      M.Manifest{n, _e, _b, _ds, _ts} = m
+      M.Manifest{n, _e, _b, _h, _ds, _ts} = m
       n
 
 # the entry file of a ledger that was read
@@ -71,7 +72,7 @@ def entry(ledger: M.Read) -> String:
     case M.Bad{_why}:
       "main.bend"
     case M.Good{m}:
-      M.Manifest{_n, e, _b, _ds, _ts} = m
+      M.Manifest{_n, e, _b, _h, _ds, _ts} = m
       entry.or(e)
 
 # a ledger that would not parse stops the command before it does damage
@@ -178,12 +179,44 @@ def publish() -> IO(Unit):
     lib : String <- Env.lib()
     Pub.publish(lib, at)
 
-# every .bend file under the current directory, for the lock's roots
+# a listed path the lock starts from: any but the committed trees under
+# `.ez/`, which are packages and not the project's own sources
+def root.keep(+at: String) -> List<&2, String>:
+  Bool.pick(List<&2, String>, String.starts_with(at, ".ez/"), [], [at])
+
+# every listed path the lock starts from
+def roots.of(ls: List<&2, String>) -> List<&2, String>:
+  match ls:
+    case []:
+      []
+    case h <> t:
+      List.append(&2, String, root.keep(h), roots.of(t))
+
+# the lock's roots, from what `git ls-files` printed: blank lines dropped,
+# `.ez/` dropped, and the rest in order, so the walk starts from the same
+# list on every machine
+def tracked(ls: List<&2, String>) -> List<&2, String>:
+  Sorted.sort(roots.of(Args.nonempty(ls)))
+
+# a listing that failed is not an empty project. Outside a git repository
+# there is no committed tree to lock, and a lock of whatever happened to be
+# on disk is one a clone could not reproduce.
+def sources.got(ok: Bool, +text: String) -> IO(List<&2, String>):
+  match ok:
+    case True{}:
+      IO.pure(List<&2, String>, tracked(String.lines(text)))
+    case False{}:
+      IO.die(List<&2, String>, 1,
+        "ez: ez lock reads the .bend files git tracks, and git could not list them: " ++
+          String.trim(text))
+
+# every .bend file git tracks under the current directory, for the lock's
+# roots. Untracked files are not a clone's, so they are not the lock's.
 def sources() -> IO(List<&2, String>):
   do IO<List<&2, String>>:
-    +out : String <- R.exec(["find", ".", "-name", "*.bend",
-      "-not", "-path", "./.ez/*"])
-    return Args.nonempty(String.lines(R.text(out)))
+    +out : String <- R.exec(["git", "-c", "core.quotepath=off", "ls-files",
+      "--", "*.bend"])
+    sources.got(R.ok(out), R.text(out))
 
 # the lock's path, which is fixed
 def lockfile() -> String:
@@ -198,21 +231,24 @@ def lock.now() -> IO(Unit):
     wrote : Bool <- F.write(lockfile(), text)
     report.exit(wrote)
 
-# `--package` is only a filter on an upgrade
+# `--package` is only a filter on an upgrade. A plain lock copies every pin
+# as the ledger has it, and refuses one it would have to fill.
 def lock.plain(bare: Bool, +_name: String) -> IO(Unit):
   match bare:
     case True{}:
       do IO<Unit>:
-        Pin.fill()
+        Pin.need()
         lock.now()
     case False{}:
       IO.die(Unit, 1, "ez: --package needs --upgrade")
 
 # `ez lock`, or `ez lock --upgrade` which re-pins git deps and tools first
 # and then resolves. The lock is written from the ledger either way. A tool
-# pin is recorded under `[tools.*]` and is not laid into BEND_LIB. Fetch stays
-# a separate command; a `vendor = true` dependency is laid out by the upgrade
-# itself, because that tree is committed.
+# pin is recorded under `[tools.*]` and is not laid into BEND_LIB. A git
+# dependency whose tree is not under BEND_LIB is fetched at its ledger rev by
+# the lock itself, since its files are what the lock records; filling the rest
+# of BEND_LIB stays `ez fetch`'s. A `vendor = true` dependency is laid out by
+# the upgrade itself, because that tree is committed.
 def lock.up(up: Bool, +name: String) -> IO(Unit):
   match up:
     case False{}:
@@ -340,7 +376,7 @@ def init(+asked: String, +file: String) -> IO(Unit):
     +name : String <- IO.pure(String, init.name(asked))
     +at : String <- IO.pure(String, entry.or(file))
     wrote : Bool <- F.write(toml(),
-      Rend.show(M.Manifest{name, at, "", [], []}))
+      Rend.show(M.Manifest{name, at, "", "", [], []}))
     +kept : Bool <- init.ignore(name)
     +made : Bool <- init.entry(at)
     report.exit(Bool.and(wrote, Bool.and(kept, made)))

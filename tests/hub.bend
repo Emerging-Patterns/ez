@@ -47,11 +47,14 @@ def named(+at: String) -> IO(List<&2, String>):
     return D.uniq(List.sort(~String, ~String.is_le,
       W.nonblank(String.lines(R.text(out)))))
 
-# the entry, locked against the hub that is serving the two packages
+# the entry, locked against the hub that is serving the two packages. The hub
+# is the one the ledger names, since `ez lock` reads no environment for it.
 def lock(+repo: String, +app: String, +hub: String) -> IO(Unit):
   do IO<Unit>:
-    _o : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
-      repo ++ "/bin/ez.bin", "lock"]))
+    _t : Bool <- F.write(app ++ "/ez.toml",
+      "[package]\nname = \"app\"\nhub = \"" ++ hub ++ "\"\n")
+    W.track(app)
+    _o : String <- R.exec(W.ez(repo, app, ["lock"]))
     return Unit{}
 
 # BEND_LIB filled from the lock and nothing else, which is what the nix

@@ -55,9 +55,9 @@ def tools(ts: List<&2, M.Tool>) -> String:
 
 # the ledger as an ez.toml
 def show(manifest: M.Manifest) -> String:
-  M.Manifest{n, e, b, ds, ts} = manifest
+  M.Manifest{n, e, b, h, ds, ts} = manifest
   "[package]\n" ++ line("name", n) ++ line("entry", e) ++ line("bin", b) ++
-    deps(ds) ++ tools(ts)
+    line("hub", h) ++ deps(ds) ++ tools(ts)
 
 # a ledger that was read, as an ez.toml; an unreadable one renders as nothing,
 # so a failed read can never overwrite a good file with a guess
@@ -87,10 +87,10 @@ def without(ds: List<&2, M.Dep>, +name: String) -> List<&2, M.Dep>:
 # the ledger with a dependency added, replacing any of the same name, so adding
 # twice is the same as adding once
 def add(manifest: M.Manifest, +dependency: M.Dep) -> M.Manifest:
-  M.Manifest{n, e, b, ds, ts} = manifest
-  M.Manifest{n, e, b, List.append(&2, M.Dep, without(ds, M.dep.name(dependency)), [dependency]), ts}
+  M.Manifest{n, e, b, h, ds, ts} = manifest
+  M.Manifest{n, e, b, h, List.append(&2, M.Dep, without(ds, M.dep.name(dependency)), [dependency]), ts}
 
 # the ledger with a dependency dropped
 def remove(manifest: M.Manifest, name: String) -> M.Manifest:
-  M.Manifest{n, e, b, ds, ts} = manifest
-  M.Manifest{n, e, b, without(ds, name), ts}
+  M.Manifest{n, e, b, h, ds, ts} = manifest
+  M.Manifest{n, e, b, h, without(ds, name), ts}

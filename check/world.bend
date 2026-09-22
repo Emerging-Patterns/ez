@@ -128,6 +128,15 @@ def rm(at: String) -> IO(Unit):
     _o : String <- R.exec(["rm", "-rf", at])
     return Unit{}
 
+# a project's files, tracked by a repository of its own. `ez lock` starts from
+# the `.bend` files git tracks, so a project a test writes is one it has to
+# add before it locks; staged is enough, since `git ls-files` reads the index.
+def track(+at: String) -> IO(Unit):
+  do IO<Unit>:
+    _i : String <- R.exec(["git", "-C", at, "init", "-q"])
+    _a : String <- R.exec(["git", "-C", at, "add", "-A"])
+    return Unit{}
+
 # a command run in a directory, with the gate's BEND_LIB taken away. Base has
 # no chdir, so the directory is `env`'s business; and a test that is about
 # where packages come from must not inherit the one the gate set for itself.

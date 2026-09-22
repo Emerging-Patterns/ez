@@ -9,28 +9,29 @@ def Laws.origin_first(h, s, rest):
   Equal.cong(Bool, L.Src, b => Bool.pick(L.Src, b, s, L.origin(rest, h)),
     String.eq(h, h), True{}, Eq.string_eq_self(h))
 
-# LAW: a hash recorded at the head of a list of origins resolves to what was
-# recorded for it, whatever the list behind it holds. This is `origin_first`
-# again, and it is stated here because the agreement law needs it at two
-# different tails: the cache on one side, nothing at all on the other.
-law head_wins:
-  for +h: String
-  for s: L.Src
-  for rest: List<&2, L.Origin>
-  {L.origin(L.Origin{h, s} <> rest, h) == s : L.Src}
-
-def head_wins(h, s, rest):
-  Equal.cong(Bool, L.Src, b => Bool.pick(L.Src, b, s, L.origin(rest, h)),
+# The head's hash compared with itself is the arm that answers at once.
+def Laws.known_first(h, _s, rest):
+  Equal.cong(Bool, Bool, b => L.any.step(b, _u => L.known(rest, h)),
     String.eq(h, h), True{}, Eq.string_eq_self(h))
 
-def Laws.origin_agrees(h, s, cache):
-  Equal.trans(L.Src,
-    L.origin(L.origins.all([L.Origin{h, s}], cache), h),
-    s,
-    L.origin(L.origins.all([], [L.Origin{h, s}]), h),
-    head_wins(h, s, cache),
-    Equal.sym(L.Src, L.origin(L.origins.all([], [L.Origin{h, s}]), h), s,
-      head_wins(h, s, [])))
+# A NAR hash that is not empty takes the second arm, and one compared with
+# itself is the arm that passes.
+def Laws.nar_why_agrees(n, url, rev, f):
+  %f : {L.nar.why.go(_, String.eq(n, n), n, n, url, rev) == "" : String}
+  Equal.cong(Bool, String, b => L.nar.why.go(False{}, b, n, n, url, rev),
+    String.eq(n, n), True{}, Eq.string_eq_self(n))
+
+# Both tests are rewritten to the False the premises give, and the reason
+# that is left opens with a literal, so it is not empty.
+def Laws.nar_why_refuses(want, got, url, rev, f, d):
+  %f : {String.is_empty(L.nar.why.go(_, String.eq(want, got), want, got, url,
+    rev)) == False{} : Bool}
+  %d : {String.is_empty(L.nar.why.go(False{}, _, want, got, url, rev))
+    == False{} : Bool}
+  {==}
+
+def Laws.nar_why_needs_a_hash(_got, _url, _rev):
+  {==}
 
 # Insertion rewrites its comparison into the arm that writes the
 # package first. The hub name and the two closed document laws reduce.
@@ -42,7 +43,7 @@ def Laws.pack_ins_le(x, h, t, e):
     == x <> (h <> t) : List<&2, L.Pack>}
   {==}
 
-def Laws.lock_names_hub(_hub, _ver, _ps):
+def Laws.lock_names_hub(_hub, _ps):
   {==}
 
 def Laws.hashes_sorted():
@@ -51,7 +52,7 @@ def Laws.hashes_sorted():
 def Laws.lock_roundtrip():
   {==}
 
-def Laws.render_keeps_packages_without_tools(_hub, _ver, _ps):
+def Laws.render_keeps_packages_without_tools(_hub, _ps):
   {==}
 
 def Laws.tools_are_not_packages():

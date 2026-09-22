@@ -1,11 +1,11 @@
 # git: the laws. The human states them; PROOF.bend must prove them.
 #
 # Vendoring is almost all effect, and an effect proves nothing. The one pure
-# decision it makes that anything downstream depends on is the shape of
-# `.ez/origins.toml`: this module writes it and `lock/lock.bend` reads it, and
-# nothing else in ez ever sees the file. A key spelled one way here and
-# another way there produces a lock that rebuilds a package from nowhere, and
-# says so no louder than a missing url. That is the law worth stating, and
+# decision it makes that anything downstream depends on is the shape of an
+# origin table: this module writes it into `.ez/origins.toml`, and
+# `lock/lock.bend` reads the same keys back out of a lock's `source` tables. A
+# key spelled one way here and another way there produces a lock that
+# rebuilds a package from nowhere, and says so no louder than a missing url. That is the law worth stating, and
 # until this port it could not be stated at all, because the writer was
 # TypeScript and no Bend proof could reach it.
 #

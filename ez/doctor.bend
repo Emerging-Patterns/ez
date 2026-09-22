@@ -85,7 +85,7 @@ def toml.note(ledger: M.Read) -> Note:
     case M.Bad{why}:
       Note{True{}, "ez.toml: " ++ why}
     case M.Good{m}:
-      M.Manifest{n, e, _b, ds, _ts} = m
+      M.Manifest{n, e, _b, _h, ds, _ts} = m
       Note{False{}, "ez.toml: " ++ n ++ ", entry " ++ e ++ ", " ++
         plural(List.length(&2, M.Dep, ds), "dependency", "dependencies")}
 

@@ -195,9 +195,10 @@ law show_good_opens_with_name:
   for +n: String
   for e: String
   for b: String
+  for hb: String
   for ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {String.starts_with(M.show(M.Good{M.Manifest{n, e, b, ds, ts}}), n) == True{}
+  {String.starts_with(M.show(M.Good{M.Manifest{n, e, b, hb, ds, ts}}), n) == True{}
     : Bool}
 
 # LAW: a lookup answers with the first dependency of that name, whole
@@ -223,6 +224,7 @@ law rev_of_names_the_commit:
   for mn: String
   for me: String
   for mb: String
+  for mh: String
   for +n: String
   for h: String
   for en: String
@@ -234,7 +236,7 @@ law rev_of_names_the_commit:
   for vend: Bool
   for t: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {M.rev_of(M.Good{M.Manifest{mn, me, mb,
+  {M.rev_of(M.Good{M.Manifest{mn, me, mb, mh,
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, ts}}, n) == rev
     : String}
 
@@ -243,6 +245,7 @@ law tag_of_names_the_tag:
   for mn: String
   for me: String
   for mb: String
+  for mh: String
   for +n: String
   for h: String
   for en: String
@@ -254,7 +257,7 @@ law tag_of_names_the_tag:
   for vend: Bool
   for t: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {M.tag_of(M.Good{M.Manifest{mn, me, mb,
+  {M.tag_of(M.Good{M.Manifest{mn, me, mb, mh,
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, ts}}, n) == tag
     : String}
 
@@ -308,9 +311,10 @@ law show_opens_with_package:
   for n: String
   for e: String
   for b: String
+  for hb: String
   for ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {String.starts_with(R.show(M.Manifest{n, e, b, ds, ts}), "[package]\n") == True{}
+  {String.starts_with(R.show(M.Manifest{n, e, b, hb, ds, ts}), "[package]\n") == True{}
     : Bool}
 
 # LAW: a ledger that did not read renders as nothing. `ez add` and `ez remove`
@@ -327,6 +331,35 @@ law remove_idem:
   for +name: String
   {R.remove(R.remove(m, name), name) == R.remove(m, name) : M.Manifest}
 
+# LAW: a ledger that did not read locks against bend's own hub. Nothing it
+# said can be trusted, so nothing it said picks where packages come from.
+law hub_of_unread_is_bends:
+  for why: String
+  {M.hub_of(M.Bad{why}) == "https://hub.bend-lang.com" : String}
+
+# LAW: and so does one whose `[package]` table names no hub
+law hub_of_absent_is_bends:
+  for n: String
+  for e: String
+  for b: String
+  for ds: List<&2, M.Dep>
+  for ts: List<&2, M.Tool>
+  {M.hub_of(M.Good{M.Manifest{n, e, b, "", ds, ts}})
+    == "https://hub.bend-lang.com" : String}
+
+# LAW: a hub the ledger names is the hub, whatever else the ledger holds.
+# This is the only place `ez lock` learns a hub from, so two checkouts of one
+# commit fetch from the same place whatever their environments say.
+law hub_of_names_the_hub:
+  for n: String
+  for e: String
+  for b: String
+  for +hb: String
+  for ds: List<&2, M.Dep>
+  for ts: List<&2, M.Tool>
+  for f: {False{} == String.is_empty(hb) : Bool}
+  {M.hub_of(M.Good{M.Manifest{n, e, b, hb, ds, ts}}) == hb : String}
+
 # a ledger in the form `show` writes: the package table, then each
 # dependency, with every value quoted and an absent key left out
 def ledger() -> String:
@@ -334,6 +367,7 @@ def ledger() -> String:
   "name = \"myapp\"\n" ++
   "entry = \"src/main.bend\"\n" ++
   "bin = \"src/main.bend\"\n" ++
+  "hub = \"https://hub.example\"\n" ++
   "\n[deps.json]\n" ++
   "hash = \"0x1111111111111111111111111111aaaa\"\n" ++
   "\n[deps.wire]\n" ++
