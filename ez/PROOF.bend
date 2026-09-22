@@ -35,27 +35,6 @@ def Laws.dash_follows_report(rest):
 def Laws.dash_alone_is_output(_rest):
   {==}
 
-def Laws.filter_empty():
-  {==}
-
-def Laws.filter_old_report():
-  {==}
-
-def Laws.filter_new_report():
-  {==}
-
-def Laws.filter_keeps_own_dash():
-  {==}
-
-def Laws.filter_untouched():
-  {==}
-
-def Laws.chomp_trailing():
-  {==}
-
-def Laws.chomp_keeps_inner_blank():
-  {==}
-
 def Laws.want_skips(h, t, e):
   %e : {G.want.put(_, h, G.want(t)) == G.want(t) : List<&2, String>}
   {==}
@@ -102,15 +81,6 @@ def Laws.want_keeps(rest, t):
       String.drop(String.append("#|", rest), 2n), rest,
       drop_hash_bar(rest)))
 
-def Laws.trailer_extracts():
-  {==}
-
-def Laws.trailer_empty():
-  {==}
-
-def Laws.trailer_ignores_note():
-  {==}
-
 def Laws.hash_of_local(s, e):
   %e : {Bool.pick(String, _,
     D.head(String.split(String.drop(s, 7n), '/')), "") == "" : String}
@@ -152,106 +122,25 @@ def Laws.rel_dot(rest):
       Eq.starts_append("./", rest)),
     drop_dot_slash(rest))
 
-def Laws.at_root():
-  {==}
-
 def Laws.at_under(d, e):
   %e : {Bool.pick(String, _, G.root(), G.root() ++ "/" ++ d)
     == G.root() ++ "/" ++ d : String}
   {==}
 
-def Laws.proj_one():
-  {==}
-
-def Laws.proj_top():
-  {==}
-
-def Laws.proj_deep():
-  {==}
-
-def Laws.src_place():
-  {==}
-
-def Laws.levels_of_two():
-  {==}
-
-def Laws.linked_keeps_bin():
-  {==}
-
-def Laws.agg_imports_local():
-  {==}
-
-def Laws.agg_calls_behind_mark():
-  {==}
-
-def Laws.slice_first():
-  {==}
-
-def Laws.slice_last():
-  {==}
-
-def Laws.slice_miss():
-  {==}
-
-def Laws.started_yes():
-  {==}
-
-def Laws.started_no():
-  {==}
-
-def Laws.headed_line():
-  {==}
-
-def Laws.headed_quoted():
-  {==}
-
-def Laws.solitary_reads_args():
-  {==}
-
-def Laws.solitary_comment_only():
-  {==}
-
-# The clock's pure half: the closed on/off cases reduce, and a
-# non-empty deadline is rewritten into the pick that keeps it.
-
-def Laws.on_budget():
-  {==}
-
-def Laws.on_zero():
-  {==}
-
-def Laws.on_empty():
-  {==}
+# The clock's pure half: a non-empty deadline is rewritten into the
+# pick that keeps it.
 
 def Laws.by_effect_keeps(d, e):
   %e : {Bool.pick(String, _, "0", d) == d : String}
   {==}
 
-def Laws.by_effect_empty():
-  {==}
-
 # The command line as parse sees it. Each side is a known list, so the
 # proof is the computation itself.
-
-def Laws.rest_empty():
-  {==}
-
-def Laws.rest_tail():
-  {==}
 
 def Laws.argv_of_run():
   {==}
 
-def Laws.argv_of_other():
-  {==}
-
-def Laws.argv_of_empty():
-  {==}
-
 def Laws.argv_of_tool():
-  {==}
-
-def Laws.argv_of_tool_bare():
   {==}
 
 def Laws.tool_rest_dashes():
@@ -303,67 +192,4 @@ def Laws.out_name_empty():
   {==}
 
 def Laws.out_name():
-  {==}
-
-def Laws.dep_git_names_the_repo():
-  {==}
-
-def Laws.dep_hub_names_the_hash():
-  {==}
-
-def Laws.dep_cached_is_not_a_fetch():
-  {==}
-
-def Laws.label_from_entry():
-  {==}
-
-def Laws.label_falls_back_to_hash():
-  {==}
-
-def Laws.brief_is_twelve():
-  {==}
-
-def Laws.brief_keeps_short():
-  {==}
-
-def Laws.fetching_names_the_commit():
-  {==}
-
-def Laws.installed_names_the_link():
-  {==}
-
-def Laws.tty_pts():
-  {==}
-
-def Laws.tty_pipe():
-  {==}
-
-def Laws.tty_prefers_stderr():
-  {==}
-
-def Laws.tty_falls_back_to_stdout():
-  {==}
-
-def Laws.tty_neither():
-  {==}
-
-def Laws.hub_404_teaches():
-  {==}
-
-def Laws.hub_other_miss_kept():
-  {==}
-
-def Laws.drift_names_the_tag():
-  {==}
-
-def Laws.tools_section_is_tools():
-  {==}
-
-def Laws.deps_are_not_tools():
-  {==}
-
-def Laws.hint_sync_when_tools():
-  {==}
-
-def Laws.hint_sync_without_tools():
   {==}

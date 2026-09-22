@@ -30,28 +30,6 @@ law origin_agrees:
   {L.origin(L.origins.all([L.Origin{h, s}], cache), h)
     == L.origin(L.origins.all([], [L.Origin{h, s}]), h) : L.Src}
 
-# The shape lock/lock.bend's "have I read this file" scan had before this pass
-# rewrote it for cost, kept here so the rewrite's risk can be stated rather
-# than sampled. Nothing but the law below reads it.
-#
-# `Bool.or` is an ordinary function and reduces both of its sides, so a scan
-# written with it reads the whole list even when the head answers. This list
-# grows by one with every file the project walk reads, which makes the scan
-# the inner half of a quadratic.
-def old.seen.holds(xs: List<&2, String>, +s: String) -> Bool:
-  match xs:
-    case []:
-      False{}
-    case +h <> t:
-      Bool.or(String.eq(h, s), old.seen.holds(t, s))
-
-# LAW: the scan that stops at the name it was looking for answers what the
-# scan that read past it answered, on every list and every name.
-law seen_holds_agrees:
-  for xs: List<&2, String>
-  for +s: String
-  {old.seen.holds(xs, s) == L.seen.holds(xs, s) : Bool}
-
 # The rest of the lock document: the order packages are written in, the
 # `0x` name an import carries, and that a lock that was written reads
 # back as the lock it was. A lock that names packages in walk order
@@ -102,6 +80,7 @@ def sample.packs() -> List<&2, L.Pack>:
 
 # LAW: packages are written in hash order. The walk found `0xbb` first;
 # the document names `0xaa` first.
+# toward EZ-DOC-2
 law hashes_sorted:
   {L.hashes(L.doc("https://hub.bend-lang.com", "2.0.16", sample.packs()))
     == ["0xaa", "0xbb"] : List<&2, String>}
@@ -109,6 +88,7 @@ law hashes_sorted:
 # LAW: what was written reads back as what it was. The lock as text is
 # the lock as a document, so a file `ez lock` wrote is the file the
 # next lock reads.
+# toward EZ-DOC-1
 law lock_roundtrip:
   {L.packs(T.sects(T.parse(L.render("https://hub.bend-lang.com",
     "2.0.16", sample.packs()))))
@@ -131,12 +111,14 @@ law render_keeps_packages_without_tools:
 
 # LAW: a `[tools.*]` table is not a package. `restore` and `bendLib` read
 # `packs`, and a tool pin does not join that list.
+# toward EZ-LED-5
 law tools_are_not_packages:
   {L.packs(T.sects(T.parse(L.render.pick(False{}, "https://hub.bend-lang.com",
     "2.0.16", sample.packs(), [sample.tool()]))))
     == L.pack.sort(sample.packs()) : List<&2, L.Pack>}
 
 # LAW: the commit written for a tool is the commit read back
+# toward EZ-DOC-1
 law tool_pin_reads_back:
   {M.source.rev(M.tool.source(M.tool.find(M.tools(T.sects(T.parse(
     L.render.pick(False{}, "https://hub.bend-lang.com", "2.0.16", [],

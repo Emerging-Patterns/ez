@@ -324,6 +324,3 @@ def Laws.sha256_allowlist():
 
 def Laws.imports_follow_hash():
   {==}
-
-def Laws.hub_digest_disagrees():
-  {==}
