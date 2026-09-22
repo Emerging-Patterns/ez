@@ -91,15 +91,9 @@ def spec() -> Shake.Cli:
       ]),
       Shake.sub("publish", "send the entry to the hub, under ez's 0x name",
         [], []),
-      Shake.sub("test", "run every */tests/*.bend, on both lanes",
-        [
-          Shake.flag("js-only", None{}, Some{"js-only"},
-            "run the JS lane only"),
-          Shake.flag("full", None{}, Some{"full"}, "ignore the cache"),
-          Shake.flag("unit-only", None{}, Some{"unit-only"},
-            "skip the end-to-end tests")
-        ], []),
-      Shake.sub("prove", "check every PROOF.bend: the proof gate", [], []),
+      Shake.sub("test", "run every */tests/*.bend against its trailer", [], []),
+      Shake.sub("prove", "check every PROOF.bend: the proof gate",
+        [], []),
       Shake.sub("doctor", "report on the toolchain and the project", [], [])
     ])
 
@@ -156,8 +150,7 @@ def dispatch(sub: Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Uni
     case CPublish{}:
       Cmd.publish()
     case CTest{}:
-      Test.run(Shake.on(matched, "js-only"), Shake.on(matched, "full"),
-        Shake.on(matched, "unit-only"))
+      Test.run()
     case CProve{}:
       Prove.run()
     case CDoctor{}:

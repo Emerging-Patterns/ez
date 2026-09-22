@@ -59,14 +59,6 @@ law drop_hash_bar:
 def drop_hash_bar(rest):
   drop_zero(rest)
 
-# LAW: and the same for the `./` a find path opens with
-law drop_dot_slash:
-  for +rest: String
-  {String.drop("./" ++ rest, 2n) == rest : String}
-
-def drop_dot_slash(rest):
-  drop_zero(rest)
-
 def Laws.want_keeps(rest, t):
   Equal.trans(List<&2, String>,
     G.want.put(String.starts_with(String.append("#|", rest), "#|"),
@@ -102,29 +94,6 @@ def Laws.report_both_ways():
   {==}
 
 def Laws.report_unused():
-  {==}
-
-def Laws.rel_plain(p, e):
-  %e : {Bool.pick(String, _, String.drop(p, 2n), p) == p : String}
-  {==}
-
-def Laws.rel_dot(rest):
-  Equal.trans(String,
-    Bool.pick(String, String.starts_with(String.append("./", rest), "./"),
-      String.drop(String.append("./", rest), 2n), String.append("./", rest)),
-    Bool.pick(String, True{}, String.drop(String.append("./", rest), 2n),
-      String.append("./", rest)),
-    rest,
-    Equal.cong(Bool, String,
-      x => Bool.pick(String, x, String.drop(String.append("./", rest), 2n),
-        String.append("./", rest)),
-      String.starts_with(String.append("./", rest), "./"), True{},
-      Eq.starts_append("./", rest)),
-    drop_dot_slash(rest))
-
-def Laws.at_under(d, e):
-  %e : {Bool.pick(String, _, G.root(), G.root() ++ "/" ++ d)
-    == G.root() ++ "/" ++ d : String}
   {==}
 
 # The clock's pure half: a non-empty deadline is rewritten into the

@@ -1,7 +1,7 @@
 # ez/clock: the wall-clock budget a run has to finish inside.
 #
-# `ez test` is the gate, and a gate nobody waits for is not one. The budget is
-# a comparison like any other: it is checked, it is counted, and a run that
+# `ez test` is held to it, since a check nobody waits for is not one. The
+# budget is a comparison like any other: it is checked, it is counted, and a run that
 # overran fails on it the way a test that printed the wrong line fails. That is
 # the difference between a number in a readme and a number something enforces.
 #
