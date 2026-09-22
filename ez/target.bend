@@ -1,8 +1,7 @@
-# ez/target: what `ez tool run`, `install` and `upgrade` were asked for,
-# decided from the word
-# alone. `owner/repo` is GitHub. A URL is that URL. Anything else is a
-# path, and a path written `./…`, `../…`, `/…` or `~/…` is a path even
-# when it would otherwise read as a repository.
+# ez/target: what `ez add`, `ez tool run`, `install` and `upgrade` were asked
+# for, decided from the word alone. `owner/repo` is GitHub. A URL is that URL.
+# Anything else is a path, and a path written `./…`, `../…`, `/…` or `~/…` is
+# a path even when it would otherwise read as a repository.
 import Base
 
 # where a target names, or why it names nothing
@@ -11,60 +10,188 @@ type Place is Data:
   Local{path: String}
   Remote{url: String, slug: String}
 
-# a char a GitHub owner or repository may hold. A dot is not one: `src/main.bend`
-# is a path.
+# a char a GitHub owner or repository may hold besides a dot: a letter, a
+# digit, `-` or `_`
 def plain.at(+ch: Char) -> Bool:
   Bool.or(Char.is_digit(ch), Bool.or(Char.is_alpha(ch),
     Bool.or(Char.is_eq(ch, '-'), Char.is_eq(ch, '_'))))
 
-# one step of a scan that must hold of every char. `Bool.and` reduces both
-# sides, so the rest arrives as a thunk.
-def plain.step(here: Bool, rest: Unit -> Bool) -> Bool:
-  match here:
+# what one char of a target is, as far as telling a shorthand from a path
+# goes. A colon is asked about first, so a char that is anything but `Other`
+# is known not to be one: that is what lets a proof say a shorthand never
+# contains `://`.
+type Mark is Data:
+  Slash{}
+  Dot{}
+  Tilde{}
+  Word{}
+  Other{}
+
+def kind.word(word: Bool) -> Mark:
+  match word:
     case True{}:
-      rest(Unit{})
+      Word{}
     case False{}:
+      Other{}
+
+def kind.tilde(tilde: Bool, word: Bool) -> Mark:
+  match tilde:
+    case True{}:
+      Tilde{}
+    case False{}:
+      kind.word(word)
+
+def kind.dot(dot: Bool, tilde: Bool, word: Bool) -> Mark:
+  match dot:
+    case True{}:
+      Dot{}
+    case False{}:
+      kind.tilde(tilde, word)
+
+def kind.slash(slash: Bool, dot: Bool, tilde: Bool, word: Bool) -> Mark:
+  match slash:
+    case True{}:
+      Slash{}
+    case False{}:
+      kind.dot(dot, tilde, word)
+
+def kind.colon(colon: Bool, slash: Bool, dot: Bool, tilde: Bool, word: Bool) -> Mark:
+  match colon:
+    case True{}:
+      Other{}
+    case False{}:
+      kind.slash(slash, dot, tilde, word)
+
+# a char's kind
+def kind(+ch: Char) -> Mark:
+  kind.colon(Char.is_eq(ch, ':'), Char.is_eq(ch, '/'), Char.is_eq(ch, '.'),
+    Char.is_eq(ch, '~'), plain.at(ch))
+
+# one char of a name, with the rest of the name still to be asked about.
+# The rest arrives as a thunk, so a char that ends the name ends the walk.
+def name.keep(mark: Mark, rest: Unit -> Bool) -> Bool:
+  match mark:
+    case Word{}:
+      rest(Unit{})
+    case Dot{}:
+      rest(Unit{})
+    case Slash{}:
+      False{}
+    case Tilde{}:
+      False{}
+    case Other{}:
       False{}
 
-# whether every char is one a GitHub name may hold
-def plain.all(cs: List<&2, Char>) -> Bool:
-  match cs:
-    case []:
+# every char a letter, a digit, `-`, `_` or `.`
+def name.all(text: String) -> Bool:
+  match text:
+    case SNil{}:
       True{}
-    case +h <> t:
-      plain.step(plain.at(h), _u => plain.all(t))
+    case SCon{+h, t}:
+      name.keep(kind(h), _u => name.all(t))
 
-# a single path segment of a GitHub shorthand
-def seg(+text: String) -> Bool:
-  Bool.and(Bool.not(String.is_empty(text)), plain.all(String.to_list(text)))
+# after `..`: one more name char, so the segment is not `..`
+def seg.dots(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      False{}
+    case SCon{+h, t}:
+      name.keep(kind(h), _u => name.all(t))
 
-# the second segment, once the first is in hand. One segment and three are
-# not a shorthand.
-def two.at(ps: List<&2, String>, +first: String) -> String & String:
-  match ps:
-    case Nil{}:
-      ("", "")
-    case Con{+b, Nil{}}:
-      (first, b)
-    case Con{_b, _t}:
-      ("", "")
+# the second char after a leading dot
+def seg.dot2(mark: Mark, rest: String) -> Bool:
+  match mark:
+    case Word{}:
+      name.all(rest)
+    case Dot{}:
+      seg.dots(rest)
+    case Slash{}:
+      False{}
+    case Tilde{}:
+      False{}
+    case Other{}:
+      False{}
 
-# the two segments of a shorthand, or two empty strings when it is not one
-def two(ps: List<&2, String>) -> String & String:
-  match ps:
-    case Nil{}:
-      ("", "")
-    case Con{+a, t}:
-      two.at(t, a)
+# after a leading `.`: more, so the segment is not `.`
+def seg.dot(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      False{}
+    case SCon{+h, t}:
+      seg.dot2(kind(h), t)
 
-# both segments in hand
-def github.go(ab: String & String) -> Bool:
-  (a, b) = ab
-  Bool.and(seg(a), seg(b))
+# the first char of a segment
+def seg.first(mark: Mark, rest: String) -> Bool:
+  match mark:
+    case Word{}:
+      name.all(rest)
+    case Dot{}:
+      seg.dot(rest)
+    case Slash{}:
+      False{}
+    case Tilde{}:
+      False{}
+    case Other{}:
+      False{}
 
-# `owner/repo`, and not a path that merely contains one slash
-def github.ok(+text: String) -> Bool:
-  github.go(two(String.split(text, '/')))
+# one segment of a GitHub shorthand: letters, digits, `-`, `_` and `.`, at
+# least one of them, and not `.` or `..`, which name a directory
+def seg(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      False{}
+    case SCon{+h, t}:
+      seg.first(kind(h), t)
+
+# a word cut at its first slash, or not cut because a char before any slash
+# could not be in a shorthand
+type Halves is Data:
+  Uncut{}
+  Two{left: String, right: String}
+
+# a char put back in front of the left half
+def halve.put(ch: Char, halves: Halves) -> Halves:
+  match halves:
+    case Uncut{}:
+      Uncut{}
+    case Two{left, right}:
+      Two{SCon{ch, left}, right}
+
+# one char of the first segment. A slash ends it; the rest of the word is
+# asked about only past a char a segment may hold.
+def halve.at(mark: Mark, ch: Char, +tail: String, rest: Unit -> Halves) -> Halves:
+  match mark:
+    case Slash{}:
+      Two{"", tail}
+    case Word{}:
+      halve.put(ch, rest(Unit{}))
+    case Dot{}:
+      halve.put(ch, rest(Unit{}))
+    case Tilde{}:
+      Uncut{}
+    case Other{}:
+      Uncut{}
+
+# the word before its first slash and the word after it
+def halve(text: String) -> Halves:
+  match text:
+    case SNil{}:
+      Uncut{}
+    case SCon{+h, +t}:
+      halve.at(kind(h), h, t, _u => halve(t))
+
+# both segments of a shorthand, where there are two
+def github.halves(halves: Halves) -> Bool:
+  match halves:
+    case Uncut{}:
+      False{}
+    case Two{left, right}:
+      Bool.and(seg(left), seg(right))
+
+# `owner/repo`: exactly two segments, each a `seg`. A second slash leaves
+# the right half with a slash in it, which no segment holds.
+def github.ok(text: String) -> Bool:
+  github.halves(halve(text))
 
 # one step of a scan looking for `..`. A slug with one would leave the cache.
 def climb.step(here: Bool, rest: Unit -> Bool) -> Bool:
@@ -127,20 +254,87 @@ def slug.url(+text: String) -> String:
 def slug.scp(+text: String) -> String:
   ungit(unslash(String.join(String.split(String.drop(text, 4n), ':'), "/")))
 
-# a word that already says it is a path
-def looks.path(+text: String) -> Bool:
-  Bool.or(String.starts_with(text, "/"),
-    Bool.or(String.starts_with(text, "./"),
-      Bool.or(String.starts_with(text, "../"),
-        String.starts_with(text, "~/"))))
+# the char after `~` or `..`: a slash
+def looks.slash.at(mark: Mark) -> Bool:
+  match mark:
+    case Slash{}:
+      True{}
+    case Dot{}:
+      False{}
+    case Tilde{}:
+      False{}
+    case Word{}:
+      False{}
+    case Other{}:
+      False{}
 
-# `owner/repo`, once it is known not to be a URL or a path
+def looks.slash(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      False{}
+    case SCon{+h, _t}:
+      looks.slash.at(kind(h))
+
+# the char after a leading dot: `./` or `../`
+def looks.dot.at(mark: Mark, rest: String) -> Bool:
+  match mark:
+    case Slash{}:
+      True{}
+    case Dot{}:
+      looks.slash(rest)
+    case Tilde{}:
+      False{}
+    case Word{}:
+      False{}
+    case Other{}:
+      False{}
+
+def looks.dot(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      False{}
+    case SCon{+h, t}:
+      looks.dot.at(kind(h), t)
+
+# the first char: `/`, or the start of `./`, `../` or `~/`
+def looks.first(mark: Mark, rest: String) -> Bool:
+  match mark:
+    case Slash{}:
+      True{}
+    case Dot{}:
+      looks.dot(rest)
+    case Tilde{}:
+      looks.slash(rest)
+    case Word{}:
+      False{}
+    case Other{}:
+      False{}
+
+# a word that already says it is a path: it starts `/`, `./`, `../` or `~/`
+def looks.path(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      False{}
+    case SCon{+h, t}:
+      looks.first(kind(h), t)
+
+# `git@host:path`, or a path
+def classify.scp(scp: Bool, +text: String) -> Place:
+  match scp:
+    case True{}:
+      remote(text, slug.scp(text))
+    case False{}:
+      Local{text}
+
+# `owner/repo`. Its slug is safe without the check a URL's gets: neither
+# segment is empty, `.`, `..` or holds a slash, so it cannot climb out of the
+# cache. A trailing `.git` is not part of the cache directory, as for a URL.
 def classify.hub(ok: Bool, +text: String) -> Place:
   match ok:
     case True{}:
-      remote("https://github.com/" ++ text, "github.com/" ++ text)
+      Remote{"https://github.com/" ++ text, "github.com/" ++ ungit(text)}
     case False{}:
-      Local{text}
+      classify.scp(String.starts_with(text, "git@"), text)
 
 # a path prefix, or a possible shorthand
 def classify.path(local: Bool, +text: String) -> Place:
@@ -150,21 +344,13 @@ def classify.path(local: Bool, +text: String) -> Place:
     case False{}:
       classify.hub(github.ok(text), text)
 
-# `git@host:path`, or a path
-def classify.scp(scp: Bool, +text: String) -> Place:
-  match scp:
-    case True{}:
-      remote(text, slug.scp(text))
-    case False{}:
-      classify.path(looks.path(text), text)
-
 # a URL, or not
 def classify.url(url: Bool, +text: String) -> Place:
   match url:
     case True{}:
       remote(text, slug.url(text))
     case False{}:
-      classify.scp(String.starts_with(text, "git@"), text)
+      classify.path(looks.path(text), text)
 
 # nothing was asked for
 def classify.empty(empty: Bool, +text: String) -> Place:
@@ -174,7 +360,11 @@ def classify.empty(empty: Bool, +text: String) -> Place:
     case False{}:
       classify.url(String.contains(text, "://"), text)
 
-# what a target word names
+# what a target word names. A word with `://` in it is a URL; one starting
+# `/`, `./`, `../` or `~/` is a path; `owner/repo` is GitHub; one starting
+# `git@` is a URL; anything else is a path. The shorthand is asked about
+# before `git@` because no shorthand holds an `@`, and in that order the
+# shorthand's law needs nothing said about `git@`.
 def classify(+text: String) -> Place:
   classify.empty(String.is_empty(text), text)
 

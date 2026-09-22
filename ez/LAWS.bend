@@ -143,47 +143,84 @@ law tool_rest_dashes:
 law tool_rest_plain:
   {Args.tool.rest(["tool", "run", "o/r", "a"]) == ["a"] : List<&2, String>}
 
-# LAW: `owner/repo` is that repository on GitHub, cached under the same path
-# toward EZ-RES-3
-law target_github:
-  {Tgt.show(Tgt.classify("Emerging-Patterns/bolt"))
-    == "remote https://github.com/Emerging-Patterns/bolt github.com/Emerging-Patterns/bolt"
-    : String}
+# target: what a word names. The four ways a word can name something are
+# each a law over every word of that shape, and together they are EZ-RES-3.
 
-# LAW: a URL is kept, and `.git` is not part of its cache directory
-# toward EZ-RES-3
-law target_url:
-  {Tgt.show(Tgt.classify("https://github.com/Emerging-Patterns/bolt.git"))
-    == "remote https://github.com/Emerging-Patterns/bolt.git github.com/Emerging-Patterns/bolt"
-    : String}
+# LAW: a target with `://` in it is a git URL, whatever is around it
+# EZ-RES-3
+law classify_url:
+  for +a: String
+  for +b: String
+  {Tgt.classify(a ++ ("://" ++ b))
+    == Tgt.remote(a ++ ("://" ++ b), Tgt.slug.url(a ++ ("://" ++ b)))
+    : Tgt.Place}
 
-# LAW: `git@host:path` is a URL, cached as host/path
-# toward EZ-RES-3
-law target_scp:
-  {Tgt.show(Tgt.classify("git@github.com:Emerging-Patterns/bolt.git"))
-    == "remote git@github.com:Emerging-Patterns/bolt.git github.com/Emerging-Patterns/bolt"
-    : String}
+# LAW: a target starting `git@` is a git URL
+# EZ-RES-3
+law classify_scp:
+  for +rest: String
+  for e: {False{} == String.contains("git@" ++ rest, "://") : Bool}
+  {Tgt.classify("git@" ++ rest)
+    == Tgt.remote("git@" ++ rest, Tgt.slug.scp("git@" ++ rest)) : Tgt.Place}
 
-# LAW: a path that says it is a path is a path
-# toward EZ-RES-3
-law target_abs:
-  {Tgt.show(Tgt.classify("/tmp/bolt")) == "local /tmp/bolt" : String}
+# LAW: a target starting `/` is a path
+# EZ-RES-3
+law classify_abs:
+  for +rest: String
+  for e: {False{} == String.contains("/" ++ rest, "://") : Bool}
+  {Tgt.classify("/" ++ rest) == Tgt.Local{"/" ++ rest} : Tgt.Place}
 
-# LAW: a relative path with a dot in it is a path, not a repository
-# toward EZ-RES-3
-law target_file:
-  {Tgt.show(Tgt.classify("src/main.bend")) == "local src/main.bend" : String}
+# LAW: a target starting `./` is a path, even when what follows is
+# `owner/repo`
+# EZ-RES-3
+law classify_here:
+  for +rest: String
+  for e: {False{} == String.contains("./" ++ rest, "://") : Bool}
+  {Tgt.classify("./" ++ rest) == Tgt.Local{"./" ++ rest} : Tgt.Place}
 
-# LAW: an explicit relative path is a path even when it has two plain segments
-# toward EZ-RES-3
-law target_dot:
-  {Tgt.show(Tgt.classify("./Emerging-Patterns/bolt"))
-    == "local ./Emerging-Patterns/bolt" : String}
+# LAW: a target starting `../` is a path
+# EZ-RES-3
+law classify_up:
+  for +rest: String
+  for e: {False{} == String.contains("../" ++ rest, "://") : Bool}
+  {Tgt.classify("../" ++ rest) == Tgt.Local{"../" ++ rest} : Tgt.Place}
 
-# LAW: nothing was asked for
-# toward EZ-RES-3
-law target_empty:
-  {Tgt.show(Tgt.classify("")) == "bad a target is needed" : String}
+# LAW: a target starting `~/` is a path
+# EZ-RES-3
+law classify_home:
+  for +rest: String
+  for e: {False{} == String.contains("~/" ++ rest, "://") : Bool}
+  {Tgt.classify("~/" ++ rest) == Tgt.Local{"~/" ++ rest} : Tgt.Place}
+
+# LAW: two segments of letters, digits, `-`, `_` and `.`, neither of them `.`
+# or `..`, are that repository on GitHub. `vercel/next.js` is one, and so is
+# `o/r.git`, which is cached without its `.git` as its URL would be.
+# EZ-RES-3
+law classify_github:
+  for +a: String
+  for +b: String
+  for ea: {Tgt.seg(a) == True{} : Bool}
+  for eb: {Tgt.seg(b) == True{} : Bool}
+  {Tgt.classify(a ++ ("/" ++ b))
+    == Tgt.Remote{"https://github.com/" ++ (a ++ ("/" ++ b)),
+      "github.com/" ++ Tgt.ungit(a ++ ("/" ++ b))} : Tgt.Place}
+
+# LAW: anything else is a path: a word with no `://`, not starting `git@`,
+# `/`, `./`, `../` or `~/`, and not two such segments around a slash. The
+# empty word is not a target at all, and is refused.
+# EZ-RES-3
+law classify_else:
+  for +text: String
+  for ne: {False{} == String.is_empty(text) : Bool}
+  for eu: {False{} == String.contains(text, "://") : Bool}
+  for eg: {False{} == String.starts_with(text, "git@") : Bool}
+  for e1: {False{} == String.starts_with(text, "/") : Bool}
+  for e2: {False{} == String.starts_with(text, "./") : Bool}
+  for e3: {False{} == String.starts_with(text, "../") : Bool}
+  for e4: {False{} == String.starts_with(text, "~/") : Bool}
+  for no: @a:String -> @b:String -> {text == a ++ ("/" ++ b) : String}
+    -> {Tgt.seg(a) == True{} : Bool} -> {Tgt.seg(b) == True{} : Bool} -> Empty
+  {Tgt.classify(text) == Tgt.Local{text} : Tgt.Place}
 
 # LAW: a slug that would leave the cache is refused
 # toward EZ-TOOL-8
@@ -192,14 +229,10 @@ law target_escapes:
     == "bad not a repository" : String}
 
 # LAW: `~/…` expands under the home directory
-# toward EZ-RES-3
-law expand_tilde:
-  {Tgt.expand("/home/u", "~/bolt") == "/home/u/bolt" : String}
-
-# LAW: a path that is not a tilde is unchanged
-# toward EZ-RES-3
-law expand_plain:
-  {Tgt.expand("/home/u", "/tmp/bolt") == "/tmp/bolt" : String}
+law expand_home:
+  for +home: String
+  for +rest: String
+  {Tgt.expand(home, "~/" ++ rest) == home ++ ("/" ++ rest) : String}
 
 # LAW: `bin` is the file that is built
 # toward EZ-TOOL-7
