@@ -174,9 +174,10 @@ def probe() -> String:
   "ppid=; while read -r k v; do case $k in PPid:) ppid=$v;; esac; done < /proc/self/status; readlink /proc/$ppid/fd/$1 2>/dev/null"
 
 # a mark on the terminal while the parent is alive. `$1` is the terminal,
-# `$2` the line. An empty parent id exits rather than spinning on `/proc`.
+# `$2` the line. The mark walks ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏. An empty parent
+# id exits rather than spinning on `/proc`.
 def frames() -> String:
-  "ppid=; while read -r k v; do case $k in PPid:) ppid=$v;; esac; done < /proc/self/status; [ -n \"$ppid\" ] || exit 0; while [ -d /proc/$ppid ]; do printf '\\r| %s' \"$2\" >\"$1\"; sleep 0.1; [ -d /proc/$ppid ] || break; printf '\\r/ %s' \"$2\" >\"$1\"; sleep 0.1; [ -d /proc/$ppid ] || break; printf '\\r- %s' \"$2\" >\"$1\"; sleep 0.1; [ -d /proc/$ppid ] || break; printf '\\r+ %s' \"$2\" >\"$1\"; sleep 0.1; done"
+  "ppid=; while read -r k v; do case $k in PPid:) ppid=$v;; esac; done < /proc/self/status; [ -n \"$ppid\" ] || exit 0; while [ -d /proc/$ppid ]; do printf '\\r%s %s' '⠋' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠙' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠹' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠸' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠼' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠴' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠦' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠧' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠇' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠏' \"$2\" >\"$1\"; sleep 0.08; done"
 
 # the mark wiped, and the line left in its place
 def settle() -> String:
