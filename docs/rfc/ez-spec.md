@@ -24,6 +24,8 @@ Items for review:
 - [x] <!-- REVIEW (resolved): The proof gate moves out of `ez test` into its own command, `ez prove`, which `mkProofs` runs. `ez test` may call it. -->
 - [x] <!-- REVIEW (resolved): `SPEC.md` is the single requirement list. The bolt rule parses only its requirement table rows. -->
 - [x] <!-- REVIEW (resolved): `mkLint` joins ez's flake checks now, with `[tools.bolt]` moved to v0.8.1 and `closed` and `law` at `warn` until the first rollout phase is done. `unsafe` stays at `error`. -->
+- [x] <!-- REVIEW (resolved): bolt v0.8.1's `closed` rule accepts closed equalities (bolt#10), so it does not enforce "closed laws have no standing". ez asks bolt for an opt-in stricter setting rather than enforcing it in its own rule. -->
+- [x] <!-- REVIEW (resolved): bolt v0.8.1 reports about 900 style, correctness and suspicious findings in ez beyond the law rules. A preliminary phase fixes all of them before `mkLint` is enabled. -->
 - [x] <!-- REVIEW (resolved): The thirteen refactor-equivalence laws, and the `old.*` definitions they compare against, are deleted in the first rollout phase. -->
 - [x] <!-- REVIEW (resolved): Guarantees proved in a pinned dependency are Trusted from ez's side, with the dependency and pin as the reason. -->
 - [x] <!-- REVIEW (resolved): Closed laws are deleted, not kept as examples. -->
@@ -119,7 +121,7 @@ Every requirement carries exactly one level.
 
 We considered intermediate levels for "checked on examples" and "agrees with an external oracle", and rejected both (see Abandoned Ideas). The short version is that Bend's gate is a proof checker, and anything it checks on a single example is a test wearing a law's syntax. Two levels keep the spec honest: if a claim is not proved for all inputs, we say we are trusting it, and a reader knows exactly how much weight to put on it.
 
-A guarantee proved in a dependency is Trusted from ez's side. The SHA-256 digest comes from Giulio2002/bend-sha256, whose own laws hold it to an executable FIPS 180-4 specification, and HTTP framing will be proved in ezhttp once `net/` moves there. Those proofs are real, but ez's gate does not re-check them, so ez records them as trust with the dependency and pinned hash as the reason.
+A guarantee proved in a dependency is Trusted from ez's side. The SHA-256 digest comes from Giulio2002/bend-sha256, whose own laws hold it to an executable FIPS 180-4 specification, and HTTP framing is proved in ezhttp, which replaced `net/` in #50. Those proofs are real, but ez's gate does not re-check them, so ez records them as trust with the dependency and pinned hash as the reason.
 
 A Proved requirement whose law has not landed yet is marked **pending** in `SPEC.md`. Pending is a status, not a third level: it means "intended to be Proved, not yet guaranteed", and the spec says so plainly. Because the gate fails on any undischarged law, a pending requirement's law stays out of LAWS.bend until its proof is written, and the statement lives in `SPEC.md` until then.
 
@@ -397,7 +399,7 @@ In the first rollout phase, every existing closed law is sorted against the requ
 
 When a requirement's quantified law lands, the closed laws pointing at it are deleted in the same PR. The quantified law strictly subsumes them, and keeping them would reintroduce exactly the brittleness this RFC removes.
 
-bolt already enforces the end state. Its `closed` rule flags every law in a LAWS.bend with no `for` or `exs` binder.
+bolt does not enforce the end state today. Its `closed` rule flagged every law with no binder up to v0.4.0, but since v0.5.0 (bolt#10) it deliberately accepts a closed equality as a stated claim and flags only a law that is neither quantified nor an equality. That default follows the direction this RFC abandons, and it is bolt's to keep. ez asks bolt for an opt-in stricter setting of `closed` that flags every law with no binder unless it carries a `# toward EZ-...` trail line, and turns it on once the first phase has sorted the closed laws.
 
 ### Tagging and traceability
 
@@ -445,7 +447,7 @@ These assumptions sit outside the proofs. They are the complete list of Trusted 
 | EZ-TRUST-2 | The interpreter reads the World and executes plans faithfully. | It makes no decisions and is kept small enough to review line by line. |
 | EZ-TRUST-3 | The hub serves, for a hash, what was published under it. | ez checks every hub body against the hash it asked for (EZ-FETCH-1), so this reduces to availability and EZ-HASH-6. |
 | EZ-TRUST-4 | `ez prove` runs `bend` on every PROOF.bend in the tree and passes only on an exact `All terms check.` first line. | It is ez code run by `mkProofs`, not a law. CI builds from a clean tree, so nothing is cached. |
-| EZ-TRUST-5 | HTTP framing and URL parsing are correct. | Proved in ezhttp at the hash ez pins, once `net/` moves there; ez's gate does not re-check it. |
+| EZ-TRUST-5 | HTTP framing and URL parsing are correct. | Proved in ezhttp (v0.4.0, the rev ez.toml pins); ez's gate does not re-check it. |
 | EZ-RES-7 | git reports refs, tags, and ancestry accurately. | The World model takes git's answers as given. |
 | EZ-HASH-4 | ez's 0x hash matches `bend --publish`. | The publisher is a separate program. |
 | EZ-HASH-5 | ez's narHash matches nix. | nix is a separate program. |
@@ -517,9 +519,11 @@ The first draft required that rendering a parsed lock reproduces the original by
 
 The rollout proceeds in phases, each of which leaves the repo consistent. The decided behavior changes land as their own PRs alongside it; the only ordering between them is that a requirement cannot be proved before the change it depends on.
 
-The first phase writes `SPEC.md` from this RFC, with the proved and pending status of each requirement, and sorts the existing closed laws using the inventory: 43 that illustrate a Proved requirement are tagged with its ID, and 78 are deleted, along with the thirteen refactor-equivalence laws and their `old.*` definitions. It tags `pkg/hash_perm` with EZ-HASH-1. It adds `mkLint` to ez's flake checks and moves `[tools.bolt]` to v0.8.1, with `closed` and `law` at `warn` and `unsafe` at `error` in `bolt.bend`. This phase changes no behavior and immediately shows how far ez is from its own spec.
+A preliminary phase makes ez lint clean under bolt v0.8.1: it fixes every style, correctness and suspicious finding (short parameter names, wrapping, doc comments, shadowing), none of which changes behavior, so that `mkLint` can join the flake checks with every group at `error` except the two law rules.
 
-The second phase enables the traceability check in bolt, reading `SPEC.md`. Pending requirements are reported but do not fail it, so it can go on at once. Once the closed laws are gone, `closed` returns to `error`; `law` follows when the commands it grades are in planner form.
+The first phase writes `SPEC.md` from this RFC, with the proved and pending status of each requirement, and sorts the existing closed laws using the inventory: 43 that illustrate a Proved requirement are tagged with its ID, and 78 are deleted, along with the thirteen refactor-equivalence laws and their `old.*` definitions. It tags `pkg/hash_perm` with EZ-HASH-1. With the preliminary phase, it adds `mkLint` to ez's flake checks and moves `[tools.bolt]` to v0.8.1, with `closed` and `law` at `warn` and everything else at `error` in `bolt.bend`. This phase changes no behavior and immediately shows how far ez is from its own spec.
+
+The second phase enables the traceability check in bolt, reading `SPEC.md`. Pending requirements are reported but do not fail it, so it can go on at once. Once bolt has the stricter `closed` setting, ez turns it on at `error`; `law` returns to `error` when the commands it grades are in planner form.
 
 The third phase introduces the World model and converts `ez lock` to planner form, then proves EZ-DOC-1 through EZ-DOC-5, EZ-RES-4 through EZ-RES-6 and EZ-RES-8, EZ-VEN-1 through EZ-VEN-3, and EZ-HASH-2, deleting the closed laws each one subsumes. EZ-DOC-3 is proved once the lock input changes have landed. `ez lock` goes first because its guarantees are the most important.
 
@@ -555,6 +559,6 @@ Every Proved requirement assumes the Bend checker is sound (EZ-TRUST-1). We cann
 
 ## Future Steps
 
-The same structure applies directly to the sibling libraries. ezjson, eztoml, and ezhttp already describe their laws in terms of external standards (TOML 1.0, RFC 9110, RFC 3986), and a shared traceability rule in bolt would cover all of them with the same two levels. Once ezhttp owns the HTTP laws, ez's EZ-TRUST-5 row points at them. Re-checking a dependency's PROOF.bend at its pinned hash inside ez's gate would turn such a row back into a proof without a third level.
+The same structure applies directly to the sibling libraries. ezjson, eztoml, and ezhttp already describe their laws in terms of external standards (TOML 1.0, RFC 9110, RFC 3986), and a shared traceability rule in bolt would cover all of them with the same two levels. ezhttp now owns the HTTP laws, and ez's EZ-TRUST-5 row points at them. Re-checking a dependency's PROOF.bend at its pinned hash inside ez's gate would turn such a row back into a proof without a third level.
 
 Once `ez lock` and `ez add` are both in planner form, the World model makes cross-command guarantees expressible, such as "`ez add` followed by `ez lock` on a fresh clone reproduces the lock `ez add` wrote." Those end-to-end statements are the strongest description of what ez is for, and they become provable only once individual commands are pure.

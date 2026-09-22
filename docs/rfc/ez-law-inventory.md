@@ -200,7 +200,7 @@ What ez proves today, in one paragraph: the 0x hash of a package's file set is i
 
 ### net/LAWS.bend
 
-The `net/` module is being migrated to ezhttp, which will own these laws. Once that lands they leave ez's gate, and HTTP correctness becomes a Trusted row in ez's specification (see EZ-TRUST-5 in the RFC).
+The `net/` module has since moved to ezhttp (#50), which owns these laws. They have left ez's gate, and HTTP correctness is a Trusted row in ez's specification (EZ-TRUST-5 in the RFC). The table records them as they were at `f009e42`.
 
 | Law | Kind | Proof | Claim | Points toward |
 | :---- | :---- | :---- | :---- | :---- |
@@ -416,7 +416,7 @@ This section checks each requirement in the RFC draft against what the code does
 | EZ-HASH-3 | partly | `Git.lay` (`git/git.bend:375-380`) writes `lib/<hash>` where `hash` is ez's own `K.pkg.hash(K.pkg_of(entry))`, and writes the manifest from the same file list, so it holds when written. `place` ignores `cp` failures (`git/git.bend:349-355`). Nothing re-checks a tree later: `read.git` checks files against the on-disk manifest but never the manifest against the directory name, and `restore` accepts a cached tree whose manifest text matches without re-reading files (`lock/restore.bend:121-132`). |
 | EZ-HASH-4 | as trusted | `ez publish` compares its hash to `bend --publish`'s answer (`pub/pub.bend:220-251`), but only after bend has uploaded. |
 | EZ-HASH-5 | as trusted | `Nar.path` (`sha/nar.bend:447`). Known divergences: the exec bit comes from `test -x` (an access check, not the mode bit); the whole `find` output and each symlink target are trimmed, so leading or trailing whitespace in a name or target is lost; a name containing a newline splits in two; submodules are not fetched by ez, while nixpkgs `fetchgit` (used by `nix/lib.nix`) may fetch them. |
-| EZ-HASH-6 | fails as worded | `Sha.hex` (`sha/sha.bend:16-17`) hashes each character's codepoint masked to its low byte, with the character count as the length. For ASCII text that is SHA-256 of the bytes; for any other text it is not. `nix/bend-lib.nix:28-32` documents the fold as Bend's own, so it may be intentional (and required for EZ-HASH-4). `sha/nar.bend` encodes to UTF-8 before hashing, so the two hashes disagree about what a character is. The digest itself comes from Giulio2002/bend-sha256, which its own laws hold to an executable FIPS 180-4 specification. |
+| EZ-HASH-6 | fails as worded | `Sha.hex` (`sha/sha.bend:16-17`) hashes each character's codepoint masked to its low byte, with the character count as the length. For ASCII text that is SHA-256 of the bytes; for any other text it is not. The fold is live in ez's own lock: `snap`'s `par.c` holds a non-ASCII character, and its recorded sum is the folded digest, not `sha256sum` of the file. `nix/bend-lib.nix:28-32` documents the fold as Bend's own, so it may be intentional (and required for EZ-HASH-4). `sha/nar.bend` encodes to UTF-8 before hashing, so the two hashes disagree about what a character is. The digest itself comes from Giulio2002/bend-sha256, which its own laws hold to an executable FIPS 180-4 specification. |
 
 ### Ledger and lock documents
 
