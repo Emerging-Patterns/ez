@@ -45,8 +45,8 @@ def value(pairs: List<&2, T.Kv>, key: String) -> String:
   T.value(pairs, key)
 
 # this section's pairs when its name matches, otherwise the rest's
-def pairs.at(s: T.Sect, rest: List<&2, T.Kv>, name: String) -> List<&2, T.Kv>:
-  T.Sect{n, ps} = s
+def pairs.at(sect: T.Sect, rest: List<&2, T.Kv>, name: String) -> List<&2, T.Kv>:
+  T.Sect{n, ps} = sect
   Bool.pick(List<&2, T.Kv>, String.eq(n, name), ps, rest)
 
 # the pairs of the section with this name, or none
@@ -58,8 +58,8 @@ def pairs_of(ss: List<&2, T.Sect>, +name: String) -> List<&2, T.Kv>:
       pairs.at(h, pairs_of(t, name), name)
 
 # `vendor = true`, bare or quoted, is the only spelling that commits the tree
-def flag(+s: String) -> Bool:
-  String.eq(s, "true")
+def flag(+word: String) -> Bool:
+  String.eq(word, "true")
 
 # no `git` key means the package lives on the hub
 def source.go(hub: Bool, url: String, rev: String, tag: String, root: String,
@@ -73,8 +73,8 @@ def source.go(hub: Bool, url: String, rev: String, tag: String, root: String,
 # a git section that names no root was written from the top of its checkout,
 # which is the root a lock already spells out as "." and the only one a ledger
 # written before this key existed can have meant
-def root.or(+r: String) -> String:
-  Bool.pick(String, String.is_empty(r), ".", r)
+def root.or(+dir: String) -> String:
+  Bool.pick(String, String.is_empty(dir), ".", dir)
 
 # where a dependency's section says its bytes come from
 def source_of(+pairs: List<&2, T.Kv>) -> Source:
@@ -87,33 +87,33 @@ def dep_of(+full: String, +pairs: List<&2, T.Kv>) -> Dep:
   Dep{String.drop(full, 5n), value(pairs, "hash"), value(pairs, "entry"), source_of(pairs)}
 
 # a dependency's own name, for finding or replacing it
-def dep.name(d: Dep) -> String:
-  Dep{n, _h, _e, _s} = d
+def dep.name(dependency: Dep) -> String:
+  Dep{n, _h, _e, _s} = dependency
   n
 
 # a dependency's hash, which is the `0x` name its import line carries
-def dep.hash(d: Dep) -> String:
-  Dep{_n, h, _e, _s} = d
+def dep.hash(dependency: Dep) -> String:
+  Dep{_n, h, _e, _s} = dependency
   h
 
 # the file inside the package a dependency was added by, which is the file its
 # hash was computed from
-def dep.entry(d: Dep) -> String:
-  Dep{_n, _h, e, _s} = d
+def dep.entry(dependency: Dep) -> String:
+  Dep{_n, _h, e, _s} = dependency
   e
 
 # a section joins the dependencies only when it is a `[deps.<name>]`
-def deps.put(is_dep: Bool, s: T.Sect, rest: List<&2, Dep>) -> List<&2, Dep>:
+def deps.put(is_dep: Bool, sect: T.Sect, rest: List<&2, Dep>) -> List<&2, Dep>:
   match is_dep:
     case True{}:
-      T.Sect{n, ps} = s
+      T.Sect{n, ps} = sect
       dep_of(n, ps) <> rest
     case False{}:
       rest
 
 # a section's name, for deciding what it is
-def name_of(s: T.Sect) -> String:
-  T.Sect{n, _ps} = s
+def name_of(sect: T.Sect) -> String:
+  T.Sect{n, _ps} = sect
   n
 
 # every `[deps.<name>]` section, as dependencies, in the order written
@@ -130,30 +130,30 @@ def tool_of(+full: String, +pairs: List<&2, T.Kv>) -> Tool:
     source_of(pairs)}
 
 # a tool's own name
-def tool.name(t: Tool) -> String:
-  Tool{n, _e, _b, _s} = t
+def tool.name(pin: Tool) -> String:
+  Tool{n, _e, _b, _s} = pin
   n
 
 # the file a pin names as its entry, or "" when the tool's ledger names it
-def tool.entry(t: Tool) -> String:
-  Tool{_n, e, _b, _s} = t
+def tool.entry(pin: Tool) -> String:
+  Tool{_n, e, _b, _s} = pin
   e
 
 # the file a pin names as its binary, or "" when the tool's ledger names it
-def tool.bin(t: Tool) -> String:
-  Tool{_n, _e, b, _s} = t
+def tool.bin(pin: Tool) -> String:
+  Tool{_n, _e, b, _s} = pin
   b
 
 # where a pinned CLI's bytes come from
-def tool.source(t: Tool) -> Source:
-  Tool{_n, _e, _b, s} = t
+def tool.source(pin: Tool) -> Source:
+  Tool{_n, _e, _b, s} = pin
   s
 
 # a section joins the tools only when it is a `[tools.<name>]`
-def tools.put(is_tool: Bool, s: T.Sect, rest: List<&2, Tool>) -> List<&2, Tool>:
+def tools.put(is_tool: Bool, sect: T.Sect, rest: List<&2, Tool>) -> List<&2, Tool>:
   match is_tool:
     case True{}:
-      T.Sect{n, ps} = s
+      T.Sect{n, ps} = sect
       tool_of(n, ps) <> rest
     case False{}:
       rest
@@ -175,8 +175,8 @@ def missing.at(bad: Bool, name: String, rest: String) -> String:
       rest
 
 # a `[deps.<name>]` section is missing its hash when the key is absent
-def missing.is(s: T.Sect) -> Bool:
-  T.Sect{n, ps} = s
+def missing.is(sect: T.Sect) -> Bool:
+  T.Sect{n, ps} = sect
   Bool.and(String.starts_with(n, "deps."), String.is_empty(value(ps, "hash")))
 
 # the first dependency section with no hash, or "" when every one has one
@@ -214,8 +214,8 @@ def read(+bad: String, +ss: List<&2, T.Sect>) -> Read:
     problem(bad, missing(ss)), ss)
 
 # the parsed document, taken apart
-def parse.go(t: T.Toml) -> Read:
-  T.Toml{bad, _name, _pairs, sects} = t
+def parse.go(toml: T.Toml) -> Read:
+  T.Toml{bad, _name, _pairs, sects} = toml
   read(bad, sects)
 
 # the ledger written in an ez.toml
@@ -223,16 +223,16 @@ def parse(text: String) -> Read:
   parse.go(T.parse(text))
 
 # how a dependency reads on one line
-def show.source(s: Source) -> String:
-  match s:
+def show.source(src: Source) -> String:
+  match src:
     case Hub{}:
       "hub"
     case Git{_url, _rev, _tag, _root, _nar, _vend}:
       "git"
 
 # `<name>=<hash>@<hub|git>`
-def show.dep(d: Dep) -> String:
-  Dep{n, h, _entry, src} = d
+def show.dep(dependency: Dep) -> String:
+  Dep{n, h, _entry, src} = dependency
   n ++ "=" ++ h ++ "@" ++ show.source(src)
 
 # every dependency shown, in the order written. Base's List.map is over a
@@ -245,30 +245,30 @@ def show.deps(ds: List<&2, Dep>) -> List<&2, String>:
       show.dep(h) <> show.deps(t)
 
 # the ledger on one line, for a test or a report
-def show.m(m: Manifest) -> String:
-  Manifest{n, e, _b, ds, _ts} = m
+def show.m(manifest: Manifest) -> String:
+  Manifest{n, e, _b, ds, _ts} = manifest
   n ++ " " ++ e ++ " " ++ String.join(show.deps(ds), " ")
 
 # the ledger, or the error, on one line
-def show(r: Read) -> String:
-  match r:
+def show(ledger: Read) -> String:
+  match ledger:
     case Bad{why}:
       "error: " ++ why
     case Good{m}:
       show.m(m)
 
 # this dependency when its name matches, otherwise whatever the rest gave
-def find.pick(hit: Bool, d: Dep, rest: Dep) -> Dep:
+def find.pick(hit: Bool, dependency: Dep, rest: Dep) -> Dep:
   match hit:
     case True{}:
-      d
+      dependency
     case False{}:
       rest
 
 # the dependency of this name, or a blank one
-def find.at(+d: Dep, rest: Dep, name: String) -> Dep:
-  Dep{n, _h, _e, _s} = d
-  find.pick(String.eq(n, name), d, rest)
+def find.at(+dependency: Dep, rest: Dep, name: String) -> Dep:
+  Dep{n, _h, _e, _s} = dependency
+  find.pick(String.eq(n, name), dependency, rest)
 
 # the dependency of this name, or one with empty fields
 def find(ds: List<&2, Dep>, +name: String) -> Dep:
@@ -279,8 +279,8 @@ def find(ds: List<&2, Dep>, +name: String) -> Dep:
       find.at(h, find(t, name), name)
 
 # the named dependency of a ledger that was read
-def dep(r: Read, name: String) -> Dep:
-  match r:
+def dep(ledger: Read, name: String) -> Dep:
+  match ledger:
     case Bad{_why}:
       Dep{"", "", "", Hub{}}
     case Good{m}:
@@ -288,77 +288,77 @@ def dep(r: Read, name: String) -> Dep:
       find(ds, name)
 
 # the commit a dependency is pinned to, or "" when it is a hub package
-def source.rev(s: Source) -> String:
-  match s:
+def source.rev(src: Source) -> String:
+  match src:
     case Hub{}:
       ""
     case Git{_url, rev, _tag, _root, _nar, _vend}:
       rev
 
 # the tag a dependency was asked for, or "" when it was pinned by commit
-def source.tag(s: Source) -> String:
-  match s:
+def source.tag(src: Source) -> String:
+  match src:
     case Hub{}:
       ""
     case Git{_url, _rev, tag, _root, _nar, _vend}:
       tag
 
 # the repo a dependency was vendored from, or "" when it is a hub package
-def source.url(s: Source) -> String:
-  match s:
+def source.url(src: Source) -> String:
+  match src:
     case Hub{}:
       ""
     case Git{url, _rev, _tag, _root, _nar, _vend}:
       url
 
 # the directory inside the checkout a dependency's paths are written from
-def source.root(s: Source) -> String:
-  match s:
+def source.root(src: Source) -> String:
+  match src:
     case Hub{}:
       ""
     case Git{_url, _rev, _tag, root, _nar, _vend}:
       root
 
 # the NAR hash nix rebuilds a dependency's checkout by
-def source.nar(s: Source) -> String:
-  match s:
+def source.nar(src: Source) -> String:
+  match src:
     case Hub{}:
       ""
     case Git{_url, _rev, _tag, _root, nar, _vend}:
       nar
 
 # whether a dependency names a repo rather than the hub
-def source.is_git(s: Source) -> Bool:
-  match s:
+def source.is_git(src: Source) -> Bool:
+  match src:
     case Hub{}:
       False{}
     case Git{_url, _rev, _tag, _root, _nar, _vend}:
       True{}
 
 # whether an upgrade that moves this dependency also commits the new tree
-def source.vendor(s: Source) -> Bool:
-  match s:
+def source.vendor(src: Source) -> Bool:
+  match src:
     case Hub{}:
       False{}
     case Git{_url, _rev, _tag, _root, _nar, vend}:
       vend
 
 # the source of a dependency that was found
-def source.dep(d: Dep) -> Source:
-  Dep{_n, _h, _e, s} = d
+def source.dep(dependency: Dep) -> Source:
+  Dep{_n, _h, _e, s} = dependency
   s
 
 # the commit the named dependency is pinned to
-def rev_of(r: Read, name: String) -> String:
-  source.rev(source.dep(dep(r, name)))
+def rev_of(ledger: Read, name: String) -> String:
+  source.rev(source.dep(dep(ledger, name)))
 
 # the tag the named dependency was asked for
-def tag_of(r: Read, name: String) -> String:
-  source.tag(source.dep(dep(r, name)))
+def tag_of(ledger: Read, name: String) -> String:
+  source.tag(source.dep(dep(ledger, name)))
 
 # the pinned CLIs of a ledger that was read; one that would not parse has none
-def tools_of(r: Read) -> List<&2, Tool>:
-  match r:
+def tools_of(ledger: Read) -> List<&2, Tool>:
+  match ledger:
     case Bad{_why}:
       []
     case Good{m}:
@@ -366,16 +366,16 @@ def tools_of(r: Read) -> List<&2, Tool>:
       ts
 
 # this tool when its name matches, otherwise whatever the rest gave
-def tool.find.pick(hit: Bool, t: Tool, rest: Tool) -> Tool:
+def tool.find.pick(hit: Bool, pin: Tool, rest: Tool) -> Tool:
   match hit:
     case True{}:
-      t
+      pin
     case False{}:
       rest
 
 # the tool of this name, or a blank one
-def tool.find.at(+t: Tool, rest: Tool, +name: String) -> Tool:
-  tool.find.pick(String.eq(tool.name(t), name), t, rest)
+def tool.find.at(+pin: Tool, rest: Tool, +name: String) -> Tool:
+  tool.find.pick(String.eq(tool.name(pin), name), pin, rest)
 
 # the tool of this name, or one with empty fields
 def tool.find(ts: List<&2, Tool>, +name: String) -> Tool:

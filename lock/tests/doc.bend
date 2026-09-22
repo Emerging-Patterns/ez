@@ -6,8 +6,8 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../../check/kit.bend as Check
 
 # the tables of a document that was read
-def sects(s: String) -> List<&2, T.Sect>:
-  T.sects(T.parse(s))
+def sects(text: String) -> List<&2, T.Sect>:
+  T.sects(T.parse(text))
 
 # a .ez/origins.toml, as `git/git.bend` writes it
 def orig() -> String:

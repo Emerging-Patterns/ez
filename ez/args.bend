@@ -15,8 +15,8 @@ def nonempty(ss: List<&2, String>) -> List<&2, String>:
       Bool.pick(List<&2, String>, String.is_empty(h), more, h <> more)
 
 # a variable's text; unset, ""
-def text_of(r: Result<&1, &1, U32 & String, String>) -> String:
-  match r:
+def text_of(res: Result<&1, &1, U32 & String, String>) -> String:
+  match res:
     case Fail{_e}:
       ""
     case Done{s}:
@@ -48,8 +48,8 @@ def split(xs: List<&2, String>) -> String & List<&2, String>:
 
 # the nth argument, or "" when it was not given. Both the list and the count
 # are scrutinised together, so the walk needs no helper to branch through.
-def at(xs: List<&2, String>, n: Nat) -> String:
-  match xs n:
+def at(xs: List<&2, String>, index: Nat) -> String:
+  match xs index:
     case Nil{} _m:
       ""
     case Con{h, _t} 0n:
@@ -66,8 +66,8 @@ def rest(as: List<&2, String>) -> List<&2, String>:
       t
 
 # `n` words dropped. What remains when the list runs out first is nothing.
-def drop(xs: List<&2, String>, n: Nat) -> List<&2, String>:
-  match xs n:
+def drop(xs: List<&2, String>, count: Nat) -> List<&2, String>:
+  match xs count:
     case Nil{} _m:
       Nil{}
     case Con{+h, +t} 0n:
@@ -90,9 +90,9 @@ def tool.rest(as: List<&2, String>) -> List<&2, String>:
 
 # `tool run` with its target, and without the words the program is given.
 # A missing target is left missing, so the parse can say so.
-def tool.line(+t: String) -> List<&2, String>:
-  Bool.pick(List<&2, String>, String.is_empty(t), ["tool", "run"],
-    ["tool", "run", t])
+def tool.line(+target: String) -> List<&2, String>:
+  Bool.pick(List<&2, String>, String.is_empty(target), ["tool", "run"],
+    ["tool", "run", target])
 
 # whether this line is `tool run`
 def is.tool.run(+as: List<&2, String>) -> Bool:

@@ -21,8 +21,8 @@ def text() -> String:
   "entry = \"src/lib.bend\"\n"
 
 # the parsed manifest, or the error, shown as one line
-def shown(s: String) -> String:
-  M.show(M.parse(s))
+def shown(toml: String) -> String:
+  M.show(M.parse(toml))
 
 def main() -> IO(Unit):
   do IO<Unit>:

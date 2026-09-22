@@ -27,84 +27,84 @@ type Goal is Data:
   FinishDir{kids: List<&2, Ent>, k: After}
 
 # one byte as a character. NAR is a byte stream held in a Bend string.
-def byte(+x: U32) -> Char:
-  Chr{(x .&. 255 : U32)}
+def byte(+code: U32) -> Char:
+  Chr{(code .&. 255 : U32)}
 
-def nat.byte(+n: Nat) -> Char:
-  byte(U32.from_nat(Nat.mod(n, 256n)))
+def nat.byte(+value: Nat) -> Char:
+  byte(U32.from_nat(Nat.mod(value, 256n)))
 
-def le64.go(width: Nat, +n: Nat) -> String:
+def le64.go(width: Nat, +value: Nat) -> String:
   match width:
     case 0n:
       ""
     case 1n+f:
-      SCon{nat.byte(n), le64.go(f, Nat.div(n, 256n))}
+      SCon{nat.byte(value), le64.go(f, Nat.div(value, 256n))}
 
 # a length as NAR writes it: eight bytes, little-endian
-def le64(+n: Nat) -> String:
-  le64.go(8n, n)
+def le64(+value: Nat) -> String:
+  le64.go(8n, value)
 
 # that many NUL bytes, the padding after a string
-def zeros(n: Nat) -> String:
-  match n:
+def zeros(count: Nat) -> String:
+  match count:
     case 0n:
       ""
     case 1n+p:
       SCon{Chr{0}, zeros(p)}
 
-def pad.of(+n: Nat) -> Nat:
-  Nat.mod(Nat.sub(8n, Nat.mod(n, 8n)), 8n)
+def pad.of(+len: Nat) -> Nat:
+  Nat.mod(Nat.sub(8n, Nat.mod(len, 8n)), 8n)
 
 # one NAR string: its length, its bytes, then zeros up to a multiple of eight
-def str(+s: String) -> String:
-  +n = String.length(s)
-  le64(n) ++ s ++ zeros(pad.of(n))
+def str(+text: String) -> String:
+  +n = String.length(text)
+  le64(n) ++ text ++ zeros(pad.of(n))
 
-def utf8.1(+u: U32) -> String:
-  SCon{byte(u), SNil{}}
+def utf8.1(+code: U32) -> String:
+  SCon{byte(code), SNil{}}
 
-def utf8.2(+u: U32) -> String:
-  SCon{byte((192 .|. U32.shrn(u, 6n) : U32)),
-    SCon{byte((128 .|. (u .&. 63 : U32) : U32)), SNil{}}}
+def utf8.2(+code: U32) -> String:
+  SCon{byte((192 .|. U32.shrn(code, 6n) : U32)),
+    SCon{byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}
 
-def utf8.3(+u: U32) -> String:
-  SCon{byte((224 .|. U32.shrn(u, 12n) : U32)),
-    SCon{byte((128 .|. (U32.shrn(u, 6n) .&. 63 : U32) : U32)),
-      SCon{byte((128 .|. (u .&. 63 : U32) : U32)), SNil{}}}}
+def utf8.3(+code: U32) -> String:
+  SCon{byte((224 .|. U32.shrn(code, 12n) : U32)),
+    SCon{byte((128 .|. (U32.shrn(code, 6n) .&. 63 : U32) : U32)),
+      SCon{byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}}
 
-def utf8.4(+u: U32) -> String:
-  SCon{byte((240 .|. U32.shrn(u, 18n) : U32)),
-    SCon{byte((128 .|. (U32.shrn(u, 12n) .&. 63 : U32) : U32)),
-      SCon{byte((128 .|. (U32.shrn(u, 6n) .&. 63 : U32) : U32)),
-        SCon{byte((128 .|. (u .&. 63 : U32) : U32)), SNil{}}}}}
+def utf8.4(+code: U32) -> String:
+  SCon{byte((240 .|. U32.shrn(code, 18n) : U32)),
+    SCon{byte((128 .|. (U32.shrn(code, 12n) .&. 63 : U32) : U32)),
+      SCon{byte((128 .|. (U32.shrn(code, 6n) .&. 63 : U32) : U32)),
+        SCon{byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}}}
 
-def utf8.put.3(three: Bool, +u: U32) -> String:
+def utf8.put.3(three: Bool, +code: U32) -> String:
   match three:
     case True{}:
-      utf8.3(u)
+      utf8.3(code)
     case False{}:
-      utf8.4(u)
+      utf8.4(code)
 
-def utf8.put.2(two: Bool, +u: U32) -> String:
+def utf8.put.2(two: Bool, +code: U32) -> String:
   match two:
     case True{}:
-      utf8.2(u)
+      utf8.2(code)
     case False{}:
-      utf8.put.3(U32.is_lt(u, 65536), u)
+      utf8.put.3(U32.is_lt(code, 65536), code)
 
-def utf8.put.ascii(ascii: Bool, +u: U32) -> String:
+def utf8.put.ascii(ascii: Bool, +code: U32) -> String:
   match ascii:
     case True{}:
-      utf8.1(u)
+      utf8.1(code)
     case False{}:
-      utf8.put.2(U32.is_lt(u, 2048), u)
+      utf8.put.2(U32.is_lt(code, 2048), code)
 
-def utf8.put(+u: U32) -> String:
-  utf8.put.ascii(U32.is_lt(u, 128), u)
+def utf8.put(+code: U32) -> String:
+  utf8.put.ascii(U32.is_lt(code, 128), code)
 
 # the string's characters encoded as UTF-8, each byte a character
-def utf8(+s: String) -> String:
-  match s:
+def utf8(+text: String) -> String:
+  match text:
     case SNil{}:
       ""
     case SCon{c, t}:
@@ -128,8 +128,8 @@ def symlink(+target: String) -> String:
     ++ str(utf8(target)) ++ str(")")
 
 # one directory entry: its name and its node
-def entry(+e: Ent) -> String:
-  Ent{name, node} = e
+def entry(+ent: Ent) -> String:
+  Ent{name, node} = ent
   str("entry") ++ str("(") ++ str("name") ++ str(utf8(name))
     ++ str("node") ++ node ++ str(")")
 
@@ -156,52 +156,52 @@ def b64.digit.plus(plus: Bool) -> Char:
     case False{}:
       '/'
 
-def b64.digit.lt62(small: Bool, +i: U32) -> Char:
+def b64.digit.lt62(small: Bool, +index: U32) -> Char:
   match small:
     case True{}:
-      Chr{U32.add(48, U32.sub(i, 52))}
+      Chr{U32.add(48, U32.sub(index, 52))}
     case False{}:
-      b64.digit.plus(U32.is_eq(i, 62))
+      b64.digit.plus(U32.is_eq(index, 62))
 
-def b64.digit.lt52(small: Bool, +i: U32) -> Char:
+def b64.digit.lt52(small: Bool, +index: U32) -> Char:
   match small:
     case True{}:
-      Chr{U32.add(97, U32.sub(i, 26))}
+      Chr{U32.add(97, U32.sub(index, 26))}
     case False{}:
-      b64.digit.lt62(U32.is_lt(i, 62), i)
+      b64.digit.lt62(U32.is_lt(index, 62), index)
 
-def b64.digit.lt26(small: Bool, +i: U32) -> Char:
+def b64.digit.lt26(small: Bool, +index: U32) -> Char:
   match small:
     case True{}:
-      Chr{U32.add(65, i)}
+      Chr{U32.add(65, index)}
     case False{}:
-      b64.digit.lt52(U32.is_lt(i, 52), i)
+      b64.digit.lt52(U32.is_lt(index, 52), index)
 
-def b64.digit(+i: U32) -> Char:
-  b64.digit.lt26(U32.is_lt(i, 26), i)
+def b64.digit(+index: U32) -> Char:
+  b64.digit.lt26(U32.is_lt(index, 26), index)
 
-def b64.triple(+a: U32, +b: U32, +c: U32) -> String:
-  +n = (U32.shln(a, 16n) .|. U32.shln(b, 8n) .|. c : U32)
+def b64.triple(+first: U32, +second: U32, +third: U32) -> String:
+  +n = (U32.shln(first, 16n) .|. U32.shln(second, 8n) .|. third : U32)
   SCon{b64.digit(U32.shrn(n, 18n)),
     SCon{b64.digit((U32.shrn(n, 12n) .&. 63 : U32)),
       SCon{b64.digit((U32.shrn(n, 6n) .&. 63 : U32)),
         SCon{b64.digit((n .&. 63 : U32)), SNil{}}}}}
 
-def b64.one(+a: U32) -> String:
-  SCon{b64.digit(U32.shrn(a, 2n)),
-    SCon{b64.digit(U32.shln((a .&. 3 : U32), 4n)),
+def b64.one(+first: U32) -> String:
+  SCon{b64.digit(U32.shrn(first, 2n)),
+    SCon{b64.digit(U32.shln((first .&. 3 : U32), 4n)),
       SCon{'=', SCon{'=', SNil{}}}}}
 
-def b64.two(+a: U32, +b: U32) -> String:
-  +n = (U32.shln(a, 8n) .|. b : U32)
+def b64.two(+first: U32, +second: U32) -> String:
+  +n = (U32.shln(first, 8n) .|. second : U32)
   SCon{b64.digit(U32.shrn(n, 10n)),
     SCon{b64.digit((U32.shrn(n, 4n) .&. 63 : U32)),
       SCon{b64.digit(U32.shln((n .&. 15 : U32), 2n)),
         SCon{'=', SNil{}}}}}
 
 # standard base64, padded with `=`
-def b64(s: String) -> String:
-  match s:
+def b64(text: String) -> String:
+  match text:
     case SNil{}:
       ""
     case SCon{a, SNil{}}:
@@ -211,33 +211,33 @@ def b64(s: String) -> String:
     case SCon{a, SCon{b, SCon{c, t}}}:
       b64.triple(Char.to_u32(a), Char.to_u32(b), Char.to_u32(c)) ++ b64(t)
 
-def hex.val.upper(is_upper: Bool, +u: U32) -> U32:
+def hex.val.upper(is_upper: Bool, +code: U32) -> U32:
   match is_upper:
     case True{}:
-      U32.sub(u, 55)
+      U32.sub(code, 55)
     case False{}:
       0
 
-def hex.val.lower(is_lower: Bool, +u: U32) -> U32:
+def hex.val.lower(is_lower: Bool, +code: U32) -> U32:
   match is_lower:
     case True{}:
-      U32.sub(u, 87)
+      U32.sub(code, 87)
     case False{}:
-      hex.val.upper(Bool.and(U32.is_ge(u, 65), U32.is_le(u, 70)), u)
+      hex.val.upper(Bool.and(U32.is_ge(code, 65), U32.is_le(code, 70)), code)
 
-def hex.val.digit(is_digit: Bool, +u: U32) -> U32:
+def hex.val.digit(is_digit: Bool, +code: U32) -> U32:
   match is_digit:
     case True{}:
-      U32.sub(u, 48)
+      U32.sub(code, 48)
     case False{}:
-      hex.val.lower(Bool.and(U32.is_ge(u, 97), U32.is_le(u, 102)), u)
+      hex.val.lower(Bool.and(U32.is_ge(code, 97), U32.is_le(code, 102)), code)
 
-def hex.val(+c: Char) -> U32:
-  +u = Char.to_u32(c)
+def hex.val(+ch: Char) -> U32:
+  +u = Char.to_u32(ch)
   hex.val.digit(Bool.and(U32.is_ge(u, 48), U32.is_le(u, 57)), u)
 
-def hex.bytes(s: String) -> String:
-  match s:
+def hex.bytes(text: String) -> String:
+  match text:
     case SNil{}:
       ""
     case SCon{_a, SNil{}}:
@@ -275,20 +275,20 @@ def nonblank(ss: List<&2, String>) -> List<&2, String>:
 
 # where one name belongs in a list already sorted. Insertion keeps the
 # termination check happy; Base's List.sort does not.
-def sort.ins.put(le: Bool, +x: String, h: String, t: List<&2, String>,
+def sort.ins.put(le: Bool, +item: String, head: String, tail: List<&2, String>,
   rest: List<&2, String>) -> List<&2, String>:
   match le:
     case True{}:
-      x <> (h <> t)
+      item <> (head <> tail)
     case False{}:
-      h <> rest
+      head <> rest
 
-def sort.ins(+x: String, ss: List<&2, String>) -> List<&2, String>:
+def sort.ins(+item: String, ss: List<&2, String>) -> List<&2, String>:
   match ss:
     case []:
-      [x]
+      [item]
     case +h <> +t:
-      sort.ins.put(String.is_le(x, h), x, h, t, sort.ins(x, t))
+      sort.ins.put(String.is_le(item, h), item, h, t, sort.ins(item, t))
 
 # directory entry names in lexicographic order, the order NAR walks them
 def sort(ss: List<&2, String>) -> List<&2, String>:
@@ -311,8 +311,8 @@ def link.of(+path: String) -> IO(String):
     +out : String <- R.exec(["readlink", "-n", path])
     said(R.ok(out), path ++ ": ", R.text(out))
 
-def file.got(m: Maybe<&2, String>, path: String) -> IO(String):
-  match m:
+def file.got(got: Maybe<&2, String>, path: String) -> IO(String):
+  match got:
     case None{}:
       IO.die(String, 1, "ez: nar hash: " ++ path ++ ": unreadable")
     case Some{s}:
@@ -355,8 +355,8 @@ def cont.rest(empty: Bool, +dir: String, rest: List<&2, String>,
     case False{}:
       cont.next(dir, rest, acc, parent, go)
 
-def cont.apply(+ser: String, k: After, go: Goal -> IO(String)) -> IO(String):
-  match k:
+def cont.apply(+ser: String, after: After, go: Goal -> IO(String)) -> IO(String):
+  match after:
     case Done{}:
       IO.pure(String, ser)
     case ChildOf{+dir, +name, +rest, acc, parent}:
@@ -364,96 +364,96 @@ def cont.apply(+ser: String, k: After, go: Goal -> IO(String)) -> IO(String):
         Ent{name, ser} <> acc, parent, go)
 
 # an empty directory under a continuation
-def load.dir.empty(k: After, go: Goal -> IO(String)) -> IO(String):
-  go(FinishDir{[], k})
+def load.dir.empty(after: After, go: Goal -> IO(String)) -> IO(String):
+  go(FinishDir{[], after})
 
 # a non-empty directory: start with its first child
-def load.dir.kids(+path: String, ns: List<&2, String>, k: After,
+def load.dir.kids(+path: String, ns: List<&2, String>, after: After,
   go: Goal -> IO(String)) -> IO(String):
   match ns:
     case []:
-      load.dir.empty(k, go)
+      load.dir.empty(after, go)
     case +h <> t:
-      go(Load{path ++ "/" ++ h, ChildOf{path, h, t, [], k}})
+      go(Load{path ++ "/" ++ h, ChildOf{path, h, t, [], after}})
 
 # a directory after its child names are known
-def load.dir(+path: String, ns: List<&2, String>, k: After,
+def load.dir(+path: String, ns: List<&2, String>, after: After,
   go: Goal -> IO(String)) -> IO(String):
-  load.dir.kids(path, ns, k, go)
+  load.dir.kids(path, ns, after, go)
 
 # a regular file's serial handed to its continuation
-def load.file(+path: String, k: After, go: Goal -> IO(String)) -> IO(String):
+def load.file(+path: String, after: After, go: Goal -> IO(String)) -> IO(String):
   do IO<String>:
     ex : Bool <- exec.of(path)
     body : String <- file.of(path)
-    cont.apply(regular(ex, body), k, go)
+    cont.apply(regular(ex, body), after, go)
 
 # a symlink's serial handed to its continuation
-def load.link(+path: String, k: After, go: Goal -> IO(String)) -> IO(String):
+def load.link(+path: String, after: After, go: Goal -> IO(String)) -> IO(String):
   do IO<String>:
     t : String <- link.of(path)
-    cont.apply(symlink(t), k, go)
+    cont.apply(symlink(t), after, go)
 
 # open a directory and continue
-def load.open(+path: String, k: After, go: Goal -> IO(String)) -> IO(String):
+def load.open(+path: String, after: After, go: Goal -> IO(String)) -> IO(String):
   do IO<String>:
     ns : List<&2, String> <- names(path)
-    load.dir(path, ns, k, go)
+    load.dir(path, ns, after, go)
 
-def load.file.only(file: Bool, +path: String, k: After,
+def load.file.only(file: Bool, +path: String, after: After,
   go: Goal -> IO(String)) -> IO(String):
   match file:
     case True{}:
-      load.file(path, k, go)
+      load.file(path, after, go)
     case False{}:
       IO.die(String, 1, "ez: nar hash: " ++ path ++ ": not a file, directory, or symlink")
 
 # non-symlink
-def load.plain(is_dir: Bool, file: Bool, +path: String, k: After,
+def load.plain(is_dir: Bool, file: Bool, +path: String, after: After,
   go: Goal -> IO(String)) -> IO(String):
   match is_dir:
     case True{}:
-      load.open(path, k, go)
+      load.open(path, after, go)
     case False{}:
-      load.file.only(file, path, k, go)
+      load.file.only(file, path, after, go)
 
 # probes answered for a Load goal
-def load.kind(link: Bool, is_dir: Bool, file: Bool, +path: String, k: After,
+def load.kind(link: Bool, is_dir: Bool, file: Bool, +path: String, after: After,
   go: Goal -> IO(String)) -> IO(String):
   match link:
     case True{}:
-      load.link(path, k, go)
+      load.link(path, after, go)
     case False{}:
-      load.plain(is_dir, file, path, k, go)
+      load.plain(is_dir, file, path, after, go)
 
 # one Load goal after probes
-def load.at(+path: String, k: After, go: Goal -> IO(String)) -> IO(String):
+def load.at(+path: String, after: After, go: Goal -> IO(String)) -> IO(String):
   do IO<String>:
     +l : String <- R.exec(["test", "-L", path])
     +d : String <- R.exec(["test", "-d", path])
     +r : String <- R.exec(["test", "-f", path])
-    load.kind(R.ok(l), R.ok(d), R.ok(r), path, k, go)
+    load.kind(R.ok(l), R.ok(d), R.ok(r), path, after, go)
 
 # FinishDir: directory serial under its continuation
-def load.finish(kids: List<&2, Ent>, k: After, go: Goal -> IO(String)) -> IO(String):
-  cont.apply(directory(kids), k, go)
+def load.finish(kids: List<&2, Ent>, after: After, go: Goal -> IO(String)) -> IO(String):
+  cont.apply(directory(kids), after, go)
 
 # one step; `go` continues with decreased fuel
-def load.step(g: Goal, go: Goal -> IO(String)) -> IO(String):
-  match g:
+def load.step(goal: Goal, go: Goal -> IO(String)) -> IO(String):
+  match goal:
     case Load{+at, k}:
       load.at(at, k, go)
     case FinishDir{kids, k}:
       load.finish(kids, k, go)
 
 # the fuelled walk
-def load.go(fuel: Nat, g: Goal) -> IO(String):
+def load.go(fuel: Nat, goal: Goal) -> IO(String):
   match fuel:
     case 0n:
       IO.die(String, 1, "ez: nar hash: tree too deep")
     case 1n+f:
       +n = f
-      load.step(g, g2 => load.go(n, g2))
+      load.step(goal, g2 => load.go(n, g2))
 
 # the NAR serial of one path
 def dump(+path: String) -> IO(String):

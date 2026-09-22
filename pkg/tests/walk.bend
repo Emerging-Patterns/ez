@@ -17,8 +17,8 @@ def ats(fs: List<&2, K.File>) -> List<&2, String>:
 
 # the fixture's package, taken apart onto one line: the root it re-rooted at,
 # its hash, and where every file of it sits
-def shown(+p: K.Pkg) -> String:
-  K.pkg.root(p) ++ " " ++ K.pkg.hash(p) ++ " " ++ String.join(ats(K.pkg.files(p)), " ")
+def shown(+pkg: K.Pkg) -> String:
+  K.pkg.root(pkg) ++ " " ++ K.pkg.hash(pkg) ++ " " ++ String.join(ats(K.pkg.files(pkg)), " ")
 
 def main() -> IO(Unit):
   do IO<Unit>:

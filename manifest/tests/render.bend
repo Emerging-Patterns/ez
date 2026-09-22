@@ -6,8 +6,8 @@ import ../../check/kit.bend as Check
 
 # a ledger edited, then rendered, then read back and rendered again, which is
 # what `ez add` and `ez remove` do to the file on disk
-def edited(m: M.Manifest) -> String:
-  R.show(m)
+def edited(manifest: M.Manifest) -> String:
+  R.show(manifest)
 
 def main() -> IO(Unit):
   do IO<Unit>:

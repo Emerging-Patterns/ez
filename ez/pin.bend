@@ -23,43 +23,43 @@ def work() -> String:
   ".ez/pin-up"
 
 # a tool left as it was
-def stay(+t: M.Tool) -> Touched:
-  Touched{t, False{}}
+def stay(+tool: M.Tool) -> Touched:
+  Touched{tool, False{}}
 
 # a tool whose pin moved
-def moved(+t: M.Tool) -> Touched:
-  Touched{t, True{}}
+def moved(+tool: M.Tool) -> Touched:
+  Touched{tool, True{}}
 
 # the pin with a commit and a NAR hash written in. An empty tag leaves the
 # one the ledger already had. The vendor bit is off: a tool is not committed
 # under `.ez/lib`.
-def set.go(+n: String, +e: String, +b: String, s: M.Source, +rev: String,
+def set.go(+name: String, +entry: String, +bin: String, source: M.Source, +rev: String,
   +tag: String, +nar: String) -> M.Tool:
-  match s:
+  match source:
     case M.Hub{}:
-      M.Tool{n, e, b, M.Hub{}}
+      M.Tool{name, entry, bin, M.Hub{}}
     case M.Git{url, _rev, old, root, _nar, _vend}:
-      M.Tool{n, e, b, M.Git{url, rev,
+      M.Tool{name, entry, bin, M.Git{url, rev,
         Bool.pick(String, String.is_empty(tag), old, tag), M.root.or(root),
         nar, False{}}}
 
 # a tool's pin with a commit, a tag and a NAR hash written in
-def set(+t: M.Tool, +rev: String, +tag: String, +nar: String) -> M.Tool:
-  M.Tool{n, e, b, s} = t
+def set(+tool: M.Tool, +rev: String, +tag: String, +nar: String) -> M.Tool:
+  M.Tool{n, e, b, s} = tool
   set.go(n, e, b, s, rev, tag, nar)
 
 # either side moved
-def either(a: Bool, b: Bool) -> Bool:
-  match a:
+def either(left: Bool, right: Bool) -> Bool:
+  match left:
     case True{}:
       True{}
     case False{}:
-      b
+      right
 
 # one tool in front of the rest
-def join(a: Touched, b: Bunch) -> Bunch:
-  Touched{t, m} = a
-  Bunch{ts, any} = b
+def join(one: Touched, rest: Bunch) -> Bunch:
+  Touched{t, m} = one
+  Bunch{ts, any} = rest
   Bunch{t <> ts, either(m, any)}
 
 # a write that did not happen is a failure
@@ -98,56 +98,56 @@ def ref.of(no_tag: Bool, +url: String, +tag: String) -> IO(String):
       Git.default.ref(url)
 
 # a commit weighed, then written into the pin
-def weighed(+t: M.Tool, +url: String, +rev: String, +tag: String) -> IO(Touched):
+def weighed(+tool: M.Tool, +url: String, +rev: String, +tag: String) -> IO(Touched):
   do IO<Touched>:
     +nar : String <- Git.weigh(url, rev)
-    return moved(set(t, rev, tag, nar))
+    return moved(set(tool, rev, tag, nar))
 
 # a rev that is already pinned, whose NAR hash is not
-def fill.nar(+t: M.Tool) -> IO(Touched):
-  +src = M.tool.source(t)
-  weighed(t, M.source.url(src), M.source.rev(src), "")
+def fill.nar(+tool: M.Tool) -> IO(Touched):
+  +src = M.tool.source(tool)
+  weighed(tool, M.source.url(src), M.source.rev(src), "")
 
 # the commit a ref named, weighed
-def fill.got(+t: M.Tool, +url: String, r: Git.Ref) -> IO(Touched):
-  Git.Ref{+rev, tag} = r
-  weighed(t, url, rev, tag)
+def fill.got(+tool: M.Tool, +url: String, answer: Git.Ref) -> IO(Touched):
+  Git.Ref{+rev, tag} = answer
+  weighed(tool, url, rev, tag)
 
 # a pin with no commit: the tag, or the default ref, then the NAR hash
-def fill.rev(+t: M.Tool) -> IO(Touched):
-  +src = M.tool.source(t)
+def fill.rev(+tool: M.Tool) -> IO(Touched):
+  +src = M.tool.source(tool)
   +url = M.source.url(src)
   do IO<Touched>:
-    +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(t)))
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(tool)))
     +ref : String <- ref.of(String.is_empty(M.source.tag(src)), url,
       M.source.tag(src))
     r : Git.Ref <- Git.resolve(url, ref)
     Say.done(s)
-    fill.got(t, url, r)
+    fill.got(tool, url, r)
 
 # a present rev whose NAR hash is or is not filled
-def fill.nar.at(no_nar: Bool, +t: M.Tool) -> IO(Touched):
+def fill.nar.at(no_nar: Bool, +tool: M.Tool) -> IO(Touched):
   match no_nar:
     case True{}:
-      fill.nar(t)
+      fill.nar(tool)
     case False{}:
-      IO.pure(Touched, stay(t))
+      IO.pure(Touched, stay(tool))
 
 # a missing rev is resolved; a missing NAR hash is filled; a full pin is kept
-def fill.gap(no_rev: Bool, no_nar: Bool, +t: M.Tool) -> IO(Touched):
+def fill.gap(no_rev: Bool, no_nar: Bool, +tool: M.Tool) -> IO(Touched):
   match no_rev:
     case True{}:
-      fill.rev(t)
+      fill.rev(tool)
     case False{}:
-      fill.nar.at(no_nar, t)
+      fill.nar.at(no_nar, tool)
 
 # one tool, filled when its pin is short
-def fill.one(+t: M.Tool) -> IO(Touched):
-  +src = M.tool.source(t)
+def fill.one(+tool: M.Tool) -> IO(Touched):
+  +src = M.tool.source(tool)
   do IO<Touched>:
-    need.git(M.source.is_git(src), M.tool.name(t))
+    need.git(M.source.is_git(src), M.tool.name(tool))
     fill.gap(String.is_empty(M.source.rev(src)),
-      String.is_empty(M.source.nar(src)), t)
+      String.is_empty(M.source.nar(src)), tool)
 
 # every tool, in the order the ledger wrote them
 def fill.walk(ts: List<&2, M.Tool>) -> IO(Bunch):
@@ -161,8 +161,8 @@ def fill.walk(ts: List<&2, M.Tool>) -> IO(Bunch):
         return join(a, b)
 
 # the branch a rev-only pin followed, said when there is one
-def branch.of(+b: String) -> String:
-  Bool.pick(String, String.is_empty(b), "", " (" ++ b ++ ")")
+def branch.of(+label: String) -> String:
+  Bool.pick(String, String.is_empty(label), "", " (" ++ label ++ ")")
 
 # a pin that moved
 def say.move(+name: String, +old: String, +new: String, +branch: String) -> IO(Unit):
@@ -188,118 +188,118 @@ def tip.of(+branch: String, +tip: String) -> String:
   Bool.pick(String, String.is_empty(branch), tip, branch)
 
 # an empty recorded hash is not a disagreement; a different one is drift
-def nar.kept(empty: Bool, same: Bool, +t: M.Tool, +rev: String, +nar: String) -> IO(Touched):
+def nar.kept(empty: Bool, same: Bool, +tool: M.Tool, +rev: String, +nar: String) -> IO(Touched):
   match empty:
     case True{}:
-      IO.pure(Touched, moved(set(t, rev, "", nar)))
+      IO.pure(Touched, moved(set(tool, rev, "", nar)))
     case False{}:
       match same:
         case True{}:
           do IO<Touched>:
-            say.keep(M.tool.name(t), rev)
-            return stay(t)
+            say.keep(M.tool.name(tool), rev)
+            return stay(tool)
         case False{}:
-          IO.die(Touched, 1, drift.why(M.tool.name(t), rev))
+          IO.die(Touched, 1, drift.why(M.tool.name(tool), rev))
 
 # the same commit, weighed
-def up.keep(+t: M.Tool, +rev: String) -> IO(Touched):
-  +src = M.tool.source(t)
+def up.keep(+tool: M.Tool, +rev: String) -> IO(Touched):
+  +src = M.tool.source(tool)
   +old = M.source.nar(src)
   do IO<Touched>:
     +nar : String <- Git.weigh(M.source.url(src), rev)
-    nar.kept(String.is_empty(old), String.eq(old, nar), t, rev, nar)
+    nar.kept(String.is_empty(old), String.eq(old, nar), tool, rev, nar)
 
 # a commit the pin moves to
-def up.move(+t: M.Tool, +rev: String, +tag: String, +branch: String) -> IO(Touched):
-  +src = M.tool.source(t)
+def up.move(+tool: M.Tool, +rev: String, +tag: String, +branch: String) -> IO(Touched):
+  +src = M.tool.source(tool)
   do IO<Touched>:
     +nar : String <- Git.weigh(M.source.url(src), rev)
-    say.move(M.tool.name(t), M.source.rev(src), rev, branch)
-    return moved(set(t, rev, tag, nar))
+    say.move(M.tool.name(tool), M.source.rev(src), rev, branch)
+    return moved(set(tool, rev, tag, nar))
 
 # the verdict, once the remote has been asked and the ancestry read
-def judged(v: U.Verdict, +t: M.Tool, +pin: String, +tip: String,
+def judged(verdict: U.Verdict, +tool: M.Tool, +pin: String, +tip: String,
   +branch: String) -> IO(Touched):
-  match v:
+  match verdict:
     case U.Keep{}:
-      up.keep(t, pin)
+      up.keep(tool, pin)
     case U.Drift{}:
-      IO.die(Touched, 1, drift.why(M.tool.name(t), pin))
+      IO.die(Touched, 1, drift.why(M.tool.name(tool), pin))
     case U.Off{}:
-      IO.die(Touched, 1, off.why(M.tool.name(t), M.source.tag(M.tool.source(t)),
+      IO.die(Touched, 1, off.why(M.tool.name(tool), M.source.tag(M.tool.source(tool)),
         pin, tip.of(branch, tip)))
     case U.Advance{+rev, tag}:
-      up.move(t, rev, tag, branch)
+      up.move(tool, rev, tag, branch)
 
 # ancestry's answer turned into a verdict. The tree has not been weighed yet;
 # a same commit is weighed in Keep.
-def resolved(+t: M.Tool, +pin: String, +tip: String, +tag: String,
+def resolved(+tool: M.Tool, +pin: String, +tip: String, +tag: String,
   +branch: String, onward: Bool) -> IO(Touched):
-  judged(U.judge(String.eq(pin, tip), onward, True{}, tip, tag), t, pin, tip,
+  judged(U.judge(String.eq(pin, tip), onward, True{}, tip, tag), tool, pin, tip,
     branch)
 
 # ancestry, then the verdict
-def ask(+t: M.Tool, +pin: String, +tip: String, +tag: String,
+def ask(+tool: M.Tool, +pin: String, +tip: String, +tag: String,
   +branch: String) -> IO(Touched):
   do IO<Touched>:
-    +on : Bool <- Git.descendant.at(work(), M.source.url(M.tool.source(t)), pin, tip)
-    resolved(t, pin, tip, tag, branch, on)
+    +on : Bool <- Git.descendant.at(work(), M.source.url(M.tool.source(tool)), pin, tip)
+    resolved(tool, pin, tip, tag, branch, on)
 
 # a recorded tag, re-resolved
-def follow.got(+t: M.Tool, r: Git.Ref) -> IO(Touched):
-  Git.Ref{+rev, tag} = r
-  ask(t, M.source.rev(M.tool.source(t)), rev, tag, "")
+def follow.got(+tool: M.Tool, answer: Git.Ref) -> IO(Touched):
+  Git.Ref{+rev, tag} = answer
+  ask(tool, M.source.rev(M.tool.source(tool)), rev, tag, "")
 
 # a tag pin, re-resolved at the remote
-def follow(+t: M.Tool, +ref: String) -> IO(Touched):
+def follow(+tool: M.Tool, +ref: String) -> IO(Touched):
   do IO<Touched>:
-    +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(t)))
-    r : Git.Ref <- Git.resolve(M.source.url(M.tool.source(t)), ref)
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(tool)))
+    r : Git.Ref <- Git.resolve(M.source.url(M.tool.source(tool)), ref)
     Say.done(s)
-    follow.got(t, r)
+    follow.got(tool, r)
 
 # a rev-only pin, against the default branch tip
-def forward.got(+t: M.Tool, tip: Git.Tip) -> IO(Touched):
+def forward.got(+tool: M.Tool, tip: Git.Tip) -> IO(Touched):
   Git.Tip{+rev, +branch} = tip
-  ask(t, M.source.rev(M.tool.source(t)), rev, "", branch)
+  ask(tool, M.source.rev(M.tool.source(tool)), rev, "", branch)
 
 # a rev-only pin, against the remote's default branch
-def forward(+t: M.Tool) -> IO(Touched):
+def forward(+tool: M.Tool) -> IO(Touched):
   do IO<Touched>:
-    +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(t)))
-    tip : Git.Tip <- Git.remote(M.source.url(M.tool.source(t)))
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(tool)))
+    tip : Git.Tip <- Git.remote(M.source.url(M.tool.source(tool)))
     Say.done(s)
-    forward.got(t, tip)
+    forward.got(tool, tip)
 
 # one selected tool
-def up.one(a: U.Aim, +t: M.Tool) -> IO(Touched):
-  match a:
+def up.one(aim: U.Aim, +tool: M.Tool) -> IO(Touched):
+  match aim:
     case U.Hold{}:
-      IO.pure(Touched, stay(t))
+      IO.pure(Touched, stay(tool))
     case U.Follow{ref}:
-      follow(t, ref)
+      follow(tool, ref)
     case U.Forward{}:
-      forward(t)
+      forward(tool)
 
 # a selected tool names a repo, or it cannot be re-pinned
-def up.git(git: Bool, +t: M.Tool, +src: M.Source) -> IO(Touched):
+def up.git(git: Bool, +tool: M.Tool, +src: M.Source) -> IO(Touched):
   match git:
     case False{}:
-      IO.die(Touched, 1, "ez: tools." ++ M.tool.name(t) ++ " has no git")
+      IO.die(Touched, 1, "ez: tools." ++ M.tool.name(tool) ++ " has no git")
     case True{}:
-      up.one(U.aim(True{}, src), t)
+      up.one(U.aim(True{}, src), tool)
 
 # a selected tool is asked; the others are left
-def up.sel(sel: Bool, +t: M.Tool, +src: M.Source) -> IO(Touched):
+def up.sel(sel: Bool, +tool: M.Tool, +src: M.Source) -> IO(Touched):
   match sel:
     case False{}:
-      IO.pure(Touched, stay(t))
+      IO.pure(Touched, stay(tool))
     case True{}:
-      up.git(M.source.is_git(src), t, src)
+      up.git(M.source.is_git(src), tool, src)
 
-def up.ask(+t: M.Tool, +only: String) -> IO(Touched):
-  +src = M.tool.source(t)
-  up.sel(U.chosen(only, M.tool.name(t)), t, src)
+def up.ask(+tool: M.Tool, +only: String) -> IO(Touched):
+  +src = M.tool.source(tool)
+  up.sel(U.chosen(only, M.tool.name(tool)), tool, src)
 
 # every tool
 def up.walk(+only: String, ts: List<&2, M.Tool>) -> IO(Bunch):
@@ -314,36 +314,36 @@ def up.walk(+only: String, ts: List<&2, M.Tool>) -> IO(Bunch):
 
 # the walk, written when a pin moved
 def bunch.put(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>,
-  b: Bunch) -> IO(Unit):
-  match b:
+  tally: Bunch) -> IO(Unit):
+  match tally:
     case Bunch{tools, mved}:
       write(mved, name, entry, bin, ds, tools)
 
 # a ledger that parsed, with every short pin filled
-def fill.good(m: M.Manifest) -> IO(Unit):
-  M.Manifest{+name, +entry, +bin, +ds, +ts} = m
+def fill.good(manifest: M.Manifest) -> IO(Unit):
+  M.Manifest{+name, +entry, +bin, +ds, +ts} = manifest
   do IO<Unit>:
     b : Bunch <- fill.walk(ts)
     bunch.put(name, entry, bin, ds, b)
 
 # a ledger that parsed, with every selected pin re-asked
-def up.good(m: M.Manifest, +only: String) -> IO(Unit):
-  M.Manifest{+name, +entry, +bin, +ds, +ts} = m
+def up.good(manifest: M.Manifest, +only: String) -> IO(Unit):
+  M.Manifest{+name, +entry, +bin, +ds, +ts} = manifest
   do IO<Unit>:
     b : Bunch <- up.walk(only, ts)
     bunch.put(name, entry, bin, ds, b)
 
 # a ledger that parsed
-def read.good(fill: Bool, m: M.Manifest, +only: String) -> IO(Unit):
+def read.good(fill: Bool, manifest: M.Manifest, +only: String) -> IO(Unit):
   match fill:
     case True{}:
-      fill.good(m)
+      fill.good(manifest)
     case False{}:
-      up.good(m, only)
+      up.good(manifest, only)
 
 # the ledger on disk, or the reason it was not one
-def read.go(r: M.Read, fill: Bool, +only: String) -> IO(Unit):
-  match r:
+def read.go(ledger: M.Read, fill: Bool, +only: String) -> IO(Unit):
+  match ledger:
     case M.Bad{why}:
       IO.die(Unit, 1, "ez: " ++ why)
     case M.Good{m}:

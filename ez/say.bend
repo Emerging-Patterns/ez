@@ -255,6 +255,6 @@ def done.bad(bad: Bool, +dev: String, +pid: String, +msg: String) -> IO(Unit):
       done.live(dev, pid, msg)
 
 # the step finished: the mark stopped and the line left, or the line owed
-def done(s: Spin) -> IO(Unit):
-  Spin{+term, +pid, +msg} = s
+def done(spin: Spin) -> IO(Unit):
+  Spin{+term, +pid, +msg} = spin
   done.bad(Bool.or(String.is_empty(pid), String.eq(pid, "0")), term, pid, msg)

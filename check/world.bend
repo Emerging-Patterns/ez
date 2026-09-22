@@ -47,8 +47,8 @@ def tail(+out: String) -> String:
 
 # the nth of a list of strings, or "" when there is no such one. The list and
 # the count are scrutinised together, so the walk needs no helper to branch.
-def nth(ls: List<&2, String>, n: Nat) -> String:
-  match ls n:
+def nth(ls: List<&2, String>, index: Nat) -> String:
+  match ls index:
     case Nil{} _m:
       ""
     case Con{h, _t} 0n:
@@ -64,10 +64,10 @@ def nth(ls: List<&2, String>, n: Nat) -> String:
 # found first still costs a walk of every line after it. The rest of the
 # search arrives as a thunk, which is a value, and only the arm that wants it
 # applies it.
-def first.step(here: Bool, h: String, rest: Unit -> String) -> String:
+def first.step(here: Bool, text: String, rest: Unit -> String) -> String:
   match here:
     case True{}:
-      h
+      text
     case False{}:
       rest(Unit{})
 
@@ -97,8 +97,8 @@ def starting.last(ls: List<&2, String>, +pre: String, got: String) -> String:
       starting.last(t, pre, Bool.pick(String, String.starts_with(h, pre), h, got))
 
 # what a `key = "value"` line holds, which is all ez's own files ever hold
-def quoted(+l: String) -> String:
-  nth(String.split(l, '"'), 1n)
+def quoted(+row: String) -> String:
+  nth(String.split(row, '"'), 1n)
 
 # the value a text gives a key, over its `key = "value"` lines
 def value(+text: String, +key: String) -> String:
@@ -173,8 +173,8 @@ def stop(pid: String) -> IO(Unit):
 # the server it just started. A Bend server started on the interpreted lane
 # takes tens of seconds to reach its first accept, so the count is generous. The verdict and the count are scrutinised
 # together, so one def covers both endings and nothing recurses mutually.
-def until(+args: List<&2, String>, n: Nat, ok: Bool) -> IO(Bool):
-  match n ok:
+def until(+args: List<&2, String>, tries: Nat, ok: Bool) -> IO(Bool):
+  match tries ok:
     case _k True{}:
       IO.pure(Bool, True{})
     case 0n False{}:

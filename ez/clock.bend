@@ -21,27 +21,27 @@ def seconds() -> IO(String):
   Env.var("EZ_DEADLINE", "300")
 
 # whether a budget is being kept at all
-def on(+s: String) -> Bool:
-  Bool.not(Bool.or(String.is_empty(s), String.eq(s, "0")))
+def on(+secs: String) -> Bool:
+  Bool.not(Bool.or(String.is_empty(secs), String.eq(secs, "0")))
 
 # the second the run must be finished by, worked out once at the start so that
 # nothing later has to add anything up
-def by(+s: String) -> IO(String):
+def by(+secs: String) -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(["date", "-d", "+" ++ s ++ " seconds", "+%s"])
+    +out : String <- R.exec(["date", "-d", "+" ++ secs ++ " seconds", "+%s"])
     return String.trim(R.text(out))
 
 # the deadline, or "" when there is none
-def start.go(keep: Bool, +s: String) -> IO(String):
+def start.go(keep: Bool, +secs: String) -> IO(String):
   match keep:
     case False{}:
       IO.pure(String, "")
     case True{}:
-      by(s)
+      by(secs)
 
 # the deadline, or "" when there is none
-def start(+s: String) -> IO(String):
-  start.go(on(s), s)
+def start(+secs: String) -> IO(String):
+  start.go(on(secs), secs)
 
 # whether the deadline has gone by
 def over.now(+deadline: String) -> IO(Bool):

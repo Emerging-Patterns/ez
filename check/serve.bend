@@ -16,16 +16,16 @@ import Base
 
 # a string's length where a Nat would be too dear: a body is thousands of
 # characters and every one of them would be a Succ
-def size(s: String) -> U32:
-  match s:
+def size(text: String) -> U32:
+  match text:
     case SNil{}:
       0
     case SCon{_c, t}:
       U32.inc(size(t))
 
 # the nth of a list of words, or "" when it is not there
-def at(xs: List<&2, String>, n: Nat) -> String:
-  match xs n:
+def at(xs: List<&2, String>, index: Nat) -> String:
+  match xs index:
     case Nil{} _m:
       ""
     case Con{h, _t} 0n:
@@ -40,20 +40,20 @@ type Msg is Data:
   MFull{head: List<&2, String>, body: String}
 
 # a head line put back in front of the ones after it
-def cut.put(h: String, m: Msg) -> Msg:
-  match m:
+def cut.put(line: String, message: Msg) -> Msg:
+  match message:
     case MPartial{}:
       MPartial{}
     case MFull{head, body}:
-      MFull{h <> head, body}
+      MFull{line <> head, body}
 
 # one step of the split, with the answer to "is this the blank line" in hand.
 # Under a `Bool.pick` the blank line that ends the head still cost a walk of
 # every line of the body, and a `cut.put` rebuilt over each of them.
-def cut.step(blank: Bool, t: List<&2, String>, rest: Unit -> Msg) -> Msg:
+def cut.step(blank: Bool, lines: List<&2, String>, rest: Unit -> Msg) -> Msg:
   match blank:
     case True{}:
-      MFull{[], String.join(t, "\n")}
+      MFull{[], String.join(lines, "\n")}
     case False{}:
       rest(Unit{})
 
@@ -77,8 +77,8 @@ def msg.head(hs: List<&2, String>, body: String) -> Msg:
       MFull{h <> t, body}
 
 # a split that found no head at all, taken back
-def msg.at(m: Msg) -> Msg:
-  match m:
+def msg.at(message: Msg) -> Msg:
+  match message:
     case MPartial{}:
       MPartial{}
     case MFull{head, body}:
@@ -103,8 +103,8 @@ def clen(hs: List<&2, String>) -> U32:
       clen.at(h, clen(t))
 
 # whether a request has arrived whole
-def complete.of(m: Msg) -> Bool:
-  match m:
+def complete.of(message: Msg) -> Bool:
+  match message:
     case MPartial{}:
       False{}
     case MFull{head, body}:
@@ -155,19 +155,19 @@ def piece.more(done: Bool, head: String, tail: String, sock: Socket,
 # client meets a header or a chunk length that straddles two of its reads. That
 # is the case a framing client breaks on, and a server that hands its whole
 # answer over in one write never presents it.
-def piece.go(fuel: Nat, +n: Nat, sock: Socket, +text: String) -> IO(Socket):
+def piece.go(fuel: Nat, +width: Nat, sock: Socket, +text: String) -> IO(Socket):
   match fuel:
     case 0n:
       IO.pure(Socket, sock)
     case 1n+f:
-      piece.more(String.is_empty(text), String.take(text, n),
-        String.drop(text, n), sock, s => t => piece.go(f, n, s, t))
+      piece.more(String.is_empty(text), String.take(text, width),
+        String.drop(text, width), sock, s => t => piece.go(f, width, s, t))
 
 # one answer written in pieces of n characters and the connection closed. The
 # fuel is one piece per character, which no answer can outrun.
-def pieces(sock: Socket, n: Nat, +text: String) -> IO(Unit):
+def pieces(sock: Socket, width: Nat, +text: String) -> IO(Unit):
   do IO<Unit>:
-    sock2 : Socket <- piece.go(String.length(text), n, sock, text)
+    sock2 : Socket <- piece.go(String.length(text), width, sock, text)
     Socket.close(sock2)
 
 # an empty chunk means the client stopped writing, whole request or not
@@ -180,9 +180,9 @@ def recv.chunk(chunk: String, sock: Socket, acc: String,
       rest(sock, acc ++ SCon{c, t})
 
 # a failed read ends the request as surely as an empty one
-def recv.got(r: Result<&1, &1, U32 & String, String>, sock: Socket, acc: String,
+def recv.got(received: Result<&1, &1, U32 & String, String>, sock: Socket, acc: String,
   rest: Socket -> String -> IO(Socket & String)) -> IO(Socket & String):
-  match r:
+  match received:
     case Fail{_e}:
       IO.pure(Socket & String, (sock, acc))
     case Done{chunk}:

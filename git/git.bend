@@ -101,16 +101,16 @@ def among.step(here: Bool, rest: Unit -> Bool) -> Bool:
 # whether a char is one of these. Base has `Char.is_digit` and `Char.is_alpha`
 # and nothing between, and a commit name is written with neither alphabet but
 # with sixteen characters of its own, so the sixteen are named.
-def among(+c: Char, cs: List<&2, Char>) -> Bool:
+def among(+ch: Char, cs: List<&2, Char>) -> Bool:
   match cs:
     case []:
       False{}
     case +h <> t:
-      among.step(Char.is_eq(h, c), _u => among(c, t))
+      among.step(Char.is_eq(h, ch), _u => among(ch, t))
 
 # a char a commit name may hold
-def hex.at(c: Char) -> Bool:
-  among(c, String.to_list("0123456789abcdef"))
+def hex.at(ch: Char) -> Bool:
+  among(ch, String.to_list("0123456789abcdef"))
 
 # one step of the walk, and `among.step` turned around: `Bool.and` reduces
 # both of its sides too, so the first char that is not hex still cost a walk
@@ -139,23 +139,23 @@ def is_rev(+ref: String) -> Bool:
   Bool.and(Nat.is_eq(String.length(ref), 40n), hex.all(String.to_list(ref)))
 
 # a row's commit
-def row.rev(r: Row) -> String:
-  Row{rev, _name} = r
+def row.rev(line: Row) -> String:
+  Row{rev, _name} = line
   rev
 
 # a row `git ls-remote` wrote for the peeled `^{}` form of a ref, which is the
 # commit an annotated tag points at rather than the tag object itself
-def row.peeled(r: Row) -> Bool:
-  Row{_rev, name} = r
+def row.peeled(line: Row) -> Bool:
+  Row{_rev, name} = line
   String.ends_with(name, "^{}")
 
 # one row taken apart. ls-remote separates the two fields with a tab.
-def row_of(+l: String) -> Row:
-  Row{K.word(String.split(l, '\t'), 0n), K.word(String.split(l, '\t'), 1n)}
+def row_of(+text: String) -> Row:
+  Row{K.word(String.split(text, '\t'), 0n), K.word(String.split(text, '\t'), 1n)}
 
 # a line that says nothing is no row
-def row.put(+l: String) -> List<&2, Row>:
-  Bool.pick(List<&2, Row>, String.is_empty(String.trim(l)), [], [row_of(l)])
+def row.put(+text: String) -> List<&2, Row>:
+  Bool.pick(List<&2, Row>, String.is_empty(String.trim(text)), [], [row_of(text)])
 
 # every row of what ls-remote printed
 def rows(ls: List<&2, String>) -> List<&2, Row>:
@@ -193,8 +193,8 @@ def unpeeled(rs: List<&2, Row>) -> String:
       row.rev(h)
 
 # the first of two answers that says anything
-def or_else(+a: String, b: String) -> String:
-  Bool.pick(String, String.is_empty(a), b, a)
+def or_else(+primary: String, fallback: String) -> String:
+  Bool.pick(String, String.is_empty(primary), fallback, primary)
 
 # the commit a ref names: an annotated tag resolves through its peeled row,
 # and everything else through the row ls-remote wrote for the ref itself
@@ -272,8 +272,8 @@ def tip.rev.pick(head: Bool, hex: Bool, rev: String) -> String:
       tip.rev.hex(hex, rev)
 
 # this row's commit when it is HEAD's commit
-def tip.rev.at(r: Row) -> String:
-  Row{+rev, name} = r
+def tip.rev.at(line: Row) -> String:
+  Row{+rev, name} = line
   tip.rev.pick(String.eq(name, "HEAD"), is_rev(rev), rev)
 
 # the commit HEAD names, from the rows `ls-remote --symref` wrote
@@ -286,9 +286,9 @@ def tip.rev(rs: List<&2, Row>) -> String:
 
 # the prefix taken off when it is there, and "" when it is not, so a commit
 # line is not mistaken for a branch name
-def tip.strip(+s: String, +pre: String) -> String:
-  Bool.pick(String, String.starts_with(s, pre),
-    String.drop(s, String.length(pre)), "")
+def tip.strip(+text: String, +pre: String) -> String:
+  Bool.pick(String, String.starts_with(text, pre),
+    String.drop(text, String.length(pre)), "")
 
 # `ref: refs/heads/main` is `main`. Anything else is no branch.
 def tip.sym(+rev: String) -> String:
@@ -303,8 +303,8 @@ def tip.branch.pick(head: Bool, rev: String) -> String:
       tip.sym(rev)
 
 # this row's branch when it is the symref for HEAD
-def tip.branch.at(r: Row) -> String:
-  Row{rev, name} = r
+def tip.branch.at(line: Row) -> String:
+  Row{rev, name} = line
   tip.branch.pick(String.eq(name, "HEAD"), rev)
 
 # the branch HEAD is, or "" when the remote did not say
@@ -347,8 +347,8 @@ def wrote(ok: Bool, at: String) -> IO(Unit):
 # one file of the package copied where bend will look for it. Copied rather
 # than read and written back: the package's identity is its bytes, and a copy
 # cannot have an opinion about them.
-def place(+from: String, +dst: String, f: K.File) -> IO(Unit):
-  +at = K.file.at(f)
+def place(+from: String, +dst: String, file: K.File) -> IO(Unit):
+  +at = K.file.at(file)
   do IO<Unit>:
     _mk : String <- R.exec(["mkdir", "-p", P.dir(dst ++ "/" ++ at)])
     _cp : String <- R.exec(["cp", P.join(from, at), dst ++ "/" ++ at])
@@ -410,17 +410,17 @@ def origin(hash: String, url: String, rev: String, entry: String, root: String,
     origin.kvs(url, rev, entry, root, nar, origin.tag(tag))}
 
 # a table's path, as it was written
-def sect.name(s: T.Sect) -> String:
-  T.Sect{n, _ps} = s
+def sect.name(section: T.Sect) -> String:
+  T.Sect{n, _ps} = section
   n
 
 # a table kept or dropped
-def but.put(hit: Bool, h: T.Sect, rest: List<&2, T.Sect>) -> List<&2, T.Sect>:
+def but.put(hit: Bool, section: T.Sect, rest: List<&2, T.Sect>) -> List<&2, T.Sect>:
   match hit:
     case True{}:
       rest
     case False{}:
-      h <> rest
+      section <> rest
 
 # every table but the ones with this path, so vendoring a package again
 # replaces what was written for it rather than sitting behind it
@@ -434,9 +434,9 @@ def but(ss: List<&2, T.Sect>, +name: String) -> List<&2, T.Sect>:
 # the file with this table in it and every other table left as it was. The
 # whole document is rendered from the model rather than patched, so what comes
 # out is what the parser would read back.
-def origins.text(+text: String, +s: T.Sect) -> String:
-  T.render(List.append(&2, T.Sect, but(T.sects(T.parse(text)), sect.name(s)),
-    [s]))
+def origins.text(+text: String, +section: T.Sect) -> String:
+  T.render(List.append(&2, T.Sect, but(T.sects(T.parse(text)), sect.name(section)),
+    [section]))
 
 # where the origins of vendored packages are written down, which is beside the
 # BEND_LIB they were vendored into. Named by the half that writes the file;
@@ -446,17 +446,17 @@ def origins.at(lib: String) -> String:
 
 # a package's origin written down, so `ez lock` can say where a package no hub
 # has ever seen came from
-def note(+lib: String, +s: T.Sect) -> IO(Unit):
+def note(+lib: String, +section: T.Sect) -> IO(Unit):
   +at = origins.at(lib)
   do IO<Unit>:
     m : Maybe<&2, String> <- F.read(at)
     _mk : String <- R.exec(["mkdir", "-p", P.dir(at)])
-    ok : Bool <- F.write(at, origins.text(F.text_of(m), s))
+    ok : Bool <- F.write(at, origins.text(F.text_of(m), section))
     wrote(ok, at)
 
 # how many components a path has, which is how far down it sits
-def depth(p: String) -> Nat:
-  List.length(&2, String, String.split(P.norm(p), '/'))
+def depth(path: String) -> Nat:
+  List.length(&2, String, String.split(P.norm(path), '/'))
 
 # the directory inside the repo a package's paths are written from. `pkg/pkg`
 # resolves that against the checkout it read; the lock records it against the
@@ -484,8 +484,8 @@ def title.go(cs: List<&2, Char>) -> String:
       String.from_list(Char.to_upper(h) <> t)
 
 # a name as an import alias
-def title(s: String) -> String:
-  title.go(String.to_list(s))
+def title(text: String) -> String:
+  title.go(String.to_list(text))
 
 # the tag a ref resolved through, said out loud, because a person who asked for
 # `v1.0` is owed the commit it turned out to be
@@ -519,25 +519,25 @@ def vendor.tree(+lib: String, +work: String, +url: String, +rev: String,
 
 # `main.bend` when neither the entry nor the bin was named. That is the file
 # `ez init` writes when it is not told an entry.
-def entry.main(no: Bool, +b: String) -> String:
+def entry.main(no: Bool, +binary: String) -> String:
   match no:
     case False{}:
-      b
+      binary
     case True{}:
       "main.bend"
 
 # `bin` only when the package named no entry. The bin is the file a tool
 # builds; it is not the entry unless the entry is absent.
-def entry.bin(no: Bool, +e: String, +b: String) -> String:
+def entry.bin(no: Bool, +file: String, +binary: String) -> String:
   match no:
     case False{}:
-      e
+      file
     case True{}:
-      entry.main(String.is_empty(b), b)
+      entry.main(String.is_empty(binary), binary)
 
 # the file a package is taken from: its entry, else its bin, else `main.bend`
-def entry.pick(+e: String, +b: String) -> String:
-  entry.bin(String.is_empty(e), e, b)
+def entry.pick(+file: String, +binary: String) -> String:
+  entry.bin(String.is_empty(file), file, binary)
 
 # a document that did not parse has no entry to take
 def entry.sects(ok: Bool, ss: List<&2, T.Sect>) -> String:
@@ -549,8 +549,8 @@ def entry.sects(ok: Bool, ss: List<&2, T.Sect>) -> String:
       entry.pick(M.value(ps, "entry"), M.value(ps, "bin"))
 
 # the entry a parsed document names
-def entry.doc(t: T.Toml) -> String:
-  T.Toml{bad, _name, _pairs, sects} = t
+def entry.doc(toml: T.Toml) -> String:
+  T.Toml{bad, _name, _pairs, sects} = toml
   entry.sects(String.is_empty(bad), sects)
 
 # the entry a parsed ez.toml names
@@ -558,8 +558,8 @@ def entry.text(+text: String) -> String:
   entry.doc(T.parse(text))
 
 # a missing ez.toml names `main.bend`, the same stub `ez init` uses
-def entry.maybe(m: Maybe<&2, String>) -> String:
-  match m:
+def entry.maybe(got: Maybe<&2, String>) -> String:
+  match got:
     case None{}:
       "main.bend"
     case Some{text}:
@@ -583,8 +583,8 @@ def entry.for(given: Bool, +entry: String, +work: String) -> IO(String):
 # it. The `.git` goes before the tree is weighed, because `fetchgit`'s hash is
 # over the working tree alone. An entry that was not asked for is read from
 # this checkout before that.
-def vendor.at(+lib: String, +url: String, r: Ref, +entry: String) -> IO(Got):
-  Ref{+rev, tag} = r
+def vendor.at(+lib: String, +url: String, ref: Ref, +entry: String) -> IO(Got):
+  Ref{+rev, tag} = ref
   +work = lib ++ "/.work-" ++ rev
   do IO<Got>:
     _rm : String <- R.exec(["rm", "-rf", work])
@@ -711,8 +711,8 @@ def ord.str(eq: Bool, le: Bool) -> Ord:
     case False{}:
       ord.lt(le)
 
-def ord.flip(o: Ord) -> Ord:
-  match o:
+def ord.flip(order: Ord) -> Ord:
+  match order:
     case Lt{}:
       Gt{}
     case Gt{}:
@@ -734,8 +734,8 @@ def ord.pad(xs: List<&2, Nat>) -> Ord:
     case Con{+h, t}:
       ord.pad.at(Nat.is_eq(h, 0n), _u => ord.pad(t))
 
-def ord.nums.at(o: Ord, rest: Unit -> Ord) -> Ord:
-  match o:
+def ord.nums.at(order: Ord, rest: Unit -> Ord) -> Ord:
+  match order:
     case Eq{}:
       rest(Unit{})
     case Lt{}:
@@ -743,8 +743,8 @@ def ord.nums.at(o: Ord, rest: Unit -> Ord) -> Ord:
     case Gt{}:
       Gt{}
 
-def ord.nums(a: List<&2, Nat>, b: List<&2, Nat>) -> Ord:
-  match a b:
+def ord.nums(left: List<&2, Nat>, right: List<&2, Nat>) -> Ord:
+  match left right:
     case Nil{} Nil{}:
       Eq{}
     case Nil{} Con{+h, t}:
@@ -755,8 +755,8 @@ def ord.nums(a: List<&2, Nat>, b: List<&2, Nat>) -> Ord:
       ord.nums.at(ord.nat(Nat.is_eq(ha, hb), Nat.is_lt(ha, hb)),
         _u => ord.nums(ta, tb))
 
-def ord.id(a: Id, b: Id) -> Ord:
-  match a b:
+def ord.id(left: Id, right: Id) -> Ord:
+  match left right:
     case IdNum{+n} IdNum{+m}:
       ord.nat(Nat.is_eq(n, m), Nat.is_lt(n, m))
     case IdNum{_n} IdWord{_s}:
@@ -766,8 +766,8 @@ def ord.id(a: Id, b: Id) -> Ord:
     case IdWord{+s} IdWord{+t}:
       ord.str(String.eq(s, t), String.is_le(s, t))
 
-def ord.ids(a: List<&2, Id>, b: List<&2, Id>) -> Ord:
-  match a b:
+def ord.ids(left: List<&2, Id>, right: List<&2, Id>) -> Ord:
+  match left right:
     case Nil{} Nil{}:
       Eq{}
     case Nil{} Con{_h, _t}:
@@ -777,7 +777,7 @@ def ord.ids(a: List<&2, Id>, b: List<&2, Id>) -> Ord:
     case Con{ha, ta} Con{hb, tb}:
       ord.nums.at(ord.id(ha, hb), _u => ord.ids(ta, tb))
 
-def ord.rel.at(ae: Bool, be: Bool, a: List<&2, Id>, b: List<&2, Id>) -> Ord:
+def ord.rel.at(ae: Bool, be: Bool, left: List<&2, Id>, right: List<&2, Id>) -> Ord:
   match ae be:
     case True{} True{}:
       Eq{}
@@ -786,16 +786,16 @@ def ord.rel.at(ae: Bool, be: Bool, a: List<&2, Id>, b: List<&2, Id>) -> Ord:
     case False{} True{}:
       Lt{}
     case False{} False{}:
-      ord.ids(a, b)
+      ord.ids(left, right)
 
-def ord.rel(+a: List<&2, Id>, +b: List<&2, Id>) -> Ord:
-  ord.rel.at(List.is_empty(&2, Id, a), List.is_empty(&2, Id, b), a, b)
+def ord.rel(+left: List<&2, Id>, +right: List<&2, Id>) -> Ord:
+  ord.rel.at(List.is_empty(&2, Id, left), List.is_empty(&2, Id, right), left, right)
 
-def ord.ver.at(o: Ord, pa: List<&2, Id>, pb: List<&2, Id>) -> Ord:
-  ord.nums.at(o, _u => ord.rel(pa, pb))
+def ord.ver.at(order: Ord, pa: List<&2, Id>, pb: List<&2, Id>) -> Ord:
+  ord.nums.at(order, _u => ord.rel(pa, pb))
 
-def ord.ver(a: Ver, b: Ver) -> Ord:
-  match a b:
+def ord.ver(left: Ver, right: Ver) -> Ord:
+  match left right:
     case Yes{na, pa} Yes{nb, pb}:
       ord.ver.at(ord.nums(na, nb), pa, pb)
     case No{} _:
@@ -804,11 +804,11 @@ def ord.ver(a: Ver, b: Ver) -> Ord:
       Eq{}
 
 # a decimal digit's value
-def dig(c: Char) -> Nat:
-  U32.to_nat(U32.sub(Char.to_u32(c), 48))
+def dig(ch: Char) -> Nat:
+  U32.to_nat(U32.sub(Char.to_u32(ch), 48))
 
-def num.go(s: String, +acc: Nat) -> Nat:
-  match s:
+def num.go(text: String, +acc: Nat) -> Nat:
+  match text:
     case SNil{}:
       acc
     case SCon{+h, t}:
@@ -821,38 +821,38 @@ def flag.step(ok: Bool, rest: Unit -> Bool) -> Bool:
     case True{}:
       rest(Unit{})
 
-def digits.go(s: String) -> Bool:
-  match s:
+def digits.go(text: String) -> Bool:
+  match text:
     case SNil{}:
       True{}
     case SCon{+h, t}:
       flag.step(Char.is_digit(h), _u => digits.go(t))
 
-def digits.at(empty: Bool, +s: String) -> Bool:
+def digits.at(empty: Bool, +text: String) -> Bool:
   match empty:
     case True{}:
       False{}
     case False{}:
-      digits.go(s)
+      digits.go(text)
 
 # a non-empty run of decimal digits
-def digits(+s: String) -> Bool:
-  digits.at(String.is_empty(s), s)
+def digits(+text: String) -> Bool:
+  digits.at(String.is_empty(text), text)
 
-def nums.cons(n: Nat, rest: Maybe<&2, List<&2, Nat>>) -> Maybe<&2, List<&2, Nat>>:
+def nums.cons(value: Nat, rest: Maybe<&2, List<&2, Nat>>) -> Maybe<&2, List<&2, Nat>>:
   match rest:
     case None{}:
       None{}
     case Some{ns}:
-      Some{n <> ns}
+      Some{value <> ns}
 
-def nums.put(ok: Bool, +h: String, rest: Maybe<&2, List<&2, Nat>>) ->
+def nums.put(ok: Bool, +part: String, rest: Maybe<&2, List<&2, Nat>>) ->
   Maybe<&2, List<&2, Nat>>:
   match ok:
     case False{}:
       None{}
     case True{}:
-      nums.cons(num.go(h, 0n), rest)
+      nums.cons(num.go(part, 0n), rest)
 
 def nums.of(ps: List<&2, String>) -> Maybe<&2, List<&2, Nat>>:
   match ps:
@@ -861,45 +861,45 @@ def nums.of(ps: List<&2, String>) -> Maybe<&2, List<&2, Nat>>:
     case Con{+h, t}:
       nums.put(digits(h), h, nums.of(t))
 
-def id.char(+c: Char) -> Bool:
-  Bool.or(Char.is_digit(c), Bool.or(Char.is_alpha(c), Char.is_eq(c, '-')))
+def id.char(+ch: Char) -> Bool:
+  Bool.or(Char.is_digit(ch), Bool.or(Char.is_alpha(ch), Char.is_eq(ch, '-')))
 
-def id.chars(s: String) -> Bool:
-  match s:
+def id.chars(text: String) -> Bool:
+  match text:
     case SNil{}:
       True{}
     case SCon{+h, t}:
       flag.step(id.char(h), _u => id.chars(t))
 
-def id.make(num: Bool, +s: String) -> Id:
+def id.make(num: Bool, +text: String) -> Id:
   match num:
     case True{}:
-      IdNum{num.go(s, 0n)}
+      IdNum{num.go(text, 0n)}
     case False{}:
-      IdWord{s}
+      IdWord{text}
 
-def ids.cons(x: Id, rest: Maybe<&2, List<&2, Id>>) -> Maybe<&2, List<&2, Id>>:
+def ids.cons(ident: Id, rest: Maybe<&2, List<&2, Id>>) -> Maybe<&2, List<&2, Id>>:
   match rest:
     case None{}:
       None{}
     case Some{xs}:
-      Some{x <> xs}
+      Some{ident <> xs}
 
-def ids.ok(ok: Bool, num: Bool, +h: String, rest: Maybe<&2, List<&2, Id>>) ->
+def ids.ok(ok: Bool, num: Bool, +part: String, rest: Maybe<&2, List<&2, Id>>) ->
   Maybe<&2, List<&2, Id>>:
   match ok:
     case False{}:
       None{}
     case True{}:
-      ids.cons(id.make(num, h), rest)
+      ids.cons(id.make(num, part), rest)
 
-def ids.put(empty: Bool, ok: Bool, num: Bool, +h: String,
+def ids.put(empty: Bool, ok: Bool, num: Bool, +part: String,
   rest: Maybe<&2, List<&2, Id>>) -> Maybe<&2, List<&2, Id>>:
   match empty:
     case True{}:
       None{}
     case False{}:
-      ids.ok(ok, num, h, rest)
+      ids.ok(ok, num, part, rest)
 
 def ids.of(ps: List<&2, String>) -> Maybe<&2, List<&2, Id>>:
   match ps:
@@ -922,36 +922,36 @@ def pre.of(had: Bool, +raw: String) -> Maybe<&2, List<&2, Id>>:
     case True{}:
       pre.parts(String.is_empty(raw), raw)
 
-def split1.put(h: Char, c: Cut) -> Cut:
-  Cut{left, right} = c
-  Cut{SCon{h, left}, right}
+def split1.put(ch: Char, cut: Cut) -> Cut:
+  Cut{left, right} = cut
+  Cut{SCon{ch, left}, right}
 
-def split1.step(hit: Bool, h: Char, +t: String, rest: Unit -> Cut) -> Cut:
+def split1.step(hit: Bool, ch: Char, +tail: String, rest: Unit -> Cut) -> Cut:
   match hit:
     case True{}:
-      Cut{"", t}
+      Cut{"", tail}
     case False{}:
-      split1.put(h, rest(Unit{}))
+      split1.put(ch, rest(Unit{}))
 
 # a string cut at the first of a character, the character dropped; no hit leaves
 # the whole string on the left
-def split1(+c: Char, s: String) -> Cut:
-  match s:
+def split1(+sep: Char, text: String) -> Cut:
+  match text:
     case SNil{}:
       Cut{"", ""}
     case SCon{+h, +t}:
-      split1.step(Char.is_eq(h, c), h, t, _u => split1(c, t))
+      split1.step(Char.is_eq(h, sep), h, t, _u => split1(sep, t))
 
-def unv.step(drop: Bool, h: Char, t: String) -> String:
+def unv.step(drop: Bool, ch: Char, tail: String) -> String:
   match drop:
     case True{}:
-      t
+      tail
     case False{}:
-      SCon{h, t}
+      SCon{ch, tail}
 
 # a tag with one leading `v` or `V` dropped
-def unv(s: String) -> String:
-  match s:
+def unv(text: String) -> String:
+  match text:
     case SNil{}:
       ""
     case SCon{+h, t}:
@@ -985,15 +985,15 @@ def ver.from(empty: Bool, had: Bool, +core: String, +pre: String) -> Ver:
     case False{}:
       ver.nums(had, nums.of(String.split(core, '.')), pre)
 
-def ver.cut(had: Bool, c: Cut) -> Ver:
-  Cut{+core, +pre} = c
+def ver.cut(had: Bool, cut: Cut) -> Ver:
+  Cut{+core, +pre} = cut
   ver.from(String.is_empty(core), had, core, pre)
 
 def ver.main(+main: String) -> Ver:
   ver.cut(String.contains(main, "-"), split1('-', main))
 
-def ver.core(c: Cut) -> Ver:
-  Cut{+main, _build} = c
+def ver.core(cut: Cut) -> Ver:
+  Cut{+main, _build} = cut
   ver.main(main)
 
 # a tag read as a version. A leading `v` is optional, and `+` metadata is dropped.
@@ -1001,8 +1001,8 @@ def ver.of(+tag: String) -> Ver:
   ver.core(split1('+', unv(tag)))
 
 # whether the first version is strictly newer
-def newer(o: Ord) -> Bool:
-  match o:
+def newer(order: Ord) -> Bool:
+  match order:
     case Gt{}:
       True{}
     case Lt{}:
@@ -1017,15 +1017,15 @@ def latest.cmp(take: Bool, +name: String, +rest: String) -> String:
     case False{}:
       rest
 
-def latest.have(empty: Bool, +name: String, +rest: String, v: Ver) -> String:
+def latest.have(empty: Bool, +name: String, +rest: String, version: Ver) -> String:
   match empty:
     case True{}:
       name
     case False{}:
-      latest.cmp(newer(ord.ver(v, ver.of(rest))), name, rest)
+      latest.cmp(newer(ord.ver(version, ver.of(rest))), name, rest)
 
-def latest.step(v: Ver, +name: String, +rest: String) -> String:
-  match v:
+def latest.step(version: Ver, +name: String, +rest: String) -> String:
+  match version:
     case No{}:
       rest
     case Yes{ns, ps}:
@@ -1055,8 +1055,8 @@ def tag.keep(peeled: Bool, +name: String) -> List<&2, String>:
     case False{}:
       tag.put(String.starts_with(name, "refs/tags/"), name)
 
-def tag.one(r: Row) -> List<&2, String>:
-  Row{_rev, +name} = r
+def tag.one(line: Row) -> List<&2, String>:
+  Row{_rev, +name} = line
   tag.keep(String.ends_with(name, "^{}"), name)
 
 # every tag name `ls-remote --tags` wrote, peeled rows left out
@@ -1068,8 +1068,8 @@ def tag.names(rs: List<&2, Row>) -> List<&2, String>:
       List.append(&2, String, tag.one(h), tag.names(t))
 
 # a row's ref name
-def row.name(r: Row) -> String:
-  Row{_rev, name} = r
+def row.name(line: Row) -> String:
+  Row{_rev, name} = line
   name
 
 def head.step(here: Bool, rest: Unit -> Bool) -> Bool:

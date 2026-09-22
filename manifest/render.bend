@@ -11,16 +11,16 @@ def line(key: String, +val: String) -> String:
 
 # `true` when the tree is committed, and nothing when it is not, so the key
 # is absent rather than written as an empty string
-def vendor.word(v: Bool) -> String:
-  match v:
+def vendor.word(vend: Bool) -> String:
+  match vend:
     case True{}:
       "true"
     case False{}:
       ""
 
 # the keys a source contributes
-def source(s: M.Source) -> String:
-  match s:
+def source(src: M.Source) -> String:
+  match src:
     case M.Hub{}:
       ""
     case M.Git{url, rev, tag, root, nar, vend}:
@@ -28,8 +28,8 @@ def source(s: M.Source) -> String:
       line("root", root) ++ line("narHash", nar) ++ line("vendor", vendor.word(vend))
 
 # one `[deps.<name>]` section
-def dep(d: M.Dep) -> String:
-  M.Dep{n, h, e, s} = d
+def dep(dependency: M.Dep) -> String:
+  M.Dep{n, h, e, s} = dependency
   "\n[deps." ++ n ++ "]\n" ++ line("hash", h) ++ source(s) ++ line("entry", e)
 
 # every dependency, in the order the ledger holds them
@@ -41,8 +41,8 @@ def deps(ds: List<&2, M.Dep>) -> String:
       dep(h) ++ deps(t)
 
 # one `[tools.<name>]` section. No hash: a tool is not a package.
-def tool(t: M.Tool) -> String:
-  M.Tool{n, e, b, s} = t
+def tool(pin: M.Tool) -> String:
+  M.Tool{n, e, b, s} = pin
   "\n[tools." ++ n ++ "]\n" ++ source(s) ++ line("entry", e) ++ line("bin", b)
 
 # every pinned CLI, in the order the ledger holds them
@@ -54,27 +54,27 @@ def tools(ts: List<&2, M.Tool>) -> String:
       tool(h) ++ tools(t)
 
 # the ledger as an ez.toml
-def show(m: M.Manifest) -> String:
-  M.Manifest{n, e, b, ds, ts} = m
+def show(manifest: M.Manifest) -> String:
+  M.Manifest{n, e, b, ds, ts} = manifest
   "[package]\n" ++ line("name", n) ++ line("entry", e) ++ line("bin", b) ++
     deps(ds) ++ tools(ts)
 
 # a ledger that was read, as an ez.toml; an unreadable one renders as nothing,
 # so a failed read can never overwrite a good file with a guess
-def render(r: M.Read) -> String:
-  match r:
+def render(ledger: M.Read) -> String:
+  match ledger:
     case M.Bad{_why}:
       ""
     case M.Good{m}:
       show(m)
 
 # a dependency kept or dropped
-def without.put(hit: Bool, d: M.Dep, rest: List<&2, M.Dep>) -> List<&2, M.Dep>:
+def without.put(hit: Bool, dependency: M.Dep, rest: List<&2, M.Dep>) -> List<&2, M.Dep>:
   match hit:
     case True{}:
       rest
     case False{}:
-      d <> rest
+      dependency <> rest
 
 # every dependency but the one named
 def without(ds: List<&2, M.Dep>, +name: String) -> List<&2, M.Dep>:
@@ -86,11 +86,11 @@ def without(ds: List<&2, M.Dep>, +name: String) -> List<&2, M.Dep>:
 
 # the ledger with a dependency added, replacing any of the same name, so adding
 # twice is the same as adding once
-def add(m: M.Manifest, +d: M.Dep) -> M.Manifest:
-  M.Manifest{n, e, b, ds, ts} = m
-  M.Manifest{n, e, b, List.append(&2, M.Dep, without(ds, M.dep.name(d)), [d]), ts}
+def add(manifest: M.Manifest, +dependency: M.Dep) -> M.Manifest:
+  M.Manifest{n, e, b, ds, ts} = manifest
+  M.Manifest{n, e, b, List.append(&2, M.Dep, without(ds, M.dep.name(dependency)), [dependency]), ts}
 
 # the ledger with a dependency dropped
-def remove(m: M.Manifest, name: String) -> M.Manifest:
-  M.Manifest{n, e, b, ds, ts} = m
+def remove(manifest: M.Manifest, name: String) -> M.Manifest:
+  M.Manifest{n, e, b, ds, ts} = manifest
   M.Manifest{n, e, b, without(ds, name), ts}

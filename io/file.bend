@@ -18,9 +18,9 @@ def slurp.cut(chunk: String, file: File, acc: String,
       rest(file, acc ++ SCon{c, t})
 
 # a failed read ends the file as surely as an empty one
-def slurp.more(r: Result<&1, &1, U32 & String, String>, file: File, acc: String,
+def slurp.more(res: Result<&1, &1, U32 & String, String>, file: File, acc: String,
   rest: File -> String -> IO(String)) -> IO(String):
-  match r:
+  match res:
     case Fail{_e}:
       slurp.end(file, acc)
     case Done{chunk}:
@@ -43,8 +43,8 @@ def slurp(fuel: Nat, file: File, acc: String) -> IO(String):
         slurp.next(got, acc, fl => a => slurp(f, fl, a))
 
 # what an opened file holds, or nothing when it would not open
-def read.opened(r: Result<&1, &1, U32 & String, File>) -> IO(Maybe<&2, String>):
-  match r:
+def read.opened(res: Result<&1, &1, U32 & String, File>) -> IO(Maybe<&2, String>):
+  match res:
     case Fail{_e}:
       IO.pure(Maybe<&2, String>, None{})
     case Done{file}:
@@ -59,23 +59,23 @@ def read(path: String) -> IO(Maybe<&2, String>):
     read.opened(r)
 
 # whether a write reported success
-def write.ok(r: Result<&1, &1, U32 & String, Unit>) -> Bool:
-  match r:
+def write.ok(res: Result<&1, &1, U32 & String, Unit>) -> Bool:
+  match res:
     case Fail{_e}:
       False{}
     case Done{_u}:
       True{}
 
 # a write's outcome, once the handle is shut
-def write.done(w: File & Result<&1, &1, U32 & String, Unit>) -> IO(Bool):
-  (file, r) = w
+def write.done(written: File & Result<&1, &1, U32 & String, Unit>) -> IO(Bool):
+  (file, r) = written
   do IO<Bool>:
     File.close(file)
     return write.ok(r)
 
 # the text written to an opened file
-def write.opened(r: Result<&1, &1, U32 & String, File>, text: String) -> IO(Bool):
-  match r:
+def write.opened(res: Result<&1, &1, U32 & String, File>, text: String) -> IO(Bool):
+  match res:
     case Fail{_e}:
       IO.pure(Bool, False{})
     case Done{file}:
@@ -90,8 +90,8 @@ def write(path: String, text: String) -> IO(Bool):
     write.opened(r, text)
 
 # a file's text, or "" when there is none
-def text_of(m: Maybe<&2, String>) -> String:
-  match m:
+def text_of(got: Maybe<&2, String>) -> String:
+  match got:
     case None{}:
       ""
     case Some{s}:

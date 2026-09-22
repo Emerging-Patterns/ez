@@ -24,8 +24,8 @@ def said(+out: String) -> List<&2, String>:
   String.lines(Q.filter(R.text(out)))
 
 # an environment variable's text; unset, ""
-def text_of(r: Result<&1, &1, U32 & String, String>) -> String:
-  match r:
+def text_of(res: Result<&1, &1, U32 & String, String>) -> String:
+  match res:
     case Fail{_e}:
       ""
     case Done{s}:

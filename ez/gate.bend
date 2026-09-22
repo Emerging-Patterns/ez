@@ -42,10 +42,10 @@ def mark() -> String:
   "@@ez@@ "
 
 # a trailer line kept, with its `#|` dropped, or a source line ignored
-def want.put(is_want: Bool, h: String, rest: List<&2, String>) -> List<&2, String>:
+def want.put(is_want: Bool, line: String, rest: List<&2, String>) -> List<&2, String>:
   match is_want:
     case True{}:
-      String.drop(h, 2n) <> rest
+      String.drop(line, 2n) <> rest
     case False{}:
       rest
 
@@ -182,12 +182,12 @@ def any.step(here: Bool, rest: Unit -> Bool) -> Bool:
       rest(Unit{})
 
 # whether a list already holds this string
-def holds(ss: List<&2, String>, +s: String) -> Bool:
+def holds(ss: List<&2, String>, +needle: String) -> Bool:
   match ss:
     case Nil{}:
       False{}
     case Con{+h, t}:
-      any.step(String.eq(h, s), _u => holds(t, s))
+      any.step(String.eq(h, needle), _u => holds(t, needle))
 
 # the strings with each named once, the last of any repeat kept. Which one is
 # kept does not matter: a level is a `mkdir -p` and a set of links, the links
@@ -236,22 +236,22 @@ def linked(es: List<&2, String>, +ds: List<&2, String>) -> List<&2, String>:
 
 # one test's import line, aliased by its position so two tests of the same name
 # could not shadow each other
-def agg.imports(ts: List<&2, String>, +i: Nat) -> String:
+def agg.imports(ts: List<&2, String>, +index: Nat) -> String:
   match ts:
     case Nil{}:
       ""
     case Con{+h, t}:
-      "import ../tests/" ++ base(h) ++ " as T" ++ Nat.show(i) ++ "\n" ++
-        agg.imports(t, (1n + i : Nat))
+      "import ../tests/" ++ base(h) ++ " as T" ++ Nat.show(index) ++ "\n" ++
+        agg.imports(t, (1n + index : Nat))
 
 # one test's marker and the call behind it, in the order the imports were made
-def agg.calls(ts: List<&2, String>, +i: Nat) -> String:
+def agg.calls(ts: List<&2, String>, +index: Nat) -> String:
   match ts:
     case Nil{}:
       ""
     case Con{+h, t}:
       "    IO.print(\"" ++ mark() ++ h ++ "\")\n" ++
-        "    T" ++ Nat.show(i) ++ ".main()\n" ++ agg.calls(t, (1n + i : Nat))
+        "    T" ++ Nat.show(index) ++ ".main()\n" ++ agg.calls(t, (1n + index : Nat))
 
 # what the aggregate says about itself, to whoever finds it in a work directory
 def agg.head(+dir: String) -> String:
@@ -274,12 +274,12 @@ def marked(+line: String) -> Bool:
   String.starts_with(line, mark())
 
 # a line kept or dropped
-def put(drop: Bool, h: String, rest: List<&2, String>) -> List<&2, String>:
+def put(drop: Bool, line: String, rest: List<&2, String>) -> List<&2, String>:
   match drop:
     case True{}:
       rest
     case False{}:
-      h <> rest
+      line <> rest
 
 # the state a marker line leaves behind: on when the marker is this test's, off
 # when it is another's. Any other line leaves the state as it was.
@@ -290,13 +290,13 @@ def after(is_mark: Bool, hit: Bool, on: Bool) -> Bool:
 # decided once per line and used both for this line and for the next, the way
 # quiet's walk does, so no second pass is needed. The list comes first because
 # a self-call must shrink an argument before it changes one.
-def slice.go(ls: List<&2, String>, +m: String, +on: Bool) -> List<&2, String>:
+def slice.go(ls: List<&2, String>, +wanted: String, +on: Bool) -> List<&2, String>:
   match ls:
     case Nil{}:
       Nil{}
     case Con{+h, t}:
-      +next = after(marked(h), String.eq(h, m), on)
-      put(Bool.or(marked(h), Bool.not(on)), h, slice.go(t, m, next))
+      +next = after(marked(h), String.eq(h, wanted), on)
+      put(Bool.or(marked(h), Bool.not(on)), h, slice.go(t, wanted, next))
 
 # one test's own output, out of a run that holds every test's
 def slice(text: String, +path: String) -> String:

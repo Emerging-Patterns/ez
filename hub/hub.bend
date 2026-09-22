@@ -23,8 +23,8 @@ def get.status(ok: Bool, status: U32, body: String) -> String:
 
 # what ezhttp answered. It folds a socket that would not open and a reply that
 # came apart into one Err, so both are 6.
-def get.reply(r: Client.Response) -> String:
-  match r:
+def get.reply(response: Client.Response) -> String:
+  match response:
     case Client.Err{why}:
       "6\n" ++ why
     case Client.Response{+status, _headers, body}:
@@ -38,8 +38,8 @@ def get.http(url: String) -> IO(String):
 
 # a file url read off the disk. curl served these too, and a test that wants a
 # body without a server to serve it is the reason to keep them.
-def get.file.got(m: Maybe<&2, String>, path: String) -> String:
-  match m:
+def get.file.got(got: Maybe<&2, String>, path: String) -> String:
+  match got:
     case None{}:
       "2\n" ++ path ++ " is not there"
     case Some{s}:
@@ -60,8 +60,8 @@ def get.scheme(file: Bool, url: String, path: String) -> IO(String):
       get.http(url)
 
 # a url that came apart, or the reason it did not
-def get.loc(l: Url.Loc, url: String) -> IO(String):
-  match l:
+def get.loc(loc: Url.Loc, url: String) -> IO(String):
+  match loc:
     case Url.Bad{why}:
       IO.pure(String, "22\n" ++ why)
     case Url.Loc{+scheme, _host, _port, path}:
@@ -104,8 +104,8 @@ def fetch(+url: String, want: String) -> IO(Got):
     return judge(R.ok(out), matches(want, R.text(out)), url, R.text(out))
 
 # a fetch's outcome on one line
-def show(g: Got) -> String:
-  match g:
+def show(got: Got) -> String:
+  match got:
     case Miss{why}:
       "miss " ++ why
     case Have{body}:
