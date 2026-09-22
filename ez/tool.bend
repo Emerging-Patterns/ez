@@ -171,15 +171,16 @@ def bin.dir() -> IO(String):
     bin.pick(String.is_empty(ez), ez, xdg, home)
 
 # one trailing slash is the same directory
-def bare.go(slash: Bool, +s: String) -> String:
+def bare.go(slash: Bool, +dir: String) -> String:
   match slash:
     case True{}:
-      String.take(s, Nat.sub(String.length(s), 1n))
+      String.take(dir, Nat.sub(String.length(dir), 1n))
     case False{}:
-      s
+      dir
 
-def bare(+s: String) -> String:
-  bare.go(String.ends_with(s, "/"), s)
+# a directory with no trailing slash
+def bare(+dir: String) -> String:
+  bare.go(String.ends_with(dir, "/"), dir)
 
 # one step of a scan that may stop at the first hit. `Bool.or` reduces both
 # sides, so the rest arrives as a thunk.
@@ -272,12 +273,12 @@ def fetch.gone(+src: String) -> IO(Unit):
   IO.die(Unit, 1, "ez: " ++ src ++ " has no ez.lock.toml")
 
 # the lock's text, fetched into `lib`
-def fetch.go(m: Maybe<&2, String>, +src: String, +lib: String) -> IO(Unit):
-  match m:
+def fetch.go(got: Maybe<&2, String>, +src: String, +lib: String) -> IO(Unit):
+  match got:
     case None{}:
       fetch.gone(src)
-    case Some{text}:
-      Restore.restore.at(T.sects(T.parse(text)), lib)
+    case Some{body}:
+      Restore.restore.at(T.sects(T.parse(body)), lib)
 
 # BEND_LIB filled from the checkout's lock
 def fetch(+src: String, +lib: String) -> IO(Unit):
@@ -307,16 +308,16 @@ def compile(+lib: String, +entry: String, +out: String) -> IO(Unit):
     compile.said(R.ok(bin), Cap.why(bin, g), R.text(bin))
 
 # a status that parsed. Zero is success; anything else is that status.
-def code.die(zero: Bool, n: U32) -> IO(Unit):
+def code.die(zero: Bool, status: U32) -> IO(Unit):
   match zero:
     case True{}:
       IO.pure(Unit, Unit{})
     case False{}:
-      IO.die(Unit, n, "")
+      IO.die(Unit, status, "")
 
 # the program's status, forwarded. A status that is not a number exits 1.
-def code.of(m: Maybe<&2, U32>) -> IO(Unit):
-  match m:
+def code.of(exit: Maybe<&2, U32>) -> IO(Unit):
+  match exit:
     case None{}:
       IO.die(Unit, 1, "")
     case Some{+n}:
@@ -357,12 +358,12 @@ def load.missing(+src: String) -> IO(M.Read):
   IO.die(M.Read, 1, "ez: " ++ src ++ "/ez.toml is not there")
 
 # the file, or a refusal when it is not there
-def load.go(m: Maybe<&2, String>, +src: String) -> IO(M.Read):
-  match m:
+def load.go(got: Maybe<&2, String>, +src: String) -> IO(M.Read):
+  match got:
     case None{}:
       load.missing(src)
-    case Some{text}:
-      IO.pure(M.Read, M.parse(text))
+    case Some{body}:
+      IO.pure(M.Read, M.parse(body))
 
 # the ledger read out of a checkout
 def load(+src: String) -> IO(M.Read):
@@ -385,8 +386,16 @@ def local.rev(+path: String) -> IO(String):
       String.trim(R.text(st)))
 
 # fetch, build, record the commit, then start the binary or link it
-def miss(+src: String, +lib: String, +entry: String, +out: String,
-  +dir: String, +rev: String, +name: String, act: Act) -> IO(Unit):
+def miss(
+  +src: String,
+  +lib: String,
+  +entry: String,
+  +out: String,
+  +dir: String,
+  +rev: String,
+  +name: String,
+  act: Act
+) -> IO(Unit):
   do IO<Unit>:
     fetch(src, lib)
     +s : Say.Spin <- Say.hold(Say.building(name))
@@ -396,8 +405,17 @@ def miss(+src: String, +lib: String, +entry: String, +out: String,
     finish(act, out, name)
 
 # the binary when it is already this commit, otherwise a build
-def go.hit(hit: Bool, +src: String, +lib: String, +entry: String, +out: String,
-  +dir: String, +rev: String, +name: String, act: Act) -> IO(Unit):
+def go.hit(
+  hit: Bool,
+  +src: String,
+  +lib: String,
+  +entry: String,
+  +out: String,
+  +dir: String,
+  +rev: String,
+  +name: String,
+  act: Act
+) -> IO(Unit):
   match hit:
     case True{}:
       do IO<Unit>:
@@ -407,8 +425,15 @@ def go.hit(hit: Bool, +src: String, +lib: String, +entry: String, +out: String,
       miss(src, lib, entry, out, dir, rev, name, act)
 
 # the package's name and file, then the cached binary
-def go.named(+name: String, +entry: String, +src: String, +lib: String,
-  +dir: String, +rev: String, act: Act) -> IO(Unit):
+def go.named(
+  +name: String,
+  +entry: String,
+  +src: String,
+  +lib: String,
+  +dir: String,
+  +rev: String,
+  act: Act
+) -> IO(Unit):
   +out = dir ++ "/bin/" ++ name ++ ".out"
   do IO<Unit>:
     +cached : String <- text(dir ++ "/rev")
@@ -417,32 +442,45 @@ def go.named(+name: String, +entry: String, +src: String, +lib: String,
 
 # the file a pin names, or the checkout's own file when the pin names none.
 # An empty pin is "", not `main.bend`: that default belongs to the checkout.
-def go.over(empty: Bool, +over: String, +b: String, +e: String) -> String:
+def go.over(empty: Bool, +over: String, +binary: String, +entry: String) -> String:
   match empty:
     case True{}:
-      Tgt.file.of(b, e)
+      Tgt.file.of(binary, entry)
     case False{}:
       over
 
 # a ledger that read. `over` is a file the pin named, or "" for the checkout's.
-def go.good(m: M.Manifest, +src: String, +lib: String, +dir: String,
-  +rev: String, act: Act, +over: String) -> IO(Unit):
-  M.Manifest{+n, +e, +b, _ds, _ts} = m
+def go.good(
+  manifest: M.Manifest,
+  +src: String,
+  +lib: String,
+  +dir: String,
+  +rev: String,
+  act: Act,
+  +over: String
+) -> IO(Unit):
+  M.Manifest{+n, +e, +b, _ds, _ts} = manifest
   go.named(Tgt.out.name(n), P.join(src, go.over(String.is_empty(over), over, b, e)),
     src, lib, dir, rev, act)
 
 # the ledger, or the reason it did not read
-def go.read(r: M.Read, +src: String, +lib: String, +dir: String, +rev: String,
-  act: Act, +over: String) -> IO(Unit):
-  match r:
+def go.read(
+  ledger: M.Read,
+  +src: String,
+  +lib: String,
+  +dir: String,
+  +rev: String,
+  act: Act,
+  +over: String
+) -> IO(Unit):
+  match ledger:
     case M.Bad{why}:
       IO.die(Unit, 1, "ez: error: " ++ why)
     case M.Good{m}:
       go.good(m, src, lib, dir, rev, act, over)
 
 # the checkout's ledger, built into `dir`. `Run` starts the binary.
-def go(+src: String, +lib: String, +dir: String, +rev: String,
-  act: Act, +over: String) -> IO(Unit):
+def go(+src: String, +lib: String, +dir: String, +rev: String, act: Act, +over: String) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- load(src)
     go.read(r, src, lib, dir, rev, act, over)
@@ -455,8 +493,7 @@ def clone(+src: String, +url: String, +rev: String, +label: String) -> IO(Unit):
     Git.clone.say(src, url, rev, Say.fetching(label, rev))
 
 # clone when the checkout is not already this commit
-def freshen(need: Bool, +src: String, +url: String, +rev: String,
-  +label: String) -> IO(Unit):
+def freshen(need: Bool, +src: String, +url: String, +rev: String, +label: String) -> IO(Unit):
   match need:
     case False{}:
       IO.print_err(Say.kept(label))
@@ -465,8 +502,7 @@ def freshen(need: Bool, +src: String, +url: String, +rev: String,
 
 # the checkout and the binary for one remote, once the cache root and the
 # commit are known
-def run.remote.at(+root: String, +url: String, +slug: String, +rev: String,
-  act: Act, +over: String) -> IO(Unit):
+def run.remote.at(+root: String, +url: String, +slug: String, +rev: String, act: Act, +over: String) -> IO(Unit):
   +dir = root ++ "/" ++ slug
   +src = dir ++ "/src"
   do IO<Unit>:
@@ -504,8 +540,8 @@ def run.bad(+why: String) -> IO(Unit):
   IO.die(Unit, 1, "ez: " ++ why)
 
 # a classified target
-def run.go(p: Tgt.Place, act: Act) -> IO(Unit):
-  match p:
+def run.go(target: Tgt.Place, act: Act) -> IO(Unit):
+  match target:
     case Tgt.Bad{why}:
       run.bad(why)
     case Tgt.Local{path}:
@@ -514,20 +550,20 @@ def run.go(p: Tgt.Place, act: Act) -> IO(Unit):
       run.remote(url, slug, act)
 
 # a ledger that did not parse stops the command
-def project.read(r: M.Read) -> IO(M.Read):
-  match r:
+def project.read(ledger: M.Read) -> IO(M.Read):
+  match ledger:
     case M.Bad{why}:
       IO.die(M.Read, 1, "ez: error: " ++ why)
     case M.Good{_m}:
-      IO.pure(M.Read, r)
+      IO.pure(M.Read, ledger)
 
 # a missing ledger pins nothing, so the word stays a free target
-def project.go(m: Maybe<&2, String>) -> IO(M.Read):
-  match m:
+def project.go(got: Maybe<&2, String>) -> IO(M.Read):
+  match got:
     case None{}:
       IO.pure(M.Read, M.Good{M.Manifest{"", "", "", [], []}})
-    case Some{text}:
-      project.read(M.parse(text))
+    case Some{body}:
+      project.read(M.parse(body))
 
 # the project's own ledger
 def project() -> IO(M.Read):
@@ -536,34 +572,34 @@ def project() -> IO(M.Read):
     project.go(m)
 
 # the lock's text, or a refusal when it was not written
-def lock.open(m: Maybe<&2, String>) -> IO(String):
-  match m:
+def lock.open(got: Maybe<&2, String>) -> IO(String):
+  match got:
     case None{}:
       IO.die(String, 1, "ez: ez.lock.toml is not there")
-    case Some{text}:
-      IO.pure(String, text)
+    case Some{body}:
+      IO.pure(String, body)
 
 # a name the lock does not pin
-def lock.have(missing: Bool, +name: String, t: M.Tool) -> IO(M.Tool):
+def lock.have(missing: Bool, +name: String, tool: M.Tool) -> IO(M.Tool):
   match missing:
     case True{}:
       IO.die(M.Tool, 1, "ez: " ++ name ++ " is not pinned in ez.lock.toml")
     case False{}:
-      IO.pure(M.Tool, t)
+      IO.pure(M.Tool, tool)
 
 # the pin `ez lock` wrote for this name
 def locked(+name: String) -> IO(M.Tool):
   do IO<M.Tool>:
     m : Maybe<&2, String> <- F.read("ez.lock.toml")
-    +text : String <- lock.open(m)
+    +body : String <- lock.open(m)
     +t : M.Tool <- IO.pure(M.Tool,
-      M.tool.find(M.tools(T.sects(T.parse(text))), name))
+      M.tool.find(M.tools(T.sects(T.parse(body))), name))
     lock.have(String.is_empty(M.tool.name(t)), name, t)
 
 # `bin` when the pin names one, otherwise `entry`, otherwise "" so the
 # checkout's own ledger chooses the file
-def over.of(+b: String, +e: String) -> String:
-  Bool.pick(String, String.is_empty(b), e, b)
+def over.of(+binary: String, +entry: String) -> String:
+  Bool.pick(String, String.is_empty(binary), entry, binary)
 
 # a pin with no commit cannot be built
 def pinned.rev(empty: Bool, +name: String, +rev: String) -> IO(String):
@@ -574,8 +610,8 @@ def pinned.rev(empty: Bool, +name: String, +rev: String) -> IO(String):
       IO.pure(String, rev)
 
 # a classified git url, built at the rev the lock recorded
-def pinned.place(p: Tgt.Place, +rev: String, +over: String, act: Act) -> IO(Unit):
-  match p:
+def pinned.place(target: Tgt.Place, +rev: String, +over: String, act: Act) -> IO(Unit):
+  match target:
     case Tgt.Bad{why}:
       IO.die(Unit, 1, "ez: " ++ why)
     case Tgt.Local{_path}:
@@ -586,14 +622,14 @@ def pinned.place(p: Tgt.Place, +rev: String, +over: String, act: Act) -> IO(Unit
         run.remote.at(root, url, slug, rev, act, over)
 
 # one pinned CLI, at the lock rev rather than at HEAD
-def run.pinned(+t: M.Tool, act: Act) -> IO(Unit):
-  +src = M.tool.source(t)
-  +name = M.tool.name(t)
+def run.pinned(+tool: M.Tool, act: Act) -> IO(Unit):
+  +src = M.tool.source(tool)
+  +name = M.tool.name(tool)
   do IO<Unit>:
     +rev : String <- pinned.rev(String.is_empty(M.source.rev(src)), name,
       M.source.rev(src))
     pinned.place(Tgt.classify(M.source.url(src)), rev,
-      over.of(M.tool.bin(t), M.tool.entry(t)), act)
+      over.of(M.tool.bin(tool), M.tool.entry(tool)), act)
 
 # a manifest name is that pin; any other word is a free target
 def named.go(free: Bool, +target: String, act: Act) -> IO(Unit):
@@ -605,6 +641,7 @@ def named.go(free: Bool, +target: String, act: Act) -> IO(Unit):
         +pin : M.Tool <- locked(target)
         run.pinned(pin, act)
 
+# a word run as the pin the ledger gives it, or as a free target
 def named(+target: String, act: Act) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- project()

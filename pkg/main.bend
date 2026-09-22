@@ -8,16 +8,16 @@ import Base
 import ./pkg.bend as K
 
 # an environment variable's text; unset, ""
-def text_of(r: Result<&1, &1, U32 & String, String>) -> String:
-  match r:
+def text_of(res: Result<&1, &1, U32 & String, String>) -> String:
+  match res:
     case Fail{_e}:
       ""
     case Done{s}:
       s
 
 # a package on three or more lines
-def show(+p: K.Pkg) -> String:
-  K.pkg.hash(p) ++ "\n" ++ K.pkg.root(p) ++ "\n" ++ K.manifest_of(K.pkg.files(p))
+def show(+pkg: K.Pkg) -> String:
+  K.pkg.hash(pkg) ++ "\n" ++ K.pkg.root(pkg) ++ "\n" ++ K.manifest_of(K.pkg.files(pkg))
 
 # the package of an entry that was named
 def report(+at: String) -> IO(Unit):

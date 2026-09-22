@@ -47,13 +47,13 @@ def words.keep(ws: List<&2, String>) -> List<&2, String>:
       Bool.pick(List<&2, String>, String.is_empty(h), more, h <> more)
 
 # the words of a line
-def words(s: String) -> List<&2, String>:
-  words.keep(String.split(s, ' '))
+def words(line: String) -> List<&2, String>:
+  words.keep(String.split(line, ' '))
 
 # the nth word, or "" when the line is shorter than that. Both the list and the
 # count are scrutinised together, so the walk needs no helper to branch through.
-def word(ws: List<&2, String>, n: Nat) -> String:
-  match ws n:
+def word(ws: List<&2, String>, index: Nat) -> String:
+  match ws index:
     case Nil{} _m:
       ""
     case Con{h, _t} 0n:
@@ -98,41 +98,40 @@ def base_of(+ws: List<&2, String>) -> Stmt:
     ws)
 
 # a line that neither opens nor ends the header
-def quiet(+s: String) -> Bool:
-  Bool.or(String.is_empty(s), String.starts_with(s, "#"))
+def quiet(+line: String) -> Bool:
+  Bool.or(String.is_empty(line), String.starts_with(line, "#"))
 
 # a line that says nothing about the header, decided. `words` is a
 # `String.split` and a filter over its result, and this is the arm it hangs
 # from: every blank line and every comment line of every `.bend` file of the
 # project and of every package it resolves used to be split into words and
 # classified, which is most of the lines ez ever reads.
-def stmt_of.quiet(skip: Bool, +s: String) -> Stmt:
+def stmt_of.quiet(skip: Bool, +line: String) -> Stmt:
   match skip:
     case True{}:
       SNone{}
     case False{}:
-      base_of(words(s))
+      base_of(words(line))
 
 # the foreign import decided. The rest of the cascade hangs off the False arm
 # rather than sitting in an argument, so a line that is a foreign import pays
 # for nothing below it.
-def stmt_of.foreign(here: Bool, +s: String) -> Stmt:
+def stmt_of.foreign(here: Bool, +line: String) -> Stmt:
   match here:
     case True{}:
-      SForeign{String.take(String.drop(s, 8n), Nat.sub(String.length(s), 9n))}
+      SForeign{String.take(String.drop(line, 8n), Nat.sub(String.length(line), 9n))}
     case False{}:
-      stmt_of.quiet(quiet(s), s)
+      stmt_of.quiet(quiet(line), line)
 
 # a trimmed line classified. A foreign import is tested first: it lives in a
 # def's body, long after the header has ended.
-def stmt_of(+s: String) -> Stmt:
+def stmt_of(+line: String) -> Stmt:
   stmt_of.foreign(
-    Bool.and(String.starts_with(s, "import \""), String.ends_with(s, "\"")), s)
+    Bool.and(String.starts_with(line, "import \""), String.ends_with(line, "\"")), line)
 
 # a module named after the header has ended is not part of the header, so the
 # line is ignored rather than followed
-def scan.mod(+head: Bool, spec: String, mods: List<&2, String>,
-  foreign: List<&2, String>) -> Head:
+def scan.mod(+head: Bool, spec: String, mods: List<&2, String>, foreign: List<&2, String>) -> Head:
   match head:
     case True{}:
       Head{True{}, spec <> mods, foreign}
@@ -140,9 +139,9 @@ def scan.mod(+head: Bool, spec: String, mods: List<&2, String>,
       Head{False{}, mods, foreign}
 
 # the state once a line has been classified
-def scan.go(st: Head, s: Stmt) -> Head:
+def scan.go(st: Head, stmt: Stmt) -> Head:
   Head{head, mods, foreign} = st
-  match s:
+  match stmt:
     case SNone{}:
       Head{head, mods, foreign}
     case SForeign{at}:
@@ -177,13 +176,13 @@ def scan(text: String) -> Scan:
   scan.fin(scan.walk(String.lines(text), Head{True{}, [], []}))
 
 # the modules a scan found
-def scan.mods(s: Scan) -> List<&2, String>:
-  Scan{mods, _foreign} = s
+def scan.mods(scanned: Scan) -> List<&2, String>:
+  Scan{mods, _foreign} = scanned
   mods
 
 # the foreign bodies a scan found
-def scan.foreign(s: Scan) -> List<&2, String>:
-  Scan{_mods, foreign} = s
+def scan.foreign(scanned: Scan) -> List<&2, String>:
+  Scan{_mods, foreign} = scanned
   foreign
 
 # an import of a hub package, which is a dependency rather than a module of
@@ -215,8 +214,8 @@ type Step is Data:
 # module's own directory. `bend --publish` writes `src/util/beep.c` for a body
 # imported by `src/util/math.bend`, so anything flatter is a different package
 # from the one bend would upload.
-def foreign.put(m: Maybe<&2, String>, raw: String) -> List<&2, Found>:
-  match m:
+def foreign.put(got: Maybe<&2, String>, raw: String) -> List<&2, Found>:
+  match got:
     case None{}:
       []
     case Some{src}:
@@ -224,35 +223,35 @@ def foreign.put(m: Maybe<&2, String>, raw: String) -> List<&2, Found>:
 
 # one foreign body, or nothing when it is not on disk. bend uploads only the
 # ones that are there.
-def foreign_of(+d: String, nd: String, +at: String) -> IO(List<&2, Found>):
+def foreign_of(+dir: String, nd: String, +at: String) -> IO(List<&2, Found>):
   do IO<List<&2, Found>>:
-    m : Maybe<&2, String> <- F.read(P.join(d, at))
+    m : Maybe<&2, String> <- F.read(P.join(dir, at))
     return foreign.put(m, P.join(nd, at))
 
 # every foreign body a file imports
-def foreigns(+d: String, +nd: String, ats: List<&2, String>) -> IO(List<&2, Found>):
+def foreigns(+dir: String, +nd: String, ats: List<&2, String>) -> IO(List<&2, Found>):
   match ats:
     case []:
       IO.pure(List<&2, Found>, [])
     case h <> t:
       do IO<List<&2, Found>>:
-        rest : List<&2, Found> <- foreigns(d, nd, t)
-        one : List<&2, Found> <- foreign_of(d, nd, h)
+        rest : List<&2, Found> <- foreigns(dir, nd, t)
+        one : List<&2, Found> <- foreign_of(dir, nd, h)
         return List.append(&2, Found, one, rest)
 
 # a module import as the file to visit next, or nothing when it names a hub
 # package
-def task_of(+d: String, +nd: String, +spec: String) -> List<&2, Task>:
+def task_of(+dir: String, +nd: String, +spec: String) -> List<&2, Task>:
   Bool.pick(List<&2, Task>, is_hub(spec), [],
-    [Task{P.join(d, spec), P.unbend(P.join(nd, spec))}])
+    [Task{P.join(dir, spec), P.unbend(P.join(nd, spec))}])
 
 # every module a file imports, as the files to visit next
-def tasks(+d: String, +nd: String, ms: List<&2, String>) -> List<&2, Task>:
+def tasks(+dir: String, +nd: String, ms: List<&2, String>) -> List<&2, Task>:
   match ms:
     case []:
       []
     case h <> t:
-      List.append(&2, Task, task_of(d, nd, h), tasks(d, nd, t))
+      List.append(&2, Task, task_of(dir, nd, h), tasks(dir, nd, t))
 
 # the directory a module's own imports are named from. The entry is the package
 # root, so its modules are named from nowhere in particular.
@@ -265,8 +264,15 @@ def raw_of(+ns: String, eb: String) -> String:
   Bool.pick(String, String.is_empty(ns), eb, ns ++ ".bend")
 
 # a file that was read: itself, its foreign bodies, and the modules it imports
-def visit.found(sc: Scan, sum: String, +file: String, +ns: String, eb: String,
-  seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
+def visit.found(
+  sc: Scan,
+  sum: String,
+  +file: String,
+  +ns: String,
+  eb: String,
+  seen: List<&2, String>,
+  out: List<&2, Found>
+) -> IO(Step):
   Scan{mods, foreign} = sc
   +d = P.dir(file)
   +nd = nsdir(ns)
@@ -278,25 +284,29 @@ def visit.found(sc: Scan, sum: String, +file: String, +ns: String, eb: String,
 
 # a module that is imported but not on disk stops the walk, since a package
 # missing a file is not the package bend would publish
-def visit.have(m: Maybe<&2, String>, +file: String, ns: String, eb: String,
-  seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
-  match m:
+def visit.have(
+  got: Maybe<&2, String>,
+  +file: String,
+  ns: String,
+  eb: String,
+  seen: List<&2, String>,
+  out: List<&2, Found>
+) -> IO(Step):
+  match got:
     case None{}:
       IO.die(Step, 1, "ez: " ++ file ++ " is imported but not there")
     case Some{+src}:
       visit.found(scan(src), Sha.hex(src), file, ns, eb, seen, out)
 
 # a file not visited before, read and taken apart
-def visit.read(+file: String, ns: String, eb: String, seen: List<&2, String>,
-  out: List<&2, Found>) -> IO(Step):
+def visit.read(+file: String, ns: String, eb: String, seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
   do IO<Step>:
     m : Maybe<&2, String> <- F.read(file)
     visit.have(m, file, ns, eb, seen, out)
 
 # a file already visited keeps the name it was first reached through, the way
 # bend's own walk does
-def visit.go(hit: Bool, file: String, ns: String, eb: String,
-  seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
+def visit.go(hit: Bool, file: String, ns: String, eb: String, seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
   match hit:
     case True{}:
       IO.pure(Step, Step{State{seen, out}, []})
@@ -319,12 +329,12 @@ def seen.has.step(here: Bool, rest: Unit -> Bool) -> Bool:
 # whether a name is already among the ones the walk has reached. Base's
 # `List.contains` applies an erased equality, which falls outside the
 # termination check; this scan is structural.
-def seen.has(xs: List<&2, String>, +s: String) -> Bool:
+def seen.has(xs: List<&2, String>, +want: String) -> Bool:
   match xs:
     case []:
       False{}
     case +h <> t:
-      seen.has.step(String.eq(h, s), _u => seen.has(t, s))
+      seen.has.step(String.eq(h, want), _u => seen.has(t, want))
 
 # one file of the walk: what it adds to the package, and what it asks for next
 def visit(eb: String, tk: Task, st: State) -> IO(Step):
@@ -334,15 +344,13 @@ def visit(eb: String, tk: Task, st: State) -> IO(Step):
 
 # what a visit answered, with its modules put at the front of the queue, so the
 # walk goes depth first the way bend's does
-def walk.rest(r: Step, rest: List<&2, Task>,
-  go: State -> List<&2, Task> -> IO(State)) -> IO(State):
-  Step{st, kids} = r
+def walk.rest(step: Step, rest: List<&2, Task>, go: State -> List<&2, Task> -> IO(State)) -> IO(State):
+  Step{st, kids} = step
   go(st, List.append(&2, Task, kids, rest))
 
 # the next file of the queue, handed on with what is left of it. An empty queue
 # is the end of the walk.
-def walk.pop(queue: List<&2, Task>, +st: State,
-  go: State -> Task -> List<&2, Task> -> IO(State)) -> IO(State):
+def walk.pop(queue: List<&2, Task>, +st: State, go: State -> Task -> List<&2, Task> -> IO(State)) -> IO(State):
   match queue:
     case []:
       IO.pure(State, st)
@@ -351,10 +359,15 @@ def walk.pop(queue: List<&2, Task>, +st: State,
 
 # one file visited, and the walk carried on. The carrying on arrives as a
 # function, since two defs in Bend may not call each other.
-def walk.step(+eb: String, h: Task, st: State, rest: List<&2, Task>,
-  go: State -> List<&2, Task> -> IO(State)) -> IO(State):
+def walk.step(
+  +eb: String,
+  task: Task,
+  st: State,
+  rest: List<&2, Task>,
+  go: State -> List<&2, Task> -> IO(State)
+) -> IO(State):
   do IO<State>:
-    r : Step <- visit(eb, h, st)
+    r : Step <- visit(eb, task, st)
     walk.rest(r, rest, go)
 
 # every file of the package, reached from the entry. The queue is a stack, and
@@ -374,8 +387,8 @@ def state.out(st: State) -> List<&2, Found>:
   out
 
 # how far a found file climbs out of the entry's directory
-def found.ups(f: Found) -> Nat:
-  Found{raw, _sum} = f
+def found.ups(hit: Found) -> Nat:
+  Found{raw, _sum} = hit
   P.ups(raw)
 
 # the deepest climb any file of the package makes
@@ -388,23 +401,23 @@ def climb(fs: List<&2, Found>) -> Nat:
 
 # the entry's own directory, named absolutely. Base cannot ask the file system,
 # so `realpath` is asked instead, and only when something actually climbs.
-def anc.at(+n: Nat, dir: String) -> IO(String):
+def anc.at(+levels: Nat, dir: String) -> IO(String):
   do IO<String>:
     +out : String <- R.exec(["realpath", dir])
-    return P.tail(String.trim(R.text(out)), n)
+    return P.tail(String.trim(R.text(out)), levels)
 
 # the trailing components of the entry's directory that the package re-roots
 # under: as many as its deepest climb, and none at all when nothing climbs
-def anc(n: Nat, dir: String) -> IO(String):
-  match n:
+def anc(levels: Nat, dir: String) -> IO(String):
+  match levels:
     case 0n:
       IO.pure(String, "")
     case 1n+p:
       anc.at(Nat.add(p, 1n), dir)
 
 # a found file, placed under whatever the package re-rooted at
-def file_of(+pre: String, f: Found) -> File:
-  Found{raw, sum} = f
+def file_of(+pre: String, hit: Found) -> File:
+  Found{raw, sum} = hit
   File{P.join(pre, raw), sum}
 
 # every found file, placed
@@ -416,30 +429,30 @@ def placed(+pre: String, fs: List<&2, Found>) -> List<&2, File>:
       file_of(pre, h) <> placed(pre, t)
 
 # where a file sits inside its package
-def file.at(f: File) -> String:
-  File{at, _sum} = f
+def file.at(item: File) -> String:
+  File{at, _sum} = item
   at
 
 # a package's files are written in path order, so the manifest of a package is
 # the same text whoever computes it
-def file.le(a: File, b: File) -> Bool:
-  String.is_le(file.at(a), file.at(b))
+def file.le(left: File, right: File) -> Bool:
+  String.is_le(file.at(left), file.at(right))
 
 # the same path twice is the same file twice, and a package holds it once
-def dedup.pick(same: Bool, h: File, r: List<&2, File>) -> List<&2, File>:
+def dedup.pick(same: Bool, head: File, rest: List<&2, File>) -> List<&2, File>:
   match same:
     case True{}:
-      r
+      rest
     case False{}:
-      h <> r
+      head <> rest
 
 # a file against the deduplicated files that follow it
-def dedup.head(+h: File, r: List<&2, File>) -> List<&2, File>:
-  match r:
+def dedup.head(+head: File, rest: List<&2, File>) -> List<&2, File>:
+  match rest:
     case []:
-      [h]
+      [head]
     case Con{+b, t}:
-      dedup.pick(String.eq(file.at(h), file.at(b)), h, b <> t)
+      dedup.pick(String.eq(file.at(head), file.at(b)), head, b <> t)
 
 # a sorted file list with the repeats dropped
 def dedup(fs: List<&2, File>) -> List<&2, File>:
@@ -452,21 +465,20 @@ def dedup(fs: List<&2, File>) -> List<&2, File>:
 # where a file goes among the files already in order: before the one it is not
 # after, otherwise behind it. The rest of the insertion is a parameter, because
 # two defs that call each other are not allowed.
-def file.ins.put(le: Bool, x: File, h: File, t: List<&2, File>,
-  rest: List<&2, File>) -> List<&2, File>:
+def file.ins.put(le: Bool, item: File, head: File, tail: List<&2, File>, rest: List<&2, File>) -> List<&2, File>:
   match le:
     case True{}:
-      x <> (h <> t)
+      item <> (head <> tail)
     case False{}:
-      h <> rest
+      head <> rest
 
 # a file inserted into a list already in path order
-def file.ins(fs: List<&2, File>, +x: File) -> List<&2, File>:
+def file.ins(fs: List<&2, File>, +item: File) -> List<&2, File>:
   match fs:
     case []:
-      [x]
+      [item]
     case Con{+h, +t}:
-      file.ins.put(file.le(x, h), x, h, t, file.ins(t, x))
+      file.ins.put(file.le(item, h), item, h, t, file.ins(t, item))
 
 # a file list in path order. Insertion rather than Base's `List.sort`: that one
 # is a fuelled bottom-up merge sort, whose recursion Bend cannot check, so it
@@ -509,8 +521,8 @@ def escaped(fs: List<&2, File>) -> String:
       escaped.step(escapes(at), at, _u => escaped(t))
 
 # one `<sha256> <path>` line
-def manifest.line(f: File) -> String:
-  File{at, sum} = f
+def manifest.line(item: File) -> String:
+  File{at, sum} = item
   sum ++ " " ++ at ++ "\n"
 
 # every line of a manifest
@@ -533,8 +545,7 @@ def hash_of(fs: List<&2, File>) -> String:
 # the verdict, with the escaping path's name already found. `hash_of` is a
 # sha256 over the whole package manifest; under a `Bool.pick` a package that
 # escapes its root paid for that hash before being refused for it.
-def pkg.judge.step(ok: Bool, bad: String, root: String,
-  +fs: List<&2, File>) -> IO(Pkg):
+def pkg.judge.step(ok: Bool, bad: String, root: String, +fs: List<&2, File>) -> IO(Pkg):
   match ok:
     case True{}:
       IO.pure(Pkg, Pkg{hash_of(fs), root, files_of(fs)})
@@ -563,21 +574,21 @@ def pkg_of(+entry: String) -> IO(Pkg):
     pkg.place(P.climb(n, P.dir(entry)), pre, fs)
 
 # the hash that names a package
-def pkg.hash(p: Pkg) -> String:
-  Pkg{h, _root, _fs} = p
+def pkg.hash(package: Pkg) -> String:
+  Pkg{h, _root, _fs} = package
   h
 
 # the directory a package's file paths are written from
-def pkg.root(p: Pkg) -> String:
-  Pkg{_h, root, _fs} = p
+def pkg.root(package: Pkg) -> String:
+  Pkg{_h, root, _fs} = package
   root
 
 # the files a package holds
-def pkg.files(p: Pkg) -> List<&2, File>:
-  Pkg{_h, _root, fs} = p
+def pkg.files(package: Pkg) -> List<&2, File>:
+  Pkg{_h, _root, fs} = package
   fs
 
 # the sha256 recorded for a file
-def file.sum(f: File) -> String:
-  File{_at, sum} = f
+def file.sum(item: File) -> String:
+  File{_at, sum} = item
   sum

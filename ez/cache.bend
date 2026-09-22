@@ -42,35 +42,35 @@ def key.on(on: Bool, +lane: String, +tool: String, +entry: String) -> IO(String)
       key(lane, tool, entry)
 
 # where a lane's answer is remembered
-def at(+k: String) -> String:
-  ".ez/cache/" ++ k
+def at(+slot: String) -> String:
+  ".ez/cache/" ++ slot
 
 # whether a file is there
-def there(m: Maybe<&2, String>) -> Bool:
-  match m:
+def there(got: Maybe<&2, String>) -> Bool:
+  match got:
     case None{}:
       False{}
     case Some{_s}:
       True{}
 
 # whether this lane has already held over exactly this evidence
-def fresh(on: Bool, +k: String) -> IO(Bool):
+def fresh(on: Bool, +slot: String) -> IO(Bool):
   match on:
     case False{}:
       IO.pure(Bool, False{})
     case True{}:
       do IO<Bool>:
-        m : Maybe<&2, String> <- F.read(at(k))
+        m : Maybe<&2, String> <- F.read(at(slot))
         return there(m)
 
 # a lane's answer remembered, and only when every test of it held
-def keep(ok: Bool, +k: String, +what: String) -> IO(Unit):
+def keep(ok: Bool, +slot: String, +what: String) -> IO(Unit):
   match ok:
     case False{}:
       IO.pure(Unit, Unit{})
     case True{}:
       do IO<Unit>:
-        _w : Bool <- F.write(at(k), what ++ "\n")
+        _w : Bool <- F.write(at(slot), what ++ "\n")
         return Unit{}
 
 # the directory the answers are kept in

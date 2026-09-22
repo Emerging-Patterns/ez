@@ -26,29 +26,29 @@ def dir() -> String:
 
 # a repo holding the package under src/, committed, and willing to serve the
 # commit by name
-def repo(+d: String) -> IO(String):
+def repo(+work: String) -> IO(String):
   do IO<String>:
-    _mk : String <- R.exec(["mkdir", "-p", d ++ "/repo/src"])
-    _w : Bool <- F.write(d ++ "/repo/src/lib.bend", leaf())
-    _i : String <- R.exec(["git", "init", "-q", d ++ "/repo"])
-    _a : String <- R.exec(["git", "-C", d ++ "/repo", "add", "-A"])
-    _c : String <- R.exec(["git", "-C", d ++ "/repo", "-c", "user.email=t@t",
+    _mk : String <- R.exec(["mkdir", "-p", work ++ "/repo/src"])
+    _w : Bool <- F.write(work ++ "/repo/src/lib.bend", leaf())
+    _i : String <- R.exec(["git", "init", "-q", work ++ "/repo"])
+    _a : String <- R.exec(["git", "-C", work ++ "/repo", "add", "-A"])
+    _c : String <- R.exec(["git", "-C", work ++ "/repo", "-c", "user.email=t@t",
       "-c", "user.name=t", "commit", "-q", "-m", "init"])
-    _s : String <- R.exec(["git", "-C", d ++ "/repo", "config",
+    _s : String <- R.exec(["git", "-C", work ++ "/repo", "config",
       "uploadpack.allowAnySHA1InWant", "true"])
-    +out : String <- R.exec(["git", "-C", d ++ "/repo", "rev-parse", "HEAD"])
+    +out : String <- R.exec(["git", "-C", work ++ "/repo", "rev-parse", "HEAD"])
     return String.trim(R.text(out))
 
 # the lock that package would be written into: pinned to the commit, with its
 # paths written from src/ inside the repo
-def lock(+d: String, rev: String) -> String:
+def lock(+work: String, rev: String) -> String:
   L.render("https://hub.example", "2.0.16",
-    [L.Pack{hash(), L.Git{"file://" ++ d ++ "/repo", rev, "src/lib.bend", "src",
+    [L.Pack{hash(), L.Git{"file://" ++ work ++ "/repo", rev, "src/lib.bend", "src",
       "sha256-zz", ""}, [K.File{"lib.bend", Sha.hex(leaf())}]}])
 
 # what landed at a path
-def landed(m: Maybe<&2, String>) -> String:
-  F.text_of(m)
+def landed(got: Maybe<&2, String>) -> String:
+  F.text_of(got)
 
 def main() -> IO(Unit):
   do IO<Unit>:

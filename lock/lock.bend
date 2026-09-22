@@ -69,47 +69,47 @@ def kids(srcs: List<&2, String>) -> List<&2, String>:
       List.append(&2, String, specs(K.scan.mods(K.scan(h))), kids(t))
 
 # a table's path, as segments
-def segs(s: T.Sect) -> List<&2, String>:
-  T.Sect{n, _ps} = s
+def segs(sect: T.Sect) -> List<&2, String>:
+  T.Sect{n, _ps} = sect
   T.segments(n)
 
 # whether a table's path is these three segments
-def is3(+ss: List<&2, String>, a: String, b: String, c: String) -> Bool:
+def is3(+ss: List<&2, String>, first: String, second: String, third: String) -> Bool:
   Bool.and(Nat.is_eq(List.length(&2, String, ss), 3n),
-    Bool.and(String.eq(K.word(ss, 0n), a),
-      Bool.and(String.eq(K.word(ss, 1n), b), String.eq(K.word(ss, 2n), c))))
+    Bool.and(String.eq(K.word(ss, 0n), first),
+      Bool.and(String.eq(K.word(ss, 1n), second), String.eq(K.word(ss, 2n), third))))
 
 # whether a table's path is one segment, this one
-def named1(+ss: List<&2, String>, a: String) -> Bool:
-  Bool.and(Nat.is_eq(List.length(&2, String, ss), 1n), String.eq(K.word(ss, 0n), a))
+def named1(+ss: List<&2, String>, first: String) -> Bool:
+  Bool.and(Nat.is_eq(List.length(&2, String, ss), 1n), String.eq(K.word(ss, 0n), first))
 
 # whether a table's path is two segments headed by this one, whatever the
 # second is, which is how a table named after a package hash is found
-def named2(+ss: List<&2, String>, a: String) -> Bool:
-  Bool.and(Nat.is_eq(List.length(&2, String, ss), 2n), String.eq(K.word(ss, 0n), a))
+def named2(+ss: List<&2, String>, first: String) -> Bool:
+  Bool.and(Nat.is_eq(List.length(&2, String, ss), 2n), String.eq(K.word(ss, 0n), first))
 
 # whether a table's path is three segments, headed and tailed by these, whatever
 # the hash between them is
-def named3(+ss: List<&2, String>, a: String, c: String) -> Bool:
+def named3(+ss: List<&2, String>, first: String, third: String) -> Bool:
   Bool.and(Nat.is_eq(List.length(&2, String, ss), 3n),
-    Bool.and(String.eq(K.word(ss, 0n), a), String.eq(K.word(ss, 2n), c)))
+    Bool.and(String.eq(K.word(ss, 0n), first), String.eq(K.word(ss, 2n), third)))
 
 # the pairs of a table when it is the one asked for, otherwise the rest's
-def at.pick(hit: Bool, s: T.Sect, rest: List<&2, T.Kv>) -> List<&2, T.Kv>:
+def at.pick(hit: Bool, sect: T.Sect, rest: List<&2, T.Kv>) -> List<&2, T.Kv>:
   match hit:
     case True{}:
-      T.Sect{_n, ps} = s
+      T.Sect{_n, ps} = sect
       ps
     case False{}:
       rest
 
 # the pairs of the table at this three segment path, or none
-def at3(ss: List<&2, T.Sect>, +a: String, +b: String, +c: String) -> List<&2, T.Kv>:
+def at3(ss: List<&2, T.Sect>, +first: String, +second: String, +third: String) -> List<&2, T.Kv>:
   match ss:
     case []:
       []
     case +h <> t:
-      at.pick(is3(segs(h), a, b, c), h, at3(t, a, b, c))
+      at.pick(is3(segs(h), first, second, third), h, at3(t, first, second, third))
 
 # a git origin keeps every key it was written with; anything else is the hub
 def src.go(git: Bool, +ps: List<&2, T.Kv>) -> Src:
@@ -125,10 +125,10 @@ def src_of(+ps: List<&2, T.Kv>) -> Src:
   src.go(String.eq(T.value(ps, "kind"), "git"), ps)
 
 # an `[origins."<hash>"]` table as an origin
-def origin.put(hit: Bool, s: T.Sect, rest: List<&2, Origin>) -> List<&2, Origin>:
+def origin.put(hit: Bool, sect: T.Sect, rest: List<&2, Origin>) -> List<&2, Origin>:
   match hit:
     case True{}:
-      T.Sect{n, ps} = s
+      T.Sect{n, ps} = sect
       Origin{K.word(T.segments(n), 1n), src_of(ps)} <> rest
     case False{}:
       rest
@@ -144,13 +144,13 @@ def origins(ss: List<&2, T.Sect>) -> List<&2, Origin>:
 # a ledger's dependency as an origin, when it names a repo. A hub dependency
 # contributes nothing, because a package no origin names already resolves from
 # the hub, and a record saying so would only be a second way to say it.
-def ledger.put(git: Bool, +d: M.Dep) -> List<&2, Origin>:
+def ledger.put(git: Bool, +dep: M.Dep) -> List<&2, Origin>:
   match git:
     case True{}:
-      [Origin{M.dep.hash(d), Git{M.source.url(M.source.dep(d)),
-        M.source.rev(M.source.dep(d)), M.dep.entry(d),
-        M.source.root(M.source.dep(d)), M.source.nar(M.source.dep(d)),
-        M.source.tag(M.source.dep(d))}}]
+      [Origin{M.dep.hash(dep), Git{M.source.url(M.source.dep(dep)),
+        M.source.rev(M.source.dep(dep)), M.dep.entry(dep),
+        M.source.root(M.source.dep(dep)), M.source.nar(M.source.dep(dep)),
+        M.source.tag(M.source.dep(dep))}}]
     case False{}:
       []
 
@@ -165,8 +165,8 @@ def ledger.origins(ds: List<&2, M.Dep>) -> List<&2, Origin>:
 
 # every origin a ledger records. A ledger that would not parse records none,
 # so a broken ez.toml leaves the lock exactly where it was without a guess.
-def ledger.read(r: M.Read) -> List<&2, Origin>:
-  match r:
+def ledger.read(parsed: M.Read) -> List<&2, Origin>:
+  match parsed:
     case M.Bad{_why}:
       []
     case M.Good{m}:
@@ -182,17 +182,17 @@ def origins.all(led: List<&2, Origin>, cache: List<&2, Origin>) -> List<&2, Orig
   List.append(&2, Origin, led, cache)
 
 # this origin's source when the hash matches, otherwise whatever the rest gave
-def origin.at(o: Origin, rest: Src, h: String) -> Src:
-  Origin{n, s} = o
-  Bool.pick(Src, String.eq(n, h), s, rest)
+def origin.at(known: Origin, rest: Src, wanted: String) -> Src:
+  Origin{n, s} = known
+  Bool.pick(Src, String.eq(n, wanted), s, rest)
 
 # where a package comes from, which is the hub unless an origin says otherwise
-def origin(ds: List<&2, Origin>, +h: String) -> Src:
+def origin(ds: List<&2, Origin>, +wanted: String) -> Src:
   match ds:
     case []:
       Hub{}
     case x <> t:
-      origin.at(x, origin(t, h), h)
+      origin.at(x, origin(t, wanted), wanted)
 
 # one `<sha256> <path>` line of a manifest
 def line.put(+ws: List<&2, String>) -> List<&2, K.File>:
@@ -220,8 +220,8 @@ def files_of(hash: String, text: String) -> IO(List<&2, K.File>):
   files.judge(K.escaped(fs), hash, fs)
 
 # what a fetch answered, or the reason it did not
-def body_of(g: Web.Got) -> IO(String):
-  match g:
+def body_of(got: Web.Got) -> IO(String):
+  match got:
     case Web.Miss{why}:
       IO.die(String, 1, "ez: " ++ why)
     case Web.Have{body}:
@@ -238,9 +238,9 @@ def want(+hash: String) -> String:
 
 # one file of a hub package, accepted only when it hashes to what the manifest
 # says
-def fetch.one(+hub: String, +hash: String, +f: K.File) -> IO(String):
+def fetch.one(+hub: String, +hash: String, +item: K.File) -> IO(String):
   do IO<String>:
-    g : Web.Got <- Web.fetch(url_of(hub, hash, K.file.at(f)), K.file.sum(f))
+    g : Web.Got <- Web.fetch(url_of(hub, hash, K.file.at(item)), K.file.sum(item))
     body_of(g)
 
 # every file of a hub package
@@ -264,12 +264,12 @@ def disk.judge(ok: Bool, at: String, text: String) -> IO(String):
       IO.die(String, 1, "ez: " ++ at ++ " does not match its manifest")
 
 # one file of a vendored package
-def disk.one(+lib: String, +hash: String, +f: K.File) -> IO(String):
-  +at = url_of(lib, hash, K.file.at(f))
+def disk.one(+lib: String, +hash: String, +item: K.File) -> IO(String):
+  +at = url_of(lib, hash, K.file.at(item))
   do IO<String>:
     m : Maybe<&2, String> <- F.read(at)
     +text : String <- IO.pure(String, F.text_of(m))
-    disk.judge(String.eq(Sha.hex(text), K.file.sum(f)), at, text)
+    disk.judge(String.eq(Sha.hex(text), K.file.sum(item)), at, text)
 
 # every file of a vendored package
 def disk.all(+lib: String, +hash: String, fs: List<&2, K.File>) -> IO(List<&2, String>):
@@ -294,27 +294,26 @@ def read.git(+lib: String, +hash: String) -> IO(Body):
 
 # the manifest, or why the hub did not have it. A 404 names the package and
 # the next step; any other miss is the reason the fetch gave.
-def read.hub.miss(+hash: String, +url: String, +why: String, s: Say.Spin) -> IO(Body):
+def read.hub.miss(+hash: String, +url: String, +why: String, spin: Say.Spin) -> IO(Body):
   do IO<Body>:
-    Say.done(s)
+    Say.done(spin)
     IO.die(Body, 1, Say.hub.explain(hash, url, why))
 
 # the files, once the manifest arrived and checked
-def read.hub.have(+text: String, +hub: String, +hash: String, s: Say.Spin) -> IO(Body):
+def read.hub.have(+text: String, +hub: String, +hash: String, spin: Say.Spin) -> IO(Body):
   do IO<Body>:
     fs : List<&2, K.File> <- files_of(hash, text)
     +files : List<&2, K.File> <- IO.pure(List<&2, K.File>, fs)
     srcs : List<&2, String> <- fetch.all(hub, hash, files)
-    Say.done(s)
+    Say.done(spin)
     return Body{files, srcs}
 
-def read.hub.got(g: Web.Got, +hub: String, +hash: String, +url: String,
-  s: Say.Spin) -> IO(Body):
-  match g:
+def read.hub.got(got: Web.Got, +hub: String, +hash: String, +url: String, spin: Say.Spin) -> IO(Body):
+  match got:
     case Web.Miss{why}:
-      read.hub.miss(hash, url, why, s)
+      read.hub.miss(hash, url, why, spin)
     case Web.Have{body}:
-      read.hub.have(body, hub, hash, s)
+      read.hub.have(body, hub, hash, spin)
 
 # a hub package is fetched, manifest first, and every file checked against it
 def read.hub(+hub: String, +hash: String) -> IO(Body):
@@ -333,8 +332,8 @@ def read.pkg(hub: String, lib: String, +hash: String, src: Src) -> IO(Body):
       read.git(lib, hash)
 
 # the hash a package is recorded under
-def pack.hash(p: Pack) -> String:
-  Pack{h, _s, _f} = p
+def pack.hash(package: Pack) -> String:
+  Pack{h, _s, _f} = package
   h
 
 # one step of a scan that is looking for one hit. Both scans in this file want
@@ -353,33 +352,51 @@ def any.step(here: Bool, rest: Unit -> Bool) -> Bool:
       rest(Unit{})
 
 # whether a package is already resolved
-def has(ds: List<&2, Pack>, +h: String) -> Bool:
+def has(ds: List<&2, Pack>, +wanted: String) -> Bool:
   match ds:
     case []:
       False{}
     case x <> t:
-      any.step(String.eq(pack.hash(x), h), _u => has(t, h))
+      any.step(String.eq(pack.hash(x), wanted), _u => has(t, wanted))
 
 # a package resolved, and every package it imports queued behind what is left
-def resolve.done(b: Body, hash: String, src: Src, rest: List<&2, String>,
+def resolve.done(
+  body: Body,
+  hash: String,
+  src: Src,
+  rest: List<&2, String>,
   done: List<&2, Pack>,
-  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
-  Body{files, srcs} = b
+  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
+  Body{files, srcs} = body
   go(List.append(&2, String, rest, kids(srcs)), Pack{hash, src, files} <> done)
 
 # one package read, then recorded
-def resolve.step(hub: String, lib: String, orgs: List<&2, Origin>, +hash: String,
-  rest: List<&2, String>, done: List<&2, Pack>,
-  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
+def resolve.step(
+  hub: String,
+  lib: String,
+  orgs: List<&2, Origin>,
+  +hash: String,
+  rest: List<&2, String>,
+  done: List<&2, Pack>,
+  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
   do IO<List<&2, Pack>>:
     +src : Src <- IO.pure(Src, origin(orgs, hash))
     b : Body <- read.pkg(hub, lib, hash, src)
     resolve.done(b, hash, src, rest, done, go)
 
 # a package already resolved is not resolved twice
-def resolve.pick(hit: Bool, hub: String, lib: String, orgs: List<&2, Origin>,
-  hash: String, rest: List<&2, String>, done: List<&2, Pack>,
-  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
+def resolve.pick(
+  hit: Bool,
+  hub: String,
+  lib: String,
+  orgs: List<&2, Origin>,
+  hash: String,
+  rest: List<&2, String>,
+  done: List<&2, Pack>,
+  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
   match hit:
     case True{}:
       go(rest, done)
@@ -387,14 +404,23 @@ def resolve.pick(hit: Bool, hub: String, lib: String, orgs: List<&2, Origin>,
       resolve.step(hub, lib, orgs, hash, rest, done, go)
 
 # one hash off the queue
-def resolve.next(hub: String, lib: String, orgs: List<&2, Origin>, +hash: String,
-  rest: List<&2, String>, +done: List<&2, Pack>,
-  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
+def resolve.next(
+  hub: String,
+  lib: String,
+  orgs: List<&2, Origin>,
+  +hash: String,
+  rest: List<&2, String>,
+  +done: List<&2, Pack>,
+  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
   resolve.pick(has(done, hash), hub, lib, orgs, hash, rest, done, go)
 
 # the next hash of the queue, handed on with what is left of it
-def resolve.pop(queue: List<&2, String>, +done: List<&2, Pack>,
-  go: String -> List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
+def resolve.pop(
+  queue: List<&2, String>,
+  +done: List<&2, Pack>,
+  go: String -> List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
   match queue:
     case []:
       IO.pure(List<&2, Pack>, done)
@@ -403,8 +429,14 @@ def resolve.pop(queue: List<&2, String>, +done: List<&2, Pack>,
 
 # every package the queue reaches, each one resolved once. The carrying on
 # arrives as a function, since two defs in Bend may not call each other.
-def resolve(fuel: Nat, +hub: String, +lib: String, +orgs: List<&2, Origin>,
-  queue: List<&2, String>, done: List<&2, Pack>) -> IO(List<&2, Pack>):
+def resolve(
+  fuel: Nat,
+  +hub: String,
+  +lib: String,
+  +orgs: List<&2, Origin>,
+  queue: List<&2, String>,
+  done: List<&2, Pack>
+) -> IO(List<&2, Pack>):
   match fuel:
     case 0n:
       IO.pure(List<&2, Pack>, done)
@@ -418,36 +450,43 @@ type Seen is Data:
   Seen{files: List<&2, String>, hits: List<&2, String>}
 
 # a module import as the file to read next, or nothing when it names a package
-def root.put(+d: String, +spec: String) -> List<&2, String>:
-  Bool.pick(List<&2, String>, K.is_hub(spec), [], [P.join(d, spec)])
+def root.put(+dir: String, +spec: String) -> List<&2, String>:
+  Bool.pick(List<&2, String>, K.is_hub(spec), [], [P.join(dir, spec)])
 
 # every module a file imports, as the files to read next
-def root.tasks(+d: String, ms: List<&2, String>) -> List<&2, String>:
+def root.tasks(+dir: String, ms: List<&2, String>) -> List<&2, String>:
   match ms:
     case []:
       []
     case h <> t:
-      List.append(&2, String, root.put(d, h), root.tasks(d, t))
+      List.append(&2, String, root.put(dir, h), root.tasks(dir, t))
 
 # what one file of the project adds: the packages it imports, and the files it
 # reaches. A file that is not there is passed over, the way a project with a
 # stale import still locks.
-def root.found(+at: String, +ms: List<&2, String>, st: Seen,
-  go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.found(
+  +at: String,
+  +ms: List<&2, String>,
+  st: Seen,
+  go: List<&2, String> -> Seen -> IO(List<&2, String>)
+) -> IO(List<&2, String>):
   Seen{files, hits} = st
   go(root.tasks(P.dir(at), ms),
     Seen{at <> files, List.append(&2, String, hits, specs(ms))})
 
 # one file of the project, read and scanned
-def root.read(+at: String, st: Seen,
-  go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.read(+at: String, st: Seen, go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     m : Maybe<&2, String> <- F.read(at)
     root.found(at, K.scan.mods(K.scan(F.text_of(m))), st, go)
 
 # a file already read adds nothing
-def root.pick(hit: Bool, at: String, st: Seen,
-  go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.pick(
+  hit: Bool,
+  at: String,
+  st: Seen,
+  go: List<&2, String> -> Seen -> IO(List<&2, String>)
+) -> IO(List<&2, String>):
   match hit:
     case True{}:
       go([], st)
@@ -471,21 +510,23 @@ def seen.hits(st: Seen) -> List<&2, String>:
 # The list grows by one with every file the project walk reads, so this scan
 # is the inner half of a quadratic; `any.step` is what lets it stop at the
 # name it was looking for instead of reading past it.
-def seen.holds(xs: List<&2, String>, +s: String) -> Bool:
+def seen.holds(xs: List<&2, String>, +needle: String) -> Bool:
   match xs:
     case []:
       False{}
     case +h <> t:
-      any.step(String.eq(h, s), _u => seen.holds(t, s))
+      any.step(String.eq(h, needle), _u => seen.holds(t, needle))
 
 # one file off the queue, skipped when it has been read already
-def root.next(+at: String, +st: Seen,
-  go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.next(+at: String, +st: Seen, go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
   root.pick(seen.holds(seen.files(st), at), at, st, go)
 
 # the next file of the queue, handed on with what is left of it
-def root.pop(queue: List<&2, String>, +st: Seen,
-  go: String -> List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.pop(
+  queue: List<&2, String>,
+  +st: Seen,
+  go: String -> List<&2, String> -> Seen -> IO(List<&2, String>)
+) -> IO(List<&2, String>):
   match queue:
     case []:
       IO.pure(List<&2, String>, seen.hits(st))
@@ -509,8 +550,8 @@ def kv(key: String, +val: String) -> List<&2, T.Kv>:
   Bool.pick(List<&2, T.Kv>, String.is_empty(val), [], [T.Kv{key, val}])
 
 # the keys a source contributes to the lock
-def src.pairs(s: Src) -> List<&2, T.Kv>:
-  match s:
+def src.pairs(source: Src) -> List<&2, T.Kv>:
+  match source:
     case Hub{}:
       [T.Kv{"kind", "hub"}]
     case Git{url, rev, entry, root, nar, tag}:
@@ -519,8 +560,8 @@ def src.pairs(s: Src) -> List<&2, T.Kv>:
          kv("root", root), kv("narHash", nar), kv("tag", tag)])
 
 # a file of a package as a `"<path>" = "<sha256>"` pair
-def file.pair(f: K.File) -> T.Kv:
-  K.File{at, sum} = f
+def file.pair(item: K.File) -> T.Kv:
+  K.File{at, sum} = item
   T.Kv{at, sum}
 
 # every file of a package, in path order
@@ -532,8 +573,8 @@ def file.pairs(fs: List<&2, K.File>) -> List<&2, T.Kv>:
       file.pair(h) <> file.pairs(t)
 
 # the two tables a package is written as
-def pack.sects(p: Pack) -> List<&2, T.Sect>:
-  Pack{hash, src, files} = p
+def pack.sects(package: Pack) -> List<&2, T.Sect>:
+  Pack{hash, src, files} = package
   +at = "packages." ++ T.quote(hash)
   [T.Sect{at ++ ".source", src.pairs(src)},
    T.Sect{at ++ ".files", file.pairs(K.files_of(files))}]
@@ -548,27 +589,26 @@ def pack.all(ps: List<&2, Pack>) -> List<&2, T.Sect>:
 
 # packages are written in hash order, so a lock is the same text however it was
 # resolved
-def pack.le(a: Pack, b: Pack) -> Bool:
-  String.is_le(pack.hash(a), pack.hash(b))
+def pack.le(left: Pack, right: Pack) -> Bool:
+  String.is_le(pack.hash(left), pack.hash(right))
 
 # where a package goes among the packages already in order. The rest of the
 # insertion is a parameter, because two defs that call each other are not
 # allowed.
-def pack.ins.put(le: Bool, x: Pack, h: Pack, t: List<&2, Pack>,
-  rest: List<&2, Pack>) -> List<&2, Pack>:
+def pack.ins.put(le: Bool, item: Pack, head: Pack, tail: List<&2, Pack>, rest: List<&2, Pack>) -> List<&2, Pack>:
   match le:
     case True{}:
-      x <> (h <> t)
+      item <> (head <> tail)
     case False{}:
-      h <> rest
+      head <> rest
 
 # a package inserted into a list already in hash order
-def pack.ins(ps: List<&2, Pack>, +x: Pack) -> List<&2, Pack>:
+def pack.ins(ps: List<&2, Pack>, +item: Pack) -> List<&2, Pack>:
   match ps:
     case []:
-      [x]
+      [item]
     case Con{+h, +t}:
-      pack.ins.put(pack.le(x, h), x, h, t, pack.ins(t, x))
+      pack.ins.put(pack.le(item, h), item, h, t, pack.ins(t, item))
 
 # the packages in hash order. Insertion rather than Base's `List.sort`: that
 # one is a fuelled bottom-up merge sort, whose recursion Bend cannot check, so
@@ -594,18 +634,18 @@ def render(hub: String, ver: String, ps: List<&2, Pack>) -> String:
 
 # the keys a pinned CLI contributes. The same names a `[tools.*]` section
 # uses in ez.toml, and not the `[packages.*]` source table.
-def tool.pairs(+e: String, +b: String, s: M.Source) -> List<&2, T.Kv>:
-  match s:
+def tool.pairs(+entry: String, +binary: String, source: M.Source) -> List<&2, T.Kv>:
+  match source:
     case M.Hub{}:
-      List.concat(&2, T.Kv, [kv("entry", e), kv("bin", b)])
+      List.concat(&2, T.Kv, [kv("entry", entry), kv("bin", binary)])
     case M.Git{url, rev, tag, root, nar, _vend}:
       List.concat(&2, T.Kv,
         [kv("git", url), kv("rev", rev), kv("tag", tag), kv("root", root),
-         kv("narHash", nar), kv("entry", e), kv("bin", b)])
+         kv("narHash", nar), kv("entry", entry), kv("bin", binary)])
 
 # one `[tools.<name>]` table
-def tool.sect(t: M.Tool) -> T.Sect:
-  M.Tool{n, e, b, s} = t
+def tool.sect(pin: M.Tool) -> T.Sect:
+  M.Tool{n, e, b, s} = pin
   T.Sect{"tools." ++ n, tool.pairs(e, b, s)}
 
 # every pinned CLI, in the order the ledger holds them
@@ -618,8 +658,7 @@ def tool.sects(ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
 
 # the lock with its tools after the packages. An empty tool list is the
 # lock `render` writes, so a ledger with no tools is unchanged.
-def render.pick(empty: Bool, hub: String, ver: String, ps: List<&2, Pack>,
-  ts: List<&2, M.Tool>) -> String:
+def render.pick(empty: Bool, hub: String, ver: String, ps: List<&2, Pack>, ts: List<&2, M.Tool>) -> String:
   match empty:
     case True{}:
       render(hub, ver, ps)
@@ -627,8 +666,7 @@ def render.pick(empty: Bool, hub: String, ver: String, ps: List<&2, Pack>,
       T.render(List.append(&2, T.Sect, doc(hub, ver, ps), tool.sects(ts)))
 
 # the same choice, made by matching the list so it is read once
-def render.tools(ts: List<&2, M.Tool>, hub: String, ver: String,
-  ps: List<&2, Pack>) -> String:
+def render.tools(ts: List<&2, M.Tool>, hub: String, ver: String, ps: List<&2, Pack>) -> String:
   match ts:
     case []:
       render(hub, ver, ps)
@@ -648,10 +686,10 @@ def lock.hub(ss: List<&2, T.Sect>) -> String:
   T.value(lock.pairs(ss), "hub")
 
 # every hash a lock records, one per `[packages."<hash>".files]` table
-def hash.put(hit: Bool, s: T.Sect, rest: List<&2, String>) -> List<&2, String>:
+def hash.put(hit: Bool, sect: T.Sect, rest: List<&2, String>) -> List<&2, String>:
   match hit:
     case True{}:
-      T.Sect{n, _ps} = s
+      T.Sect{n, _ps} = sect
       K.word(T.segments(n), 1n) <> rest
     case False{}:
       rest
@@ -678,9 +716,9 @@ def pair.files(ps: List<&2, T.Kv>) -> List<&2, K.File>:
       pair.file(h) <> pair.files(t)
 
 # the package a lock records under this hash
-def pack_of(+ss: List<&2, T.Sect>, +h: String) -> Pack:
-  Pack{h, src_of(at3(ss, "packages", h, "source")),
-    pair.files(at3(ss, "packages", h, "files"))}
+def pack_of(+ss: List<&2, T.Sect>, +key: String) -> Pack:
+  Pack{key, src_of(at3(ss, "packages", key, "source")),
+    pair.files(at3(ss, "packages", key, "files"))}
 
 # every package a lock records
 def packs.at(+ss: List<&2, T.Sect>, hs: List<&2, String>) -> List<&2, Pack>:
@@ -695,46 +733,46 @@ def packs(+ss: List<&2, T.Sect>) -> List<&2, Pack>:
   packs.at(ss, hashes(ss))
 
 # a package's source
-def pack.src(p: Pack) -> Src:
-  Pack{_h, s, _f} = p
+def pack.src(package: Pack) -> Src:
+  Pack{_h, s, _f} = package
   s
 
 # a package's files
-def pack.files(p: Pack) -> List<&2, K.File>:
-  Pack{_h, _s, f} = p
+def pack.files(package: Pack) -> List<&2, K.File>:
+  Pack{_h, _s, f} = package
   f
 
 # the manifest text a package is served with
-def pack.manifest(p: Pack) -> String:
-  K.manifest_of(pack.files(p))
+def pack.manifest(package: Pack) -> String:
+  K.manifest_of(pack.files(package))
 
 # where a package comes from, in a word
-def src.kind(s: Src) -> String:
-  match s:
+def src.kind(source: Src) -> String:
+  match source:
     case Hub{}:
       "hub"
     case Git{_u, _r, _e, _ro, _n, _t}:
       "git"
 
 # the commit a package is pinned to, or "" when it comes from the hub
-def src.rev(s: Src) -> String:
-  match s:
+def src.rev(source: Src) -> String:
+  match source:
     case Hub{}:
       ""
     case Git{_u, rev, _e, _ro, _n, _t}:
       rev
 
 # the repo a package was vendored from, or "" when it comes from the hub
-def src.url(s: Src) -> String:
-  match s:
+def src.url(source: Src) -> String:
+  match source:
     case Hub{}:
       ""
     case Git{url, _r, _e, _ro, _n, _t}:
       url
 
 # the directory inside a checkout a vendored package's paths are written from
-def src.root(s: Src) -> String:
-  match s:
+def src.root(source: Src) -> String:
+  match source:
     case Hub{}:
       ""
     case Git{_u, _r, _e, root, _n, _t}:
@@ -742,20 +780,20 @@ def src.root(s: Src) -> String:
 
 # the NAR hash nix rebuilds a vendored package's checkout by, or "" when it
 # comes from the hub
-def src.nar(s: Src) -> String:
-  match s:
+def src.nar(source: Src) -> String:
+  match source:
     case Hub{}:
       ""
     case Git{_u, _r, _e, _ro, nar, _t}:
       nar
 
 # where the hub is, which is where bend's own is unless BEND_HUB says otherwise
-def hub.or(+s: String) -> String:
-  Bool.pick(String, String.is_empty(s), "https://hub.bend-lang.com", s)
+def hub.or(+url: String) -> String:
+  Bool.pick(String, String.is_empty(url), "https://hub.bend-lang.com", url)
 
 # an environment variable's text; unset, ""
-def env.text(r: Result<&1, &1, U32 & String, String>) -> String:
-  match r:
+def env.text(res: Result<&1, &1, U32 & String, String>) -> String:
+  match res:
     case Fail{_e}:
       ""
     case Done{s}:
@@ -768,8 +806,8 @@ def hub() -> IO(String):
     return hub.or(String.trim(env.text(r)))
 
 # where packages live, which is with the project rather than in ~/.bend/lib
-def lib.or(+s: String) -> String:
-  Bool.pick(String, String.is_empty(s), ".ez/lib", s)
+def lib.or(+dir: String) -> String:
+  Bool.pick(String, String.is_empty(dir), ".ez/lib", dir)
 
 # the BEND_LIB this project pins
 def lib() -> IO(String):
@@ -814,8 +852,7 @@ def version() -> IO(String):
 # the lock of a project, resolved against a named hub, ledger and BEND_LIB. The
 # ledger's path is a parameter rather than the fixed name, so a test can lock a
 # project that is not the one it was started in.
-def lock.at(+hub: String, +toml: String, +at: String,
-  entries: List<&2, String>) -> IO(String):
+def lock.at(+hub: String, +toml: String, +at: String, entries: List<&2, String>) -> IO(String):
   do IO<String>:
     led : List<&2, Origin> <- ledger_of(toml)
     cache : List<&2, Origin> <- origins_of(at)

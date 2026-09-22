@@ -57,25 +57,25 @@ def ledger(+name: String, +hash: String) -> String:
 # the project, its packages, and the two files that say where they came from.
 # `b` is in both, with a different rev in each, and `c` is in the ledger alone,
 # which is the state a fresh clone is in for every package it has.
-def fixture(+d: String) -> IO(Unit):
+def fixture(+dir: String) -> IO(Unit):
   do IO<Unit>:
-    _mk : String <- R.exec(["mkdir", "-p", d ++ "/app"])
-    vendor(d ++ "/lib", a(), leaf())
-    vendor(d ++ "/lib", b(), mid())
-    vendor(d ++ "/lib", c(), leaf())
-    _o : Bool <- F.write(d ++ "/origins.toml", origin(a()) ++ origin(b()))
-    _t : Bool <- F.write(d ++ "/ez.toml",
+    _mk : String <- R.exec(["mkdir", "-p", dir ++ "/app"])
+    vendor(dir ++ "/lib", a(), leaf())
+    vendor(dir ++ "/lib", b(), mid())
+    vendor(dir ++ "/lib", c(), leaf())
+    _o : Bool <- F.write(dir ++ "/origins.toml", origin(a()) ++ origin(b()))
+    _t : Bool <- F.write(dir ++ "/ez.toml",
       "[package]\nname = \"fixture\"\nentry = \"app/main.bend\"\n" ++
       ledger("mid", b()) ++ ledger("leaf", c()))
-    _m : Bool <- F.write(d ++ "/app/main.bend",
+    _m : Bool <- F.write(dir ++ "/app/main.bend",
       "import Base\nimport " ++ b() ++ "/lib.bend as B\nimport ./side.bend as S\n")
-    _s : Bool <- F.write(d ++ "/app/side.bend",
+    _s : Bool <- F.write(dir ++ "/app/side.bend",
       "import Base\nimport " ++ c() ++ "/lib.bend as C\n")
     return Unit{}
 
 # the tables of a lock that was written
-def sects(s: String) -> List<&2, T.Sect>:
-  T.sects(T.parse(s))
+def sects(text: String) -> List<&2, T.Sect>:
+  T.sects(T.parse(text))
 
 # every package a lock records, by hash
 def names(+text: String) -> String:

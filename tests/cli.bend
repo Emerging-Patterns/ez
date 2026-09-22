@@ -14,10 +14,10 @@ def yes(name: String, ok: Bool) -> IO(Unit):
   Check.eq_str(name, Bool.pick(String, ok, "yes", "no"), "yes")
 
 # a line kept or dropped
-def put(keep: Bool, h: String, rest: List<&2, String>) -> List<&2, String>:
+def put(keep: Bool, line: String, rest: List<&2, String>) -> List<&2, String>:
   match keep:
     case True{}:
-      h <> rest
+      line <> rest
     case False{}:
       rest
 

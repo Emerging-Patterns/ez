@@ -19,15 +19,15 @@ def show(+out: String) -> String:
   R.code(out) ++ " " ++ R.text(out)
 
 # every fetch, once the server is up
-def fetch(+p: String) -> IO(Unit):
+def fetch(+port: String) -> IO(Unit):
   do IO<Unit>:
-    +plain : String <- Hub.get(at(p, "/plain"))
+    +plain : String <- Hub.get(at(port, "/plain"))
     Check.eq_str("a Content-Length body comes back whole", show(plain),
       "0 a manifest line\n")
-    +chunked : String <- Hub.get(at(p, "/chunked"))
+    +chunked : String <- Hub.get(at(port, "/chunked"))
     Check.eq_str("a chunked body is put back together", show(chunked),
       "0 one two three four\n")
-    +gone : String <- Hub.get(at(p, "/gone"))
+    +gone : String <- Hub.get(at(port, "/gone"))
     Check.eq_str("a 404 is a status, never a body", show(gone),
       "22 the server answered 404")
     +shut : String <- Hub.get("http://127.0.0.1:1/plain")
