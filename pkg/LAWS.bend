@@ -235,11 +235,6 @@ law climb_absolute:
   for e: {True{} == String.starts_with(p, "/") : Bool}
   {String.starts_with(Path.climb(n, p), "/") == True{} : Bool}
 
-# LAW: a `.` is not a component. The walk skips it, so `./` in a path is
-# never a name a module is published under.
-law comp_dot:
-  {Path.comp_of(".") == Path.CSkip{} : Path.Comp}
-
 # LAW: skipping a component leaves the walk as it was
 law skip_id:
   for w: Path.Walk

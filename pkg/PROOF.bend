@@ -1463,9 +1463,6 @@ def Laws.climb_absolute(n, p, e):
 # are a hypothesis rewritten into a pick, a split walked one character at
 # a time, or a suffix taken off a concatenation.
 
-def Laws.comp_dot():
-  {==}
-
 def Laws.skip_id(w):
   match w:
     case Path.Walk{_abs, _out}:
@@ -1631,6 +1628,15 @@ def split_dot(p):
         Char.is_eq('/', '/'), True{}, Eq.char_eq_self('/'))))
 
 # LAW: walking a skip first is walking what follows
+# a `.` is not a component: the walk skips it. A lemma of `walk_skip_dot`
+# below, stated here rather than in LAWS.bend because it is one computed case
+# and no requirement's claim.
+law comp_dot:
+  {Path.comp_of(".") == Path.CSkip{} : Path.Comp}
+
+def comp_dot():
+  {==}
+
 law walk_skip_dot:
   for cs: List<&2, String>
   for w: Path.Walk
@@ -1643,7 +1649,7 @@ def walk_skip_dot(cs, w):
     Path.norm.walk(cs, w),
     Equal.cong(Path.Comp, Path.Walk,
       c => Path.norm.walk(cs, Path.norm.go(w, c)),
-      Path.comp_of("."), Path.CSkip{}, Laws.comp_dot()),
+      Path.comp_of("."), Path.CSkip{}, comp_dot()),
     Equal.cong(Path.Walk, Path.Walk,
       st => Path.norm.walk(cs, st),
       Path.norm.go(w, Path.CSkip{}), w, Laws.skip_id(w)))

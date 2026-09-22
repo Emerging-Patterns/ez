@@ -30,3 +30,10 @@ def laws() -> String:
 # an `@unsafe` def that a LAWS.bend or PROOF.bend reaches
 def unsafe() -> String:
   "error"
+
+# a law in a LAWS.bend with no binder, equality or not. A closed law claims one
+# computed case and no requirement (SPEC.md); the ones kept on purpose carry a
+# `# toward EZ-...` line right above them and are exempt until their
+# requirement's law lands.
+def quantify() -> String:
+  "error"
