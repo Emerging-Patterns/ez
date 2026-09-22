@@ -7,6 +7,7 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./manifest.bend as M
 import ./render.bend as R
 import ./upgrade.bend as U
+import ./ignore.bend as I
 
 # LAW: dropping a dependency drops every entry of that name, so dropping twice
 # is dropping once. `ez remove` on a ledger it already edited is a no-op.
@@ -360,6 +361,52 @@ law hub_of_names_the_hub:
   for f: {False{} == String.is_empty(hb) : Bool}
   {M.hub_of(M.Good{M.Manifest{n, e, b, hb, ds, ts}}) == hb : String}
 
+# LAW: a git section's vendor bit is its `vendor` key read as `true`, and
+# nothing else. This is the bit the allowlist is derived from.
+law source_of_vendor:
+  for +pairs: List<&2, T.Kv>
+  for e: {False{} == String.is_empty(M.value(pairs, "git")) : Bool}
+  {M.source.vendor(M.source_of(pairs)) == M.flag(M.value(pairs, "vendor"))
+    : Bool}
+
+# LAW: a dependency added again keeps the `vendor = true` the ledger already
+# gave it. `ez add` has no way to say it, so dropping it would drop the tree
+# from the allowlist without anyone having asked.
+law readd_keeps_vendor:
+  for ds: List<&2, M.Dep>
+  for +n: String
+  for h: String
+  for en: String
+  for url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for v: Bool
+  for e: {M.source.vendor(M.source.dep(M.find(ds, n))) == True{} : Bool}
+  {M.source.vendor(M.source.dep(R.readd(ds,
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, v}}))) == True{} : Bool}
+
+# LAW: the gitignore allowlist names exactly the hashes of the dependencies
+# the ledger marks `vendor = true`, in the ledger's order, whatever the file
+# said before. `ez add`, `ez remove` and `ez lock --upgrade` write the file
+# `I.sync` makes from these lines, so after any of them the allowlist is the
+# ledger's and no one else's.
+# EZ-VEN-1
+law allowlist_is_the_ledger:
+  for +ds: List<&2, M.Dep>
+  for +ls: List<&2, String>
+  {I.hashes(I.lines(ds, ls)) == I.vended(ds) : List<&2, String>}
+
+# LAW: and every line that is not ez's is kept, in order, as it was written.
+# ez's lines are the allowlist, the three rules it needs, and a `.ez/` that
+# would make it inert; everything else in the file is the project's.
+# EZ-VEN-1
+law allowlist_keeps_other_lines:
+  for +ds: List<&2, M.Dep>
+  for +ls: List<&2, String>
+  {I.others(I.lines(ds, ls)) == I.others(ls) : List<&2, String>}
+
 # a ledger in the form `show` writes: the package table, then each
 # dependency, with every value quoted and an absent key left out
 def ledger() -> String:
@@ -434,25 +481,6 @@ def sha.dep() -> M.Dep:
 def sha.tip() -> String:
   "5887e7cefa273ff7f90e3edfd6e90b815bbc79ed"
 
-# the allowlist as `.gitignore` writes it for the committed sha256 tree
-def sha.ignore() -> String:
-  ".ez/*\n!.ez/lib\n.ez/lib/*\n!.ez/lib/0x0a5c2c95283e42e081da247c84debe18\n"
-
-# LAW: `vendor = true`, bare, is the committed-tree bit
-# toward EZ-VEN-1
-law sha256_vendor_flag:
-  {M.source.vendor(M.source.dep(sha.dep())) == True{} : Bool}
-
-# LAW: a quoted true is the same bit. The renderer writes the quotes.
-# toward EZ-VEN-1
-law vendor_flag_true:
-  {M.flag("true") == True{} : Bool}
-
-# LAW: an absent vendor key is not a committed tree
-# toward EZ-VEN-1
-law vendor_flag_absent:
-  {M.flag("") == False{} : Bool}
-
 # LAW: sha256 has no tag, so an upgrade asks the default branch rather than
 # a ref the ledger never named
 # toward EZ-RES-5
@@ -509,12 +537,6 @@ law sha256_retarget:
     == M.Dep{"sha256", "0xnew", "sha256.bend",
       M.Git{"https://github.com/Giulio2002/bend-sha256", sha.tip(), "", ".",
         "sha256-new", True{}}} : M.Dep}
-
-# LAW: the allowlist follows the new hash and leaves the rest of the file
-# toward EZ-VEN-1
-law sha256_allowlist:
-  {U.reallow(sha.ignore(), "0x0a5c2c95283e42e081da247c84debe18", "0xnew")
-    == ".ez/*\n!.ez/lib\n.ez/lib/*\n!.ez/lib/0xnew\n" : String}
 
 # a source file that names sha256 twice, names another package, and also
 # carries the same digits where they are not that import

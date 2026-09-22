@@ -141,7 +141,21 @@ revision's `ez.toml`, then `[package] bin` when `entry` is absent, then
 
 A dependency with no `git` key lives on the hub. `vendor = true` commits that
 dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.
-Without it, the tree is not committed: `ez fetch` fills `BEND_LIB` from the
+`ez add` records a new dependency without it; you set it by hand, and
+adding the dependency again keeps it. The allowlist is derived from the
+ledger: after `ez add`, `ez remove` or `ez lock --upgrade`, the
+`!.ez/lib/<hash>` lines of `.gitignore` are exactly the hashes of the
+dependencies marked `vendor = true`, in the ledger's order, and every other
+line is left as it was. A missing hash is written where the first allowlist
+line was, or at the end of the file; a hash the ledger no longer vendors is
+dropped. ez counts as its own any `!` line under `.ez/lib/`, however it
+is spelled (a leading or trailing `/`, surrounding blanks), and writes the
+ones it keeps as `!.ez/lib/<hash>`. The allowlist
+needs `.ez/*`, `!.ez/lib` and `.ez/lib/*`, which `ez init` writes: git
+cannot re-include a file under a directory it has excluded, so under a bare
+`.ez/` no allowlist line works, and ez replaces that line with the three.
+The file is only written when this changes it.
+Without `vendor = true`, the tree is not committed: `ez fetch` fills `BEND_LIB` from the
 lock, and `ez lock` fetches a git dependency whose tree is not under
 `BEND_LIB` at the ledger's `rev`, checks it against `narHash`, and leaves it
 there. A fetch or a check that fails stops the lock with exit 1. `ez doctor`

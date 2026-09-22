@@ -83,7 +83,7 @@ def refuses.dirty(+repo: String, +app: String, +hub: String) -> IO(Unit):
     yes("and reports no hash at all",
       Bool.not(String.contains(R.text(out), "import 0x")))
 
-# the build output every project has and no project commits. `.ez/` and
+# the build output every project has and no project commits. `.ez/*` and
 # `bin/<name>.out` are what `ez init` wrote into the project's .gitignore, so
 # git never names them and a tree holding them is still clean.
 def ignored(+app: String) -> IO(Unit):

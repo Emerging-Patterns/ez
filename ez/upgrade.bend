@@ -4,28 +4,30 @@
 # A hub dependency is left, because the hash is the pin. `ez fetch` still
 # fills BEND_LIB for everything else. A dependency with `vendor = true` is
 # the exception: its tree is committed under `.ez/lib/<hash>` and named in
-# the gitignore allowlist, so a move lays the new tree there and rewrites
-# the line. An import that names the old hash is rewritten to the new one.
+# the gitignore allowlist, so a move lays the new tree there, removes the
+# old one, and the allowlist is derived again from the ledger the move
+# wrote. An import that names the old hash is rewritten to the new one.
 import Base
 import ../io/file.bend as F
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../manifest/manifest.bend as M
 import ../manifest/render.bend as Rend
 import ../manifest/upgrade.bend as U
+import ../manifest/ignore.bend as Ig
 import ../git/git.bend as Git
 import ../hub/hub.bend as Web
 import ../lock/lock.bend as L
 import ./args.bend as Args
 import ../ez/say.bend as Say
 
-# what one dependency became. `old` is the hash the allowlist must drop, ""
+# what one dependency became. `old` is the committed tree to remove, ""
 # when the tree is not committed or the hash did not change. `prev` is the
 # content hash an import must stop naming, "" when that hash did not change.
 type Done is Data:
   Done{dep: M.Dep, old: String, new: String, prev: String, moved: Bool}
 
-# the whole ledger after the walk. `swaps` rename committed trees. `edits`
-# rename the hashes import lines carry.
+# the whole ledger after the walk. `swaps` name the committed trees that
+# moved. `edits` rename the hashes import lines carry.
 type Out is Data:
   Out{deps: List<&2, M.Dep>, swaps: List<&2, U.Swap>, edits: List<&2, U.Swap>, moved: Bool}
 
@@ -46,13 +48,13 @@ def work() -> String:
 def stay(dep: M.Dep) -> Done:
   Done{dep, "", "", "", False{}}
 
-# a moved pin. `old` is the hash the allowlist must drop, "" when the tree
+# a moved pin. `old` is the committed tree to remove, "" when the tree
 # is not committed or the hash did not change. `prev` is the content hash
 # the imports named, "" when that hash did not change.
 def moved(dep: M.Dep, +old: String, +new: String, +prev: String) -> Done:
   Done{dep, old, new, prev, True{}}
 
-# the hash to drop from the allowlist, or "" when there is nothing to drop
+# the old hash, or "" when it did not change
 def swap.hash(same: Bool, +old: String) -> String:
   match same:
     case True{}:
@@ -60,7 +62,7 @@ def swap.hash(same: Bool, +old: String) -> String:
     case False{}:
       old
 
-# a committed tree whose hash changed is an allowlist edit
+# a committed tree whose hash changed is a tree to remove
 def swap.of(vend: Bool, +old: String, +new: String) -> String:
   match vend:
     case False{}:
@@ -172,7 +174,7 @@ def confirm(+hub: String, +dep: M.Dep, got: Git.Got) -> IO(Done):
   confirmed(U.agree(M.dep.hash(dep), hash, M.source.nar(src), nar,
     M.source.root(src), root), hub, dep, hash, rev)
 
-# the new pin, the allowlist edit, and what a person is told
+# the new pin, the committed tree it replaces, and what a person is told
 def advanced(+hub: String, +dep: M.Dep, got: Git.Got, +branch: String) -> IO(Done):
   Git.Got{+hash, _url, +rev, _entry, _tag, +root, +nar} = got
   +src = M.source.dep(dep)
@@ -295,7 +297,7 @@ def one(aim: U.Aim, +lib: String, +hub: String, +only: String, dep: M.Dep) -> IO
     case U.Forward{}:
       forward(lib, hub, dep)
 
-# an allowlist edit, kept only when there is a hash to drop
+# a moved hash, kept only when there is one
 def swaps.put(empty: Bool, +old: String, +new: String, rest: List<&2, U.Swap>) -> List<&2, U.Swap>:
   match empty:
     case True{}:
@@ -358,19 +360,32 @@ def write.toml(
           Rend.show(M.Manifest{name, entry, bin, hub, ds, ts}))
         wrote(ok, "ez.toml")
 
-# the ignore file with every committed hash that moved
-def write.ignore.go(empty: Bool, ss: List<&2, U.Swap>) -> IO(Unit):
-  match empty:
+# the ignore file, written only when the allowlist the ledger calls for is
+# not the one it already has, so a command that changed nothing vendored
+# leaves the file as it found it, byte for byte
+def allowlist.put(same: Bool, +next: String) -> IO(Unit):
+  match same:
     case True{}:
       IO.pure(Unit, Unit{})
     case False{}:
       do IO<Unit>:
-        g : Maybe<&2, String> <- F.read(ignore())
-        ok : Bool <- F.write(ignore(), U.reallow.many(ss, F.text_of(g)))
+        ok : Bool <- F.write(ignore(), next)
         wrote(ok, ignore())
 
-def write.ignore(+ss: List<&2, U.Swap>) -> IO(Unit):
-  write.ignore.go(List.is_empty(&2, U.Swap, ss), ss)
+# the ignore file's text against the one the ledger calls for
+def allowlist.text(ds: List<&2, M.Dep>, +text: String) -> IO(Unit):
+  +next = Ig.sync(ds, text)
+  allowlist.put(String.eq(next, text), next)
+
+# the gitignore allowlist, derived from the ledger's dependencies: exactly
+# the hashes marked `vendor = true`, with every other line kept. `ez add`,
+# `ez remove` and `ez lock --upgrade` each call this with the ledger they
+# just wrote. A missing file reads as empty, and stays missing when the
+# ledger vendors nothing.
+def allowlist(ds: List<&2, M.Dep>) -> IO(Unit):
+  do IO<Unit>:
+    g : Maybe<&2, String> <- F.read(ignore())
+    allowlist.text(ds, F.text_of(g))
 
 # a listing that did not happen is a failure
 def sources.got(ok: Bool, +text: String) -> IO(List<&2, String>):
@@ -460,7 +475,7 @@ def go.out(+name: String, +entry: String, +bin: String, +hub: String, ts: List<&
   Out{+deps, +swaps, +edits, changed} = out
   do IO<Unit>:
     write.toml(changed, name, entry, bin, hub, deps, ts)
-    write.ignore(swaps)
+    allowlist(deps)
     write.imports(edits)
     drop(swaps)
 
