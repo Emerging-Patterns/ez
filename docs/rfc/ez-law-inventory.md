@@ -405,7 +405,7 @@ These come out of reading the laws and the gate that runs them. The findings fro
 
 ## Requirements against code
 
-This section checks each requirement in the RFC draft against what the code does. The verdict is one of: **holds** (the code behaves that way), **partly** (it holds with exceptions listed), or **fails** (the code does not behave that way). We do not resolve disagreements here; each one that needs a decision carries a REVIEW marker in the revised RFC. Citations are `file:line` at `b28ca2c`.
+This section checks each requirement in the RFC draft against what the code does. The verdict is one of: **holds** (the code behaves that way), **partly** (it holds with exceptions listed), or **fails** (the code does not behave that way). Disagreements are recorded here as found. A maintainer has since decided each one; the RFC's "Decided behavior changes" section lists the outcome. Citations are `file:line` at `b28ca2c`.
 
 ### Hashing
 
