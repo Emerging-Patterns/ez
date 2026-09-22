@@ -529,6 +529,8 @@ The third phase introduces the World model and converts `ez lock` to planner for
 
 Later phases convert `ez add`, `ez fetch`, `ez publish`, `ez doctor` and the tool commands in the same way, one command per phase, each ending with its requirements proved and its closed laws gone.
 
+ez stays on bolt v0.9.0 while any `# toward` trail remains. bolt is retiring `quantify` and its `# toward` exemption in favour of a strict `closed`, which ez's trails would fail. When the last trail is deleted, ez moves to the current bolt, drops `def quantify()` from `bolt.bend`, and turns on the strict `closed`.
+
 The refactoring contract applies from the first phase, since it depends only on law statements and the trust boundary.
 
 ## Risks
