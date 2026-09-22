@@ -15,6 +15,8 @@ law hash_perm:
 
 A closed law that illustrates a pending requirement is marked `# toward EZ-X-N` directly above its `law` line. It is a trail, not a proof, and we delete it in the same change that lands its requirement's quantified law. bolt's `quantify` rule (L004), on at `error` in `bolt.bend`, rejects any other law without a binder.
 
+A pending requirement may already have tagged quantified laws that prove part of it. The Law column names them, and "Left to prove" below says what is missing before the status becomes proved.
+
 Untagged quantified laws are allowed. They pass the proof gate like any law, but nothing here protects them, so a change may edit or delete them freely.
 
 ## Requirements
@@ -67,7 +69,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 
 | ID | Requirement | Level | Status | Law |
 | :---- | :---- | :---- | :---- | :---- |
-| EZ-VEN-1 | After `ez add`, `ez remove` or `ez lock --upgrade`, the `.gitignore` allowlist names exactly the hashes of dependencies marked `vendor = true`, and every other line of `.gitignore` is unchanged. | Proved | proved | manifest/LAWS.bend allowlist_is_the_ledger, allowlist_keeps_other_lines |
+| EZ-VEN-1 | After `ez add`, `ez remove` or `ez lock --upgrade`, the `.gitignore` allowlist names exactly the hashes of dependencies marked `vendor = true`, and every other line of `.gitignore` is unchanged. | Proved | pending | manifest/LAWS.bend allowlist_is_the_ledger, allowlist_keeps_other_lines |
 | EZ-VEN-2 | When an upgrade moves a hash, every line of a `.bend` file outside `.ez` and `.git` that starts `import <old>/` names `<new>` afterwards. | Proved | pending | |
 | EZ-VEN-3 | Import rewriting leaves every other line of every file byte-identical, and does not write a file with no matching line. | Proved | pending | |
 | EZ-VEN-4 | `ez doctor` never writes to the project's source files. | Proved | pending | |
@@ -105,6 +107,14 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | ID | Requirement | Level | Status | Law |
 | :---- | :---- | :---- | :---- | :---- |
 | EZ-OUT-1 | Every command exits 0 on success and 1 on any failure ez detects, except `ez tool run`, which exits with the program's status. | Proved | pending | |
+
+## Left to prove
+
+What stands between a pending requirement that has tagged laws and the status proved.
+
+| ID | Proved so far | Left to prove |
+| :---- | :---- | :---- |
+| EZ-VEN-1 | Over the line-level function `I.lines` (manifest/ignore.bend): its allowlist lines are exactly the vendored hashes, in ledger order, and every other line is kept in order. | The text layer: `I.sync` splitting `.gitignore` into lines and joining them back, including the trailing newline, so that "every other line is unchanged" holds of the file's bytes. That applying it twice is applying it once. The commands calling it are interpreter code and stay trusted (EZ-TRUST-2). |
 
 ## Trust boundary
 
