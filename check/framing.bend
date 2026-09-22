@@ -33,18 +33,18 @@ def digits() -> List<&2, String>:
    "8", "9", "a", "b", "c", "d", "e", "f"]
 
 # one hex digit
-def hex.digit(x: U32) -> String:
-  S.at(digits(), U32.to_nat(x))
+def hex.digit(val: U32) -> String:
+  S.at(digits(), U32.to_nat(val))
 
 # a length as a chunk header states it. The chunks here are a handful of
 # characters each, so two digits covers every length this server can produce.
-def hex.show(+x: U32) -> String:
-  Bool.pick(String, U32.is_lt(x, 16), hex.digit(x),
-    hex.digit(U32.div(x, 16)) ++ hex.digit(U32.mod(x, 16)))
+def hex.show(+len: U32) -> String:
+  Bool.pick(String, U32.is_lt(len, 16), hex.digit(len),
+    hex.digit(U32.div(len, 16)) ++ hex.digit(U32.mod(len, 16)))
 
 # one chunk: its length in hex, then its bytes, each ended by a CRLF
-def chunk(+s: String) -> String:
-  hex.show(S.size(s)) ++ "\r\n" ++ s ++ "\r\n"
+def chunk(+text: String) -> String:
+  hex.show(S.size(text)) ++ "\r\n" ++ text ++ "\r\n"
 
 # the chunks of a body, one after another
 def chunked.go(ss: List<&2, String>) -> String:
@@ -97,8 +97,8 @@ def serve.req(sock: Socket, first: String) -> IO(Unit):
   S.pieces(sock, 7n, reply(S.at(String.split(first, ' '), 1n)))
 
 # a request served, or refused when its head never ended
-def serve.msg(sock: Socket, m: S.Msg) -> IO(Unit):
-  match m:
+def serve.msg(sock: Socket, msg: S.Msg) -> IO(Unit):
+  match msg:
     case S.MPartial{}:
       S.answer(sock, S.response("400 Bad Request", "an incomplete request"))
     case S.MFull{head, _body}:
@@ -121,38 +121,36 @@ type Run is Type:
   RGo{l: Listener}
 
 # a listener that will not accept is a listener that is finished
-def turn.got(r: Result<&1, &1, U32 & String, Socket>, l: Listener,
-  rest: Listener -> IO(Run)) -> IO(Run):
-  match r:
+def turn.got(accepted: Result<&1, &1, U32 & String, Socket>, listener: Listener, rest: Listener -> IO(Run)) -> IO(Run):
+  match accepted:
     case Fail{_e}:
       do IO<Run>:
-        Listener.close(l)
+        Listener.close(listener)
         return RStop{}
     case Done{sock}:
       do IO<Run>:
         once(sock)
-        rest(l)
+        rest(listener)
 
 # the listener comes back paired with the connection it accepted
-def turn.at(got: Listener & Result<&1, &1, U32 & String, Socket>,
-  rest: Listener -> IO(Run)) -> IO(Run):
+def turn.at(got: Listener & Result<&1, &1, U32 & String, Socket>, rest: Listener -> IO(Run)) -> IO(Run):
   (l, r) = got
   turn.got(r, l, rest)
 
 # a run of connections served one at a time, the listener handed back when the
 # run is up so another can have it
-def turn(fuel: Nat, l: Listener) -> IO(Run):
+def turn(fuel: Nat, listener: Listener) -> IO(Run):
   match fuel:
     case 0n:
-      IO.pure(Run, RGo{l})
+      IO.pure(Run, RGo{listener})
     case 1n+f:
       do IO<Run>:
-        got : Listener & Result<&1, &1, U32 & String, Socket> <- TCP.accept(l)
+        got : Listener & Result<&1, &1, U32 & String, Socket> <- TCP.accept(listener)
         turn.at(got, lis => turn(f, lis))
 
 # a run that ended because the listener did ends the server with it
-def loop.on(r: Run, rest: Listener -> IO(Unit)) -> IO(Unit):
-  match r:
+def loop.on(state: Run, rest: Listener -> IO(Unit)) -> IO(Unit):
+  match state:
     case RStop{}:
       IO.pure(Unit, Unit{})
     case RGo{l}:
@@ -163,23 +161,23 @@ def loop.on(r: Run, rest: Listener -> IO(Unit)) -> IO(Unit):
 # connections. The count is nested rather than written out because a Nat is
 # unary, and the interpreted lane builds the whole of it before it serves
 # anything.
-def loop(fuel: Nat, l: Listener) -> IO(Unit):
+def loop(fuel: Nat, listener: Listener) -> IO(Unit):
   match fuel:
     case 0n:
-      Listener.close(l)
+      Listener.close(listener)
     case 1n+f:
       do IO<Unit>:
-        r : Run <- turn(U32.to_nat(1000), l)
+        r : Run <- turn(U32.to_nat(1000), listener)
         loop.on(r, lis => loop(f, lis))
 
 # a port that would not open, reported rather than served on
-def begin.fail(e: U32 & String) -> IO(Unit):
-  (_code, why) = e
+def begin.fail(err: U32 & String) -> IO(Unit):
+  (_code, why) = err
   IO.die(Unit, 1, "framing: cannot listen: " ++ why)
 
 # the listener, once the port is open
-def begin.at(r: Result<&1, &1, U32 & String, Listener>, port: U32) -> IO(Unit):
-  match r:
+def begin.at(bound: Result<&1, &1, U32 & String, Listener>, port: U32) -> IO(Unit):
+  match bound:
     case Fail{e}:
       begin.fail(e)
     case Done{l}:

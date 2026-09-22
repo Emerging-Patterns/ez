@@ -43,14 +43,14 @@ def work() -> String:
   ".ez/lib/.work-up"
 
 # one dependency left as it was
-def stay(d: M.Dep) -> Done:
-  Done{d, "", "", "", False{}}
+def stay(dep: M.Dep) -> Done:
+  Done{dep, "", "", "", False{}}
 
 # a moved pin. `old` is the hash the allowlist must drop, "" when the tree
 # is not committed or the hash did not change. `prev` is the content hash
 # the imports named, "" when that hash did not change.
-def moved(d: M.Dep, +old: String, +new: String, +prev: String) -> Done:
-  Done{d, old, new, prev, True{}}
+def moved(dep: M.Dep, +old: String, +new: String, +prev: String) -> Done:
+  Done{dep, old, new, prev, True{}}
 
 # the hash to drop from the allowlist, or "" when there is nothing to drop
 def swap.hash(same: Bool, +old: String) -> String:
@@ -71,18 +71,18 @@ def swap.of(vend: Bool, +old: String, +new: String) -> String:
 # a hub pin named with `--package` is reported and left. An unselected
 # dependency is left quietly. Hold on a selected dependency is a hub pin:
 # a selected git pin is Follow or Forward instead.
-def hold.say(sel: Bool, +d: M.Dep) -> IO(Done):
+def hold.say(sel: Bool, +dep: M.Dep) -> IO(Done):
   match sel:
     case False{}:
-      IO.pure(Done, stay(d))
+      IO.pure(Done, stay(dep))
     case True{}:
       do IO<Done>:
-        IO.print(M.dep.name(d) ++ ": pinned by its hash")
-        return stay(d)
+        IO.print(M.dep.name(dep) ++ ": pinned by its hash")
+        return stay(dep)
 
 # Hold is an unselected dependency, or a selected one that has no repo
-def hold(+only: String, +d: M.Dep) -> IO(Done):
-  hold.say(U.chosen(only, M.dep.name(d)), d)
+def hold(+only: String, +dep: M.Dep) -> IO(Done):
+  hold.say(U.chosen(only, M.dep.name(dep)), dep)
 
 # the hub's answer, which fails the upgrade only when a body arrived and
 # did not hash to the name we asked for
@@ -94,8 +94,8 @@ def hub.miss(bad: Bool, +name: String, +hash: String) -> IO(Unit):
       IO.pure(Unit, Unit{})
 
 # the hub's answer
-def hub.got(+name: String, +hash: String, g: Web.Got) -> IO(Unit):
-  match g:
+def hub.got(+name: String, +hash: String, got: Web.Got) -> IO(Unit):
+  match got:
     case Web.Have{_body}:
       IO.pure(Unit, Unit{})
     case Web.Miss{why}:
@@ -117,13 +117,12 @@ def off.why(+name: String, +tag: String, +pin: String, +tip: String) -> String:
 # the same commit, whose tree no longer hashes to the pin. Upgrade does not
 # invent a replacement hash: the pin and the tree disagree, and a person
 # has to say which one is meant.
-def drift.why(+name: String, +tag: String, +rev: String, +old: String,
-  +new: String) -> String:
+def drift.why(+name: String, +tag: String, +rev: String, +old: String, +new: String) -> String:
   Say.drift(name, tag, rev, old, new)
 
 # the branch a rev-only pin followed, said when there is one
-def branch.of(+b: String) -> String:
-  Bool.pick(String, String.is_empty(b), "", " (" ++ b ++ ")")
+def branch.of(+label: String) -> String:
+  Bool.pick(String, String.is_empty(label), "", " (" ++ label ++ ")")
 
 # a pin that moved
 def say.move(+name: String, +old: String, +new: String, +branch: String) -> IO(Unit):
@@ -155,37 +154,37 @@ def say.keep(+name: String, +rev: String) -> IO(Unit):
   IO.print(name ++ ": unchanged " ++ rev)
 
 # the checkout weighed, then judged against the pin it was meant to confirm
-def confirmed(ok: Bool, +hub: String, +d: M.Dep, +hash: String, +rev: String) -> IO(Done):
+def confirmed(ok: Bool, +hub: String, +dep: M.Dep, +hash: String, +rev: String) -> IO(Done):
   match ok:
     case False{}:
-      IO.die(Done, 1, drift.why(M.dep.name(d), M.source.tag(M.source.dep(d)),
-        rev, M.dep.hash(d), hash))
+      IO.die(Done, 1, drift.why(M.dep.name(dep), M.source.tag(M.source.dep(dep)),
+        rev, M.dep.hash(dep), hash))
     case True{}:
       do IO<Done>:
-        hub.check(hub, M.dep.name(d), hash)
-        say.keep(M.dep.name(d), rev)
-        return stay(d)
+        hub.check(hub, M.dep.name(dep), hash)
+        say.keep(M.dep.name(dep), rev)
+        return stay(dep)
 
 # a checkout of the commit the ledger already pins
-def confirm(+hub: String, +d: M.Dep, g: Git.Got) -> IO(Done):
-  Git.Got{+hash, _url, +rev, _entry, _tag, +root, +nar} = g
-  +src = M.source.dep(d)
-  confirmed(U.agree(M.dep.hash(d), hash, M.source.nar(src), nar,
-    M.source.root(src), root), hub, d, hash, rev)
+def confirm(+hub: String, +dep: M.Dep, got: Git.Got) -> IO(Done):
+  Git.Got{+hash, _url, +rev, _entry, _tag, +root, +nar} = got
+  +src = M.source.dep(dep)
+  confirmed(U.agree(M.dep.hash(dep), hash, M.source.nar(src), nar,
+    M.source.root(src), root), hub, dep, hash, rev)
 
 # the new pin, the allowlist edit, and what a person is told
-def advanced(+hub: String, +d: M.Dep, g: Git.Got, +branch: String) -> IO(Done):
-  Git.Got{+hash, _url, +rev, _entry, _tag, +root, +nar} = g
-  +src = M.source.dep(d)
-  +old = M.dep.hash(d)
+def advanced(+hub: String, +dep: M.Dep, got: Git.Got, +branch: String) -> IO(Done):
+  Git.Got{+hash, _url, +rev, _entry, _tag, +root, +nar} = got
+  +src = M.source.dep(dep)
+  +old = M.dep.hash(dep)
   +drop = swap.of(M.source.vendor(src), old, hash)
   +prev = swap.hash(String.eq(old, hash), old)
   do IO<Done>:
-    hub.check(hub, M.dep.name(d), hash)
-    say.move(M.dep.name(d), M.source.rev(src), rev, branch)
-    say.imports(String.is_empty(prev), M.dep.name(d), old, hash)
-    say.tree.go(String.is_empty(drop), M.dep.name(d), hash)
-    return moved(U.retarget(d, rev, hash, root, nar), drop, hash, prev)
+    hub.check(hub, M.dep.name(dep), hash)
+    say.move(M.dep.name(dep), M.source.rev(src), rev, branch)
+    say.imports(String.is_empty(prev), M.dep.name(dep), old, hash)
+    say.tree.go(String.is_empty(drop), M.dep.name(dep), hash)
+    return moved(U.retarget(dep, rev, hash, root, nar), drop, hash, prev)
 
 # the word Off quotes: a branch name when we have one, otherwise the commit
 def tip.of(+branch: String, +tip: String) -> String:
@@ -195,77 +194,106 @@ def tip.of(+branch: String, +tip: String) -> String:
 # `branch` is the default-branch name for a rev-only pin and "" for a tag,
 # which is what the move line puts in parentheses. Off quotes the branch
 # when there is one and the tip commit otherwise.
-def judged(v: U.Verdict, +lib: String, +hub: String, +d: M.Dep, +url: String,
-  +entry: String, +pin: String, +tip: String, +branch: String) -> IO(Done):
-  match v:
+def judged(
+  verdict: U.Verdict,
+  +lib: String,
+  +hub: String,
+  +dep: M.Dep,
+  +url: String,
+  +entry: String,
+  +pin: String,
+  +tip: String,
+  +branch: String
+) -> IO(Done):
+  match verdict:
     case U.Keep{}:
       do IO<Done>:
         g : Git.Got <- Git.vendor.at(lib, url,
-          Git.Ref{pin, M.source.tag(M.source.dep(d))}, entry)
-        confirm(hub, d, g)
+          Git.Ref{pin, M.source.tag(M.source.dep(dep))}, entry)
+        confirm(hub, dep, g)
     case U.Drift{}:
-      IO.die(Done, 1, Say.stuck(M.dep.name(d)))
+      IO.die(Done, 1, Say.stuck(M.dep.name(dep)))
     case U.Off{}:
-      IO.die(Done, 1, off.why(M.dep.name(d), M.source.tag(M.source.dep(d)),
+      IO.die(Done, 1, off.why(M.dep.name(dep), M.source.tag(M.source.dep(dep)),
         pin, tip.of(branch, tip)))
     case U.Advance{+rev, tag}:
       do IO<Done>:
         g : Git.Got <- Git.vendor.at(lib, url, Git.Ref{rev, tag}, entry)
-        advanced(hub, d, g, branch)
+        advanced(hub, dep, g, branch)
 
 # ancestry's answer turned into a verdict. `agree` is true here because the
 # tree has not been weighed yet; a same commit is weighed in Keep, and a
 # disagreement there is the drift.
-def resolved(+lib: String, +hub: String, +d: M.Dep, +url: String, +entry: String,
-  +pin: String, +tip: String, +tag: String, +branch: String, onward: Bool) -> IO(Done):
+def resolved(
+  +lib: String,
+  +hub: String,
+  +dep: M.Dep,
+  +url: String,
+  +entry: String,
+  +pin: String,
+  +tip: String,
+  +tag: String,
+  +branch: String,
+  onward: Bool
+) -> IO(Done):
   judged(U.judge(String.eq(pin, tip), onward, True{}, tip, tag),
-    lib, hub, d, url, entry, pin, tip, branch)
+    lib, hub, dep, url, entry, pin, tip, branch)
 
 # ancestry, then the verdict. The same commit skips the clone.
-def ask(+lib: String, +hub: String, d: M.Dep, +url: String, +entry: String,
-  +pin: String, +tip: String, +tag: String, +branch: String) -> IO(Done):
+def ask(
+  +lib: String,
+  +hub: String,
+  dep: M.Dep,
+  +url: String,
+  +entry: String,
+  +pin: String,
+  +tip: String,
+  +tag: String,
+  +branch: String
+) -> IO(Done):
   do IO<Done>:
     +on : Bool <- Git.descendant.at(work(), url, pin, tip)
-    resolved(lib, hub, d, url, entry, pin, tip, tag, branch, on)
+    resolved(lib, hub, dep, url, entry, pin, tip, tag, branch, on)
 
 # a recorded tag, re-resolved
-def follow.got(+lib: String, +hub: String, +d: M.Dep, +src: M.Source, r: Git.Ref) -> IO(Done):
-  Git.Ref{+rev, tag} = r
-  ask(lib, hub, d, M.source.url(src), M.dep.entry(d), M.source.rev(src),
+def follow.got(+lib: String, +hub: String, +dep: M.Dep, +src: M.Source, ref: Git.Ref) -> IO(Done):
+  Git.Ref{+rev, tag} = ref
+  ask(lib, hub, dep, M.source.url(src), M.dep.entry(dep), M.source.rev(src),
     rev, tag, "")
 
-def follow(+lib: String, +hub: String, +d: M.Dep, +ref: String) -> IO(Done):
-  +src = M.source.dep(d)
+# a tag pin, re-resolved at the remote
+def follow(+lib: String, +hub: String, +dep: M.Dep, +ref: String) -> IO(Done):
+  +src = M.source.dep(dep)
   do IO<Done>:
-    +s : Say.Spin <- Say.hold(Say.resolving.at(M.dep.name(d)))
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.dep.name(dep)))
     r : Git.Ref <- Git.resolve(M.source.url(src), ref)
     Say.done(s)
-    follow.got(lib, hub, d, src, r)
+    follow.got(lib, hub, dep, src, r)
 
 # a rev-only pin, against the default branch tip
-def forward.got(+lib: String, +hub: String, +d: M.Dep, t: Git.Tip) -> IO(Done):
-  Git.Tip{+rev, +branch} = t
-  +src = M.source.dep(d)
-  ask(lib, hub, d, M.source.url(src), M.dep.entry(d), M.source.rev(src),
+def forward.got(+lib: String, +hub: String, +dep: M.Dep, latest: Git.Tip) -> IO(Done):
+  Git.Tip{+rev, +branch} = latest
+  +src = M.source.dep(dep)
+  ask(lib, hub, dep, M.source.url(src), M.dep.entry(dep), M.source.rev(src),
     rev, "", branch)
 
 # a rev-only pin
-def forward(+lib: String, +hub: String, +d: M.Dep) -> IO(Done):
+def forward(+lib: String, +hub: String, +dep: M.Dep) -> IO(Done):
   do IO<Done>:
-    +s : Say.Spin <- Say.hold(Say.resolving.at(M.dep.name(d)))
-    t : Git.Tip <- Git.remote(M.source.url(M.source.dep(d)))
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.dep.name(dep)))
+    t : Git.Tip <- Git.remote(M.source.url(M.source.dep(dep)))
     Say.done(s)
-    forward.got(lib, hub, d, t)
+    forward.got(lib, hub, dep, t)
 
 # one dependency
-def one(a: U.Aim, +lib: String, +hub: String, +only: String, d: M.Dep) -> IO(Done):
-  match a:
+def one(aim: U.Aim, +lib: String, +hub: String, +only: String, dep: M.Dep) -> IO(Done):
+  match aim:
     case U.Hold{}:
-      hold(only, d)
+      hold(only, dep)
     case U.Follow{ref}:
-      follow(lib, hub, d, ref)
+      follow(lib, hub, dep, ref)
     case U.Forward{}:
-      forward(lib, hub, d)
+      forward(lib, hub, dep)
 
 # an allowlist edit, kept only when there is a hash to drop
 def swaps.put(empty: Bool, +old: String, +new: String, rest: List<&2, U.Swap>) -> List<&2, U.Swap>:
@@ -276,19 +304,19 @@ def swaps.put(empty: Bool, +old: String, +new: String, rest: List<&2, U.Swap>) -
       U.Swap{old, new} <> rest
 
 # either side moved
-def either(a: Bool, b: Bool) -> Bool:
-  match a:
+def either(left: Bool, right: Bool) -> Bool:
+  match left:
     case True{}:
       True{}
     case False{}:
-      b
+      right
 
 # one dependency in front of the rest of the ledger
-def join(a: Done, b: Out) -> Out:
-  Done{d, +old, +new, +prev, moved} = a
-  Out{ds, ss, es, any} = b
+def join(first: Done, rest: Out) -> Out:
+  Done{d, +old, +new, +prev, changed} = first
+  Out{ds, ss, es, any} = rest
   Out{d <> ds, swaps.put(String.is_empty(old), old, new, ss),
-    swaps.put(String.is_empty(prev), prev, new, es), either(moved, any)}
+    swaps.put(String.is_empty(prev), prev, new, es), either(changed, any)}
 
 # every dependency, in the order the ledger wrote them
 def walk(+lib: String, +hub: String, +only: String, ds: List<&2, M.Dep>) -> IO(Out):
@@ -312,8 +340,14 @@ def wrote(ok: Bool, +at: String) -> IO(Unit):
 
 # the ledger, rewritten only when a pin moved, so an upgrade that changed
 # nothing does not reformat the file
-def write.toml(moved: Bool, +name: String, +entry: String, +bin: String,
-  ds: List<&2, M.Dep>, ts: List<&2, M.Tool>) -> IO(Unit):
+def write.toml(
+  moved: Bool,
+  +name: String,
+  +entry: String,
+  +bin: String,
+  ds: List<&2, M.Dep>,
+  ts: List<&2, M.Tool>
+) -> IO(Unit):
   match moved:
     case False{}:
       IO.pure(Unit, Unit{})
@@ -367,8 +401,8 @@ def rewrite.body(+at: String, +text: String, +next: String) -> IO(Unit):
   rewrite.put(String.eq(text, next), at, next)
 
 # a source that could not be read is a failure
-def rewrite.open(m: Maybe<&2, String>, +at: String, ss: List<&2, U.Swap>) -> IO(Unit):
-  match m:
+def rewrite.open(got: Maybe<&2, String>, +at: String, ss: List<&2, U.Swap>) -> IO(Unit):
+  match got:
     case None{}:
       IO.die(Unit, 1, "ez: " ++ at ++ " could not be read")
     case Some{+text}:
@@ -421,25 +455,38 @@ def drop(ss: List<&2, U.Swap>) -> IO(Unit):
 
 # pins rewritten, then the allowlist, then the imports, then the old trees.
 # The lock is the caller's to write, from the ledger this just wrote.
-def go.out(+name: String, +entry: String, +bin: String, ts: List<&2, M.Tool>,
-  o: Out) -> IO(Unit):
-  Out{+deps, +swaps, +edits, moved} = o
+def go.out(+name: String, +entry: String, +bin: String, ts: List<&2, M.Tool>, out: Out) -> IO(Unit):
+  Out{+deps, +swaps, +edits, changed} = out
   do IO<Unit>:
-    write.toml(moved, name, entry, bin, deps, ts)
+    write.toml(changed, name, entry, bin, deps, ts)
     write.ignore(swaps)
     write.imports(edits)
     drop(swaps)
 
-def go(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>,
-  ts: List<&2, M.Tool>, +only: String) -> IO(Unit):
+# every dependency the filter selects walked, then the ledger rewritten
+def go(
+  +name: String,
+  +entry: String,
+  +bin: String,
+  ds: List<&2, M.Dep>,
+  ts: List<&2, M.Tool>,
+  +only: String
+) -> IO(Unit):
   do IO<Unit>:
     +hub : String <- L.hub()
     o : Out <- walk(lib(), hub, only, ds)
     go.out(name, entry, bin, ts, o)
 
 # `--package` has to name a dependency or a pinned CLI
-def read.known(ok: Bool, +name: String, +entry: String, +bin: String,
-  ds: List<&2, M.Dep>, ts: List<&2, M.Tool>, +only: String) -> IO(Unit):
+def read.known(
+  ok: Bool,
+  +name: String,
+  +entry: String,
+  +bin: String,
+  ds: List<&2, M.Dep>,
+  ts: List<&2, M.Tool>,
+  +only: String
+) -> IO(Unit):
   match ok:
     case False{}:
       IO.die(Unit, 1, "ez: no dependency or tool named " ++ only)
@@ -447,14 +494,14 @@ def read.known(ok: Bool, +name: String, +entry: String, +bin: String,
       go(name, entry, bin, ds, ts, only)
 
 # a ledger that parsed
-def read.good(m: M.Manifest, +only: String) -> IO(Unit):
-  M.Manifest{+name, +entry, +bin, +ds, +ts} = m
+def read.good(manifest: M.Manifest, +only: String) -> IO(Unit):
+  M.Manifest{+name, +entry, +bin, +ds, +ts} = manifest
   read.known(either(U.known(only, ds), M.tool.known(only, ts)), name, entry,
     bin, ds, ts, only)
 
 # the ledger on disk, or the reason it was not one
-def read.go(r: M.Read, +only: String) -> IO(Unit):
-  match r:
+def read.go(ledger: M.Read, +only: String) -> IO(Unit):
+  match ledger:
     case M.Bad{why}:
       IO.die(Unit, 1, "ez: " ++ why)
     case M.Good{m}:

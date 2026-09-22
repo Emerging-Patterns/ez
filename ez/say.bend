@@ -28,6 +28,7 @@ def brief.go(short: Bool, +rev: String) -> String:
     case False{}:
       String.take(rev, 12n)
 
+# a commit as a line shows it
 def brief(+rev: String) -> String:
   brief.go(Nat.is_le(String.length(rev), 12n), rev)
 
@@ -40,6 +41,7 @@ def label.go(empty: Bool, +hash: String, +name: String) -> String:
     case False{}:
       name
 
+# what a line calls a package
 def label(+hash: String, +entry: String) -> String:
   +name = P.unbend(P.base(entry))
   label.go(String.is_empty(name), hash, name)
@@ -64,30 +66,37 @@ def kept(+name: String) -> String:
 def reused(+name: String) -> String:
   name ++ ": cached"
 
+# the lock resolving every dependency
 def resolving() -> String:
   "resolving deps"
 
 def resolving.at(+name: String) -> String:
   "resolving " ++ name
 
+# one package being fetched at a commit
 def fetching(+label: String, +rev: String) -> String:
   "fetching " ++ label ++ "@" ++ brief(rev)
 
 def git.fetch(+url: String) -> String:
   "git fetch (" ++ url ++ ")"
 
+# a binary being built
 def building(+name: String) -> String:
   "building " ++ name
 
+# a binary being linked into place
 def linking(+at: String) -> String:
   "linking " ++ at
 
+# a binary built and linked
 def installed(+name: String, +at: String) -> String:
   "installed " ++ name ++ " -> " ++ at
 
+# a binary linked, with nothing to build
 def linked(+name: String, +at: String) -> String:
   "linked " ++ name ++ " -> " ++ at
 
+# a commit's tree being weighed for its NAR hash
 def hashing(+rev: String) -> String:
   "hashing " ++ brief(rev)
 
@@ -189,6 +198,7 @@ def link(+fd: String) -> IO(String):
     +out : String <- R.exec(["sh", "-c", probe(), "sh", fd])
     return String.trim(R.text(out))
 
+# the terminal this process writes to, stderr's first, or empty for none
 def dev() -> IO(String):
   do IO<String>:
     +err : String <- link("2")
@@ -244,6 +254,7 @@ def done.bad(bad: Bool, +dev: String, +pid: String, +msg: String) -> IO(Unit):
     case False{}:
       done.live(dev, pid, msg)
 
-def done(s: Spin) -> IO(Unit):
-  Spin{+dev, +pid, +msg} = s
-  done.bad(Bool.or(String.is_empty(pid), String.eq(pid, "0")), dev, pid, msg)
+# the step finished: the mark stopped and the line left, or the line owed
+def done(spin: Spin) -> IO(Unit):
+  Spin{+term, +pid, +msg} = spin
+  done.bad(Bool.or(String.is_empty(pid), String.eq(pid, "0")), term, pid, msg)

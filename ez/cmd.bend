@@ -53,12 +53,12 @@ def report.capped(+why: String, +out: String) -> IO(Unit):
     report.exit(R.ok(out))
 
 # the entry file a ledger names, or "main.bend" when it names none
-def entry.or(+e: String) -> String:
-  Bool.pick(String, String.is_empty(e), "main.bend", e)
+def entry.or(+file: String) -> String:
+  Bool.pick(String, String.is_empty(file), "main.bend", file)
 
 # the name a ledger gives the package, or `app` when there is no ledger to ask
-def named(r: M.Read) -> String:
-  match r:
+def named(ledger: M.Read) -> String:
+  match ledger:
     case M.Bad{_why}:
       "app"
     case M.Good{m}:
@@ -66,8 +66,8 @@ def named(r: M.Read) -> String:
       n
 
 # the entry file of a ledger that was read
-def entry(r: M.Read) -> String:
-  match r:
+def entry(ledger: M.Read) -> String:
+  match ledger:
     case M.Bad{_why}:
       "main.bend"
     case M.Good{m}:
@@ -75,8 +75,8 @@ def entry(r: M.Read) -> String:
       entry.or(e)
 
 # a ledger that would not parse stops the command before it does damage
-def refuse(r: M.Read) -> IO(Unit):
-  IO.die(Unit, 1, "ez: " ++ M.show(r))
+def refuse(ledger: M.Read) -> IO(Unit):
+  IO.die(Unit, 1, "ez: " ++ M.show(ledger))
 
 # `ez check` and `ez run` are not capped, and `ez build` is. The wall
 # `ez/cap.bend` exists for is bend's C backend: emitting the C for a large
@@ -199,7 +199,7 @@ def lock.now() -> IO(Unit):
     report.exit(wrote)
 
 # `--package` is only a filter on an upgrade
-def lock.plain(bare: Bool, +name: String) -> IO(Unit):
+def lock.plain(bare: Bool, +_name: String) -> IO(Unit):
   match bare:
     case True{}:
       do IO<Unit>:
@@ -319,8 +319,8 @@ def init.entry.put(+at: String) -> IO(Bool):
 
 # an entry that is already there is left alone, so a second `ez init` does not
 # overwrite the program
-def init.entry.go(g: Maybe<&2, String>, +at: String) -> IO(Bool):
-  match g:
+def init.entry.go(got: Maybe<&2, String>, +at: String) -> IO(Bool):
+  match got:
     case Some{_s}:
       IO.pure(Bool, True{})
     case None{}:
@@ -357,8 +357,8 @@ def add.base(ps: List<&2, String>) -> String:
 
 # a dependency is named after its entry file, the way bend names an import
 def add.alias(+at: String) -> String:
-  String.take(add.base(String.split(at, '/')), Nat.sub(String.length(
-    add.base(String.split(at, '/'))), 5n))
+  +leaf = add.base(String.split(at, '/'))
+  String.take(leaf, Nat.sub(String.length(leaf), 5n))
 
 # a vendoring's answer as a ledger entry. The entry file is read twice, once
 # for the name and once for itself, so it arrives through a parameter.
@@ -368,23 +368,22 @@ def add.alias(+at: String) -> String:
 # come straight off the vendoring that computed them: it weighed the tree for
 # the NAR hash and worked the root out from where the entry sat, so asking the
 # cache it just wrote would be reading back our own answer.
-def add.dep.go(hash: String, url: String, rev: String, +at: String,
-  tag: String, root: String, nar: String) -> M.Dep:
+def add.dep.go(hash: String, url: String, rev: String, +at: String, tag: String, root: String, nar: String) -> M.Dep:
   M.Dep{add.alias(at), hash, at, M.Git{url, rev, tag, root, nar, False{}}}
 
 # what a vendoring answered, as the ledger records it
-def add.dep(g: Git.Got) -> M.Dep:
-  Git.Got{h, u, v, e, t, r, n} = g
+def add.dep(got: Git.Got) -> M.Dep:
+  Git.Got{h, u, v, e, t, r, n} = got
   add.dep.go(h, u, v, e, t, r, n)
 
 # the ledger with this dependency written into it
-def add.write(r: M.Read, d: M.Dep) -> IO(Unit):
-  match r:
+def add.write(ledger: M.Read, dep: M.Dep) -> IO(Unit):
+  match ledger:
     case M.Bad{why}:
       refuse(M.Bad{why})
     case M.Good{m}:
       do IO<Unit>:
-        wrote : Bool <- F.write(toml(), Rend.show(Rend.add(m, d)))
+        wrote : Bool <- F.write(toml(), Rend.show(Rend.add(m, dep)))
         report.exit(wrote)
 
 # a git dependency vendored, and then recorded in the ledger under its own
@@ -404,8 +403,8 @@ def add.local(+path: String) -> IO(String):
     return Tgt.expand(home, path)
 
 # the git url a target names
-def add.url(p: Tgt.Place) -> IO(String):
-  match p:
+def add.url(place: Tgt.Place) -> IO(String):
+  match place:
     case Tgt.Bad{why}:
       IO.die(String, 1, "ez: " ++ why)
     case Tgt.Local{path}:
@@ -431,8 +430,8 @@ def add(+target: String, +ref: String, +entry: String) -> IO(Unit):
     add.go(url, got, entry)
 
 # the ledger with a dependency dropped
-def remove.write(r: M.Read, name: String) -> IO(Unit):
-  match r:
+def remove.write(ledger: M.Read, name: String) -> IO(Unit):
+  match ledger:
     case M.Bad{why}:
       refuse(M.Bad{why})
     case M.Good{m}:

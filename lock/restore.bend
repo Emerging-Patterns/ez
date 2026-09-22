@@ -30,11 +30,11 @@ def put(+lib: String, +hash: String, at: String, text: String) -> IO(Unit):
     wrote(ok, dst)
 
 # one file of a hub package, fetched and checked against the lock
-def hub.one(+hub: String, +lib: String, +hash: String, +f: K.File) -> IO(Unit):
+def hub.one(+hub: String, +lib: String, +hash: String, +file: K.File) -> IO(Unit):
   do IO<Unit>:
-    g : Web.Got <- Web.fetch(L.url_of(hub, hash, K.file.at(f)), K.file.sum(f))
+    g : Web.Got <- Web.fetch(L.url_of(hub, hash, K.file.at(file)), K.file.sum(file))
     text : String <- L.body_of(g)
-    put(lib, hash, K.file.at(f), text)
+    put(lib, hash, K.file.at(file), text)
 
 # every file of a hub package
 def hub.all(+hub: String, +lib: String, +hash: String, fs: List<&2, K.File>) -> IO(Unit):
@@ -48,8 +48,7 @@ def hub.all(+hub: String, +lib: String, +hash: String, fs: List<&2, K.File>) -> 
 
 # a file of a checkout that does not hash to what the lock says is not the file
 # the lock meant
-def git.judge(ok: Bool, at: String, lib: String, hash: String, to: String,
-  text: String) -> IO(Unit):
+def git.judge(ok: Bool, at: String, lib: String, hash: String, to: String, text: String) -> IO(Unit):
   match ok:
     case True{}:
       put(lib, hash, to, text)
@@ -57,13 +56,13 @@ def git.judge(ok: Bool, at: String, lib: String, hash: String, to: String,
       IO.die(Unit, 1, "ez: " ++ at ++ " does not match the lock")
 
 # one file of a checkout, checked and put in place
-def git.one(+from: String, +lib: String, +hash: String, +f: K.File) -> IO(Unit):
-  +at = P.join(from, K.file.at(f))
+def git.one(+from: String, +lib: String, +hash: String, +file: K.File) -> IO(Unit):
+  +at = P.join(from, K.file.at(file))
   do IO<Unit>:
     m : Maybe<&2, String> <- F.read(at)
     +text : String <- IO.pure(String, F.text_of(m))
-    git.judge(String.eq(Sha.hex(text), K.file.sum(f)), at, lib, hash,
-      K.file.at(f), text)
+    git.judge(String.eq(Sha.hex(text), K.file.sum(file)), at, lib, hash,
+      K.file.at(file), text)
 
 # every file of a checkout
 def git.all(+from: String, +lib: String, +hash: String, fs: List<&2, K.File>) -> IO(Unit):
@@ -78,8 +77,15 @@ def git.all(+from: String, +lib: String, +hash: String, fs: List<&2, K.File>) ->
 # a vendored package, rebuilt from the rev the lock pins. Its paths are written
 # from the package's root inside the repo, which is not always the entry's own
 # directory. The line names the package and the repo before the fetch starts.
-def git.pkg(+lib: String, +hash: String, +url: String, rev: String, +entry: String,
-  root: String, fs: List<&2, K.File>) -> IO(Unit):
+def git.pkg(
+  +lib: String,
+  +hash: String,
+  +url: String,
+  rev: String,
+  +entry: String,
+  root: String,
+  fs: List<&2, K.File>
+) -> IO(Unit):
   +work = lib ++ "/.work-" ++ hash
   do IO<Unit>:
     _rm : String <- R.exec(["rm", "-rf", work])
@@ -96,8 +102,7 @@ def source.hub(+hub: String, +lib: String, +hash: String, fs: List<&2, K.File>) 
     Say.done(s)
 
 # a package, from wherever the lock says it comes from
-def source(hub: String, +lib: String, +hash: String, src: L.Src,
-  fs: List<&2, K.File>) -> IO(Unit):
+def source(hub: String, +lib: String, +hash: String, src: L.Src, fs: List<&2, K.File>) -> IO(Unit):
   match src:
     case L.Hub{}:
       source.hub(hub, lib, hash, fs)
@@ -114,37 +119,36 @@ def pkg.label(+hash: String, src: L.Src) -> String:
 
 # the package laid out. The manifest is written last, so a tree that has it
 # is a tree that finished.
-def one.live(hub: String, +lib: String, +p: L.Pack) -> IO(Unit):
-  +hash = L.pack.hash(p)
+def one.live(hub: String, +lib: String, +pack: L.Pack) -> IO(Unit):
+  +hash = L.pack.hash(pack)
   do IO<Unit>:
     _rm : String <- R.exec(["rm", "-rf", lib ++ "/" ++ hash])
-    source(hub, lib, hash, L.pack.src(p), L.pack.files(p))
-    put(lib, hash, "manifest", L.pack.manifest(p))
+    source(hub, lib, hash, L.pack.src(pack), L.pack.files(pack))
+    put(lib, hash, "manifest", L.pack.manifest(pack))
 
 # a tree whose manifest is already the one the lock would write
-def one.pick(hit: Bool, hub: String, +lib: String, +p: L.Pack) -> IO(Unit):
+def one.pick(hit: Bool, hub: String, +lib: String, +pack: L.Pack) -> IO(Unit):
   match hit:
     case True{}:
-      IO.print_err(Say.dep.cached(pkg.label(L.pack.hash(p), L.pack.src(p))))
+      IO.print_err(Say.dep.cached(pkg.label(L.pack.hash(pack), L.pack.src(pack))))
     case False{}:
-      one.live(hub, lib, p)
+      one.live(hub, lib, pack)
 
-def one.seen(m: Maybe<&2, String>, +man: String, hub: String, +lib: String,
-  +p: L.Pack) -> IO(Unit):
-  match m:
+def one.seen(got: Maybe<&2, String>, +man: String, hub: String, +lib: String, +pack: L.Pack) -> IO(Unit):
+  match got:
     case None{}:
-      one.live(hub, lib, p)
+      one.live(hub, lib, pack)
     case Some{text}:
-      one.pick(String.eq(text, man), hub, lib, p)
+      one.pick(String.eq(text, man), hub, lib, pack)
 
 # one package of the lock, laid out the way the hub serves it: the files, and
 # the manifest beside them. A manifest already on disk is the package.
-def one(hub: String, +lib: String, +p: L.Pack) -> IO(Unit):
-  +hash = L.pack.hash(p)
-  +man = L.pack.manifest(p)
+def one(hub: String, +lib: String, +pack: L.Pack) -> IO(Unit):
+  +hash = L.pack.hash(pack)
+  +man = L.pack.manifest(pack)
   do IO<Unit>:
     m : Maybe<&2, String> <- F.read(lib ++ "/" ++ hash ++ "/manifest")
-    one.seen(m, man, hub, lib, p)
+    one.seen(m, man, hub, lib, pack)
 
 # every package of the lock
 def all(+hub: String, +lib: String, ps: List<&2, L.Pack>) -> IO(Unit):

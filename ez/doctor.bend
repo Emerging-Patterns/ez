@@ -26,8 +26,8 @@ def toml() -> String:
   "ez.toml"
 
 # a count with its noun, kept in agreement
-def plural(+n: Nat, one: String, many: String) -> String:
-  Nat.show(n) ++ " " ++ Bool.pick(String, Nat.is_eq(n, 1n), one, many)
+def plural(+count: Nat, one: String, many: String) -> String:
+  Nat.show(count) ++ " " ++ Bool.pick(String, Nat.is_eq(count, 1n), one, many)
 
 # the first line of what a program printed
 def banner.of(ls: List<&2, String>) -> String:
@@ -70,8 +70,8 @@ def probe(+name: String) -> IO(Note):
 
 # the C compiler the native lane will use: `$CC` when it is set, else `cc`.
 # Same source and a different compiler is a different binary, so doctor names it
-def cc.name(+v: String) -> String:
-  Bool.pick(String, String.is_empty(v), "cc", v)
+def cc.name(+var: String) -> String:
+  Bool.pick(String, String.is_empty(var), "cc", var)
 
 # the C compiler, by the name the toolchain will reach for
 def cc() -> IO(Note):
@@ -80,8 +80,8 @@ def cc() -> IO(Note):
     probe(cc.name(Args.text_of(r)))
 
 # what the ledger turned out to be
-def toml.note(r: M.Read) -> Note:
-  match r:
+def toml.note(ledger: M.Read) -> Note:
+  match ledger:
     case M.Bad{why}:
       Note{True{}, "ez.toml: " ++ why}
     case M.Good{m}:
@@ -128,11 +128,11 @@ def present(+lib: String) -> IO(List<&2, String>):
 # BEND_LIB judged against the lock: every package the lock names has to be on
 # disk, because bend resolves a hub import during the check and a sandbox has
 # no network to fall back on
-def lib.said(all: Bool, +lib: String, +n: Nat, gone: List<&2, String>) -> Note:
+def lib.said(all: Bool, +lib: String, +count: Nat, gone: List<&2, String>) -> Note:
   match all:
     case True{}:
       Note{False{}, "BEND_LIB: " ++ lib ++ ", all " ++
-        plural(n, "locked package", "locked packages") ++ " present"}
+        plural(count, "locked package", "locked packages") ++ " present"}
     case False{}:
       Note{True{}, "BEND_LIB: " ++ lib ++ " lacks " ++ String.join(gone, " ") ++
         "; run ez fetch"}
@@ -164,36 +164,36 @@ def imports() -> IO(List<&2, String>):
     return answered(R.ok(out), R.text(out))
 
 # what the ledger and the source agree, or do not, about the hashes
-def drift.said(none: Bool, +n: Nat, lines: List<&2, String>) -> Note:
+def drift.said(none: Bool, +count: Nat, lines: List<&2, String>) -> Note:
   match none:
     case True{}:
-      Note{False{}, "imports: " ++ plural(n, "package", "packages") ++
+      Note{False{}, "imports: " ++ plural(count, "package", "packages") ++
         " imported, every one named in ez.toml"}
     case False{}:
       Note{True{}, String.join(lines, "\n")}
 
 # the drift report, and how many packages the source imports at all
-def drift.go(+ls: List<&2, String>, r: M.Read) -> Note:
-  +bad = D.report(ls, r)
+def drift.go(+ls: List<&2, String>, ledger: M.Read) -> Note:
+  +bad = D.report(ls, ledger)
   drift.said(List.is_empty(&2, String, bad),
     List.length(&2, String, D.imported(ls)), bad)
 
 # the most valuable check ez has: the hashes in ez.toml against the `0x` hashes
 # the source actually imports. ez reports the disagreement and never rewrites
 # the source, so this is where a disagreement is said.
-def drift(r: M.Read) -> IO(Note):
+def drift(ledger: M.Read) -> IO(Note):
   do IO<Note>:
     ls : List<&2, String> <- imports()
-    return drift.go(ls, r)
+    return drift.go(ls, ledger)
 
 # whether a note is a problem
-def note.wrong(n: Note) -> Bool:
-  Note{w, _l} = n
+def note.wrong(finding: Note) -> Bool:
+  Note{w, _l} = finding
   w
 
 # what a note prints
-def note.line(n: Note) -> String:
-  Note{_w, l} = n
+def note.line(finding: Note) -> String:
+  Note{_w, l} = finding
   l
 
 # one step of the scan, with the head's answer in hand. `Bool.or` reduces both

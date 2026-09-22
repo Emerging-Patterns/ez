@@ -48,19 +48,19 @@ def name.length() -> Nat:
 # says so rather than leaving it to a reading of bend's source:
 # `publishing N files, ... as 0x... (mining its proof of work)` and
 # `import 0x.../entry.bend as Name` each start with something that is not `0x`.
-def is_name(+s: String) -> Bool:
-  Bool.and(String.starts_with(s, "0x"),
-    Bool.and(Nat.is_eq(String.length(s), name.length()),
-      G.hex.all(String.to_list(String.drop(s, 2n)))))
+def is_name(+word: String) -> Bool:
+  Bool.and(String.starts_with(word, "0x"),
+    Bool.and(Nat.is_eq(String.length(word), name.length()),
+      G.hex.all(String.to_list(String.drop(word, 2n)))))
 
 # one step of the search, with the head's answer in hand. `Bool.pick` is an
 # ordinary function and builds both arms before it picks one, so a search
 # written with it never stops at the line it found. The rest arrives as a
 # thunk and only the arm that wants it applies it.
-def answer.step(here: Bool, h: String, rest: Unit -> String) -> String:
+def answer.step(here: Bool, line: String, rest: Unit -> String) -> String:
   match here:
     case True{}:
-      h
+      line
     case False{}:
       rest(Unit{})
 
@@ -101,8 +101,8 @@ def judge(+ours: String, ls: List<&2, String>) -> Said:
   judge.at(ours, answer(ls))
 
 # whether a verdict lets the command go on. Only one of the three does.
-def agreed(s: Said) -> Bool:
-  match s:
+def agreed(reply: Said) -> Bool:
+  match reply:
     case Agreed{}:
       True{}
     case Unread{}:
@@ -241,8 +241,8 @@ def sent.unread(+text: String) -> IO(Unit):
     "nothing to check ez's hash against. bend said:\n" ++ text)
 
 # the verdict acted on
-def sent(s: Said, +ours: String, +entry: String, +text: String) -> IO(Unit):
-  match s:
+def sent(reply: Said, +ours: String, +entry: String, +text: String) -> IO(Unit):
+  match reply:
     case Agreed{}:
       said(ours, entry)
     case Unread{}:
@@ -252,8 +252,7 @@ def sent(s: Said, +ours: String, +entry: String, +text: String) -> IO(Unit):
 
 # a `bend --publish` that failed fails the command with what bend said. Only a
 # run that finished has an answer worth checking.
-def publish.said(ok: Bool, +ours: String, +entry: String,
-  +text: String) -> IO(Unit):
+def publish.said(ok: Bool, +ours: String, +entry: String, +text: String) -> IO(Unit):
   match ok:
     case False{}:
       IO.die(Unit, 1, "ez: bend " ++ entry ++ " --publish: " ++ text)

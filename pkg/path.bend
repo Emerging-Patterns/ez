@@ -16,9 +16,9 @@ type Comp is Data:
   CName{s: String}
 
 # a component classified. `+c` because it is both asked about and kept.
-def comp_of(+c: String) -> Comp:
-  Bool.pick(Comp, Bool.or(String.is_empty(c), String.eq(c, ".")), CSkip{},
-    Bool.pick(Comp, String.eq(c, ".."), CUp{}, CName{c}))
+def comp_of(+part: String) -> Comp:
+  Bool.pick(Comp, Bool.or(String.is_empty(part), String.eq(part, ".")), CSkip{},
+    Bool.pick(Comp, String.eq(part, ".."), CUp{}, CName{part}))
 
 # a climb with nothing left to climb off: at the root it goes nowhere, and in a
 # relative path it is kept, since the package may still be re-rooted under it
@@ -30,16 +30,16 @@ def up.root(abs: Bool) -> List<&2, String>:
       [".."]
 
 # a climb past a component that is itself a climb keeps both
-def up.back(same: Bool, h: String, t: List<&2, String>) -> List<&2, String>:
+def up.back(same: Bool, head: String, rest: List<&2, String>) -> List<&2, String>:
   match same:
     case True{}:
-      ".." <> (h <> t)
+      ".." <> (head <> rest)
     case False{}:
-      t
+      rest
 
 # a climb against what has been kept: it cancels the last real component
-def up.go(+h: String, t: List<&2, String>) -> List<&2, String>:
-  up.back(String.eq(h, ".."), h, t)
+def up.go(+head: String, rest: List<&2, String>) -> List<&2, String>:
+  up.back(String.eq(head, ".."), head, rest)
 
 # a climb against what has been kept
 def up(abs: Bool, out: List<&2, String>) -> List<&2, String>:
@@ -54,9 +54,9 @@ def up.step(+abs: Bool, out: List<&2, String>) -> Walk:
   Walk{abs, up(abs, out)}
 
 # the state once a component has been classified
-def norm.go(st: Walk, c: Comp) -> Walk:
+def norm.go(st: Walk, comp: Comp) -> Walk:
   Walk{abs, out} = st
-  match c:
+  match comp:
     case CSkip{}:
       Walk{abs, out}
     case CUp{}:
@@ -65,8 +65,8 @@ def norm.go(st: Walk, c: Comp) -> Walk:
       Walk{abs, s <> out}
 
 # one component against the state
-def norm.step(st: Walk, c: String) -> Walk:
-  norm.go(st, comp_of(c))
+def norm.step(st: Walk, part: String) -> Walk:
+  norm.go(st, comp_of(part))
 
 # a relative path with nothing left in it is the current directory
 def norm.rel(+body: String) -> String:
@@ -99,15 +99,15 @@ def norm.walk(cs: List<&2, String>, st: Walk) -> Walk:
 # a path with `.` and an inner `..` resolved by text. A leading `..` survives,
 # because a module reached through one re-roots the package rather than
 # escaping it.
-def norm(+p: String) -> String:
-  norm.fin(norm.walk(String.split(p, '/'), Walk{String.starts_with(p, "/"), []}))
+def norm(+path: String) -> String:
+  norm.fin(norm.walk(String.split(path, '/'), Walk{String.starts_with(path, "/"), []}))
 
 # the component carried so far, kept when nothing follows it. The list is the
 # first argument because that is the one the walk shrinks.
-def base.go(ps: List<&2, String>, +h: String) -> String:
+def base.go(ps: List<&2, String>, +last: String) -> String:
   match ps:
     case []:
-      h
+      last
     case +h2 <> t:
       base.go(t, h2)
 
@@ -120,37 +120,37 @@ def base.last(ps: List<&2, String>) -> String:
       base.go(t, h)
 
 # the last component of a path
-def base(p: String) -> String:
-  base.last(String.split(p, '/'))
+def base(path: String) -> String:
+  base.last(String.split(path, '/'))
 
 # the path with its last component climbed back off
-def dir(+p: String) -> String:
-  norm(p ++ "/..")
+def dir(+path: String) -> String:
+  norm(path ++ "/..")
 
 # the path before it is normalised: the second alone when there is no
 # directory to take it relative to, the two spliced otherwise. Split out so
 # that `norm` runs once. Under a `Bool.pick` both arms were built, so every
 # join paid two full component walks and one concatenation it threw away.
-def join.at(bare: Bool, a: String, b: String) -> String:
+def join.at(bare: Bool, left: String, right: String) -> String:
   match bare:
     case True{}:
-      b
+      right
     case False{}:
-      a ++ "/" ++ b
+      left ++ "/" ++ right
 
 # a path taken relative to a directory. An empty directory means the path is
 # already where it should be, and never that it starts at the root.
-def join(+a: String, +b: String) -> String:
-  norm(join.at(String.is_empty(a), a, b))
+def join(+left: String, +right: String) -> String:
+  norm(join.at(String.is_empty(left), left, right))
 
 # the last `n` components of a path
-def tail(p: String, n: Nat) -> String:
+def tail(path: String, count: Nat) -> String:
   String.join(List.reverse(&2, String,
-    List.take(&2, String, List.reverse(&2, String, String.split(p, '/')), n)), "/")
+    List.take(&2, String, List.reverse(&2, String, String.split(path, '/')), count)), "/")
 
 # whether a component is a climb
-def up.is(s: String) -> Bool:
-  String.eq(s, "..")
+def up.is(part: String) -> Bool:
+  String.eq(part, "..")
 
 # the climbs among components counted one at a time. Base's `List.filter`
 # applies an erased function parameter, so it falls outside the termination
@@ -163,19 +163,19 @@ def ups.go(ps: List<&2, String>) -> Nat:
       Nat.add(Bool.pick(Nat, up.is(h), 1n, 0n), ups.go(t))
 
 # how many components of a path are climbs
-def ups(p: String) -> Nat:
-  ups.go(String.split(p, '/'))
+def ups(path: String) -> Nat:
+  ups.go(String.split(path, '/'))
 
 # a module path without its `.bend`, which is how bend names the module
-def unbend(+p: String) -> String:
-  Bool.pick(String, String.ends_with(p, ".bend"),
-    String.take(p, Nat.sub(String.length(p), 5n)), p)
+def unbend(+path: String) -> String:
+  Bool.pick(String, String.ends_with(path, ".bend"),
+    String.take(path, Nat.sub(String.length(path), 5n)), path)
 
 # the path with `n` of its components climbed back off, which is where a
 # package re-roots when a module of it was reached through that many `..`
-def climb(n: Nat, p: String) -> String:
-  match n:
+def climb(count: Nat, path: String) -> String:
+  match count:
     case 0n:
-      norm(p)
+      norm(path)
     case 1n+q:
-      climb(q, dir(p))
+      climb(q, dir(path))

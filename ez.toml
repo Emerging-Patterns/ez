@@ -49,7 +49,7 @@ entry = "ezhttp/main.bend"
 
 [tools.bolt]
 git = "https://github.com/Emerging-Patterns/bolt"
-rev = "24b497e294a08f6a83e0b08ece3795f813421b87"
-tag = "v0.4.0"
+rev = "0b92fbba18948e71462cfc19c7aead5d9642c06d"
+tag = "v0.8.1"
 root = "."
-narHash = "sha256-ByR8UDGFAfn5HgVa8muRz5IA1DzoOxpOESB9TNezmus="
+narHash = "sha256-11Izj7JiNQhioZ67frs9r7ZYjGKjbwkUdPm8eABQEQc="

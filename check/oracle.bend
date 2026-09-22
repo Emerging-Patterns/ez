@@ -25,12 +25,12 @@ import ./serve.bend as S
 # a list with its last element gone, the head held back one step so the walk can
 # see whether it is looking at the last one. The list comes first because a
 # self-call must shrink an argument before it changes one.
-def init.put(t: List<&2, String>, h: String) -> List<&2, String>:
-  match t:
+def init.put(rest: List<&2, String>, held: String) -> List<&2, String>:
+  match rest:
     case []:
       []
     case h2 <> t2:
-      h <> init.put(t2, h2)
+      held <> init.put(t2, h2)
 
 # every element but the last
 def init.of(xs: List<&2, String>) -> List<&2, String>:
@@ -41,24 +41,24 @@ def init.of(xs: List<&2, String>) -> List<&2, String>:
       init.put(t, h)
 
 # the directory a path lies in
-def parent.of(p: String) -> String:
-  String.join(init.of(String.split(p, '/')), "/")
+def parent.of(path: String) -> String:
+  String.join(init.of(String.split(path, '/')), "/")
 
 # one step of the skip, with the head's answer in hand. A recursive call in an
 # arm of a `Bool.pick` is not an arm: `Bool.pick` is an ordinary function and
 # builds both before it picks one, so the first non-space still cost a walk of
 # everything after it. The rest arrives as a thunk and only the arm that wants
 # it applies it.
-def ws.step(space: Bool, c: Char, t: String, rest: Unit -> String) -> String:
+def ws.step(space: Bool, ch: Char, tail: String, rest: Unit -> String) -> String:
   match space:
     case True{}:
       rest(Unit{})
     case False{}:
-      SCon{c, t}
+      SCon{ch, tail}
 
 # the text with its leading whitespace gone
-def ws(s: String) -> String:
-  match s:
+def ws(text: String) -> String:
+  match text:
     case SNil{}:
       SNil{}
     case SCon{+c, +t}:
@@ -73,13 +73,13 @@ def eat.at(ok: Bool, rest: String) -> Maybe<&2, String>:
       None{}
 
 # the text after a character that must head it, or nothing when it does not
-def eat(+s: String, c: Char) -> Maybe<&2, String>:
-  eat.at(String.starts_with(s, Char.show(c)), String.drop(s, 1n))
+def eat(+text: String, ch: Char) -> Maybe<&2, String>:
+  eat.at(String.starts_with(text, Char.show(ch)), String.drop(text, 1n))
 
 # a hex digit's value, or nothing when the character is not one
-def hex.val(+c: Char) -> Maybe<&2, U32>:
-  +x = Char.to_u32(c)
-  Bool.pick(Maybe<&2, U32>, Char.is_digit(c), Some{U32.sub(x, 48)},
+def hex.val(+ch: Char) -> Maybe<&2, U32>:
+  +x = Char.to_u32(ch)
+  Bool.pick(Maybe<&2, U32>, Char.is_digit(ch), Some{U32.sub(x, 48)},
     Bool.pick(Maybe<&2, U32>, Bool.and(U32.is_ge(x, 97), U32.is_le(x, 102)),
       Some{U32.sub(x, 87)},
       Bool.pick(Maybe<&2, U32>, Bool.and(U32.is_ge(x, 65), U32.is_le(x, 70)),
@@ -89,12 +89,12 @@ def hex.val(+c: Char) -> Maybe<&2, U32>:
 # a code point this oracle will put in a file. A Bend source file is ASCII, and
 # a guess at what a higher code point should become would corrupt the file
 # rather than fail, so nothing above 0x7f is accepted.
-def hex.small(+x: U32) -> Maybe<&2, U32>:
-  Bool.pick(Maybe<&2, U32>, U32.is_lt(x, 128), Some{x}, None{})
+def hex.small(+code: U32) -> Maybe<&2, U32>:
+  Bool.pick(Maybe<&2, U32>, U32.is_lt(code, 128), Some{code}, None{})
 
 # two digit values as one byte
-def hex.join(a: Maybe<&2, U32>, b: Maybe<&2, U32>) -> Maybe<&2, U32>:
-  match a b:
+def hex.join(high: Maybe<&2, U32>, low: Maybe<&2, U32>) -> Maybe<&2, U32>:
+  match high low:
     case Some{x} Some{y}:
       Some{U32.add(U32.mul(x, 16), y)}
     case Some{x} None{}:
@@ -103,8 +103,8 @@ def hex.join(a: Maybe<&2, U32>, b: Maybe<&2, U32>) -> Maybe<&2, U32>:
       None{}
 
 # the byte two hex characters spell
-def hex.pair(a: Maybe<&2, Char>, b: Maybe<&2, Char>) -> Maybe<&2, U32>:
-  match a b:
+def hex.pair(high: Maybe<&2, Char>, low: Maybe<&2, Char>) -> Maybe<&2, U32>:
+  match high low:
     case Some{x} Some{y}:
       hex.join(hex.val(x), hex.val(y))
     case Some{x} None{}:
@@ -113,8 +113,8 @@ def hex.pair(a: Maybe<&2, Char>, b: Maybe<&2, Char>) -> Maybe<&2, U32>:
       None{}
 
 # two bytes as one code point, the high one first, refused when it is not ASCII
-def hex.wide(a: Maybe<&2, U32>, b: Maybe<&2, U32>) -> Maybe<&2, U32>:
-  match a b:
+def hex.wide(high: Maybe<&2, U32>, low: Maybe<&2, U32>) -> Maybe<&2, U32>:
+  match high low:
     case Some{x} Some{y}:
       hex.small(U32.add(U32.mul(x, 256), y))
     case Some{x} None{}:
@@ -129,25 +129,25 @@ type Esc is Data:
   EOk{c: Char, rest: String}
 
 # a `\uXXXX` escape's verdict
-def esc.u.fin(v: Maybe<&2, U32>, rest: String) -> Esc:
-  match v:
+def esc.u.fin(code: Maybe<&2, U32>, rest: String) -> Esc:
+  match code:
     case None{}:
       EBad{"a unicode escape that is not four hex digits below 0080"}
     case Some{x}:
       EOk{Chr{x}, rest}
 
 # the character a `\uXXXX` escape names, read from just after the `u`
-def esc.u(+s: String) -> Esc:
+def esc.u(+text: String) -> Esc:
   esc.u.fin(
-    hex.wide(hex.pair(String.get(s, 0n), String.get(s, 1n)),
-      hex.pair(String.get(s, 2n), String.get(s, 3n))),
-    String.drop(s, 4n))
+    hex.wide(hex.pair(String.get(text, 0n), String.get(text, 1n)),
+      hex.pair(String.get(text, 2n), String.get(text, 3n))),
+    String.drop(text, 4n))
 
 # the character a backslash introduces, read from just after it. An escape this
 # oracle does not know is refused, never passed through: a body half understood
 # would write a file that is not the one that was published.
-def esc.of(s: String) -> Esc:
-  match s:
+def esc.of(text: String) -> Esc:
+  match text:
     case SNil{}:
       EBad{"a backslash at the end of the body"}
     case SCon{+c, +t}:
@@ -170,43 +170,43 @@ type Uns is Data:
 # the next character of a span, whether a backslash spelled it or it stood for
 # itself. Both are decided here so the walk below has one recursive call and not
 # two, which would make it read the rest of the span twice over at every step.
-def uns.step(esc: Bool, c: Char, t: String) -> Esc:
+def uns.step(esc: Bool, ch: Char, tail: String) -> Esc:
   match esc:
     case True{}:
-      esc.of(t)
+      esc.of(tail)
     case False{}:
-      EOk{c, t}
+      EOk{ch, tail}
 
 # what is left of a span after one character of it
-def uns.rest(e: Esc) -> String:
-  match e:
+def uns.rest(step: Esc) -> String:
+  match step:
     case EBad{_why}:
       SNil{}
     case EOk{_c, r}:
       r
 
 # a character put in front of what came after it
-def uns.push(c: Char, r: Uns) -> Uns:
-  match r:
+def uns.push(ch: Char, acc: Uns) -> Uns:
+  match acc:
     case UBad{why}:
       UBad{why}
     case UOk{text}:
-      UOk{SCon{c, text}}
+      UOk{SCon{ch, text}}
 
 # one decoded character joined to the rest, an escape that failed carrying its
 # reason out past everything after it
-def uns.put(e: Esc, r: Uns) -> Uns:
-  match e:
+def uns.put(step: Esc, acc: Uns) -> Uns:
+  match step:
     case EBad{why}:
       UBad{why}
     case EOk{c, _rest}:
-      uns.push(c, r)
+      uns.push(c, acc)
 
 # a span of a body decoded. The fuel is the span's own length: every step eats
 # at least one character, so it cannot run out early, and the walk needs it
 # because an escape makes the step shorter than the string it left behind.
-def unesc(fuel: Nat, s: String) -> Uns:
-  match fuel s:
+def unesc(fuel: Nat, span: String) -> Uns:
+  match fuel span:
     case 0n SNil{}:
       UOk{""}
     case 0n SCon{_c, _t}:
@@ -236,8 +236,8 @@ def str.end.step(shut: Bool, rest: Unit -> Nat) -> Nat:
 # how many characters lie before the quote that closes a string literal, or the
 # whole length when none does. `esc` says a backslash stood before this
 # character, so this one cannot close the literal and cannot escape the next.
-def str.end(s: String, +esc: Bool) -> Nat:
-  match s:
+def str.end(text: String, +esc: Bool) -> Nat:
+  match text:
     case SNil{}:
       0n
     case SCon{+c, t}:
@@ -245,8 +245,8 @@ def str.end(s: String, +esc: Bool) -> Nat:
         _u => Succ{str.end(t, Bool.and(Bool.not(esc), Char.is_eq(c, '\\')))})
 
 # a literal whose span decoded, or the escape that stopped it
-def str.done(u: Uns, rest: String) -> Str:
-  match u:
+def str.done(unescaped: Uns, rest: String) -> Str:
+  match unescaped:
     case UBad{why}:
       SBad{why}
     case UOk{text}:
@@ -254,42 +254,42 @@ def str.done(u: Uns, rest: String) -> Str:
 
 # a literal that ran off the end of the body is refused rather than taken for
 # whatever was left
-def str.fin(closed: Bool, u: Uns, rest: String) -> Str:
+def str.fin(closed: Bool, unescaped: Uns, rest: String) -> Str:
   match closed:
     case False{}:
       SBad{"a string in the body has no closing quote"}
     case True{}:
-      str.done(u, rest)
+      str.done(unescaped, rest)
 
 # the span up to the closing quote decoded, and the body past that quote
-def str.cut(+n: Nat, +s: String) -> Str:
-  str.fin(Maybe.is_some(&2, Char, String.get(s, n)),
-    unesc(n, String.take(s, n)), String.drop(s, Succ{n}))
+def str.cut(+len: Nat, +text: String) -> Str:
+  str.fin(Maybe.is_some(&2, Char, String.get(text, len)),
+    unesc(len, String.take(text, len)), String.drop(text, Succ{len}))
 
 # a string literal read from just after its opening quote
-def str.of(+s: String) -> Str:
-  str.cut(str.end(s, False{}), s)
+def str.of(+text: String) -> Str:
+  str.cut(str.end(text, False{}), text)
 
 # one file of a package: where it sits in the package, and what is in it
 type Ent is Data:
   Ent{path: String, text: String}
 
 # where a file sits
-def ent.path(e: Ent) -> String:
-  Ent{p, _t} = e
+def ent.path(entry: Ent) -> String:
+  Ent{p, _t} = entry
   p
 
 # the order the manifest lists files in, which is ascending by path
-def ent.le(a: Ent, b: Ent) -> Bool:
-  String.is_le(ent.path(a), ent.path(b))
+def ent.le(left: Ent, right: Ent) -> Bool:
+  String.is_le(ent.path(left), ent.path(right))
 
 # the files in the order a manifest names them
 def sorted(es: List<&2, Ent>) -> List<&2, Ent>:
   List.sort(~Ent, ~ent.le, es)
 
 # a manifest line: a file's digest, a space, its path
-def line.of(e: Ent) -> String:
-  Ent{p, t} = e
+def line.of(entry: Ent) -> String:
+  Ent{p, t} = entry
   Sha.hex(t) ++ " " ++ p ++ "\n"
 
 # the manifest: a line for each file, in the order they were given
@@ -302,8 +302,8 @@ def manifest.of(es: List<&2, Ent>) -> String:
 
 # the `0x` name a manifest gives its package: the first 32 hex characters of the
 # manifest's digest
-def hash.of(m: String) -> String:
-  "0x" ++ String.take(Sha.hex(m), 32n)
+def hash.of(content: String) -> String:
+  "0x" ++ String.take(Sha.hex(content), 32n)
 
 # one `"path": "contents"` pair of the files object, or the end of that object
 type Mem is Data:
@@ -312,18 +312,18 @@ type Mem is Data:
   MOne{path: String, text: String, more: Bool, rest: String}
 
 # a comma means another pair follows, a brace ends the object
-def mem.tail.at(+path: String, +text: String, +c: String, +rest: String) -> Mem:
-  Bool.pick(Mem, String.eq(c, ","), MOne{path, text, True{}, rest},
-    Bool.pick(Mem, String.eq(c, "}"), MOne{path, text, False{}, rest},
+def mem.tail.at(+path: String, +text: String, +sep: String, +rest: String) -> Mem:
+  Bool.pick(Mem, String.eq(sep, ","), MOne{path, text, True{}, rest},
+    Bool.pick(Mem, String.eq(sep, "}"), MOne{path, text, False{}, rest},
       MBad{"a files entry followed by neither a comma nor a brace"}))
 
 # what stands after a pair
-def mem.tail(path: String, text: String, +s: String) -> Mem:
-  mem.tail.at(path, text, String.take(s, 1n), String.drop(s, 1n))
+def mem.tail(path: String, text: String, +after: String) -> Mem:
+  mem.tail.at(path, text, String.take(after, 1n), String.drop(after, 1n))
 
 # a pair whose value has been read
-def mem.val(path: String, v: Str) -> Mem:
-  match v:
+def mem.val(path: String, value: Str) -> Mem:
+  match value:
     case SBad{why}:
       MBad{why}
     case SOk{text, rest}:
@@ -339,20 +339,20 @@ def mem.quote.at(path: String, ok: Bool, rest: String) -> Mem:
       mem.val(path, str.of(rest))
 
 # the quote that opens a value
-def mem.quote(path: String, +s: String) -> Mem:
-  mem.quote.at(path, String.starts_with(s, "\""), String.drop(s, 1n))
+def mem.quote(path: String, +text: String) -> Mem:
+  mem.quote.at(path, String.starts_with(text, "\""), String.drop(text, 1n))
 
 # the colon between a key and its value
-def mem.colon(path: String, m: Maybe<&2, String>) -> Mem:
-  match m:
+def mem.colon(path: String, after: Maybe<&2, String>) -> Mem:
+  match after:
     case None{}:
       MBad{"a files entry with no colon after its key"}
     case Some{t}:
       mem.quote(path, ws(t))
 
 # a pair whose key has been read
-def mem.key(k: Str) -> Mem:
-  match k:
+def mem.key(key: Str) -> Mem:
+  match key:
     case SBad{why}:
       MBad{why}
     case SOk{path, rest}:
@@ -369,20 +369,20 @@ def mem.one.key(ok: Bool, rest: String) -> Mem:
 # the end of the object, decided. The pair reader hangs off the other arm
 # rather than sitting in an argument, so an object that has ended does not
 # read a pair out of what follows it.
-def mem.one.shut(end: Bool, +s: String) -> Mem:
+def mem.one.shut(end: Bool, +text: String) -> Mem:
   match end:
     case True{}:
       MEnd{}
     case False{}:
-      mem.one.key(String.starts_with(s, "\""), String.drop(s, 1n))
+      mem.one.key(String.starts_with(text, "\""), String.drop(text, 1n))
 
 # either the brace that ends the object or the pair that continues it
-def mem.one.at(+s: String) -> Mem:
-  mem.one.shut(String.starts_with(s, "}"), s)
+def mem.one.at(+text: String) -> Mem:
+  mem.one.shut(String.starts_with(text, "}"), text)
 
 # the next pair of the files object, read from wherever the last one left off
-def mem.one(s: String) -> Mem:
-  mem.one.at(ws(s))
+def mem.one(text: String) -> Mem:
+  mem.one.at(ws(text))
 
 # every file a body carried, or the reason the body could not be read
 type Obj is Data:
@@ -398,8 +398,8 @@ def obj.rest.if(more: Bool, rest: String) -> String:
       SNil{}
 
 # where the walk picks up after a pair
-def obj.rest(m: Mem) -> String:
-  match m:
+def obj.rest(member: Mem) -> String:
+  match member:
     case MBad{_why}:
       SNil{}
     case MEnd{}:
@@ -408,53 +408,53 @@ def obj.rest(m: Mem) -> String:
       obj.rest.if(more, rest)
 
 # one file joined to the ones after it
-def obj.cons(e: Ent, o: Obj) -> Obj:
-  match o:
+def obj.cons(entry: Ent, tail: Obj) -> Obj:
+  match tail:
     case OBad{why}:
       OBad{why}
     case OOk{items}:
-      OOk{e <> items}
+      OOk{entry <> items}
 
 # the last pair of an object closes it, and what the walk found past it is not
 # part of the body
-def obj.put.if(more: Bool, e: Ent, o: Obj) -> Obj:
+def obj.put.if(more: Bool, entry: Ent, tail: Obj) -> Obj:
   match more:
     case True{}:
-      obj.cons(e, o)
+      obj.cons(entry, tail)
     case False{}:
-      OOk{[e]}
+      OOk{[entry]}
 
 # a pair joined to whatever the rest of the object gave
-def obj.put(m: Mem, o: Obj) -> Obj:
-  match m:
+def obj.put(member: Mem, tail: Obj) -> Obj:
+  match member:
     case MBad{why}:
       OBad{why}
     case MEnd{}:
       OOk{[]}
     case MOne{p, t, more, _rest}:
-      obj.put.if(more, Ent{p, t}, o)
+      obj.put.if(more, Ent{p, t}, tail)
 
 # every pair of the files object. The fuel is the body's length, which no object
 # can hold more pairs than.
-def obj.go(fuel: Nat, s: String) -> Obj:
+def obj.go(fuel: Nat, text: String) -> Obj:
   match fuel:
     case 0n:
       OBad{"a files object that never ends"}
     case 1n+f:
-      +m = mem.one(s)
+      +m = mem.one(text)
       obj.put(m, obj.go(f, obj.rest(m)))
 
 # the files object itself
-def parse.body(fuel: Nat, m: Maybe<&2, String>) -> Obj:
-  match m:
+def parse.body(fuel: Nat, after: Maybe<&2, String>) -> Obj:
+  match after:
     case None{}:
       OBad{"a files key whose value is not an object"}
     case Some{t}:
       obj.go(fuel, t)
 
 # the colon after the files key
-def parse.colon(fuel: Nat, m: Maybe<&2, String>) -> Obj:
-  match m:
+def parse.colon(fuel: Nat, after: Maybe<&2, String>) -> Obj:
+  match after:
     case None{}:
       OBad{"no colon after the files key"}
     case Some{t}:
@@ -463,16 +463,16 @@ def parse.colon(fuel: Nat, m: Maybe<&2, String>) -> Obj:
 # bend sends `{"files": {..}, "nonce": N}` and this oracle reads exactly that.
 # A body in another shape is refused rather than searched, because a body it
 # only half understood would publish a package that is not the one that was sent.
-def parse.name.if(fuel: Nat, ok: Bool, s: String) -> Obj:
+def parse.name.if(fuel: Nat, ok: Bool, text: String) -> Obj:
   match ok:
     case False{}:
       OBad{"a body whose first key is not files"}
     case True{}:
-      parse.colon(fuel, eat(s, ':'))
+      parse.colon(fuel, eat(text, ':'))
 
 # the body's first key
-def parse.name(fuel: Nat, k: Str) -> Obj:
-  match k:
+def parse.name(fuel: Nat, key: Str) -> Obj:
+  match key:
     case SBad{why}:
       OBad{why}
     case SOk{name, rest}:
@@ -487,12 +487,12 @@ def parse.quote.at(fuel: Nat, ok: Bool, rest: String) -> Obj:
       parse.name(fuel, str.of(rest))
 
 # the key that follows the body's opening brace
-def parse.quote(fuel: Nat, +s: String) -> Obj:
-  parse.quote.at(fuel, String.starts_with(s, "\""), String.drop(s, 1n))
+def parse.quote(fuel: Nat, +text: String) -> Obj:
+  parse.quote.at(fuel, String.starts_with(text, "\""), String.drop(text, 1n))
 
 # the body's opening brace
-def parse.open(fuel: Nat, m: Maybe<&2, String>) -> Obj:
-  match m:
+def parse.open(fuel: Nat, after: Maybe<&2, String>) -> Obj:
+  match after:
     case None{}:
       OBad{"a body that is not an object"}
     case Some{t}:
@@ -513,8 +513,8 @@ def answer(sock: Socket, status: String, body: String) -> IO(Unit):
   S.answer(sock, S.response(status, body))
 
 # a file that was there, or the 404 for one that was not
-def serve.file(sock: Socket, m: Maybe<&2, String>) -> IO(Unit):
-  match m:
+def serve.file(sock: Socket, got: Maybe<&2, String>) -> IO(Unit):
+  match got:
     case None{}:
       answer(sock, "404 Not Found", "")
     case Some{text}:
@@ -549,8 +549,8 @@ def write.file(+at: String, text: String) -> IO(Bool):
     write.after(out, at, text)
 
 # one file of a package written under the package's directory
-def write.ent(dir: String, e: Ent) -> IO(Bool):
-  Ent{p, t} = e
+def write.ent(dir: String, entry: Ent) -> IO(Bool):
+  Ent{p, t} = entry
   write.file(dir ++ "/" ++ p, t)
 
 # every file of a package written
@@ -566,20 +566,19 @@ def write.all(+dir: String, es: List<&2, Ent>) -> IO(Bool):
 
 # a package that could not be written is a 500, so a test sees the failure here
 # rather than in a hash that does not match
-def post.said(sock: Socket, ok: Bool, h: String) -> IO(Unit):
+def post.said(sock: Socket, ok: Bool, digest: String) -> IO(Unit):
   match ok:
     case True{}:
-      answer(sock, "200 OK", h)
+      answer(sock, "200 OK", digest)
     case False{}:
       answer(sock, "500 Internal Server Error", "the package could not be written")
 
 # the package written out under its hash, then that hash answered
-def post.at(sock: Socket, +at: String, h: String, m: String,
-  es: List<&2, Ent>) -> IO(Unit):
+def post.at(sock: Socket, +at: String, digest: String, listing: String, es: List<&2, Ent>) -> IO(Unit):
   do IO<Unit>:
     a : Bool <- write.all(at, es)
-    b : Bool <- write.file(at ++ "/manifest", m)
-    post.said(sock, Bool.and(a, b), h)
+    b : Bool <- write.file(at ++ "/manifest", listing)
+    post.said(sock, Bool.and(a, b), digest)
 
 # a package's manifest and name, computed from its files the way cli_publish
 # computes them
@@ -589,16 +588,15 @@ def post.write(sock: Socket, dir: String, +es: List<&2, Ent>) -> IO(Unit):
   post.at(sock, dir ++ "/" ++ h, h, m, es)
 
 # a POST answered: the package it carried, or the reason its body was refused
-def post.go(sock: Socket, dir: String, o: Obj) -> IO(Unit):
-  match o:
+def post.go(sock: Socket, dir: String, parsed: Obj) -> IO(Unit):
+  match parsed:
     case OBad{why}:
       answer(sock, "400 Bad Request", why)
     case OOk{items}:
       post.write(sock, dir, sorted(items))
 
 # a POST publishes, anything else fetches
-def serve.pick(post: Bool, sock: Socket, dir: String, +path: String,
-  body: String) -> IO(Unit):
+def serve.pick(post: Bool, sock: Socket, dir: String, +path: String, body: String) -> IO(Unit):
   match post:
     case True{}:
       post.go(sock, dir, parse(body))
@@ -611,8 +609,8 @@ def serve.req(sock: Socket, dir: String, first: String, body: String) -> IO(Unit
   serve.pick(String.eq(S.at(parts, 0n), "POST"), sock, dir, S.at(parts, 1n), body)
 
 # a request served, or refused when its head never ended
-def serve.msg(sock: Socket, dir: String, m: S.Msg) -> IO(Unit):
-  match m:
+def serve.msg(sock: Socket, dir: String, msg: S.Msg) -> IO(Unit):
+  match msg:
     case S.MPartial{}:
       answer(sock, "400 Bad Request", "an incomplete request")
     case S.MFull{head, body}:
@@ -635,38 +633,45 @@ type Run is Type:
   RGo{l: Listener}
 
 # a listener that will not accept is a listener that is finished
-def turn.got(r: Result<&1, &1, U32 & String, Socket>, l: Listener, +dir: String,
-  rest: String -> Listener -> IO(Run)) -> IO(Run):
-  match r:
+def turn.got(
+  accepted: Result<&1, &1, U32 & String, Socket>,
+  listener: Listener,
+  +dir: String,
+  rest: String -> Listener -> IO(Run)
+) -> IO(Run):
+  match accepted:
     case Fail{_e}:
       do IO<Run>:
-        Listener.close(l)
+        Listener.close(listener)
         return RStop{}
     case Done{sock}:
       do IO<Run>:
         once(sock, dir)
-        rest(dir, l)
+        rest(dir, listener)
 
 # the listener comes back paired with the connection it accepted
-def turn.at(got: Listener & Result<&1, &1, U32 & String, Socket>, dir: String,
-  rest: String -> Listener -> IO(Run)) -> IO(Run):
+def turn.at(
+  got: Listener & Result<&1, &1, U32 & String, Socket>,
+  dir: String,
+  rest: String -> Listener -> IO(Run)
+) -> IO(Run):
   (l, r) = got
   turn.got(r, l, dir, rest)
 
 # a run of connections served one at a time, the listener handed back when the
 # run is up so another can have it
-def turn(fuel: Nat, dir: String, l: Listener) -> IO(Run):
+def turn(fuel: Nat, dir: String, listener: Listener) -> IO(Run):
   match fuel:
     case 0n:
-      IO.pure(Run, RGo{l})
+      IO.pure(Run, RGo{listener})
     case 1n+f:
       do IO<Run>:
-        got : Listener & Result<&1, &1, U32 & String, Socket> <- TCP.accept(l)
+        got : Listener & Result<&1, &1, U32 & String, Socket> <- TCP.accept(listener)
         turn.at(got, dir, d => lis => turn(f, d, lis))
 
 # a run that ended because the listener did ends the oracle with it
-def loop.on(r: Run, dir: String, rest: String -> Listener -> IO(Unit)) -> IO(Unit):
-  match r:
+def loop.on(state: Run, dir: String, rest: String -> Listener -> IO(Unit)) -> IO(Unit):
+  match state:
     case RStop{}:
       IO.pure(Unit, Unit{})
     case RGo{l}:
@@ -677,26 +682,25 @@ def loop.on(r: Run, dir: String, rest: String -> Listener -> IO(Unit)) -> IO(Uni
 # connections. The count is nested rather than written out because a Nat is
 # unary, and the interpreted lane builds the whole of it before it serves
 # anything.
-def loop(fuel: Nat, +dir: String, l: Listener) -> IO(Unit):
+def loop(fuel: Nat, +dir: String, listener: Listener) -> IO(Unit):
   match fuel:
     case 0n:
-      Listener.close(l)
+      Listener.close(listener)
     case 1n+f:
       do IO<Unit>:
-        r : Run <- turn(U32.to_nat(1000), dir, l)
+        r : Run <- turn(U32.to_nat(1000), dir, listener)
         loop.on(r, dir, d => lis => loop(f, d, lis))
 
 # a port that would not open, reported rather than served on
-def begin.fail(e: U32 & String) -> IO(Unit):
-  (_code, why) = e
+def begin.fail(err: U32 & String) -> IO(Unit):
+  (_code, why) = err
   IO.die(Unit, 1, "oracle: cannot listen: " ++ why)
 
 # the listener, once the port is open. The line printed here is the oracle
 # saying it is up, though a caller that waits on `GET /` waits on the socket
 # itself and not on a pipe it would have to drain.
-def begin.at(r: Result<&1, &1, U32 & String, Listener>, +dir: String,
-  port: U32) -> IO(Unit):
-  match r:
+def begin.at(bound: Result<&1, &1, U32 & String, Listener>, +dir: String, port: U32) -> IO(Unit):
+  match bound:
     case Fail{e}:
       begin.fail(e)
     case Done{l}:

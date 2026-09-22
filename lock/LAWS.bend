@@ -38,8 +38,8 @@ law origin_agrees:
 # has never seen.
 
 # whether a string holds no `/`, and so is one component of a spec
-def slashless(s: String) -> Bool:
-  match s:
+def slashless(text: String) -> Bool:
+  match text:
     case SNil{}:
       True{}
     case SCon{+h, t}:

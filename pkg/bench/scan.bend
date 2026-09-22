@@ -52,11 +52,11 @@ def old.base_of(+ws: List<&2, String>) -> P.Stmt:
 # the classifier, before: `words(s)` is a `String.split` and a filter over its
 # result, and it sits in an arm of a `Bool.pick`, so it runs for every blank
 # line and every comment line as well
-def old.stmt_of(+s: String) -> P.Stmt:
+def old.stmt_of(+line: String) -> P.Stmt:
   Bool.pick(P.Stmt,
-    Bool.and(String.starts_with(s, "import \""), String.ends_with(s, "\"")),
-    P.SForeign{String.take(String.drop(s, 8n), Nat.sub(String.length(s), 9n))},
-    Bool.pick(P.Stmt, P.quiet(s), P.SNone{}, old.base_of(P.words(s))))
+    Bool.and(String.starts_with(line, "import \""), String.ends_with(line, "\"")),
+    P.SForeign{String.take(String.drop(line, 8n), Nat.sub(String.length(line), 9n))},
+    Bool.pick(P.Stmt, P.quiet(line), P.SNone{}, old.base_of(P.words(line))))
 
 # one block of source as this repo writes it: two lines of comment, a blank, a
 # def of seven lines, and the blank that follows it
@@ -73,16 +73,16 @@ def block() -> List<&2, String>:
    ""]
 
 # `n` blocks of it
-def lines.go(n: Nat, +one: List<&2, String>) -> List<&2, String>:
-  match n:
+def lines.go(size: Nat, +one: List<&2, String>) -> List<&2, String>:
+  match size:
     case 0n:
       []
     case 1n+p:
       List.append(&2, String, one, lines.go(p, one))
 
 # the source, built once so both modes classify the same lines
-def lines(n: Nat) -> List<&2, String>:
-  lines.go(n, block())
+def lines(size: Nat) -> List<&2, String>:
+  lines.go(size, block())
 
 # a line that said something about the header counts one, a line that said
 # nothing counts none. The count is what makes the classification observable:
@@ -117,16 +117,16 @@ def count.old(ls: List<&2, String>) -> Nat:
 
 # the answer a mode asks for. Both modes build the same lines, so the
 # difference between the two timings is the classifier alone.
-def run.at(old: Bool, n: Nat) -> String:
+def run.at(old: Bool, size: Nat) -> String:
   match old:
     case True{}:
-      "old " ++ Nat.show(count.old(lines(n)))
+      "old " ++ Nat.show(count.old(lines(size)))
     case False{}:
-      "new " ++ Nat.show(count.new(lines(n)))
+      "new " ++ Nat.show(count.new(lines(size)))
 
 # the mode named on the command line, answered
-def run(mode: String, n: Nat) -> String:
-  run.at(String.eq(mode, "old"), n)
+def run(mode: String, size: Nat) -> String:
+  run.at(String.eq(mode, "old"), size)
 
 # a &1 list copied into a &2 one, since `IO.args()` answers a list read once
 def copy(xs: List<&1, String>) -> List<&2, String>:
@@ -137,8 +137,8 @@ def copy(xs: List<&1, String>) -> List<&2, String>:
       h <> copy(t)
 
 # the nth argument, "" past the end
-def at(xs: List<&2, String>, n: Nat) -> String:
-  match xs n:
+def at(xs: List<&2, String>, index: Nat) -> String:
+  match xs index:
     case Nil{} 0n:
       ""
     case Nil{} 1n+p:

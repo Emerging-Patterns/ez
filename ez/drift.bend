@@ -22,12 +22,12 @@ def hash_of(+line: String) -> String:
     head(String.split(String.drop(line, 7n), '/')), "")
 
 # a hash kept, or an unhashed line dropped
-def hashes.put(none: Bool, h: String, rest: List<&2, String>) -> List<&2, String>:
+def hashes.put(none: Bool, hash: String, rest: List<&2, String>) -> List<&2, String>:
   match none:
     case True{}:
       rest
     case False{}:
-      h <> rest
+      hash <> rest
 
 # every hash the given lines name
 def hashes(ls: List<&2, String>) -> List<&2, String>:
@@ -39,20 +39,20 @@ def hashes(ls: List<&2, String>) -> List<&2, String>:
       hashes.put(String.is_empty(got), got, hashes(t))
 
 # a head dropped when what follows repeats it
-def uniq.cut(same: Bool, h: String, r: String, t: List<&2, String>) -> List<&2, String>:
+def uniq.cut(same: Bool, item: String, next: String, rest: List<&2, String>) -> List<&2, String>:
   match same:
     case True{}:
-      r <> t
+      next <> rest
     case False{}:
-      h <> (r <> t)
+      item <> (next <> rest)
 
 # a head offered to a list that is already deduplicated
-def uniq.put(+h: String, rest: List<&2, String>) -> List<&2, String>:
+def uniq.put(+item: String, rest: List<&2, String>) -> List<&2, String>:
   match rest:
     case []:
-      [h]
+      [item]
     case +r <> t:
-      uniq.cut(String.eq(h, r), h, r, t)
+      uniq.cut(String.eq(item, r), item, r, t)
 
 # a sorted list with its repeats dropped
 def uniq(ss: List<&2, String>) -> List<&2, String>:
@@ -78,20 +78,20 @@ def has.step(here: Bool, rest: Unit -> Bool) -> Bool:
       rest(Unit{})
 
 # whether a list holds this string
-def has(ss: List<&2, String>, +x: String) -> Bool:
+def has(ss: List<&2, String>, +want: String) -> Bool:
   match ss:
     case []:
       False{}
     case h <> t:
-      has.step(String.eq(h, x), _u => has(t, x))
+      has.step(String.eq(h, want), _u => has(t, want))
 
 # a string kept when the other list lacks it
-def missing.put(hit: Bool, h: String, rest: List<&2, String>) -> List<&2, String>:
+def missing.put(hit: Bool, item: String, rest: List<&2, String>) -> List<&2, String>:
   match hit:
     case True{}:
       rest
     case False{}:
-      h <> rest
+      item <> rest
 
 # the strings of `xs` that `known` does not hold
 def missing(xs: List<&2, String>, +known: List<&2, String>) -> List<&2, String>:
@@ -110,13 +110,13 @@ def label(ls: List<&2, String>, +pre: String, +post: String) -> List<&2, String>
       (pre ++ h ++ post) <> label(t, pre, post)
 
 # a dependency's hash
-def dep.hash(d: M.Dep) -> String:
-  M.Dep{_n, h, _e, _s} = d
+def dep.hash(dependency: M.Dep) -> String:
+  M.Dep{_n, h, _e, _s} = dependency
   h
 
 # how a ledger entry nobody imports reads
-def dep.line(+d: M.Dep) -> String:
-  "drift: " ++ M.dep.name(d) ++ " = " ++ dep.hash(d) ++
+def dep.line(+dependency: M.Dep) -> String:
+  "drift: " ++ M.dep.name(dependency) ++ " = " ++ dep.hash(dependency) ++
   " is in ez.toml but no import line uses it"
 
 # the hashes a ledger's dependencies name
@@ -128,12 +128,12 @@ def pinned(ds: List<&2, M.Dep>) -> List<&2, String>:
       dep.hash(h) <> pinned(t)
 
 # a dependency reported when nothing imports it
-def unused.put(hit: Bool, d: M.Dep, rest: List<&2, String>) -> List<&2, String>:
+def unused.put(hit: Bool, dependency: M.Dep, rest: List<&2, String>) -> List<&2, String>:
   match hit:
     case True{}:
       rest
     case False{}:
-      dep.line(d) <> rest
+      dep.line(dependency) <> rest
 
 # every dependency of the ledger that no import line uses
 def unused(ds: List<&2, M.Dep>, +imports: List<&2, String>) -> List<&2, String>:
@@ -144,8 +144,8 @@ def unused(ds: List<&2, M.Dep>, +imports: List<&2, String>) -> List<&2, String>:
       unused.put(has(imports, dep.hash(h)), h, unused(t, imports))
 
 # the dependencies of a ledger that was read; one that would not parse has none
-def deps_of(r: M.Read) -> List<&2, M.Dep>:
-  match r:
+def deps_of(ledger: M.Read) -> List<&2, M.Dep>:
+  match ledger:
     case M.Bad{_why}:
       []
     case M.Good{m}:
@@ -161,5 +161,5 @@ def report.go(+imports: List<&2, String>, +ds: List<&2, M.Dep>) -> List<&2, Stri
     unused(ds, imports))
 
 # every disagreement between a repo's import lines and its ledger
-def report(ls: List<&2, String>, r: M.Read) -> List<&2, String>:
-  report.go(imported(ls), deps_of(r))
+def report(ls: List<&2, String>, ledger: M.Read) -> List<&2, String>:
+  report.go(imported(ls), deps_of(ledger))

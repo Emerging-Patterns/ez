@@ -35,23 +35,23 @@ def ok() -> IO(Bool):
 
 # the cgroup a capped run gets. `MemorySwapMax=0` matters: without it the
 # cgroup spills into swap and the cap stops meaning anything.
-def scope(+g: String) -> List<&2, String>:
-  ["systemd-run", "--user", "--scope", "-q", "-p", "MemoryMax=" ++ g ++ "G",
+def scope(+gigs: String) -> List<&2, String>:
+  ["systemd-run", "--user", "--scope", "-q", "-p", "MemoryMax=" ++ gigs ++ "G",
     "-p", "MemorySwapMax=0", "nice"]
 
 # the words a capped run is prefixed with, or none when nothing can cap it
-def pre(on: Bool, +g: String) -> List<&2, String>:
+def pre(on: Bool, +gigs: String) -> List<&2, String>:
   match on:
     case True{}:
-      scope(g)
+      scope(gigs)
     case False{}:
       []
 
 # a program's arguments dressed the way the cap wants them, for a caller that
 # is not going to run it here. The cap goes outside `env`, so the variable is
 # set inside the cgroup.
-def argv(on: Bool, +g: String, +at: String, args: List<&2, String>) -> List<&2, String>:
-  List.append(&2, String, pre(on, g), Env.line(at, args))
+def argv(on: Bool, +gigs: String, +at: String, args: List<&2, String>) -> List<&2, String>:
+  List.append(&2, String, pre(on, gigs), Env.line(at, args))
 
 # a program run under the cap, with this project's BEND_LIB set for it
 def run(on: Bool, args: List<&2, String>) -> IO(String):
@@ -65,9 +65,9 @@ def killed(+out: String) -> Bool:
   String.eq(R.code(out), "137")
 
 # what to say when a run died for memory rather than for being wrong
-def why(+out: String, +g: String) -> String:
+def why(+out: String, +gigs: String) -> String:
   Bool.pick(String, killed(out),
-    "killed for memory at " ++ g ++ "G: raise EZ_CAP\n", "")
+    "killed for memory at " ++ gigs ++ "G: raise EZ_CAP\n", "")
 
 # a warning printed once when nothing is capping the jobs
 def warn(on: Bool) -> IO(Unit):

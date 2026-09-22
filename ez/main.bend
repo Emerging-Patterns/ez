@@ -122,38 +122,38 @@ def command(+name: String) -> Sub:
                                 CHelp{})))))))))))))))
 
 # what a subcommand runs
-def dispatch(sub: Sub, +m: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
+def dispatch(sub: Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
   match sub:
     case CInit{}:
-      Cmd.init(Shake.get(m, "name"), Shake.get(m, "entry"))
+      Cmd.init(Shake.get(matched, "name"), Shake.get(matched, "entry"))
     case CAdd{}:
-      Cmd.add(Shake.get(m, "target"), Shake.get(m, "ref"),
-        Shake.get(m, "entry"))
+      Cmd.add(Shake.get(matched, "target"), Shake.get(matched, "ref"),
+        Shake.get(matched, "entry"))
     case CRemove{}:
-      Cmd.remove(Shake.get(m, "name"))
+      Cmd.remove(Shake.get(matched, "name"))
     case CLock{}:
-      Cmd.lock(Shake.on(m, "upgrade"), Shake.get(m, "package"))
+      Cmd.lock(Shake.on(matched, "upgrade"), Shake.get(matched, "package"))
     case CFetch{}:
       Cmd.fetch()
     case CCheck{}:
       Cmd.check()
     case CBuild{}:
-      Cmd.build(Shake.get(m, "out"))
+      Cmd.build(Shake.get(matched, "out"))
     case CRun{}:
       Cmd.run(Args.rest(as))
     case CToolSync{}:
       Tool.sync()
     case CToolRun{}:
-      Tool.run(Shake.get(m, "target"), Args.tool.rest(as))
+      Tool.run(Shake.get(matched, "target"), Args.tool.rest(as))
     case CToolInstall{}:
-      Tool.install(Shake.get(m, "target"))
+      Tool.install(Shake.get(matched, "target"))
     case CToolUpgrade{}:
-      Tool.upgrade(Shake.get(m, "target"))
+      Tool.upgrade(Shake.get(matched, "target"))
     case CPublish{}:
       Cmd.publish()
     case CTest{}:
-      Test.run(Shake.on(m, "js-only"), Shake.on(m, "full"),
-        Shake.on(m, "unit-only"))
+      Test.run(Shake.on(matched, "js-only"), Shake.on(matched, "full"),
+        Shake.on(matched, "unit-only"))
     case CDoctor{}:
       Doctor.run()
     case CHelp{}:
@@ -170,8 +170,8 @@ def hint.sync(is_sync: Bool) -> IO(Unit):
         m : Maybe<&2, String> <- F.read("ez.toml")
         IO.print_err(Say.hint(Say.has.tools(F.text_of(m))))
 
-def hint.of(e: Shake.ParseErr) -> IO(Unit):
-  match e:
+def hint.of(err: Shake.ParseErr) -> IO(Unit):
+  match err:
     case Shake.Unexpected{arg}:
       hint.sync(String.eq(arg, "sync"))
     case Shake.UnknownFlag{_word}:
@@ -184,28 +184,31 @@ def hint.of(e: Shake.ParseErr) -> IO(Unit):
       IO.pure(Unit, Unit{})
 
 # a hard error
-def fail.err(+app: Shake.Cli, +e: Shake.ParseErr) -> IO(Unit):
+def fail.err(+app: Shake.Cli, +problem: Shake.ParseErr) -> IO(Unit):
   do IO<Unit>:
-    IO.print_err(Shake.err_text(app, e))
-    hint.of(e)
+    IO.print_err(Shake.err_text(app, problem))
+    hint.of(problem)
     IO.die(Unit, 1, "")
 
 # a failed parse: help text, or an error
-def fail(+app: Shake.Cli, e: Shake.ParseErr) -> IO(Unit):
-  match e:
+def fail(+app: Shake.Cli, err: Shake.ParseErr) -> IO(Unit):
+  match err:
     case Shake.NeedHelp{path}:
       IO.write(Shake.help(app, path))
     case other:
       fail.err(app, other)
 
 # a successful parse: the command named by the path, then its bindings
-def go.done(+as: List<&2, String>, +m: Shake.Matched) -> IO(Unit):
-  dispatch(command(String.join(Shake.path_of(m), "/")), m, as)
+def go.done(+as: List<&2, String>, +matched: Shake.Matched) -> IO(Unit):
+  dispatch(command(String.join(Shake.path_of(matched), "/")), matched, as)
 
 # the parse result
-def go.parsed(+app: Shake.Cli, +as: List<&2, String>,
-  r: Result<&2, &2, Shake.ParseErr, Shake.Matched>) -> IO(Unit):
-  match r:
+def go.parsed(
+  +app: Shake.Cli,
+  +as: List<&2, String>,
+  parsed: Result<&2, &2, Shake.ParseErr, Shake.Matched>
+) -> IO(Unit):
+  match parsed:
     case Fail{e}:
       fail(app, e)
     case Done{m}:

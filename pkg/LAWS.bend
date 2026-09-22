@@ -12,14 +12,14 @@ import ../sha/sha.bend as Sha
 # and `perm` below are the vocabulary the order-independence law needs and
 # nothing else uses: ez never calls them, and they say here what a rearranged
 # file list is in a form Bend can walk.
-def perm.ins_at(n: Nat, x: P.File, xs: List<&2, P.File>) -> List<&2, P.File>:
-  match n xs:
+def perm.ins_at(place: Nat, file: P.File, xs: List<&2, P.File>) -> List<&2, P.File>:
+  match place xs:
     case 0n _:
-      x <> xs
+      file <> xs
     case 1n+p Nil{}:
-      [x]
+      [file]
     case 1n+p Con{h, t}:
-      h <> perm.ins_at(p, x, t)
+      h <> perm.ins_at(p, file, t)
 
 # a list rearranged: each file is taken in turn and put back at the place its
 # number names. This is what "the order the walk found them in" means here: a
@@ -40,12 +40,12 @@ def perm(ns: List<&2, Nat>, xs: List<&2, P.File>) -> List<&2, P.File>:
       perm.ins_at(n, h, perm(ms, t))
 
 # whether a file's path is none of the paths a list holds
-def fresh(+x: P.File, xs: List<&2, P.File>) -> Bool:
+def fresh(+file: P.File, xs: List<&2, P.File>) -> Bool:
   match xs:
     case []:
       True{}
     case Con{+h, t}:
-      Bool.and(Bool.not(String.eq(P.file.at(x), P.file.at(h))), fresh(x, t))
+      Bool.and(Bool.not(String.eq(P.file.at(file), P.file.at(h))), fresh(file, t))
 
 # whether a list names each path at most once. A package's file set does: a
 # path is a file's identity here, and the walk reads a file once. Two entries
@@ -124,16 +124,16 @@ law hash_perm:
 # which half of a half-finished normalisation is the root flag.
 
 # whether a string holds no separator, and so is one component of a path
-def slashless(s: String) -> Bool:
-  match s:
+def slashless(text: String) -> Bool:
+  match text:
     case SNil{}:
       True{}
     case SCon{+h, t}:
       Bool.and(Bool.not(Char.is_eq(h, '/')), slashless(t))
 
 # whether a half-finished normalisation began at the root
-def walk.abs(w: Path.Walk) -> Bool:
-  Path.Walk{abs, out} = w
+def walk.abs(state: Path.Walk) -> Bool:
+  Path.Walk{abs, out} = state
   abs
 
 # LAW: a component that is none of the three the walk acts on is kept, text

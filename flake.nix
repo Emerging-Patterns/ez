@@ -89,7 +89,13 @@
       # put bend-cc in packages.
       lib.${system} = ez;
       apps.${system}.default = { type = "app"; program = "${ezBin}/bin/ez"; };
-      checks.${system} = { inherit tests; ez = ezBin; };
+      # `lint` is bolt at the lock's `[tools.bolt]` pin, run with `--gpu off`
+      # over a copy of the tree, graded by ./bolt.bend
+      checks.${system} = {
+        inherit tests;
+        lint = ez.mkLint { src = self; };
+        ez = ezBin;
+      };
       devShells.${system}.default = ez.mkShell {
         src = self;
         packages = [ bend bend-cc pkgs.git pkgs.openssl pkgs.cacert ];
