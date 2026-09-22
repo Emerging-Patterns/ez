@@ -16,6 +16,7 @@ import ../git/git.bend as Git
 import ../hub/hub.bend as Web
 import ../lock/lock.bend as L
 import ./args.bend as Args
+import ../ez/say.bend as Say
 
 # what one dependency became. `old` is the hash the allowlist must drop, ""
 # when the tree is not committed or the hash did not change. `prev` is the
@@ -113,9 +114,12 @@ def off.why(+name: String, +tag: String, +pin: String, +tip: String) -> String:
     "ez: " ++ name ++ ": " ++ pin ++ " is not an ancestor of " ++ tip,
     "ez: " ++ name ++ ": tag " ++ tag ++ " moved off " ++ pin)
 
-# the same commit, whose tree no longer hashes to the pin
-def drift.why(+name: String, +rev: String, +old: String, +new: String) -> String:
-  "ez: " ++ name ++ ": hash drifted at " ++ rev ++ " (" ++ old ++ " vs " ++ new ++ ")"
+# the same commit, whose tree no longer hashes to the pin. Upgrade does not
+# invent a replacement hash: the pin and the tree disagree, and a person
+# has to say which one is meant.
+def drift.why(+name: String, +tag: String, +rev: String, +old: String,
+  +new: String) -> String:
+  Say.drift(name, tag, rev, old, new)
 
 # the branch a rev-only pin followed, said when there is one
 def branch.of(+b: String) -> String:
@@ -154,7 +158,8 @@ def say.keep(+name: String, +rev: String) -> IO(Unit):
 def confirmed(ok: Bool, +hub: String, +d: M.Dep, +hash: String, +rev: String) -> IO(Done):
   match ok:
     case False{}:
-      IO.die(Done, 1, drift.why(M.dep.name(d), rev, M.dep.hash(d), hash))
+      IO.die(Done, 1, drift.why(M.dep.name(d), M.source.tag(M.source.dep(d)),
+        rev, M.dep.hash(d), hash))
     case True{}:
       do IO<Done>:
         hub.check(hub, M.dep.name(d), hash)
@@ -199,7 +204,7 @@ def judged(v: U.Verdict, +lib: String, +hub: String, +d: M.Dep, +url: String,
           Git.Ref{pin, M.source.tag(M.source.dep(d))}, entry)
         confirm(hub, d, g)
     case U.Drift{}:
-      IO.die(Done, 1, drift.why(M.dep.name(d), pin, M.dep.hash(d), M.dep.hash(d)))
+      IO.die(Done, 1, Say.stuck(M.dep.name(d)))
     case U.Off{}:
       IO.die(Done, 1, off.why(M.dep.name(d), M.source.tag(M.source.dep(d)),
         pin, tip.of(branch, tip)))
@@ -232,7 +237,9 @@ def follow.got(+lib: String, +hub: String, +d: M.Dep, +src: M.Source, r: Git.Ref
 def follow(+lib: String, +hub: String, +d: M.Dep, +ref: String) -> IO(Done):
   +src = M.source.dep(d)
   do IO<Done>:
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.dep.name(d)))
     r : Git.Ref <- Git.resolve(M.source.url(src), ref)
+    Say.done(s)
     follow.got(lib, hub, d, src, r)
 
 # a rev-only pin, against the default branch tip
@@ -245,7 +252,9 @@ def forward.got(+lib: String, +hub: String, +d: M.Dep, t: Git.Tip) -> IO(Done):
 # a rev-only pin
 def forward(+lib: String, +hub: String, +d: M.Dep) -> IO(Done):
   do IO<Done>:
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.dep.name(d)))
     t : Git.Tip <- Git.remote(M.source.url(M.source.dep(d)))
+    Say.done(s)
     forward.got(lib, hub, d, t)
 
 # one dependency

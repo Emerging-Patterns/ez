@@ -11,6 +11,8 @@ import ./test.bend as Test
 import ./doctor.bend as Doctor
 import ./env.bend as Env
 import ./tool.bend as Tool
+import ../ez/say.bend as Say
+import ../io/file.bend as F
 
 # a subcommand
 type Sub is Data:
@@ -157,10 +159,35 @@ def dispatch(sub: Sub, +m: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
     case CHelp{}:
       IO.write(Shake.help(spec(), []))
 
+# `sync` with no tools is lock or install; a ledger that pins tools already
+# names the command that builds them. Anything else is the parser's own error.
+def hint.sync(is_sync: Bool) -> IO(Unit):
+  match is_sync:
+    case False{}:
+      IO.pure(Unit, Unit{})
+    case True{}:
+      do IO<Unit>:
+        m : Maybe<&2, String> <- F.read("ez.toml")
+        IO.print_err(Say.hint(Say.has.tools(F.text_of(m))))
+
+def hint.of(e: Shake.ParseErr) -> IO(Unit):
+  match e:
+    case Shake.Unexpected{arg}:
+      hint.sync(String.eq(arg, "sync"))
+    case Shake.UnknownFlag{_word}:
+      IO.pure(Unit, Unit{})
+    case Shake.Missing{_name}:
+      IO.pure(Unit, Unit{})
+    case Shake.BadValue{_name, _value}:
+      IO.pure(Unit, Unit{})
+    case Shake.NeedHelp{_path}:
+      IO.pure(Unit, Unit{})
+
 # a hard error
-def fail.err(+app: Shake.Cli, e: Shake.ParseErr) -> IO(Unit):
+def fail.err(+app: Shake.Cli, +e: Shake.ParseErr) -> IO(Unit):
   do IO<Unit>:
     IO.print_err(Shake.err_text(app, e))
+    hint.of(e)
     IO.die(Unit, 1, "")
 
 # a failed parse: help text, or an error

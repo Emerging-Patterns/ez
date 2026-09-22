@@ -11,6 +11,7 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
 import ./lock.bend as L
+import ../ez/say.bend as Say
 
 # a write that did not happen is a failure, not a silence
 def wrote(ok: Bool, at: String) -> IO(Unit):
@@ -76,35 +77,74 @@ def git.all(+from: String, +lib: String, +hash: String, fs: List<&2, K.File>) ->
 
 # a vendored package, rebuilt from the rev the lock pins. Its paths are written
 # from the package's root inside the repo, which is not always the entry's own
-# directory.
-def git.pkg(+lib: String, +hash: String, url: String, rev: String, root: String,
-  fs: List<&2, K.File>) -> IO(Unit):
+# directory. The line names the package and the repo before the fetch starts.
+def git.pkg(+lib: String, +hash: String, +url: String, rev: String, +entry: String,
+  root: String, fs: List<&2, K.File>) -> IO(Unit):
   +work = lib ++ "/.work-" ++ hash
   do IO<Unit>:
     _rm : String <- R.exec(["rm", "-rf", work])
-    Git.clone(work, url, rev)
+    Git.clone.say(work, url, rev, Say.dep.git(Say.label(hash, entry), url))
     git.all(P.join(work, root), lib, hash, fs)
     _cl : String <- R.exec(["rm", "-rf", work])
     return Unit{}
+
+# a hub package, fetched and said so before the first byte
+def source.hub(+hub: String, +lib: String, +hash: String, fs: List<&2, K.File>) -> IO(Unit):
+  do IO<Unit>:
+    +s : Say.Spin <- Say.hold(Say.dep.hub(hash))
+    hub.all(hub, lib, hash, fs)
+    Say.done(s)
 
 # a package, from wherever the lock says it comes from
 def source(hub: String, +lib: String, +hash: String, src: L.Src,
   fs: List<&2, K.File>) -> IO(Unit):
   match src:
     case L.Hub{}:
-      hub.all(hub, lib, hash, fs)
-    case L.Git{url, rev, _entry, root, _nar, _tag}:
-      git.pkg(lib, hash, url, rev, root, fs)
+      source.hub(hub, lib, hash, fs)
+    case L.Git{url, rev, entry, root, _nar, _tag}:
+      git.pkg(lib, hash, url, rev, entry, root, fs)
 
-# one package of the lock, laid out the way the hub serves it: the files, and
-# the manifest beside them
-def one(hub: String, +lib: String, +p: L.Pack) -> IO(Unit):
+# the name a line uses: the entry's, or the hash when the package has no entry
+def pkg.label(+hash: String, src: L.Src) -> String:
+  match src:
+    case L.Hub{}:
+      hash
+    case L.Git{_url, _rev, entry, _root, _nar, _tag}:
+      Say.label(hash, entry)
+
+# the package laid out. The manifest is written last, so a tree that has it
+# is a tree that finished.
+def one.live(hub: String, +lib: String, +p: L.Pack) -> IO(Unit):
   +hash = L.pack.hash(p)
   do IO<Unit>:
     _rm : String <- R.exec(["rm", "-rf", lib ++ "/" ++ hash])
     source(hub, lib, hash, L.pack.src(p), L.pack.files(p))
     put(lib, hash, "manifest", L.pack.manifest(p))
-    IO.print(hash ++ " " ++ L.src.kind(L.pack.src(p)))
+
+# a tree whose manifest is already the one the lock would write
+def one.pick(hit: Bool, hub: String, +lib: String, +p: L.Pack) -> IO(Unit):
+  match hit:
+    case True{}:
+      IO.print_err(Say.dep.cached(pkg.label(L.pack.hash(p), L.pack.src(p))))
+    case False{}:
+      one.live(hub, lib, p)
+
+def one.seen(m: Maybe<&2, String>, +man: String, hub: String, +lib: String,
+  +p: L.Pack) -> IO(Unit):
+  match m:
+    case None{}:
+      one.live(hub, lib, p)
+    case Some{text}:
+      one.pick(String.eq(text, man), hub, lib, p)
+
+# one package of the lock, laid out the way the hub serves it: the files, and
+# the manifest beside them. A manifest already on disk is the package.
+def one(hub: String, +lib: String, +p: L.Pack) -> IO(Unit):
+  +hash = L.pack.hash(p)
+  +man = L.pack.manifest(p)
+  do IO<Unit>:
+    m : Maybe<&2, String> <- F.read(lib ++ "/" ++ hash ++ "/manifest")
+    one.seen(m, man, hub, lib, p)
 
 # every package of the lock
 def all(+hub: String, +lib: String, ps: List<&2, L.Pack>) -> IO(Unit):

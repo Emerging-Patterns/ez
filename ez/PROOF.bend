@@ -304,3 +304,66 @@ def Laws.out_name_empty():
 
 def Laws.out_name():
   {==}
+
+def Laws.dep_git_names_the_repo():
+  {==}
+
+def Laws.dep_hub_names_the_hash():
+  {==}
+
+def Laws.dep_cached_is_not_a_fetch():
+  {==}
+
+def Laws.label_from_entry():
+  {==}
+
+def Laws.label_falls_back_to_hash():
+  {==}
+
+def Laws.brief_is_twelve():
+  {==}
+
+def Laws.brief_keeps_short():
+  {==}
+
+def Laws.fetching_names_the_commit():
+  {==}
+
+def Laws.installed_names_the_link():
+  {==}
+
+def Laws.tty_pts():
+  {==}
+
+def Laws.tty_pipe():
+  {==}
+
+def Laws.tty_prefers_stderr():
+  {==}
+
+def Laws.tty_falls_back_to_stdout():
+  {==}
+
+def Laws.tty_neither():
+  {==}
+
+def Laws.hub_404_teaches():
+  {==}
+
+def Laws.hub_other_miss_kept():
+  {==}
+
+def Laws.drift_names_the_tag():
+  {==}
+
+def Laws.tools_section_is_tools():
+  {==}
+
+def Laws.deps_are_not_tools():
+  {==}
+
+def Laws.hint_sync_when_tools():
+  {==}
+
+def Laws.hint_sync_without_tools():
+  {==}
