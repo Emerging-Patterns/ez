@@ -166,35 +166,33 @@ rec {
       '';
     });
 
-  # `ez test` in a writable copy of src. EZ_DEADLINE defaults to 0.
-  # extraFlags are further arguments. Omit `--js-only` when the host
-  # `/usr/bin/ld` is usable under the check. Flags only: there is no
-  # separate native helper.
+  # `ez prove` in a writable copy of src: `bend` on every PROOF.bend, passing
+  # only when each one's first line is `All terms check.` It takes no flags.
   # `lock` is an explicit lock path, as in mkPackage. `bendLib`, when non-null,
   # is the store path used as BEND_LIB. Precedence: `bendLib`, else
   # `bendLibOf src lock`, else no BEND_LIB.
   #
-  #   checks.${system}.test = inputs.ez.lib.${system}.mkProofs {
+  #   checks.${system}.proofs = inputs.ez.lib.${system}.mkProofs {
   #     ez = inputs.ez.packages.${system}.default;
   #     src = self;
-  #     name = "…-test";
-  #     extraFlags = [ "--unit-only" ]; # add "--js-only" when host ld unavailable in sandbox
+  #     name = "…-proofs";
   #   };
   mkProofs = {
     ez,
     src,
     name ? "proofs",
-    extraFlags ? [ ],
-    deadline ? "0",
     lock ? null,
     bendLib ? null,
+    # accepted and ignored: they were `ez test`'s flags and budget, and a
+    # caller written against the old signature still evaluates
+    extraFlags ? [ ],
+    deadline ? null,
   }:
     pkgs.runCommand name
       (withBendLib (bendLibFor bendLib src lock) {
         nativeBuildInputs = [ ez ];
-        EZ_DEADLINE = toString deadline;
       })
-      (copyTree src "ez test ${lib.escapeShellArgs extraFlags}");
+      (copyTree src "ez prove");
 
   # A locked `[tools.<name>]` built with mkPackage. `bend` defaults to the
   # one this lib was imported with. The derivation's name is the pin's name.

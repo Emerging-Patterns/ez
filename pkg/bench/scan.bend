@@ -2,9 +2,8 @@
 #
 # This is not a test and the gate does not collect it. It lives in `bench/`
 # rather than `tests/` because `ez test` runs
-# every `*/tests/*.bend` on both lanes, and an input big enough to show the
-# cost would add minutes to the gate to assert nothing the scan laws do
-# not already assert.
+# every `*/tests/*.bend`, and an input big enough to show the cost would add
+# minutes to the run to assert nothing the scan laws do not already assert.
 #
 #   bend pkg/bench/scan.bend -o /tmp/scan
 #   /tmp/scan new 200000    # the classifier as pkg/pkg.bend has it now

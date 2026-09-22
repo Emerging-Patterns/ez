@@ -127,7 +127,7 @@ A Proved requirement whose law has not landed yet is marked **pending** in `SPEC
 
 ### The proof gate
 
-The specification depends on one mechanical check: for every PROOF.bend in the tree, `bend PROOF.bend` prints exactly `All terms check.` as its first line. Today that check is the proof lane of `ez test`, run by `mkProofs` in `flake.nix`. It moves into its own command, `ez prove`, which does only that and which `mkProofs` runs; `ez test` may call it for convenience. The test lanes are outside the specification. The runner's faithfulness is a trust assumption (EZ-TRUST-4), in the same way the interpreter's is.
+The specification depends on one mechanical check: for every PROOF.bend in the tree, `bend PROOF.bend` prints exactly `All terms check.` as its first line. That check is its own command, `ez prove`, which does only that and which `mkProofs` in `flake.nix` runs. It was once the proof lane of `ez test`; `ez test` no longer runs proofs, and is outside the specification. The runner's faithfulness is a trust assumption (EZ-TRUST-4), in the same way the interpreter's is.
 
 ### The World model
 

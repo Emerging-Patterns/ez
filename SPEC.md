@@ -1,6 +1,6 @@
 # ez specification
 
-This is the list of every behavior ez guarantees, each under a stable requirement ID. Every requirement has one of two levels. A **Proved** requirement holds for every input, and is backed by a quantified law in a LAWS.bend that passes the proof gate. A **Trusted** requirement is an assumption about something ez cannot check from inside its own gate, and it is listed in the trust boundary below. A Proved requirement whose law has not landed yet has status **pending**: we intend to prove it, and until then it is not guaranteed. The proof gate is this check: for every PROOF.bend in the tree, the first line `bend PROOF.bend` prints is exactly `All terms check.`
+This is the list of every behavior ez guarantees, each under a stable requirement ID. Every requirement has one of two levels. A **Proved** requirement holds for every input, and is backed by a quantified law in a LAWS.bend that passes the proof gate. A **Trusted** requirement is an assumption about something ez cannot check from inside its own gate, and it is listed in the trust boundary below. A Proved requirement whose law has not landed yet has status **pending**: we intend to prove it, and until then it is not guaranteed. The proof gate is this check: for every PROOF.bend in the tree, the first line `bend PROOF.bend` prints is exactly `All terms check.` `ez prove` runs it, and it is the check CI runs.
 
 The reasoning behind each requirement, and the decisions that shaped them, are in [docs/rfc/ez-spec.md](docs/rfc/ez-spec.md).
 
