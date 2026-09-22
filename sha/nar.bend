@@ -9,7 +9,6 @@
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
-import ../ez/sorted.bend as Sort
 import ./sha.bend as Sha
 
 # one directory child: its name, and the NAR serial of its node
@@ -259,12 +258,37 @@ def nonblank(ss: List<&2, String>) -> List<&2, String>:
       +more = nonblank(t)
       Bool.pick(List<&2, String>, String.is_empty(h), more, h <> more)
 
+# where one name belongs in a list already sorted. Insertion keeps the
+# termination check happy; Base's List.sort does not.
+def sort.ins.put(le: Bool, +x: String, h: String, t: List<&2, String>,
+  rest: List<&2, String>) -> List<&2, String>:
+  match le:
+    case True{}:
+      x <> (h <> t)
+    case False{}:
+      h <> rest
+
+def sort.ins(+x: String, ss: List<&2, String>) -> List<&2, String>:
+  match ss:
+    case []:
+      [x]
+    case +h <> +t:
+      sort.ins.put(String.is_le(x, h), x, h, t, sort.ins(x, t))
+
+# directory entry names in lexicographic order, the order NAR walks them
+def sort(ss: List<&2, String>) -> List<&2, String>:
+  match ss:
+    case []:
+      []
+    case +h <> t:
+      sort.ins(h, sort(t))
+
 def names(+path: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     +out : String <- R.exec(["find", path, "-mindepth", "1", "-maxdepth", "1",
       "-printf", "%f\\n"])
     text : String <- said(R.ok(out), path ++ ": ", R.text(out))
-    return Sort.sort(nonblank(String.lines(text)))
+    return sort(nonblank(String.lines(text)))
 
 def link.of(+path: String) -> IO(String):
   do IO<String>:
