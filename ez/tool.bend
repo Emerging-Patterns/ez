@@ -1,7 +1,9 @@
-# ez/tool: `ez tool run`, `ez tool install`, `ez tool upgrade`, and `ezx`.
-# A target is resolved, its ledger read, its lock fetched, and the binary
-# it names built under `$XDG_CACHE_HOME/ez/tool/<slug>`
-# (`~/.cache/ez/tool/<slug>` when that variable is unset).
+# ez/tool: `ez tool sync`, `ez tool run`, `ez tool install`, `ez tool upgrade`,
+# and `ezx`. A target is resolved, its ledger read, its lock fetched, and the
+# binary it names built under `$XDG_CACHE_HOME/ez/tool/<slug>`
+# (`~/.cache/ez/tool/<slug>` when that variable is unset). A name that matches
+# a `[tools.*]` pin is built at the rev in `ez.lock.toml`. Any other target is
+# resolved as a free `owner/repo`, URL or path.
 #
 # A remote is cloned again only when `git ls-remote <url> HEAD` names a
 # different commit than the `rev` file, and the binary is built again only
@@ -389,28 +391,37 @@ def go.named(+name: String, +entry: String, +src: String, +lib: String,
     +bin_ok : Bool <- is.exec(out)
     go.hit(reuse(cached, rev, bin_ok), src, lib, entry, out, dir, rev, name, act)
 
-# a ledger that read
+# the file a pin names, or the checkout's own file when the pin names none.
+# An empty pin is "", not `main.bend`: that default belongs to the checkout.
+def go.over(empty: Bool, +over: String, +b: String, +e: String) -> String:
+  match empty:
+    case True{}:
+      Tgt.file.of(b, e)
+    case False{}:
+      over
+
+# a ledger that read. `over` is a file the pin named, or "" for the checkout's.
 def go.good(m: M.Manifest, +src: String, +lib: String, +dir: String,
-  +rev: String, act: Act) -> IO(Unit):
-  M.Manifest{+n, +e, +b, _ds} = m
-  go.named(Tgt.out.name(n), P.join(src, Tgt.file.of(b, e)), src, lib, dir,
-    rev, act)
+  +rev: String, act: Act, +over: String) -> IO(Unit):
+  M.Manifest{+n, +e, +b, _ds, _ts} = m
+  go.named(Tgt.out.name(n), P.join(src, go.over(String.is_empty(over), over, b, e)),
+    src, lib, dir, rev, act)
 
 # the ledger, or the reason it did not read
 def go.read(r: M.Read, +src: String, +lib: String, +dir: String, +rev: String,
-  act: Act) -> IO(Unit):
+  act: Act, +over: String) -> IO(Unit):
   match r:
     case M.Bad{why}:
       IO.die(Unit, 1, "ez: error: " ++ why)
     case M.Good{m}:
-      go.good(m, src, lib, dir, rev, act)
+      go.good(m, src, lib, dir, rev, act, over)
 
 # the checkout's ledger, built into `dir`. `Run` starts the binary.
 def go(+src: String, +lib: String, +dir: String, +rev: String,
-  act: Act) -> IO(Unit):
+  act: Act, +over: String) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- load(src)
-    go.read(r, src, lib, dir, rev, act)
+    go.read(r, src, lib, dir, rev, act, over)
 
 # a checkout replaced with this commit. The rev file is left alone until the
 # build has written a binary for it.
@@ -420,7 +431,7 @@ def clone(+src: String, +url: String, +rev: String) -> IO(Unit):
     Git.clone(src, url, rev)
 
 # clone when the checkout is not already this commit
-def sync(need: Bool, +src: String, +url: String, +rev: String) -> IO(Unit):
+def freshen(need: Bool, +src: String, +url: String, +rev: String) -> IO(Unit):
   match need:
     case False{}:
       IO.pure(Unit, Unit{})
@@ -430,26 +441,26 @@ def sync(need: Bool, +src: String, +url: String, +rev: String) -> IO(Unit):
 # the checkout and the binary for one remote, once the cache root and the
 # commit are known
 def run.remote.at(+root: String, +url: String, +slug: String, +rev: String,
-  act: Act) -> IO(Unit):
+  act: Act, +over: String) -> IO(Unit):
   +dir = root ++ "/" ++ slug
   +src = dir ++ "/src"
   do IO<Unit>:
     +cached : String <- text(dir ++ "/rev")
     +src_ok : Bool <- is.file(src ++ "/ez.toml")
-    sync(Bool.not(fresh(src_ok, cached, rev)), src, url, rev)
-    go(src, src ++ "/.ez/lib", dir, rev, act)
+    freshen(Bool.not(fresh(src_ok, cached, rev)), src, url, rev)
+    go(src, src ++ "/.ez/lib", dir, rev, act, over)
 
 # a remote: the cache holds the checkout and the binary
 def run.remote(+url: String, +slug: String, act: Act) -> IO(Unit):
   do IO<Unit>:
     +root : String <- cache.root()
     +rev : String <- head.ask(url)
-    run.remote.at(root, url, slug, rev, act)
+    run.remote.at(root, url, slug, rev, act, "")
 
 # a path, once it is absolute and its commit is known
 def run.local.at(+root: String, +abs: String, +rev: String, act: Act) -> IO(Unit):
   +dir = root ++ "/local" ++ abs
-  go(abs, dir ++ "/lib", dir, rev, act)
+  go(abs, dir ++ "/lib", dir, rev, act, "")
 
 # a path: nothing is cloned. Dependencies are fetched into the cache, not
 # into the tree.
@@ -475,17 +486,133 @@ def run.go(p: Tgt.Place, act: Act) -> IO(Unit):
     case Tgt.Remote{url, slug}:
       run.remote(url, slug, act)
 
-# `ez tool run <target> [-- args…]`, and what `ezx` runs
+# a ledger that did not parse stops the command
+def project.read(r: M.Read) -> IO(M.Read):
+  match r:
+    case M.Bad{why}:
+      IO.die(M.Read, 1, "ez: error: " ++ why)
+    case M.Good{_m}:
+      IO.pure(M.Read, r)
+
+# a missing ledger pins nothing, so the word stays a free target
+def project.go(m: Maybe<&2, String>) -> IO(M.Read):
+  match m:
+    case None{}:
+      IO.pure(M.Read, M.Good{M.Manifest{"", "", "", [], []}})
+    case Some{text}:
+      project.read(M.parse(text))
+
+# the project's own ledger
+def project() -> IO(M.Read):
+  do IO<M.Read>:
+    m : Maybe<&2, String> <- F.read("ez.toml")
+    project.go(m)
+
+# the lock's text, or a refusal when it was not written
+def lock.open(m: Maybe<&2, String>) -> IO(String):
+  match m:
+    case None{}:
+      IO.die(String, 1, "ez: ez.lock.toml is not there")
+    case Some{text}:
+      IO.pure(String, text)
+
+# a name the lock does not pin
+def lock.have(missing: Bool, +name: String, t: M.Tool) -> IO(M.Tool):
+  match missing:
+    case True{}:
+      IO.die(M.Tool, 1, "ez: " ++ name ++ " is not pinned in ez.lock.toml")
+    case False{}:
+      IO.pure(M.Tool, t)
+
+# the pin `ez lock` wrote for this name
+def locked(+name: String) -> IO(M.Tool):
+  do IO<M.Tool>:
+    m : Maybe<&2, String> <- F.read("ez.lock.toml")
+    +text : String <- lock.open(m)
+    +t : M.Tool <- IO.pure(M.Tool,
+      M.tool.find(M.tools(T.sects(T.parse(text))), name))
+    lock.have(String.is_empty(M.tool.name(t)), name, t)
+
+# `bin` when the pin names one, otherwise `entry`, otherwise "" so the
+# checkout's own ledger chooses the file
+def over.of(+b: String, +e: String) -> String:
+  Bool.pick(String, String.is_empty(b), e, b)
+
+# a pin with no commit cannot be built
+def pinned.rev(empty: Bool, +name: String, +rev: String) -> IO(String):
+  match empty:
+    case True{}:
+      IO.die(String, 1, "ez: tools." ++ name ++ " has no rev")
+    case False{}:
+      IO.pure(String, rev)
+
+# a classified git url, built at the rev the lock recorded
+def pinned.place(p: Tgt.Place, +rev: String, +over: String, act: Act) -> IO(Unit):
+  match p:
+    case Tgt.Bad{why}:
+      IO.die(Unit, 1, "ez: " ++ why)
+    case Tgt.Local{_path}:
+      IO.die(Unit, 1, "ez: a pinned tool names a git repo")
+    case Tgt.Remote{url, slug}:
+      do IO<Unit>:
+        +root : String <- cache.root()
+        run.remote.at(root, url, slug, rev, act, over)
+
+# one pinned CLI, at the lock rev rather than at HEAD
+def run.pinned(+t: M.Tool, act: Act) -> IO(Unit):
+  +src = M.tool.source(t)
+  +name = M.tool.name(t)
+  do IO<Unit>:
+    +rev : String <- pinned.rev(String.is_empty(M.source.rev(src)), name,
+      M.source.rev(src))
+    pinned.place(Tgt.classify(M.source.url(src)), rev,
+      over.of(M.tool.bin(t), M.tool.entry(t)), act)
+
+# a manifest name is that pin; any other word is a free target
+def named.go(free: Bool, +target: String, act: Act) -> IO(Unit):
+  match free:
+    case True{}:
+      run.go(Tgt.classify(target), act)
+    case False{}:
+      do IO<Unit>:
+        +pin : M.Tool <- locked(target)
+        run.pinned(pin, act)
+
+def named(+target: String, act: Act) -> IO(Unit):
+  do IO<Unit>:
+    r : M.Read <- project()
+    +t : M.Tool <- IO.pure(M.Tool, M.tool.find(M.tools_of(r), target))
+    named.go(String.is_empty(M.tool.name(t)), target, act)
+
+# every pinned CLI, built and linked at its lock rev
+def sync.go(ts: List<&2, M.Tool>) -> IO(Unit):
+  match ts:
+    case []:
+      IO.pure(Unit, Unit{})
+    case +h <> t:
+      do IO<Unit>:
+        +pin : M.Tool <- locked(M.tool.name(h))
+        run.pinned(pin, Hold{})
+        sync.go(t)
+
+# `ez tool sync`
+def sync() -> IO(Unit):
+  do IO<Unit>:
+    r : M.Read <- project()
+    sync.go(M.tools_of(r))
+
+# `ez tool run <target> [-- args…]`, and what `ezx` runs. A name that is a
+# `[tools.*]` pin is built at the lock rev. Anything else is a free target.
 def run(+target: String, args: List<&2, String>) -> IO(Unit):
-  run.go(Tgt.classify(target), Run{args})
+  named(target, Run{args})
 
 # `ez tool install <target>`: the lock fetched, the binary built, linked
 # onto PATH under the package's name, not run
 def install(+target: String) -> IO(Unit):
-  run.go(Tgt.classify(target), Hold{})
+  named(target, Hold{})
 
 # `ez tool upgrade <target>`: the same resolution `run` uses, and a rebuild
-# when that commit is not the one on record. The PATH link is written again.
-# The binary is not run.
+# when that commit is not the one on record. A pinned tool uses the lock rev.
+# The PATH link is written again. The binary is not run.
 def upgrade(+target: String) -> IO(Unit):
-  run.go(Tgt.classify(target), Hold{})
+  named(target, Hold{})

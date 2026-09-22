@@ -11,7 +11,7 @@ def edited(m: M.Manifest) -> String:
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    +one : M.Manifest <- IO.pure(M.Manifest, M.Manifest{"a", "m.bend", "", []})
+    +one : M.Manifest <- IO.pure(M.Manifest, M.Manifest{"a", "m.bend", "", [], []})
     Check.eq_str("a ledger with no dependencies", R.show(one),
       "[package]\nname = \"a\"\nentry = \"m.bend\"\n")
     Check.eq_str("a dependency added", edited(R.add(one,

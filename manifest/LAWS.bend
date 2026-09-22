@@ -101,6 +101,43 @@ law deps_skips_other_sections:
   for e: {False{} == String.starts_with(n, "deps.") : Bool}
   {M.deps(T.Sect{n, ps} <> ss) == M.deps(ss) : List<&2, M.Dep>}
 
+# LAW: a `[tools.<name>]` section is a pinned CLI of that name, with the
+# prefix off and nothing else taken with it.
+law tool_of_drops_prefix:
+  for +name: String
+  for +pairs: List<&2, T.Kv>
+  {M.tool.name(M.tool_of("tools." ++ name, pairs)) == name : String}
+
+# LAW: every `[tools.<name>]` section becomes a pinned CLI, in the order the
+# document wrote them. A dependency section is not one of them.
+law tools_takes_tool_sections:
+  for +name: String
+  for +ps: List<&2, T.Kv>
+  for ss: List<&2, T.Sect>
+  {M.tools(T.Sect{"tools." ++ name, ps} <> ss)
+    == M.tool_of("tools." ++ name, ps) <> M.tools(ss) : List<&2, M.Tool>}
+
+# LAW: and a section that is not one is passed over
+law tools_skips_other_sections:
+  for +n: String
+  for ps: List<&2, T.Kv>
+  for ss: List<&2, T.Sect>
+  for e: {False{} == String.starts_with(n, "tools.") : Bool}
+  {M.tools(T.Sect{n, ps} <> ss) == M.tools(ss) : List<&2, M.Tool>}
+
+# LAW: a tool section with no hash is not a missing dependency. A hash is
+# the `0x` name an import carries, and a tool is not imported.
+law tool_needs_no_hash:
+  {M.missing([T.Sect{"tools.bolt", [T.Kv{"git", "https://github.com/o/bolt"}]}])
+    == "" : String}
+
+# LAW: a `[tools.*]` section is not a dependency
+law tool_is_not_a_dep:
+  {M.deps([T.Sect{"tools.bolt",
+    [T.Kv{"git", "https://github.com/Emerging-Patterns/bolt"},
+     T.Kv{"rev", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}])
+    == [] : List<&2, M.Dep>}
+
 # LAW: a dependency section with no hash is reported, by its own name, before
 # any section after it. A hash is the `0x` name the import line carries, so a
 # section without one names a package ez cannot resolve.
@@ -157,7 +194,8 @@ law show_good_opens_with_name:
   for e: String
   for b: String
   for ds: List<&2, M.Dep>
-  {String.starts_with(M.show(M.Good{M.Manifest{n, e, b, ds}}), n) == True{}
+  for ts: List<&2, M.Tool>
+  {String.starts_with(M.show(M.Good{M.Manifest{n, e, b, ds, ts}}), n) == True{}
     : Bool}
 
 # LAW: a lookup answers with the first dependency of that name, whole
@@ -193,8 +231,9 @@ law rev_of_names_the_commit:
   for nar: String
   for vend: Bool
   for t: List<&2, M.Dep>
+  for ts: List<&2, M.Tool>
   {M.rev_of(M.Good{M.Manifest{mn, me, mb,
-    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t}}, n) == rev
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, ts}}, n) == rev
     : String}
 
 # LAW: and the tag it was asked for is the tag its git section wrote
@@ -212,8 +251,9 @@ law tag_of_names_the_tag:
   for nar: String
   for vend: Bool
   for t: List<&2, M.Dep>
+  for ts: List<&2, M.Tool>
   {M.tag_of(M.Good{M.Manifest{mn, me, mb,
-    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t}}, n) == tag
+    M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, ts}}, n) == tag
     : String}
 
 # LAW: a key with no value leaves no trace in the file. An absent tag or entry
@@ -243,6 +283,15 @@ law dep_opens_its_section:
   {String.starts_with(R.dep(M.Dep{n, h, e, s}), "\n[deps." ++ n) == True{}
     : Bool}
 
+# LAW: a tool's section is headed by that tool's own name
+law tool_opens_its_section:
+  for +n: String
+  for e: String
+  for b: String
+  for s: M.Source
+  {String.starts_with(R.tool(M.Tool{n, e, b, s}), "\n[tools." ++ n) == True{}
+    : Bool}
+
 # LAW: rendering a list of dependencies renders each of them, in order, and
 # adds nothing between. Splitting the list splits the text at the same place,
 # which is what makes the file the ledger and not a summary of it.
@@ -258,7 +307,8 @@ law show_opens_with_package:
   for e: String
   for b: String
   for ds: List<&2, M.Dep>
-  {String.starts_with(R.show(M.Manifest{n, e, b, ds}), "[package]\n") == True{}
+  for ts: List<&2, M.Tool>
+  {String.starts_with(R.show(M.Manifest{n, e, b, ds, ts}), "[package]\n") == True{}
     : Bool}
 
 # LAW: a ledger that did not read renders as nothing. `ez add` and `ez remove`
@@ -291,13 +341,34 @@ def ledger() -> String:
   "tag = \"v1.0\"\n" ++
   "root = \".\"\n" ++
   "narHash = \"sha256-zz\"\n" ++
-  "entry = \"src/lib.bend\"\n"
+  "entry = \"src/lib.bend\"\n" ++
+  "\n[tools.bolt]\n" ++
+  "git = \"https://github.com/Emerging-Patterns/bolt\"\n" ++
+  "rev = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n" ++
+  "tag = \"v0.4.0\"\n" ++
+  "root = \".\"\n" ++
+  "narHash = \"sha256-zz\"\n" ++
+  "entry = \"bolt/main.bend\"\n"
 
 # LAW: a rendered ledger reads back as the file it was. `ez add` and
 # `ez remove` write what they render, so the file on disk after either
 # command is the file the next command will write again.
 law render_parse_roundtrip:
   {R.render(M.parse(ledger())) == ledger() : String}
+
+# LAW: the bolt pin in that ledger is a tool, and not a dependency of that name
+law bolt_is_a_tool:
+  {M.tool.name(M.tool.find(M.tools_of(M.parse(ledger())), "bolt")) == "bolt"
+    : String}
+
+# LAW: and its commit is the commit the tool section wrote
+law bolt_rev:
+  {M.source.rev(M.tool.source(M.tool.find(M.tools_of(M.parse(ledger())), "bolt")))
+    == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" : String}
+
+# LAW: a lookup for that name among the dependencies finds none
+law bolt_is_not_a_dep:
+  {M.dep.name(M.dep(M.parse(ledger()), "bolt")) == "" : String}
 
 # a sha256 pin with a rev and no tag, and the tree committed.
 # The tip below is `main` of Giulio2002/bend-sha256 as `ls-remote --symref`

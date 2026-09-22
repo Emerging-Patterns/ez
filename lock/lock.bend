@@ -169,7 +169,7 @@ def ledger.read(r: M.Read) -> List<&2, Origin>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, _b, ds} = m
+      M.Manifest{_n, _e, _b, ds, _ts} = m
       ledger.origins(ds)
 
 # the ledger first, the cache behind it. `origin` answers with the first record
@@ -569,6 +569,49 @@ def doc(hub: String, ver: String, ps: List<&2, Pack>) -> List<&2, T.Sect>:
 def render(hub: String, ver: String, ps: List<&2, Pack>) -> String:
   T.render(doc(hub, ver, ps))
 
+# the keys a pinned CLI contributes. The same names a `[tools.*]` section
+# uses in ez.toml, and not the `[packages.*]` source table.
+def tool.pairs(+e: String, +b: String, s: M.Source) -> List<&2, T.Kv>:
+  match s:
+    case M.Hub{}:
+      List.concat(&2, T.Kv, [kv("entry", e), kv("bin", b)])
+    case M.Git{url, rev, tag, root, nar, _vend}:
+      List.concat(&2, T.Kv,
+        [kv("git", url), kv("rev", rev), kv("tag", tag), kv("root", root),
+         kv("narHash", nar), kv("entry", e), kv("bin", b)])
+
+# one `[tools.<name>]` table
+def tool.sect(t: M.Tool) -> T.Sect:
+  M.Tool{n, e, b, s} = t
+  T.Sect{"tools." ++ n, tool.pairs(e, b, s)}
+
+# every pinned CLI, in the order the ledger holds them
+def tool.sects(ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
+  match ts:
+    case []:
+      []
+    case h <> t:
+      tool.sect(h) <> tool.sects(t)
+
+# the lock with its tools after the packages. An empty tool list is the
+# lock `render` writes, so a ledger with no tools is unchanged.
+def render.pick(empty: Bool, hub: String, ver: String, ps: List<&2, Pack>,
+  ts: List<&2, M.Tool>) -> String:
+  match empty:
+    case True{}:
+      render(hub, ver, ps)
+    case False{}:
+      T.render(List.append(&2, T.Sect, doc(hub, ver, ps), tool.sects(ts)))
+
+# the same choice, made by matching the list so it is read once
+def render.tools(ts: List<&2, M.Tool>, hub: String, ver: String,
+  ps: List<&2, Pack>) -> String:
+  match ts:
+    case []:
+      render(hub, ver, ps)
+    case h <> t:
+      render.pick(False{}, hub, ver, ps, h <> t)
+
 # the `[lock]` table of a lock that was read
 def lock.pairs(ss: List<&2, T.Sect>) -> List<&2, T.Kv>:
   match ss:
@@ -733,6 +776,12 @@ def ledger_of(+at: String) -> IO(List<&2, Origin>):
     m : Maybe<&2, String> <- F.read(at)
     return ledger.read(M.parse(F.text_of(m)))
 
+# the pinned CLIs the committed ledger records
+def tools_at(+at: String) -> IO(List<&2, M.Tool>):
+  do IO<List<&2, M.Tool>>:
+    m : Maybe<&2, String> <- F.read(at)
+    return M.tools_of(M.parse(F.text_of(m)))
+
 # the version of bend that resolved a lock, for the record
 def version() -> IO(String):
   do IO<String>:
@@ -750,8 +799,9 @@ def lock.at(+hub: String, +toml: String, +at: String,
     +orgs : List<&2, Origin> <- IO.pure(List<&2, Origin>, origins.all(led, cache))
     hs : List<&2, String> <- roots(U32.to_nat(100000), entries, Seen{[], []})
     ps : List<&2, Pack> <- resolve(U32.to_nat(100000), hub, at, orgs, hs, [])
+    ts : List<&2, M.Tool> <- tools_at(toml)
     ver : String <- version()
-    return render(hub, ver, ps)
+    return render.tools(ts, hub, ver, ps)
 
 # the lock of a project, from the files it was asked to start at
 def lock(entries: List<&2, String>) -> IO(String):

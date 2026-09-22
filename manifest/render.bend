@@ -40,10 +40,24 @@ def deps(ds: List<&2, M.Dep>) -> String:
     case h <> t:
       dep(h) ++ deps(t)
 
+# one `[tools.<name>]` section. No hash: a tool is not a package.
+def tool(t: M.Tool) -> String:
+  M.Tool{n, e, b, s} = t
+  "\n[tools." ++ n ++ "]\n" ++ source(s) ++ line("entry", e) ++ line("bin", b)
+
+# every pinned CLI, in the order the ledger holds them
+def tools(ts: List<&2, M.Tool>) -> String:
+  match ts:
+    case []:
+      ""
+    case h <> t:
+      tool(h) ++ tools(t)
+
 # the ledger as an ez.toml
 def show(m: M.Manifest) -> String:
-  M.Manifest{n, e, b, ds} = m
-  "[package]\n" ++ line("name", n) ++ line("entry", e) ++ line("bin", b) ++ deps(ds)
+  M.Manifest{n, e, b, ds, ts} = m
+  "[package]\n" ++ line("name", n) ++ line("entry", e) ++ line("bin", b) ++
+    deps(ds) ++ tools(ts)
 
 # a ledger that was read, as an ez.toml; an unreadable one renders as nothing,
 # so a failed read can never overwrite a good file with a guess
@@ -73,10 +87,10 @@ def without(ds: List<&2, M.Dep>, +name: String) -> List<&2, M.Dep>:
 # the ledger with a dependency added, replacing any of the same name, so adding
 # twice is the same as adding once
 def add(m: M.Manifest, +d: M.Dep) -> M.Manifest:
-  M.Manifest{n, e, b, ds} = m
-  M.Manifest{n, e, b, List.append(&2, M.Dep, without(ds, M.dep.name(d)), [d])}
+  M.Manifest{n, e, b, ds, ts} = m
+  M.Manifest{n, e, b, List.append(&2, M.Dep, without(ds, M.dep.name(d)), [d]), ts}
 
 # the ledger with a dependency dropped
 def remove(m: M.Manifest, name: String) -> M.Manifest:
-  M.Manifest{n, e, b, ds} = m
-  M.Manifest{n, e, b, without(ds, name)}
+  M.Manifest{n, e, b, ds, ts} = m
+  M.Manifest{n, e, b, without(ds, name), ts}

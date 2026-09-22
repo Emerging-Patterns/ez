@@ -76,6 +76,15 @@ def Laws.hashes_sorted():
 def Laws.lock_roundtrip():
   {==}
 
+def Laws.render_keeps_packages_without_tools(_hub, _ver, _ps):
+  {==}
+
+def Laws.tools_are_not_packages():
+  {==}
+
+def Laws.tool_pin_reads_back():
+  {==}
+
 # LAW: one character before the slash, with the separator test given as
 # a parameter, since a match may not scrutinise a computed value
 law spec_split.step:

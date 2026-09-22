@@ -54,6 +54,7 @@ let
         cp ${hubFile hash at sha256} "$out/${hash}/${at}"
       '') files)}
     '';
+  # `[tools.*]` is a CLI pin. This tree is `[packages.*]` only.
 in
 runCommand "bend-lib" {
   passthru = { lock = doc; };
@@ -64,4 +65,4 @@ runCommand "bend-lib" {
   bend_sha256() {
     python3 -c 'import hashlib,sys; t=open(sys.argv[1],encoding="utf-8",newline="").read(); print(hashlib.sha256(bytes(ord(c)&255 for c in t)).hexdigest(), end="")' "$1"
   }
-'' + lib.concatStrings (lib.mapAttrsToList pkg doc.packages))
+'' + lib.concatStrings (lib.mapAttrsToList pkg (doc.packages or { })))
