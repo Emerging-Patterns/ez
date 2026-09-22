@@ -19,6 +19,11 @@ def hash() -> String:
 def leaf() -> String:
   "import Base\n\n# double the number\ndef double(+x: U32) -> U32:\n  (x * 2 : U32)\n"
 
+# a fixed directory. The fetch line names this path, and the trailer has to
+# say the same path on every run.
+def dir() -> String:
+  "/tmp/ez-lock-restore"
+
 # a repo holding the package under src/, committed, and willing to serve the
 # commit by name
 def repo(+d: String) -> IO(String):
@@ -47,8 +52,8 @@ def landed(m: Maybe<&2, String>) -> String:
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    +out : String <- R.exec(["mktemp", "-d"])
-    +d : String <- IO.pure(String, String.trim(R.text(out)))
+    +d : String <- IO.pure(String, dir())
+    _clr : String <- R.exec(["rm", "-rf", d])
     rev : String <- repo(d)
     Restore.restore.at(T.sects(T.parse(lock(d, rev))), d ++ "/lib")
     f : Maybe<&2, String> <- F.read(d ++ "/lib/" ++ hash() ++ "/lib.bend")
@@ -59,6 +64,6 @@ def main() -> IO(Unit):
     _rm : String <- R.exec(["rm", "-rf", d])
     return Unit{}
 
-#|0xdddddddddddddddddddddddddddddddd git
+#|dep lib: git fetch (file:///tmp/ez-lock-restore/repo)
 #|ok the package's file is rebuilt from the rev
 #|ok the manifest is written beside it

@@ -22,6 +22,7 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
+import ../ez/say.bend as Say
 
 # where a package's bytes come from. A hub package needs nothing else; a git
 # one pins a commit, the entry its hash was computed from, the directory inside
@@ -291,15 +292,37 @@ def read.git(+lib: String, +hash: String) -> IO(Body):
     srcs : List<&2, String> <- disk.all(lib, hash, files)
     return Body{files, srcs}
 
-# a hub package is fetched, manifest first, and every file checked against it
-def read.hub(+hub: String, +hash: String) -> IO(Body):
+# the manifest, or why the hub did not have it. A 404 names the package and
+# the next step; any other miss is the reason the fetch gave.
+def read.hub.miss(+hash: String, +url: String, +why: String, s: Say.Spin) -> IO(Body):
   do IO<Body>:
-    g : Web.Got <- Web.fetch(url_of(hub, hash, "manifest"), want(hash))
-    text : String <- body_of(g)
+    Say.done(s)
+    IO.die(Body, 1, Say.hub.explain(hash, url, why))
+
+# the files, once the manifest arrived and checked
+def read.hub.have(+text: String, +hub: String, +hash: String, s: Say.Spin) -> IO(Body):
+  do IO<Body>:
     fs : List<&2, K.File> <- files_of(hash, text)
     +files : List<&2, K.File> <- IO.pure(List<&2, K.File>, fs)
     srcs : List<&2, String> <- fetch.all(hub, hash, files)
+    Say.done(s)
     return Body{files, srcs}
+
+def read.hub.got(g: Web.Got, +hub: String, +hash: String, +url: String,
+  s: Say.Spin) -> IO(Body):
+  match g:
+    case Web.Miss{why}:
+      read.hub.miss(hash, url, why, s)
+    case Web.Have{body}:
+      read.hub.have(body, hub, hash, s)
+
+# a hub package is fetched, manifest first, and every file checked against it
+def read.hub(+hub: String, +hash: String) -> IO(Body):
+  +url = url_of(hub, hash, "manifest")
+  do IO<Body>:
+    +s : Say.Spin <- Say.hold(Say.dep.hub(hash))
+    g : Web.Got <- Web.fetch(url, want(hash))
+    read.hub.got(g, hub, hash, url, s)
 
 # a package's files and their text, from wherever it comes from
 def read.pkg(hub: String, lib: String, +hash: String, src: Src) -> IO(Body):

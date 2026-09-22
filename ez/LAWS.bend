@@ -11,6 +11,7 @@ import ./gate.bend as G
 import ./clock.bend as Clock
 import ./args.bend as Args
 import ./target.bend as Tgt
+import ../ez/say.bend as Say
 import ../manifest/manifest.bend as M
 
 # a ledger naming two packages, the one the drift laws read
@@ -401,3 +402,113 @@ law out_name_empty:
 # LAW: otherwise the binary is the package's name
 law out_name:
   {Tgt.out.name("bolt") == "bolt" : String}
+
+# what a long step says. The words are the whole of the contract: a fetch, a
+# cache hit, a drift and a missing manifest each have to be readable as that.
+
+# LAW: a git package is named, and the repo it is fetched from is named
+law dep_git_names_the_repo:
+  {Say.dep.git("sha256", "https://github.com/Giulio2002/bend-sha256")
+    == "dep sha256: git fetch (https://github.com/Giulio2002/bend-sha256)"
+    : String}
+
+# LAW: a hub package says it is fetching from the hub
+law dep_hub_names_the_hash:
+  {Say.dep.hub("0x0a5c2c95283e42e081da247c84debe18")
+    == "dep 0x0a5c2c95283e42e081da247c84debe18: hub fetch" : String}
+
+# LAW: a tree already on disk says so, and does not claim a fetch
+law dep_cached_is_not_a_fetch:
+  {Say.dep.cached("sha256") == "dep sha256: cached" : String}
+
+# LAW: an entry file is the package's name
+law label_from_entry:
+  {Say.label("0xabc", "sha256.bend") == "sha256" : String}
+
+# LAW: an entry with no name leaves the hash
+law label_falls_back_to_hash:
+  {Say.label("0xabc", "") == "0xabc" : String}
+
+# LAW: a commit is shown by its first twelve characters
+law brief_is_twelve:
+  {Say.brief("3424b39197335f0aa741e8928dbe5c27b3bde0ef") == "3424b3919733"
+    : String}
+
+# LAW: a name shorter than that is left whole
+law brief_keeps_short:
+  {Say.brief("abc") == "abc" : String}
+
+# LAW: a tool checkout is named with the commit it is fetching
+law fetching_names_the_commit:
+  {Say.fetching("github.com/Emerging-Patterns/bolt",
+      "3424b39197335f0aa741e8928dbe5c27b3bde0ef")
+    == "fetching github.com/Emerging-Patterns/bolt@3424b3919733" : String}
+
+# LAW: an install says what was linked, and where
+law installed_names_the_link:
+  {Say.installed("bolt", "/home/u/.local/bin/bolt")
+    == "installed bolt -> /home/u/.local/bin/bolt" : String}
+
+# LAW: a pts device is a terminal
+law tty_pts:
+  {Say.tty.at("/dev/pts/3") == True{} : Bool}
+
+# LAW: a pipe is not
+law tty_pipe:
+  {Say.tty.at("pipe:[12]") == False{} : Bool}
+
+# LAW: stderr's terminal wins
+law tty_prefers_stderr:
+  {Say.tty.pick("/dev/pts/1", "pipe:[2]") == "/dev/pts/1" : String}
+
+# LAW: stdout's terminal is used when stderr is a pipe
+law tty_falls_back_to_stdout:
+  {Say.tty.pick("pipe:[1]", "/dev/pts/4") == "/dev/pts/4" : String}
+
+# LAW: neither being a terminal means no spinner
+law tty_neither:
+  {Say.tty.pick("pipe:[1]", "/dev/null") == "" : String}
+
+# LAW: a manifest 404 names the package, that the hub has no manifest, and
+# what to do next
+law hub_404_teaches:
+  {Say.hub.explain("0x0a5c2c95283e42e081da247c84debe18",
+      "https://hub.bend-lang.com/0x0a5c2c95283e42e081da247c84debe18/manifest",
+      "https://hub.bend-lang.com/0x0a5c2c95283e42e081da247c84debe18/manifest: the server answered 404")
+    == "ez: 0x0a5c2c95283e42e081da247c84debe18: the hub has no manifest for this package (https://hub.bend-lang.com/0x0a5c2c95283e42e081da247c84debe18/manifest answered 404). Re-lock with `ez lock`, fix the dependency, or vendor it offline (`ez add`)."
+    : String}
+
+# LAW: a miss that is not a missing manifest keeps the reason it arrived with
+law hub_other_miss_kept:
+  {Say.hub.explain("0xabc", "https://hub.bend-lang.com/0xabc/manifest",
+      "https://hub.bend-lang.com/0xabc/manifest does not hash to what was asked for")
+    == "ez: https://hub.bend-lang.com/0xabc/manifest does not hash to what was asked for"
+    : String}
+
+# LAW: a drifted tag says the tree hash moved and that upgrade will not rewrite it
+law drift_names_the_tag:
+  {Say.drift("shake", "v0.1.0", "3424b39197335f0aa741e8928dbe5c27b3bde0ef",
+      "0xebdf72b20ad527103f6efc0d2aa8f1ec", "0x97f80841000000000000000000000000")
+    == "ez: shake: the tree hash of tagged commit v0.1.0 (3424b39197335f0aa741e8928dbe5c27b3bde0ef) no longer matches the pin (the package moved, or the hash is wrong: 0xebdf72b20ad527103f6efc0d2aa8f1ec on the pin, 0x97f80841000000000000000000000000 in the tree). `ez lock --upgrade` cannot fix a drifted pin. Update the dependency hash, re-add the package, or check the tag."
+    : String}
+
+# LAW: a ledger that names a tool section has tools
+law tools_section_is_tools:
+  {Say.has.tools("[package]\nname = \"ez\"\n\n[tools.bolt]\ngit = \"https://github.com/Emerging-Patterns/bolt\"\n")
+    == True{} : Bool}
+
+# LAW: a ledger of dependencies alone does not
+law deps_are_not_tools:
+  {Say.has.tools("[package]\nname = \"ez\"\n\n[deps.sha256]\nhash = \"0xabc\"\n")
+    == False{} : Bool}
+
+# LAW: `ez sync` in a project that pins tools is `ez tool sync`
+law hint_sync_when_tools:
+  {Say.hint(True{}) == "hint: `sync` is not a command; use `ez tool sync`"
+    : String}
+
+# LAW: without tools, the hint is lock or install
+law hint_sync_without_tools:
+  {Say.hint(False{})
+    == "hint: `sync` is not a command. Use `ez lock` to resolve dependencies, or `ez tool install <target>` to link a binary."
+    : String}

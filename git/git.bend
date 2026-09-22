@@ -13,6 +13,7 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
+import ../ez/say.bend as Say
 
 # what a ref turned out to name: the commit that gets pinned, and the tag or
 # branch that was asked for, "" when the ref was a commit to begin with
@@ -70,12 +71,18 @@ def run(what: String, args: List<&2, String>) -> IO(Unit):
     ran(R.ok(out), what, R.text(out))
 
 # the checkout a package is taken from: the pinned commit alone, at the depth
-# of one, so a repo with a long history costs nothing to vendor
-def clone(+work: String, +url: String, +rev: String) -> IO(Unit):
+# of one, so a repo with a long history costs nothing to vendor. The fetch is
+# quiet; the line above it is what a person sees while it runs.
+def clone.say(+work: String, +url: String, +rev: String, +msg: String) -> IO(Unit):
   do IO<Unit>:
+    +s : Say.Spin <- Say.hold(msg)
     run("init", ["git", "init", "-q", work])
     run("fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", url, rev])
     run("checkout", ["git", "-C", work, "checkout", "-q", rev])
+    Say.done(s)
+
+def clone(+work: String, +url: String, +rev: String) -> IO(Unit):
+  clone.say(work, url, rev, Say.git.fetch(url))
 
 # one step of a scan looking for one hit, with the head's answer in hand.
 # `Bool.or` is an ordinary function and reduces both of its sides, so the
@@ -332,7 +339,9 @@ def weigh(+url: String, +rev: String) -> IO(String):
     _mk : String <- R.exec(["mkdir", "-p", work])
     clone(work, url, rev)
     _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
+    +s : Say.Spin <- Say.hold(Say.hashing(rev))
     +nh : String <- nar(work)
+    Say.done(s)
     _cl : String <- R.exec(["rm", "-rf", work])
     return nh
 
@@ -629,9 +638,13 @@ def remote(+url: String) -> IO(Tip):
     +out : String <- R.exec(["git", "ls-remote", "--symref", url, "HEAD"])
     remote.said(R.ok(out), url, R.text(out))
 
-# a bare clone, blobs left behind. Ancestry only needs the commits.
+# a bare clone, blobs left behind. Ancestry only needs the commits. The clone
+# is quiet; the line is what shows while it runs.
 def clone.bare(+work: String, +url: String) -> IO(Unit):
-  run("clone", ["git", "clone", "--bare", "--filter=blob:none", "-q", url, work])
+  do IO<Unit>:
+    +s : Say.Spin <- Say.hold(Say.git.fetch(url))
+    run("clone", ["git", "clone", "--bare", "--filter=blob:none", "-q", url, work])
+    Say.done(s)
 
 # merge-base answers 0 for a descendant, 1 for anything else, and some other
 # status when the question itself could not be asked

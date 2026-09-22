@@ -17,6 +17,7 @@ import ./cap.bend as Cap
 import ./target.bend as Tgt
 import ./upgrade.bend as Up
 import ./pin.bend as Pin
+import ../ez/say.bend as Say
 
 # the ledger's path, which is fixed
 def toml() -> String:
@@ -191,6 +192,7 @@ def lockfile() -> String:
 # the lock, rewritten from every root in the tree
 def lock.now() -> IO(Unit):
   do IO<Unit>:
+    IO.print_err(Say.resolving())
     srcs : List<&2, String> <- sources()
     text : String <- Lock.lock(srcs)
     wrote : Bool <- F.write(lockfile(), text)

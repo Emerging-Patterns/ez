@@ -27,12 +27,14 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./cap.bend as Cap
 import ./env.bend as Env
 import ./target.bend as Tgt
+import ../ez/say.bend as Say
 
 # what happens once the binary for this commit is in the cache. `Run`
-# starts it. `Hold` is `install` and `upgrade`: the binary stays put.
+# starts it. `Install` and `Upgrade` link it and say where.
 type Act is Data:
   Run{args: List<&2, String>}
-  Hold{}
+  Install{}
+  Upgrade{}
 
 # the first line, or nothing
 def line0(ls: List<&2, String>) -> String:
@@ -218,18 +220,21 @@ def place.after(ok: Bool, +at: String, +text: String, +dir: String) -> IO(Unit):
         +path : String <- Env.var("PATH", "")
         place.warn(on.path(dir, path), dir)
 
-# the absolute binary linked under `name` in this directory
-def place.at(+dir: String, +bin: String, +name: String) -> IO(Unit):
+# the absolute binary linked under `name` in this directory. The path is
+# what the next line reports.
+def place.at(+dir: String, +bin: String, +name: String) -> IO(String):
   +at = dir ++ "/" ++ name
-  do IO<Unit>:
+  do IO<String>:
+    IO.print_err(Say.linking(at))
     _mk : String <- R.exec(["mkdir", "-p", dir])
     +ln : String <- R.exec(["ln", "-sfn", bin, at])
     place.after(R.ok(ln), at, R.text(ln), dir)
+    return at
 
 # the built file linked as the package's name. The link names the absolute
 # path, so it does not depend on the directory the command is run from.
-def place(+out: String, +name: String) -> IO(Unit):
-  do IO<Unit>:
+def place(+out: String, +name: String) -> IO(String):
+  do IO<String>:
     +dir : String <- bin.dir()
     +bin : String <- abs.of(out)
     place.at(dir, bin, name)
@@ -324,11 +329,26 @@ def launch(+bin: String, args: List<&2, String>) -> IO(Unit):
     IO.write(R.text(out))
     code.of(U32.read(R.code(out)))
 
+def finish.said(install: Bool, +name: String, +at: String) -> IO(Unit):
+  match install:
+    case True{}:
+      IO.print_err(Say.installed(name, at))
+    case False{}:
+      IO.print_err(Say.linked(name, at))
+
+# the link, then the line that names it
+def finish.link(which: Bool, +out: String, +name: String) -> IO(Unit):
+  do IO<Unit>:
+    +at : String <- place(out, name)
+    finish.said(which, name, at)
+
 # the binary, once it is current. Install and upgrade link it and stop.
 def finish(act: Act, +out: String, +name: String) -> IO(Unit):
   match act:
-    case Hold{}:
-      place(out, name)
+    case Install{}:
+      finish.link(True{}, out, name)
+    case Upgrade{}:
+      finish.link(False{}, out, name)
     case Run{args}:
       launch(out, args)
 
@@ -369,7 +389,9 @@ def miss(+src: String, +lib: String, +entry: String, +out: String,
   +dir: String, +rev: String, +name: String, act: Act) -> IO(Unit):
   do IO<Unit>:
     fetch(src, lib)
+    +s : Say.Spin <- Say.hold(Say.building(name))
     compile(lib, entry, out)
+    Say.done(s)
     stamp(dir ++ "/rev", rev)
     finish(act, out, name)
 
@@ -378,7 +400,9 @@ def go.hit(hit: Bool, +src: String, +lib: String, +entry: String, +out: String,
   +dir: String, +rev: String, +name: String, act: Act) -> IO(Unit):
   match hit:
     case True{}:
-      finish(act, out, name)
+      do IO<Unit>:
+        IO.print_err(Say.reused(name))
+        finish(act, out, name)
     case False{}:
       miss(src, lib, entry, out, dir, rev, name, act)
 
@@ -425,18 +449,19 @@ def go(+src: String, +lib: String, +dir: String, +rev: String,
 
 # a checkout replaced with this commit. The rev file is left alone until the
 # build has written a binary for it.
-def clone(+src: String, +url: String, +rev: String) -> IO(Unit):
+def clone(+src: String, +url: String, +rev: String, +label: String) -> IO(Unit):
   do IO<Unit>:
     _rm : String <- R.exec(["rm", "-rf", src])
-    Git.clone(src, url, rev)
+    Git.clone.say(src, url, rev, Say.fetching(label, rev))
 
 # clone when the checkout is not already this commit
-def freshen(need: Bool, +src: String, +url: String, +rev: String) -> IO(Unit):
+def freshen(need: Bool, +src: String, +url: String, +rev: String,
+  +label: String) -> IO(Unit):
   match need:
     case False{}:
-      IO.pure(Unit, Unit{})
+      IO.print_err(Say.kept(label))
     case True{}:
-      clone(src, url, rev)
+      clone(src, url, rev, label)
 
 # the checkout and the binary for one remote, once the cache root and the
 # commit are known
@@ -447,14 +472,16 @@ def run.remote.at(+root: String, +url: String, +slug: String, +rev: String,
   do IO<Unit>:
     +cached : String <- text(dir ++ "/rev")
     +src_ok : Bool <- is.file(src ++ "/ez.toml")
-    freshen(Bool.not(fresh(src_ok, cached, rev)), src, url, rev)
+    freshen(Bool.not(fresh(src_ok, cached, rev)), src, url, rev, slug)
     go(src, src ++ "/.ez/lib", dir, rev, act, over)
 
 # a remote: the cache holds the checkout and the binary
 def run.remote(+url: String, +slug: String, act: Act) -> IO(Unit):
   do IO<Unit>:
     +root : String <- cache.root()
+    +s : Say.Spin <- Say.hold(Say.resolving.at(slug))
     +rev : String <- head.ask(url)
+    Say.done(s)
     run.remote.at(root, url, slug, rev, act, "")
 
 # a path, once it is absolute and its commit is known
@@ -592,7 +619,7 @@ def sync.go(ts: List<&2, M.Tool>) -> IO(Unit):
     case +h <> t:
       do IO<Unit>:
         +pin : M.Tool <- locked(M.tool.name(h))
-        run.pinned(pin, Hold{})
+        run.pinned(pin, Install{})
         sync.go(t)
 
 # `ez tool sync`
@@ -609,10 +636,10 @@ def run(+target: String, args: List<&2, String>) -> IO(Unit):
 # `ez tool install <target>`: the lock fetched, the binary built, linked
 # onto PATH under the package's name, not run
 def install(+target: String) -> IO(Unit):
-  named(target, Hold{})
+  named(target, Install{})
 
 # `ez tool upgrade <target>`: the same resolution `run` uses, and a rebuild
 # when that commit is not the one on record. A pinned tool uses the lock rev.
 # The PATH link is written again. The binary is not run.
 def upgrade(+target: String) -> IO(Unit):
-  named(target, Hold{})
+  named(target, Upgrade{})

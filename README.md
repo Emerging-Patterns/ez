@@ -119,7 +119,9 @@ binary is reused while it was built from that commit. A dirty worktree, or a
 path that is not a checkout, has no commit and is built every time.
 
 `ez tool install` fetches the lock and builds `<slug>/bin/<name>.out`, then
-links that file onto PATH as `<name>`. `<name>` is the package name in the
+links that file onto PATH as `<name>`. Each long step says what it is doing
+before it waits, and on success the command names what it installed and where
+the link is. `<name>` is the package name in the
 target's `ez.toml` (`bolt` for bolt), or `app` when the ledger names none.
 The link is `$EZ_TOOL_BIN/<name>` when `EZ_TOOL_BIN` is set, otherwise
 `$XDG_BIN_HOME/<name>`, otherwise `~/.local/bin/<name>`. The directory is

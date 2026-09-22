@@ -8,6 +8,7 @@ import ../manifest/manifest.bend as M
 import ../manifest/render.bend as Rend
 import ../manifest/upgrade.bend as U
 import ../git/git.bend as Git
+import ../ez/say.bend as Say
 
 # one tool after it was asked about
 type Touched is Data:
@@ -116,9 +117,11 @@ def fill.rev(+t: M.Tool) -> IO(Touched):
   +src = M.tool.source(t)
   +url = M.source.url(src)
   do IO<Touched>:
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(t)))
     +ref : String <- ref.of(String.is_empty(M.source.tag(src)), url,
       M.source.tag(src))
     r : Git.Ref <- Git.resolve(url, ref)
+    Say.done(s)
     fill.got(t, url, r)
 
 # a present rev whose NAR hash is or is not filled
@@ -248,7 +251,9 @@ def follow.got(+t: M.Tool, r: Git.Ref) -> IO(Touched):
 
 def follow(+t: M.Tool, +ref: String) -> IO(Touched):
   do IO<Touched>:
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(t)))
     r : Git.Ref <- Git.resolve(M.source.url(M.tool.source(t)), ref)
+    Say.done(s)
     follow.got(t, r)
 
 # a rev-only pin, against the default branch tip
@@ -258,7 +263,9 @@ def forward.got(+t: M.Tool, tip: Git.Tip) -> IO(Touched):
 
 def forward(+t: M.Tool) -> IO(Touched):
   do IO<Touched>:
+    +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(t)))
     tip : Git.Tip <- Git.remote(M.source.url(M.tool.source(t)))
+    Say.done(s)
     forward.got(t, tip)
 
 # one selected tool
