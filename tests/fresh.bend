@@ -25,14 +25,13 @@
 # is not what runs it: `bend` is run by hand, or by a `nix build`, and by the
 # time the tests start the only evidence left is what is on disk.
 #
-# So the toolchain is written down. `ez/cache.bend` already has the right
-# notion of one — `bend version` and `$CC`, because a new bend checks and emits
-# differently and the native lane hands its C to whatever `$CC` names — and
-# this uses that same `tool()` rather than inventing a second answer to the
-# same question. It is recorded under `.ez/`, beside the lane answers that are
-# keyed on the very same string, because `.ez/` is the one directory this
-# project keeps its own working state in and a second dot-directory at the root
-# would be one more thing to explain, gitignore and clean.
+# So the toolchain is written down. `ez/cache.bend` has the notion of one:
+# `bend version` and `$CC`, because a new bend checks and emits differently and
+# a native build hands its C to whatever `$CC` names. This uses that
+# `tool()` rather than inventing a second answer to the same question. It is
+# recorded under `.ez/`, because `.ez/` is the one directory this project keeps
+# its own working state in and a second dot-directory at the root would be one
+# more thing to explain, gitignore and clean.
 #
 # The rule that makes a stamp mean something: it is rewritten only when the
 # binary is newer than the stamp itself, which is to say only when somebody

@@ -8,6 +8,7 @@ import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
 import ./args.bend as Args
 import ./cmd.bend as Cmd
 import ./test.bend as Test
+import ./prove.bend as Prove
 import ./doctor.bend as Doctor
 import ./env.bend as Env
 import ./tool.bend as Tool
@@ -26,6 +27,7 @@ type Sub is Data:
   CRun{}
   CPublish{}
   CTest{}
+  CProve{}
   CDoctor{}
   CToolSync{}
   CToolRun{}
@@ -89,14 +91,9 @@ def spec() -> Shake.Cli:
       ]),
       Shake.sub("publish", "send the entry to the hub, under ez's 0x name",
         [], []),
-      Shake.sub("test", "run every */tests/*.bend, on both lanes",
-        [
-          Shake.flag("js-only", None{}, Some{"js-only"},
-            "run the JS lane only"),
-          Shake.flag("full", None{}, Some{"full"}, "ignore the cache"),
-          Shake.flag("unit-only", None{}, Some{"unit-only"},
-            "skip the end-to-end tests")
-        ], []),
+      Shake.sub("test", "run every */tests/*.bend against its trailer", [], []),
+      Shake.sub("prove", "check every PROOF.bend: the proof gate",
+        [], []),
       Shake.sub("doctor", "report on the toolchain and the project", [], [])
     ])
 
@@ -112,14 +109,15 @@ def command(+name: String) -> Sub:
                 Bool.pick(Sub, String.eq(name, "run"), CRun{},
                   Bool.pick(Sub, String.eq(name, "publish"), CPublish{},
                     Bool.pick(Sub, String.eq(name, "test"), CTest{},
-                      Bool.pick(Sub, String.eq(name, "doctor"), CDoctor{},
-                        Bool.pick(Sub, String.eq(name, "tool/sync"), CToolSync{},
-                          Bool.pick(Sub, String.eq(name, "tool/run"), CToolRun{},
-                            Bool.pick(Sub, String.eq(name, "tool/install"),
-                              CToolInstall{},
-                              Bool.pick(Sub, String.eq(name, "tool/upgrade"),
-                                CToolUpgrade{},
-                                CHelp{})))))))))))))))
+                      Bool.pick(Sub, String.eq(name, "prove"), CProve{},
+                        Bool.pick(Sub, String.eq(name, "doctor"), CDoctor{},
+                          Bool.pick(Sub, String.eq(name, "tool/sync"), CToolSync{},
+                            Bool.pick(Sub, String.eq(name, "tool/run"), CToolRun{},
+                              Bool.pick(Sub, String.eq(name, "tool/install"),
+                                CToolInstall{},
+                                Bool.pick(Sub, String.eq(name, "tool/upgrade"),
+                                  CToolUpgrade{},
+                                  CHelp{}))))))))))))))))
 
 # what a subcommand runs
 def dispatch(sub: Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
@@ -152,8 +150,9 @@ def dispatch(sub: Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Uni
     case CPublish{}:
       Cmd.publish()
     case CTest{}:
-      Test.run(Shake.on(matched, "js-only"), Shake.on(matched, "full"),
-        Shake.on(matched, "unit-only"))
+      Test.run()
+    case CProve{}:
+      Prove.run()
     case CDoctor{}:
       Doctor.run()
     case CHelp{}:

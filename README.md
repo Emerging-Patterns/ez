@@ -59,8 +59,8 @@ ez tool install <target>         build the binary and link it on PATH
 ez tool upgrade <target>         rebuild when the commit moved, refresh the link
 ezx <target> [-- args..]         ez tool run, when ezx is on PATH
 ez publish                       send the entry to the hub, under ez's 0x name
-ez test [--js-only] [--full] [--unit-only]
-                                 run every */tests/*.bend, on both lanes
+ez test                          run every */tests/*.bend against its trailer
+ez prove                         check every PROOF.bend: the proof gate
 ez doctor                        report on the toolchain and the project
 ```
 
@@ -189,11 +189,10 @@ ez = inputs.ez.lib.${system};
 
 pkg = ez.mkPackage { inherit bend; src = self; };
 
-checks.${system}.test = ez.mkProofs {
+checks.${system}.proofs = ez.mkProofs {
   ez = inputs.ez.packages.${system}.default;
   src = self;
-  name = "…-test";
-  extraFlags = [ "--unit-only" ]; # add "--js-only" when host ld unavailable in sandbox
+  name = "…-proofs";
 };
 lint = ez.mkLint { src = self; };
 ```
@@ -209,18 +208,25 @@ an explicit lock path. `bendLib`, when set, is the store path used as
 `src/ez.lock.toml` when that file is present. `ez.bendLib ./ez.lock.toml` is
 that tree on its own. Every file comes from a fixed-output derivation keyed
 by the sha256 the lock already records, so the build needs no network and
-`bend` never reaches the hub. Omit `--js-only` when the check can use
-`/usr/bin/ld`. This repo's own check passes `--js-only --unit-only`.
+`bend` never reaches the hub. `mkProofs` runs `ez prove` over a copy of
+`src`, and this repo's own `proofs` check is that.
 
-`ez test` is the gate. It compiles a project's tests into one binary rather
-than one each, runs every project, end-to-end test and proof at once rather
-than in turn, and caches a lane on the content of everything it reads, so a
-second run of an unchanged tree is seconds. A whole run has five minutes to
-finish in, and one that takes longer fails on that the way a test that printed
-the wrong line fails.
+`ez prove` is the gate. It runs `bend` on every PROOF.bend in the tree, all at
+once, and passes a proof only when the first line bend prints is exactly
+`All terms check.`: bend exits 0 on a proof that leans on unsafe or foreign
+code, so the exit status is not enough. It prints a line for each proof and
+then the count, and exits 1 when any proof failed. Nothing is cached, so every
+run checks every proof.
 
-`--full` ignores the cache and `EZ_PROGRESS=1` shows the run being planned.
-`EZ_CAP` sets the memory cap each `bend` runs under, `EZ_JOBS` how many run at
-once, and `EZ_DEADLINE` the budget in seconds, or `0` for no budget. `EZ_JOBS`
-defaults to your cores, and never to more of them than the memory cap divides
-the machine into, since any one `bend` may claim the whole cap.
+`ez test` runs every `*/tests/*.bend`, each as its own `bend`, all at once, and
+holds each run's output to the `#|` trailer at the end of its file. This
+repo's are the end-to-end tests under `tests/`, which drive real git daemons,
+`bend --publish` and `nix-build`, so CI does not run them. A whole run has five
+minutes to finish in, and one that takes longer fails on that the way a test
+that printed the wrong line fails.
+
+`EZ_CAP` sets the memory cap each `bend` runs under and `EZ_JOBS` how many run
+at once, for both commands. `EZ_DEADLINE` is `ez test`'s budget in seconds, or
+`0` for no budget. `EZ_JOBS` defaults to your cores, and never to more of them
+than the memory cap divides the machine into, since any one `bend` may claim
+the whole cap.

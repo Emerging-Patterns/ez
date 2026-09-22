@@ -1,9 +1,8 @@
 # ez: the laws. The human states them; PROOF.bend must prove them. The string
-# and path facts a test run turns on live here: what bend's own chatter is,
-# what a `#|` trailer asks for, which `0x` name an import line wrote, and
-# where a test sits in the shadow. The clock's by.effect deadline lives
-# here too, and the command line as parse sees it. The OS half of the clock
-# is not among them.
+# facts a test run turns on live here: what bend's own chatter is, what a `#|`
+# trailer asks for, and which `0x` name an import line wrote. The clock's
+# by.effect deadline lives here too, and the command line as parse sees it.
+# The OS half of the clock is not among them.
 import Base
 import ./quiet.bend as Q
 import ./drift.bend as D
@@ -109,25 +108,6 @@ law report_unused:
   {D.report(["import 0xaaaa/s.bend as S"], M.parse(ledger()))
     == ["drift: wire = 0xbbbb is in ez.toml but no import line uses it"]
     : List<&2, String>}
-
-# gate: the shadow's paths
-
-# LAW: a path that does not open with `./` is already relative
-law rel_plain:
-  for +p: String
-  for e: {False{} == String.starts_with(p, "./") : Bool}
-  {G.rel(p) == p : String}
-
-# LAW: a path find printed with `./` drops those two characters
-law rel_dot:
-  for +rest: String
-  {G.rel("./" ++ rest) == rest : String}
-
-# LAW: a directory of the shadow sits under the root
-law at_under:
-  for +d: String
-  for e: {False{} == String.is_empty(d) : Bool}
-  {G.at(d) == G.root() ++ "/" ++ d : String}
 
 # clock: the deadline the run effect holds. `date` and `test` are not
 # among them.

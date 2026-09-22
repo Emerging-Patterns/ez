@@ -131,12 +131,12 @@ def runner(+repo: String, +app: String) -> IO(Unit):
     W.mkdir(app ++ "/src/tests")
     _w : Bool <- F.write(app ++ "/src/tests/ok.bend",
       "import Base\n\ndef main() -> IO(Unit):\n  IO.print(\"ok one\")\n\n#|ok one\n")
-    +good : String <- R.exec(W.ez(repo, app, ["test", "--js-only"]))
+    +good : String <- R.exec(W.ez(repo, app, ["test"]))
     Check.eq_str("test passes a file that prints its trailer", answer(good),
       "PASS: 1 / 1")
     _b : Bool <- F.write(app ++ "/src/tests/bad.bend",
       "import Base\n\ndef main() -> IO(Unit):\n  IO.print(\"ok one\")\n\n#|ok two\n")
-    +bad : String <- R.exec(W.ez(repo, app, ["test", "--js-only"]))
+    +bad : String <- R.exec(W.ez(repo, app, ["test"]))
     yes("test fails a file that does not", Bool.not(R.ok(bad)))
     W.rm(app ++ "/src/tests/bad.bend")
 

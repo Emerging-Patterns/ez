@@ -24,7 +24,7 @@ Items for review:
 - [x] <!-- REVIEW (resolved): The proof gate moves out of `ez test` into its own command, `ez prove`, which `mkProofs` runs. `ez test` may call it. -->
 - [x] <!-- REVIEW (resolved): `SPEC.md` is the single requirement list. The bolt rule parses only its requirement table rows. -->
 - [x] <!-- REVIEW (resolved): `mkLint` joins ez's flake checks now, with `[tools.bolt]` moved to v0.8.1 and `closed` and `law` at `warn` until the first rollout phase is done. `unsafe` stays at `error`. -->
-- [x] <!-- REVIEW (resolved): bolt v0.8.1's `closed` rule accepts closed equalities (bolt#10), so it does not enforce "closed laws have no standing". ez asks bolt for an opt-in stricter setting rather than enforcing it in its own rule. -->
+- [x] <!-- REVIEW (resolved): bolt v0.8.1's `closed` rule accepts closed equalities (bolt#10), so it does not enforce "closed laws have no standing". ez asked bolt for an opt-in stricter setting rather than enforcing it in its own rule; bolt v0.9.0 added it as the `quantify` rule (L004), and ez turns it on. -->
 - [x] <!-- REVIEW (resolved): bolt v0.8.1 reports about 900 style, correctness and suspicious findings in ez beyond the law rules. A preliminary phase fixes all of them before `mkLint` is enabled. -->
 - [x] <!-- REVIEW (resolved): The thirteen refactor-equivalence laws, and the `old.*` definitions they compare against, are deleted in the first rollout phase. -->
 - [x] <!-- REVIEW (resolved): Guarantees proved in a pinned dependency are Trusted from ez's side, with the dependency and pin as the reason. -->
@@ -127,7 +127,7 @@ A Proved requirement whose law has not landed yet is marked **pending** in `SPEC
 
 ### The proof gate
 
-The specification depends on one mechanical check: for every PROOF.bend in the tree, `bend PROOF.bend` prints exactly `All terms check.` as its first line. Today that check is the proof lane of `ez test`, run by `mkProofs` in `flake.nix`. It moves into its own command, `ez prove`, which does only that and which `mkProofs` runs; `ez test` may call it for convenience. The test lanes are outside the specification. The runner's faithfulness is a trust assumption (EZ-TRUST-4), in the same way the interpreter's is.
+The specification depends on one mechanical check: for every PROOF.bend in the tree, `bend PROOF.bend` prints exactly `All terms check.` as its first line. That check is its own command, `ez prove`, which does only that and which `mkProofs` in `flake.nix` runs. It was once the proof lane of `ez test`; `ez test` no longer runs proofs, and is outside the specification. The runner's faithfulness is a trust assumption (EZ-TRUST-4), in the same way the interpreter's is.
 
 ### The World model
 
@@ -399,7 +399,7 @@ In the first rollout phase, every existing closed law is sorted against the requ
 
 When a requirement's quantified law lands, the closed laws pointing at it are deleted in the same PR. The quantified law strictly subsumes them, and keeping them would reintroduce exactly the brittleness this RFC removes.
 
-bolt does not enforce the end state today. Its `closed` rule flagged every law with no binder up to v0.4.0, but since v0.5.0 (bolt#10) it deliberately accepts a closed equality as a stated claim and flags only a law that is neither quantified nor an equality. That default follows the direction this RFC abandons, and it is bolt's to keep. ez asks bolt for an opt-in stricter setting of `closed` that flags every law with no binder unless it carries a `# toward EZ-...` trail line, and turns it on once the first phase has sorted the closed laws.
+bolt enforces the end state through an opt-in rule. Its `closed` rule flagged every law with no binder up to v0.4.0, but since v0.5.0 (bolt#10) it deliberately accepts a closed equality as a stated claim and flags only a law that is neither quantified nor an equality. That default follows the direction this RFC abandons, and it is bolt's to keep. At ez's request bolt v0.9.0 added `quantify` (L004), off unless a project names it: it flags every law in a LAWS.bend with no binder, equality or not, unless the comment line right above the law starts with `# toward `. ez turns it on at `error`, so a new closed law cannot land, and the trails disappear as their requirements are proved.
 
 ### Tagging and traceability
 
@@ -523,7 +523,7 @@ A preliminary phase makes ez lint clean under bolt v0.8.1: it fixes every style,
 
 The first phase writes `SPEC.md` from this RFC, with the proved and pending status of each requirement, and sorts the existing closed laws using the inventory: 43 that illustrate a Proved requirement are tagged with its ID, and 78 are deleted, along with the thirteen refactor-equivalence laws and their `old.*` definitions. It tags `pkg/hash_perm` with EZ-HASH-1. With the preliminary phase, it adds `mkLint` to ez's flake checks and moves `[tools.bolt]` to v0.8.1, with `closed` and `law` at `warn` and everything else at `error` in `bolt.bend`. This phase changes no behavior and immediately shows how far ez is from its own spec.
 
-The second phase enables the traceability check in bolt, reading `SPEC.md`. Pending requirements are reported but do not fail it, so it can go on at once. Once bolt has the stricter `closed` setting, ez turns it on at `error`; `law` returns to `error` when the commands it grades are in planner form.
+The second phase enables the traceability check in bolt, reading `SPEC.md`. Pending requirements are reported but do not fail it, so it can go on at once. `quantify` is already on at `error`, which keeps the closed laws from coming back; `law` returns to `error` when the commands it grades are in planner form.
 
 The third phase introduces the World model and converts `ez lock` to planner form, then proves EZ-DOC-1 through EZ-DOC-5, EZ-RES-4 through EZ-RES-6 and EZ-RES-8, EZ-VEN-1 through EZ-VEN-3, and EZ-HASH-2, deleting the closed laws each one subsumes. EZ-DOC-3 is proved once the lock input changes have landed. `ez lock` goes first because its guarantees are the most important.
 

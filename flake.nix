@@ -45,16 +45,15 @@
         '';
       };
 
-      # `--unit-only` leaves out the top-level `tests/`, which drive real git
-      # daemons, a real `bend --publish` and `nix-build` — no network, no nix
-      # daemon and no ports here. `--js-only` leaves out the native lane: that
-      # clang reaches for the host `/usr/bin/ld` and dynamic linker, and a
-      # pure sandbox has neither. Flags only; there is no separate native helper.
-      tests = ez.mkProofs {
+      # `ez prove`: every PROOF.bend, each passing only on a first line of
+      # exactly `All terms check.` That is the gate CI runs. The end-to-end
+      # tests under `tests/` are not run here: they drive real git daemons, a
+      # real `bend --publish` and `nix-build`, and the sandbox has no network,
+      # no nix daemon and no ports to give them.
+      proofs = ez.mkProofs {
         ez = ezBin;
         src = self;
-        name = "ez-tests";
-        extraFlags = [ "--js-only" "--unit-only" ];
+        name = "ez-proofs";
       };
     in {
       packages.${system} = {
@@ -67,7 +66,7 @@
       #   bendLib ./ez.lock.toml          lock path -> BEND_LIB
       #   mkPackage { bend, src, wrapFlags?, pname?, version?, entry?, lock?,
       #               wrapEnv?, defaultWrapEnv?, extraPath?, extraInstall? }
-      #   mkProofs { ez, src, name?, extraFlags?, deadline?, lock?, bendLib? }
+      #   mkProofs { ez, src, name?, lock?, bendLib? }
       #   mkLint { src, bolt?, bend?, name?, lock?, bendLib? }
       #   toolPackage { name, src, bend?, lock?, wrapFlags?, ... }
       #   devPackages src
@@ -76,23 +75,20 @@
       # main.bend, and wraps $out/bin/<name> with bend on PATH. Version falls
       # back to 0.1.0. mkProofs and mkLint set BEND_LIB from an explicit
       # bendLib, else from lock (or src/ez.lock.toml), else set none.
-      # A check:
-      #   checks.${system}.test = inputs.ez.lib.${system}.mkProofs {
+      # A check, which runs `ez prove`:
+      #   checks.${system}.proofs = inputs.ez.lib.${system}.mkProofs {
       #     ez = inputs.ez.packages.${system}.default;
       #     src = self;
-      #     name = "…-test";
-      #     extraFlags = [ "--unit-only" ]; # add "--js-only" when host ld unavailable in sandbox
+      #     name = "…-proofs";
       #   };
-      # Omit `--js-only` when host `/usr/bin/ld` is usable under the check.
-      # This flake keeps `--js-only --unit-only`: a pure sandbox has no system
-      # ld. Flags only. mkShell sets CC=bend-cc and BEND_LIB=$PWD/.ez/lib;
-      # put bend-cc in packages.
+      # mkShell sets CC=bend-cc and BEND_LIB=$PWD/.ez/lib; put bend-cc in
+      # packages.
       lib.${system} = ez;
       apps.${system}.default = { type = "app"; program = "${ezBin}/bin/ez"; };
       # `lint` is bolt at the lock's `[tools.bolt]` pin, run with `--gpu off`
       # over a copy of the tree, graded by ./bolt.bend
       checks.${system} = {
-        inherit tests;
+        inherit proofs;
         lint = ez.mkLint { src = self; };
         ez = ezBin;
       };
