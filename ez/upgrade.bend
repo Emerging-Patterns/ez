@@ -345,6 +345,7 @@ def write.toml(
   +name: String,
   +entry: String,
   +bin: String,
+  +hub: String,
   ds: List<&2, M.Dep>,
   ts: List<&2, M.Tool>
 ) -> IO(Unit):
@@ -354,7 +355,7 @@ def write.toml(
     case True{}:
       do IO<Unit>:
         ok : Bool <- F.write("ez.toml",
-          Rend.show(M.Manifest{name, entry, bin, ds, ts}))
+          Rend.show(M.Manifest{name, entry, bin, hub, ds, ts}))
         wrote(ok, "ez.toml")
 
 # the ignore file with every committed hash that moved
@@ -455,27 +456,28 @@ def drop(ss: List<&2, U.Swap>) -> IO(Unit):
 
 # pins rewritten, then the allowlist, then the imports, then the old trees.
 # The lock is the caller's to write, from the ledger this just wrote.
-def go.out(+name: String, +entry: String, +bin: String, ts: List<&2, M.Tool>, out: Out) -> IO(Unit):
+def go.out(+name: String, +entry: String, +bin: String, +hub: String, ts: List<&2, M.Tool>, out: Out) -> IO(Unit):
   Out{+deps, +swaps, +edits, changed} = out
   do IO<Unit>:
-    write.toml(changed, name, entry, bin, deps, ts)
+    write.toml(changed, name, entry, bin, hub, deps, ts)
     write.ignore(swaps)
     write.imports(edits)
     drop(swaps)
 
-# every dependency the filter selects walked, then the ledger rewritten
+# every dependency the filter selects walked, then the ledger rewritten. The
+# hub a moved hash is checked against is the one the ledger names.
 def go(
   +name: String,
   +entry: String,
   +bin: String,
+  +hub: String,
   ds: List<&2, M.Dep>,
   ts: List<&2, M.Tool>,
   +only: String
 ) -> IO(Unit):
   do IO<Unit>:
-    +hub : String <- L.hub()
-    o : Out <- walk(lib(), hub, only, ds)
-    go.out(name, entry, bin, ts, o)
+    o : Out <- walk(lib(), M.hub.or(hub), only, ds)
+    go.out(name, entry, bin, hub, ts, o)
 
 # `--package` has to name a dependency or a pinned CLI
 def read.known(
@@ -483,6 +485,7 @@ def read.known(
   +name: String,
   +entry: String,
   +bin: String,
+  +hub: String,
   ds: List<&2, M.Dep>,
   ts: List<&2, M.Tool>,
   +only: String
@@ -491,13 +494,13 @@ def read.known(
     case False{}:
       IO.die(Unit, 1, "ez: no dependency or tool named " ++ only)
     case True{}:
-      go(name, entry, bin, ds, ts, only)
+      go(name, entry, bin, hub, ds, ts, only)
 
 # a ledger that parsed
 def read.good(manifest: M.Manifest, +only: String) -> IO(Unit):
-  M.Manifest{+name, +entry, +bin, +ds, +ts} = manifest
+  M.Manifest{+name, +entry, +bin, +hub, +ds, +ts} = manifest
   read.known(either(U.known(only, ds), M.tool.known(only, ts)), name, entry,
-    bin, ds, ts, only)
+    bin, hub, ds, ts, only)
 
 # the ledger on disk, or the reason it was not one
 def read.go(ledger: M.Read, +only: String) -> IO(Unit):

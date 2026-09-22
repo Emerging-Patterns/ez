@@ -1,7 +1,9 @@
 # lock: the transitive walk. A project's own files are followed into one
 # another, every package they name is resolved, and a package's own imports are
 # resolved behind it. The packages here are vendored ones, laid out under a
-# BEND_LIB of the test's own, so the walk needs no hub and no network.
+# BEND_LIB of the test's own, so the walk needs no hub and no network. Each is
+# named by the digest of its manifest, as bend names a package, since a tree
+# whose manifest is not its name's is refused.
 import Base
 import ../lock.bend as L
 import ../../io/file.bend as F
@@ -9,29 +11,39 @@ import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../../sha/sha.bend as Sha
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../../check/kit.bend as Check
-
-# the three package names the fixture uses
-def a() -> String:
-  "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-def b() -> String:
-  "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-
-def c() -> String:
-  "0xcccccccccccccccccccccccccccccccc"
+import ../../ez/sorted.bend as Sorted
 
 # a package that depends on nothing
 def leaf() -> String:
   "import Base\n\n# double the number\ndef double(+x: U32) -> U32:\n  (x * 2 : U32)\n"
+
+# another package that depends on nothing
+def other() -> String:
+  "import Base\n\n# triple the number\ndef triple(+x: U32) -> U32:\n  (x * 3 : U32)\n"
+
+# the manifest ez writes beside a vendored package
+def manifest(+src: String) -> String:
+  Sha.hex(src) ++ " lib.bend\n"
+
+# the name a one-file package is published under
+def name(+src: String) -> String:
+  "0x" ++ String.take(Sha.hex(manifest(src)), 32n)
+
+# the name of the package that depends on nothing
+def a() -> String:
+  name(leaf())
 
 # a package that imports another package
 def mid() -> String:
   "import Base\nimport " ++ a() ++ "/lib.bend as A\n\n" ++
   "# four times the number\ndef quad(+x: U32) -> U32:\n  A.double(A.double(x))\n"
 
-# the manifest ez writes beside a vendored package
-def manifest(+src: String) -> String:
-  Sha.hex(src) ++ " lib.bend\n"
+# the names of the other two
+def b() -> String:
+  name(mid())
+
+def c() -> String:
+  name(other())
 
 # one vendored package under a BEND_LIB
 def vendor(+lib: String, +hash: String, +src: String) -> IO(Unit):
@@ -41,32 +53,27 @@ def vendor(+lib: String, +hash: String, +src: String) -> IO(Unit):
     _m : Bool <- F.write(lib ++ "/" ++ hash ++ "/manifest", manifest(src))
     return Unit{}
 
-# what .ez/origins.toml says about one vendored package
-def origin(+hash: String) -> String:
-  "[origins." ++ T.quote(hash) ++ "]\n" ++
-  "kind = \"git\"\nurl = \"https://h/" ++ hash ++ "\"\nrev = \"c0ffee\"\n" ++
-  "entry = \"lib.bend\"\nroot = \".\"\nnarHash = \"sha256-zz\"\n\n"
-
-# what ez.toml says about one vendored package. The rev differs from the
-# cache's, so which file a rev came from is visible in the answer.
+# what ez.toml says about one vendored package
 def ledger(+name: String, +hash: String) -> String:
   "\n[deps." ++ name ++ "]\nhash = \"" ++ hash ++ "\"\n" ++
   "git = \"https://h/" ++ hash ++ "\"\nrev = \"beef\"\nroot = \".\"\n" ++
   "narHash = \"sha256-yy\"\nentry = \"lib.bend\"\n"
 
-# the project, its packages, and the two files that say where they came from.
-# `b` is in both, with a different rev in each, and `c` is in the ledger alone,
-# which is the state a fresh clone is in for every package it has.
+# the project, its packages, and the ledger that says where they came from.
+# A stray `.ez/origins.toml` beside the BEND_LIB says otherwise about `a`, and
+# is not read: the ledger is the only record a clone has.
 def fixture(+dir: String) -> IO(Unit):
   do IO<Unit>:
     _mk : String <- R.exec(["mkdir", "-p", dir ++ "/app"])
     vendor(dir ++ "/lib", a(), leaf())
     vendor(dir ++ "/lib", b(), mid())
-    vendor(dir ++ "/lib", c(), leaf())
-    _o : Bool <- F.write(dir ++ "/origins.toml", origin(a()) ++ origin(b()))
+    vendor(dir ++ "/lib", c(), other())
+    _o : Bool <- F.write(dir ++ "/origins.toml",
+      "[origins." ++ T.quote(a()) ++ "]\nkind = \"git\"\nurl = \"https://h/x\"\n" ++
+      "rev = \"c0ffee\"\nentry = \"lib.bend\"\nroot = \".\"\nnarHash = \"sha256-zz\"\n")
     _t : Bool <- F.write(dir ++ "/ez.toml",
       "[package]\nname = \"fixture\"\nentry = \"app/main.bend\"\n" ++
-      ledger("mid", b()) ++ ledger("leaf", c()))
+      ledger("double", a()) ++ ledger("mid", b()) ++ ledger("leaf", c()))
     _m : Bool <- F.write(dir ++ "/app/main.bend",
       "import Base\nimport " ++ b() ++ "/lib.bend as B\nimport ./side.bend as S\n")
     _s : Bool <- F.write(dir ++ "/app/side.bend",
@@ -90,17 +97,20 @@ def main() -> IO(Unit):
     +out : String <- R.exec(["mktemp", "-d"])
     +d : String <- IO.pure(String, String.trim(R.text(out)))
     fixture(d)
-    +text : String <- L.lock.at("https://hub.example", d ++ "/ez.toml",
-      d ++ "/lib", [d ++ "/app/main.bend"])
+    +text : String <- L.lock.at(d ++ "/ez.toml", d ++ "/lib",
+      [d ++ "/app/main.bend"])
     Check.eq_str("a package reached through another file, and one reached through a package",
-      names(text), a() ++ " " ++ b() ++ " " ++ c())
+      names(text), String.join(Sorted.sort([a(), b(), c()]), " "))
     Check.eq_str("a package's files come with the sha256 its manifest named",
       files(text, a()), manifest(leaf()))
-    Check.eq_str("a vendored package records the rev it was pinned to",
-      L.src.rev(L.pack.src(L.pack_of(sects(text), a()))), "c0ffee")
+    Check.eq_str("a vendored package records the rev the ledger pinned, whatever the cache says",
+      L.src.rev(L.pack.src(L.pack_of(sects(text), a()))), "beef")
+    Check.eq_str("a ledger that names no hub locks against bend's",
+      L.lock.hub(sects(text)), "https://hub.bend-lang.com")
     _rm : String <- R.exec(["rm", "-rf", d])
     return Unit{}
 
 #|ok a package reached through another file, and one reached through a package
 #|ok a package's files come with the sha256 its manifest named
-#|ok a vendored package records the rev it was pinned to
+#|ok a vendored package records the rev the ledger pinned, whatever the cache says
+#|ok a ledger that names no hub locks against bend's

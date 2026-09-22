@@ -1,8 +1,10 @@
 # `ez lock` from the ledger alone: what a fresh clone can do. `ez add` writes
 # two records of where a package came from, one in ez.toml and one in
-# .ez/origins.toml, and .gitignore keeps the second out of the repo. So a clone
-# has the first and never the second, and the lock it writes has to be the lock
-# that was committed. This test takes the cache away and asks again.
+# .ez/origins.toml, and lays the package's tree under .ez/lib; .gitignore
+# keeps the second record and the tree out of the repo. So a clone has the
+# ledger and neither of the others, and the lock it writes has to be the lock
+# that was committed. This test takes the cache and the tree away and asks
+# again: the lock fetches the tree at the ledger's rev and checks it.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
@@ -41,15 +43,17 @@ def built(+repo: String, +app: String, +url: String, +rev: String) -> IO(String)
     _w : Bool <- F.write(app ++ "/main.bend",
       "import Base\nimport " ++ hash ++ "/lib.bend as L\n\n" ++
       "def main() -> U32:\n  L.double(21)\n")
+    W.track(app)
     +l : String <- R.exec(W.ez(repo, app, ["lock"]))
     yes("lock writes a lock with the cache in place", R.ok(l))
     return hash
 
-# the same project with the gitignored cache gone, which is the state of a
-# clone. `ez add` is not run again: the committed ledger is all there is.
+# the same project with the gitignored cache and tree gone, which is the state
+# of a clone. `ez add` is not run again: the committed ledger is all there is.
 def again(+repo: String, +app: String, +was: String) -> IO(Unit):
   do IO<Unit>:
     W.rm(app ++ "/.ez/origins.toml")
+    W.rm(app ++ "/.ez/lib")
     +gone : String <- R.exec(["test", "-e", app ++ "/.ez/origins.toml"])
     yes("the cache is gone", Bool.not(R.ok(gone)))
     +l : String <- R.exec(W.ez(repo, app, ["lock"]))

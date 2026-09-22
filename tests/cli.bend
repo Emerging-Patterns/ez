@@ -103,6 +103,7 @@ def project(+repo: String, +app: String, +hash: String, +rev: String) -> IO(Unit
     _w : Bool <- F.write(app ++ "/main.bend",
       "import Base\nimport " ++ hash ++ "/lib.bend as L\n\n" ++
       "def main() -> U32:\n  L.double(21)\n")
+    W.track(app)
     _l : String <- R.exec(W.ez(repo, app, ["lock"]))
     +at : String <- W.only(app, "ez.lock.*")
     +lock : Maybe<&2, String> <- F.read(at)

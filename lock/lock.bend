@@ -6,15 +6,16 @@
 # never published, from the git rev recorded for it. Both end up as the same
 # BEND_LIB tree.
 #
-# Two files record a rev: ez.toml, which is committed, and .ez/origins.toml,
-# which `ez add` writes and .gitignore keeps out of the repo. The ledger is the
-# authority and the cache is only a cache, because a clone has the first and
-# never the second, and a lock that needs a gitignored file is a lock a clone
-# cannot reproduce.
+# What a lock reads is what a clone has: the ledger, the committed sources,
+# the committed trees under `.ez/lib`, each git dependency's files at the rev
+# the ledger pins, and hub content, which is checked against its hash. ez.toml
+# is the only record of where a package comes from. `ez add` also writes
+# .ez/origins.toml, which .gitignore keeps out of the repo, and the lock does
+# not read it: a lock that needs a gitignored file is a lock a clone cannot
+# reproduce.
 import Base
 import ../io/file.bend as F
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
-import ../run/bend.bend as Bend
 import ../sha/sha.bend as Sha
 import ../hub/hub.bend as Web
 import ../git/git.bend as Git
@@ -35,7 +36,7 @@ type Src is Data:
 type Pack is Data:
   Pack{hash: String, src: Src, files: List<&2, K.File>}
 
-# a package's origin, as ez.toml or .ez/origins.toml records it
+# a package's origin, as ez.toml records it
 type Origin is Data:
   Origin{hash: String, src: Src}
 
@@ -83,11 +84,6 @@ def is3(+ss: List<&2, String>, first: String, second: String, third: String) -> 
 def named1(+ss: List<&2, String>, first: String) -> Bool:
   Bool.and(Nat.is_eq(List.length(&2, String, ss), 1n), String.eq(K.word(ss, 0n), first))
 
-# whether a table's path is two segments headed by this one, whatever the
-# second is, which is how a table named after a package hash is found
-def named2(+ss: List<&2, String>, first: String) -> Bool:
-  Bool.and(Nat.is_eq(List.length(&2, String, ss), 2n), String.eq(K.word(ss, 0n), first))
-
 # whether a table's path is three segments, headed and tailed by these, whatever
 # the hash between them is
 def named3(+ss: List<&2, String>, first: String, third: String) -> Bool:
@@ -124,26 +120,10 @@ def src.go(git: Bool, +ps: List<&2, T.Kv>) -> Src:
 def src_of(+ps: List<&2, T.Kv>) -> Src:
   src.go(String.eq(T.value(ps, "kind"), "git"), ps)
 
-# an `[origins."<hash>"]` table as an origin
-def origin.put(hit: Bool, sect: T.Sect, rest: List<&2, Origin>) -> List<&2, Origin>:
-  match hit:
-    case True{}:
-      T.Sect{n, ps} = sect
-      Origin{K.word(T.segments(n), 1n), src_of(ps)} <> rest
-    case False{}:
-      rest
-
-# every origin a .ez/origins.toml records
-def origins(ss: List<&2, T.Sect>) -> List<&2, Origin>:
-  match ss:
-    case []:
-      []
-    case +h <> t:
-      origin.put(named2(segs(h), "origins"), h, origins(t))
-
-# a ledger's dependency as an origin, when it names a repo. A hub dependency
-# contributes nothing, because a package no origin names already resolves from
-# the hub, and a record saying so would only be a second way to say it.
+# a ledger's dependency as an origin: the repo and rev it names, or the hub.
+# A hub dependency is recorded too, so that a package the ledger names is told
+# apart from one it does not, which also resolves from the hub but is not
+# vouched for by anything a clone has.
 def ledger.put(git: Bool, +dep: M.Dep) -> List<&2, Origin>:
   match git:
     case True{}:
@@ -152,7 +132,7 @@ def ledger.put(git: Bool, +dep: M.Dep) -> List<&2, Origin>:
         M.source.root(M.source.dep(dep)), M.source.nar(M.source.dep(dep)),
         M.source.tag(M.source.dep(dep))}}]
     case False{}:
-      []
+      [Origin{M.dep.hash(dep), Hub{}}]
 
 # every origin a ledger's dependencies record, in the order written
 def ledger.origins(ds: List<&2, M.Dep>) -> List<&2, Origin>:
@@ -170,16 +150,8 @@ def ledger.read(parsed: M.Read) -> List<&2, Origin>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, _b, ds, _ts} = m
+      M.Manifest{_n, _e, _b, _h, ds, _ts} = m
       ledger.origins(ds)
-
-# the ledger first, the cache behind it. `origin` answers with the first record
-# of a hash, so a package ez.toml names resolves from ez.toml however stale
-# .ez/origins.toml has become, and a package it does not name still resolves
-# from the cache. That is the only order under which a fresh clone, which has
-# the ledger and no cache at all, resolves what a working checkout resolves.
-def origins.all(led: List<&2, Origin>, cache: List<&2, Origin>) -> List<&2, Origin>:
-  List.append(&2, Origin, led, cache)
 
 # this origin's source when the hash matches, otherwise whatever the rest gave
 def origin.at(known: Origin, rest: Src, wanted: String) -> Src:
@@ -193,6 +165,11 @@ def origin(ds: List<&2, Origin>, +wanted: String) -> Src:
       Hub{}
     case x <> t:
       origin.at(x, origin(t, wanted), wanted)
+
+# the hash an origin is recorded under
+def origin.hash(known: Origin) -> String:
+  Origin{n, _s} = known
+  n
 
 # one `<sha256> <path>` line of a manifest
 def line.put(+ws: List<&2, String>) -> List<&2, K.File>:
@@ -282,22 +259,130 @@ def disk.all(+lib: String, +hash: String, fs: List<&2, K.File>) -> IO(List<&2, S
         one : String <- disk.one(lib, hash, h)
         return one <> rest
 
-# a vendored package is already on disk under BEND_LIB, with the manifest ez
-# wrote beside it
-def read.git(+lib: String, +hash: String) -> IO(Body):
+# why a fetched checkout is not the one the ledger pins, or "" when it is.
+# The NAR hash is over the whole checkout, so a rev that no longer holds what
+# it held when it was pinned is caught here, before anything is laid out. A
+# ledger with no NAR hash has nothing to check the checkout against, and an
+# unchecked tree is not one a lock may record.
+def nar.why.go(none: Bool, same: Bool, +want: String, +got: String, +url: String, +rev: String) -> String:
+  match none:
+    case True{}:
+      "ez: ez.toml records no narHash for " ++ url ++ " at " ++ rev ++
+        ", so its tree cannot be checked; run `ez lock --upgrade` to pin it"
+    case False{}:
+      match same:
+        case True{}:
+          ""
+        case False{}:
+          "ez: " ++ url ++ " at " ++ rev ++ " has narHash " ++ got ++
+            ", and ez.toml records " ++ want
+
+def nar.why(+want: String, +got: String, +url: String, +rev: String) -> String:
+  nar.why.go(String.is_empty(want), String.eq(want, got), want, got, url, rev)
+
+# why an entry is missing from a checkout, or "" when it is there
+def entry.why(ok: Bool, +entry: String, +url: String, +rev: String) -> String:
+  Bool.pick(String, ok, "", "ez: " ++ entry ++ " is not in " ++ url ++ " at " ++ rev)
+
+# a checkout that failed a check is removed, and the lock stops
+def fetch.stop(+work: String, +why: String) -> IO(Unit):
+  do IO<Unit>:
+    _rm : String <- R.exec(["rm", "-rf", work])
+    IO.die(Unit, 1, why)
+
+# a check that passed lets the fetch go on
+def fetch.judge(+why: String, +work: String) -> IO(Unit):
+  Bool.pick(IO(Unit), String.is_empty(why), IO.pure(Unit, Unit{}),
+    fetch.stop(work, why))
+
+# a git package whose tree is not under BEND_LIB, fetched at the rev the ledger
+# pins with the same shallow clone `ez add` and `ez fetch` use, weighed against
+# the ledger's NAR hash, walked from its entry the way `ez add` walked it, and
+# laid out under the hash the ledger names, the way `ez fetch` lays it. The
+# tree stays there, since the build that follows a lock needs it, and so a
+# second lock reads it instead of fetching again.
+def fetch.git(+lib: String, +hash: String, +url: String, +rev: String, +entry: String, +nar: String) -> IO(Unit):
+  +work = lib ++ "/.work-" ++ hash
+  +at = P.join(work, entry)
+  do IO<Unit>:
+    _rm : String <- R.exec(["rm", "-rf", work])
+    _mk : String <- R.exec(["mkdir", "-p", work])
+    Git.clone.say(work, url, rev, Say.dep.git(Say.label(hash, entry), url))
+    _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
+    +s : Say.Spin <- Say.hold(Say.hashing(rev))
+    +got : String <- Git.nar(work)
+    Say.done(s)
+    fetch.judge(nar.why(nar, got, url, rev), work)
+    +ck : String <- R.exec(["test", "-f", at])
+    fetch.judge(entry.why(R.ok(ck), entry, url, rev), work)
+    +p : K.Pkg <- K.pkg_of(at)
+    Git.lay(lib, hash, K.pkg.root(p), K.pkg.files(p))
+    _cl : String <- R.exec(["rm", "-rf", work])
+    return Unit{}
+
+# a git package always has files, since its entry is one. A manifest that
+# names none is not a tree to record, and is refused rather than written as an
+# empty `files` table.
+def tree.judge(empty: Bool, +at: String) -> IO(Unit):
+  match empty:
+    case False{}:
+      IO.pure(Unit, Unit{})
+    case True{}:
+      IO.die(Unit, 1, "ez: " ++ at ++ " names no files")
+
+# a git package's tree, read from BEND_LIB with the manifest beside it
+def read.tree(+lib: String, +hash: String, +text: String) -> IO(Body):
   do IO<Body>:
-    m : Maybe<&2, String> <- F.read(url_of(lib, hash, "manifest"))
-    fs : List<&2, K.File> <- files_of(hash, F.text_of(m))
+    fs : List<&2, K.File> <- files_of(hash, text)
     +files : List<&2, K.File> <- IO.pure(List<&2, K.File>, fs)
+    tree.judge(List.is_empty(&2, K.File, files), url_of(lib, hash, "manifest"))
     srcs : List<&2, String> <- disk.all(lib, hash, files)
     return Body{files, srcs}
 
+# a tree already there is read; a missing one is fetched first. A missing
+# tree is never read as a package with no files.
+def read.git.seen(
+  got: Maybe<&2, String>,
+  +lib: String,
+  +hash: String,
+  +url: String,
+  +rev: String,
+  +entry: String,
+  +nar: String
+) -> IO(Body):
+  match got:
+    case Some{text}:
+      read.tree(lib, hash, text)
+    case None{}:
+      do IO<Body>:
+        fetch.git(lib, hash, url, rev, entry, nar)
+        m : Maybe<&2, String> <- F.read(url_of(lib, hash, "manifest"))
+        read.tree(lib, hash, F.text_of(m))
+
+# a git package: vendored and committed under `.ez/lib`, fetched there by an
+# earlier lock or `ez fetch`, or fetched now at the rev the ledger pins
+def read.git(+lib: String, +hash: String, +url: String, +rev: String, +entry: String, +nar: String) -> IO(Body):
+  do IO<Body>:
+    m : Maybe<&2, String> <- F.read(url_of(lib, hash, "manifest"))
+    read.git.seen(m, lib, hash, url, rev, entry, nar)
+
+# why a hub package could not be read. One the ledger names is explained the
+# way a hub miss always was. One it does not name is said to be unnamed, since
+# that, and not the hub, is what a person has to fix.
+def hub.why(named: Bool, +hash: String, +hub: String, +url: String, +why: String) -> String:
+  match named:
+    case True{}:
+      Say.hub.explain(hash, url, why)
+    case False{}:
+      "ez: " ++ hash ++ " is imported, ez.toml does not name it, and the hub at " ++
+        hub ++ " did not serve it (" ++ why ++ "). A package taken from git is recorded with `ez add`."
+
 # the manifest, or why the hub did not have it. A 404 names the package and
 # the next step; any other miss is the reason the fetch gave.
-def read.hub.miss(+hash: String, +url: String, +why: String, spin: Say.Spin) -> IO(Body):
+def read.hub.miss(named: Bool, +hub: String, +hash: String, +url: String, +why: String, spin: Say.Spin) -> IO(Body):
   do IO<Body>:
     Say.done(spin)
-    IO.die(Body, 1, Say.hub.explain(hash, url, why))
+    IO.die(Body, 1, hub.why(named, hash, hub, url, why))
 
 # the files, once the manifest arrived and checked
 def read.hub.have(+text: String, +hub: String, +hash: String, spin: Say.Spin) -> IO(Body):
@@ -308,28 +393,28 @@ def read.hub.have(+text: String, +hub: String, +hash: String, spin: Say.Spin) ->
     Say.done(spin)
     return Body{files, srcs}
 
-def read.hub.got(got: Web.Got, +hub: String, +hash: String, +url: String, spin: Say.Spin) -> IO(Body):
+def read.hub.got(named: Bool, got: Web.Got, +hub: String, +hash: String, +url: String, spin: Say.Spin) -> IO(Body):
   match got:
     case Web.Miss{why}:
-      read.hub.miss(hash, url, why, spin)
+      read.hub.miss(named, hub, hash, url, why, spin)
     case Web.Have{body}:
       read.hub.have(body, hub, hash, spin)
 
 # a hub package is fetched, manifest first, and every file checked against it
-def read.hub(+hub: String, +hash: String) -> IO(Body):
+def read.hub(named: Bool, +hub: String, +hash: String) -> IO(Body):
   +url = url_of(hub, hash, "manifest")
   do IO<Body>:
     +s : Say.Spin <- Say.hold(Say.dep.hub(hash))
     g : Web.Got <- Web.fetch(url, want(hash))
-    read.hub.got(g, hub, hash, url, s)
+    read.hub.got(named, g, hub, hash, url, s)
 
 # a package's files and their text, from wherever it comes from
-def read.pkg(hub: String, lib: String, +hash: String, src: Src) -> IO(Body):
+def read.pkg(hub: String, lib: String, named: Bool, +hash: String, src: Src) -> IO(Body):
   match src:
     case Hub{}:
-      read.hub(hub, hash)
-    case Git{_u, _r, _e, _ro, _n, _t}:
-      read.git(lib, hash)
+      read.hub(named, hub, hash)
+    case Git{url, rev, entry, _ro, nar, _t}:
+      read.git(lib, hash, url, rev, entry, nar)
 
 # the hash a package is recorded under
 def pack.hash(package: Pack) -> String:
@@ -350,6 +435,17 @@ def any.step(here: Bool, rest: Unit -> Bool) -> Bool:
       True{}
     case False{}:
       rest(Unit{})
+
+# whether the ledger names a package. One it does not name still resolves from
+# the hub, since the hub serves bytes by the hash they digest to, but when the
+# hub does not have it there is nothing else to ask: nothing a clone has says
+# where it came from, so the lock says that and stops.
+def known(ds: List<&2, Origin>, +wanted: String) -> Bool:
+  match ds:
+    case []:
+      False{}
+    case x <> t:
+      any.step(String.eq(origin.hash(x), wanted), _u => known(t, wanted))
 
 # whether a package is already resolved
 def has(ds: List<&2, Pack>, +wanted: String) -> Bool:
@@ -375,7 +471,7 @@ def resolve.done(
 def resolve.step(
   hub: String,
   lib: String,
-  orgs: List<&2, Origin>,
+  +orgs: List<&2, Origin>,
   +hash: String,
   rest: List<&2, String>,
   done: List<&2, Pack>,
@@ -383,7 +479,7 @@ def resolve.step(
 ) -> IO(List<&2, Pack>):
   do IO<List<&2, Pack>>:
     +src : Src <- IO.pure(Src, origin(orgs, hash))
-    b : Body <- read.pkg(hub, lib, hash, src)
+    b : Body <- read.pkg(hub, lib, known(orgs, hash), hash, src)
     resolve.done(b, hash, src, rest, done, go)
 
 # a package already resolved is not resolved twice
@@ -622,15 +718,18 @@ def pack.sort(ps: List<&2, Pack>) -> List<&2, Pack>:
     case Con{+h, t}:
       pack.ins(pack.sort(t), h)
 
-# the lock as a document: what resolved it, then every package it resolved
-def doc(hub: String, ver: String, ps: List<&2, Pack>) -> List<&2, T.Sect>:
+# the lock as a document: what resolved it, then every package it resolved.
+# The bend that ran the lock is not recorded: it is not something a clone
+# has, and the flake pins the bend a build uses. A lock written before this
+# that records one still reads, since nothing reads the key.
+def doc(hub: String, ps: List<&2, Pack>) -> List<&2, T.Sect>:
   List.append(&2, T.Sect,
-    [T.Sect{"lock", [T.Kv{"version", "2"}, T.Kv{"hub", hub}, T.Kv{"bend", ver}]}],
+    [T.Sect{"lock", [T.Kv{"version", "2"}, T.Kv{"hub", hub}]}],
     pack.all(pack.sort(ps)))
 
 # the lock as the text written to ez.lock.toml
-def render(hub: String, ver: String, ps: List<&2, Pack>) -> String:
-  T.render(doc(hub, ver, ps))
+def render(hub: String, ps: List<&2, Pack>) -> String:
+  T.render(doc(hub, ps))
 
 # the keys a pinned CLI contributes. The same names a `[tools.*]` section
 # uses in ez.toml, and not the `[packages.*]` source table.
@@ -658,20 +757,20 @@ def tool.sects(ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
 
 # the lock with its tools after the packages. An empty tool list is the
 # lock `render` writes, so a ledger with no tools is unchanged.
-def render.pick(empty: Bool, hub: String, ver: String, ps: List<&2, Pack>, ts: List<&2, M.Tool>) -> String:
+def render.pick(empty: Bool, hub: String, ps: List<&2, Pack>, ts: List<&2, M.Tool>) -> String:
   match empty:
     case True{}:
-      render(hub, ver, ps)
+      render(hub, ps)
     case False{}:
-      T.render(List.append(&2, T.Sect, doc(hub, ver, ps), tool.sects(ts)))
+      T.render(List.append(&2, T.Sect, doc(hub, ps), tool.sects(ts)))
 
 # the same choice, made by matching the list so it is read once
-def render.tools(ts: List<&2, M.Tool>, hub: String, ver: String, ps: List<&2, Pack>) -> String:
+def render.tools(ts: List<&2, M.Tool>, hub: String, ps: List<&2, Pack>) -> String:
   match ts:
     case []:
-      render(hub, ver, ps)
+      render(hub, ps)
     case h <> t:
-      render.pick(False{}, hub, ver, ps, h <> t)
+      render.pick(False{}, hub, ps, h <> t)
 
 # the `[lock]` table of a lock that was read
 def lock.pairs(ss: List<&2, T.Sect>) -> List<&2, T.Kv>:
@@ -787,10 +886,6 @@ def src.nar(source: Src) -> String:
     case Git{_u, _r, _e, _ro, nar, _t}:
       nar
 
-# where the hub is, which is where bend's own is unless BEND_HUB says otherwise
-def hub.or(+url: String) -> String:
-  Bool.pick(String, String.is_empty(url), "https://hub.bend-lang.com", url)
-
 # an environment variable's text; unset, ""
 def env.text(res: Result<&1, &1, U32 & String, String>) -> String:
   match res:
@@ -798,12 +893,6 @@ def env.text(res: Result<&1, &1, U32 & String, String>) -> String:
       ""
     case Done{s}:
       s
-
-# the hub packages are fetched from
-def hub() -> IO(String):
-  do IO<String>:
-    r : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_HUB")
-    return hub.or(String.trim(env.text(r)))
 
 # where packages live, which is with the project rather than in ~/.bend/lib
 def lib.or(+dir: String) -> String:
@@ -815,57 +904,26 @@ def lib() -> IO(String):
     r : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_LIB")
     return lib.or(String.trim(env.text(r)))
 
-# the origins recorded beside a BEND_LIB. The file's name belongs to the half
-# that writes it, so it is asked for rather than spelled again here.
-#
-# It is a cache and nothing more. `ez add` writes it as it vendors and
-# .gitignore keeps it out of the repo, so a clone never sees one; the ledger
-# answers first for every package it names, and this file only for one the
-# ledger has forgotten.
-def origins_of(+lib: String) -> IO(List<&2, Origin>):
-  do IO<List<&2, Origin>>:
-    m : Maybe<&2, String> <- F.read(Git.origins.at(lib))
-    return origins(T.sects(T.parse(F.text_of(m))))
-
 # where the ledger is, which is the project root this command was run from
 def ledger.at() -> String:
   "ez.toml"
 
-# the origins the committed ledger records
-def ledger_of(+at: String) -> IO(List<&2, Origin>):
-  do IO<List<&2, Origin>>:
-    m : Maybe<&2, String> <- F.read(at)
-    return ledger.read(M.parse(F.text_of(m)))
-
-# the pinned CLIs the committed ledger records
-def tools_at(+at: String) -> IO(List<&2, M.Tool>):
-  do IO<List<&2, M.Tool>>:
-    m : Maybe<&2, String> <- F.read(at)
-    return M.tools_of(M.parse(F.text_of(m)))
-
-# the version of bend that resolved a lock, for the record
-def version() -> IO(String):
-  do IO<String>:
-    +out : String <- Bend.version()
-    return K.word(K.words(String.trim(R.text(out))), 1n)
-
-# the lock of a project, resolved against a named hub, ledger and BEND_LIB. The
+# the lock of a project, resolved from a named ledger and BEND_LIB. The
 # ledger's path is a parameter rather than the fixed name, so a test can lock a
-# project that is not the one it was started in.
-def lock.at(+hub: String, +toml: String, +at: String, entries: List<&2, String>) -> IO(String):
+# project that is not the one it was started in. The ledger is read once, and
+# it alone says where each package comes from, which hub the rest are fetched
+# from, and which tools are pinned.
+def lock.at(+toml: String, +at: String, entries: List<&2, String>) -> IO(String):
   do IO<String>:
-    led : List<&2, Origin> <- ledger_of(toml)
-    cache : List<&2, Origin> <- origins_of(at)
-    +orgs : List<&2, Origin> <- IO.pure(List<&2, Origin>, origins.all(led, cache))
+    m : Maybe<&2, String> <- F.read(toml)
+    +led : M.Read <- IO.pure(M.Read, M.parse(F.text_of(m)))
+    +hub : String <- IO.pure(String, M.hub_of(led))
     hs : List<&2, String> <- roots(U32.to_nat(100000), entries, Seen{[], []})
-    ps : List<&2, Pack> <- resolve(U32.to_nat(100000), hub, at, orgs, hs, [])
-    ts : List<&2, M.Tool> <- tools_at(toml)
-    ver : String <- version()
-    return render.tools(ts, hub, ver, ps)
+    ps : List<&2, Pack> <- resolve(U32.to_nat(100000), hub, at, ledger.read(led), hs, [])
+    return render.tools(M.tools_of(led), hub, ps)
 
 # the lock of a project, from the files it was asked to start at
 def lock(entries: List<&2, String>) -> IO(String):
   do IO<String>:
     at : String <- lib()
-    h : String <- hub()
-    lock.at(h, ledger.at(), at, entries)
+    lock.at(ledger.at(), at, entries)

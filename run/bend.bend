@@ -5,8 +5,8 @@
 # version` and the flag is "unknown option --version". Either way the spelling
 # it does not know exits non-zero, which looks exactly like a bend that is not
 # installed — so a caller that asks only one way cannot tell a missing bend
-# from an old one, and ez has three callers that need the banner: doctor's
-# report, the `bend = ` line of a lock, and the toolchain part of a cache key.
+# from an old one, and ez has two callers that need the banner: doctor's
+# report and the toolchain part of a cache key.
 # Asking both ways, current spelling first, is the whole of this module.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R

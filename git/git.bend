@@ -444,13 +444,12 @@ def origins.text(+text: String, +section: T.Sect) -> String:
     [section]))
 
 # where the origins of vendored packages are written down, which is beside the
-# BEND_LIB they were vendored into. Named by the half that writes the file;
-# `lock/lock.bend` reads it back from here.
+# BEND_LIB they were vendored into. `ez lock` does not read it: a clone never
+# has it, and the ledger records every origin a lock needs.
 def origins.at(lib: String) -> String:
   P.dir(lib) ++ "/origins.toml"
 
-# a package's origin written down, so `ez lock` can say where a package no hub
-# has ever seen came from
+# a package's origin written down beside the tree it was vendored into
 def note(+lib: String, +section: T.Sect) -> IO(Unit):
   +at = origins.at(lib)
   do IO<Unit>:

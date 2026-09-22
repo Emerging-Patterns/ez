@@ -8,6 +8,7 @@
 import Base
 import ./drift.bend as D
 import ./gate.bend as G
+import ./pin.bend as Pin
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
@@ -192,4 +193,27 @@ def Laws.out_name_empty():
   {==}
 
 def Laws.out_name():
+  {==}
+
+# `.ez/` is a prefix of anything appended to it, which `starts_append` holds,
+# and that picks the arm that keeps nothing.
+def Laws.root_skips_ez(p):
+  Equal.cong(Bool, List<&2, String>,
+    k => Bool.pick(List<&2, String>, k, [], [".ez/" ++ p]),
+    String.starts_with(".ez/" ++ p, ".ez/"), True{}, Eq.starts_append(".ez/", p))
+
+# A pin's two emptiness tests are rewritten to the False each premise gives,
+# and what is left is the arm that passes or the reason written out.
+def Laws.gap_of_full_pin(n, _e, _b, _url, _rev, _tag, _root, nar, _vend, fr, fn):
+  %fr : {Pin.gap.git(_, String.is_empty(nar), n) == "" : String}
+  %fn : {Pin.gap.git(False{}, _, n) == "" : String}
+  {==}
+
+def Laws.gap_of_revless_pin(_n, _e, _b, _url, _tag, _root, _nar, _vend):
+  {==}
+
+def Laws.gap_of_narless_pin(n, _e, _b, _url, _rev, _tag, _root, _vend, fr):
+  %fr : {Pin.gap.git(_, True{}, n) == "ez: tools." ++ n ++
+    " has no narHash; run `ez lock --upgrade --package " ++ n ++ "` to pin it"
+    : String}
   {==}

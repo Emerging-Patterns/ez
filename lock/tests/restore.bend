@@ -42,7 +42,7 @@ def repo(+work: String) -> IO(String):
 # the lock that package would be written into: pinned to the commit, with its
 # paths written from src/ inside the repo
 def lock(+work: String, rev: String) -> String:
-  L.render("https://hub.example", "2.0.16",
+  L.render("https://hub.example",
     [L.Pack{hash(), L.Git{"file://" ++ work ++ "/repo", rev, "src/lib.bend", "src",
       "sha256-zz", ""}, [K.File{"lib.bend", Sha.hex(leaf())}]}])
 

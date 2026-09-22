@@ -65,9 +65,9 @@ def without_append(xs, d):
 
 def Laws.add_idem(m, d):
   match m:
-    case M.Manifest{+n, +e, +b, +ds, +ts}:
+    case M.Manifest{+n, +e, +b, +hb, +ds, +ts}:
       Equal.cong(List<&2, M.Dep>, M.Manifest,
-        y => M.Manifest{n, e, b, List.append(&2, M.Dep, y, [d]), ts},
+        y => M.Manifest{n, e, b, hb, List.append(&2, M.Dep, y, [d]), ts},
         R.without(List.append(&2, M.Dep, R.without(ds, M.dep.name(d)), [d]),
           M.dep.name(d)),
         R.without(ds, M.dep.name(d)),
@@ -194,7 +194,7 @@ def Laws.parse_reads_the_sections(_text, _bad, _name, _pairs, sects, e):
 def Laws.show_bad_is_marked(why):
   Eq.starts_nil(why)
 
-def Laws.show_good_opens_with_name(n, e, _b, ds, _ts):
+def Laws.show_good_opens_with_name(n, e, _b, _hb, ds, _ts):
   Eq.starts_append(n,
     " " ++ e ++ " " ++ String.join(M.show.deps(ds), " "))
 
@@ -206,13 +206,13 @@ def Laws.find_first(n, h, en, s, t):
 def Laws.dep_of_unread_is_blank(_why, _name):
   {==}
 
-def Laws.rev_of_names_the_commit(_mn, _me, _mb, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
+def Laws.rev_of_names_the_commit(_mn, _me, _mb, _mh, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
   Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)),
     M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n),
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}},
     Laws.find_first(n, h, en, M.Git{url, rev, tag, root, nar, vend}, t))
 
-def Laws.tag_of_names_the_tag(_mn, _me, _mb, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
+def Laws.tag_of_names_the_tag(_mn, _me, _mb, _mh, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
   Equal.cong(M.Dep, String, d => M.source.tag(M.source.dep(d)),
     M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n),
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}},
@@ -251,19 +251,31 @@ def Laws.deps_splits(as, bs):
           String.append(R.dep(h), String.append(R.deps(t), R.deps(bs))),
           Eq.append_assoc(R.dep(h), R.deps(t), R.deps(bs))))
 
-def Laws.show_opens_with_package(n, e, b, ds, ts):
+def Laws.show_opens_with_package(n, e, b, hb, ds, ts):
   Eq.starts_nil(R.line("name", n) ++ R.line("entry", e) ++ R.line("bin", b) ++
-    R.deps(ds) ++ R.tools(ts))
+    R.line("hub", hb) ++ R.deps(ds) ++ R.tools(ts))
 
 def Laws.render_of_unread_is_blank(_why):
+  {==}
+
+# The two defaults reduce. A named hub is the pick's other arm once its
+# emptiness test is rewritten to the False the premise gives.
+def Laws.hub_of_unread_is_bends(_why):
+  {==}
+
+def Laws.hub_of_absent_is_bends(_n, _e, _b, _ds, _ts):
+  {==}
+
+def Laws.hub_of_names_the_hub(_n, _e, _b, hb, _ds, _ts, f):
+  %f : {Bool.pick(String, _, "https://hub.bend-lang.com", hb) == hb : String}
   {==}
 
 # Removing twice is the inner list dropped twice, which is `without_idem`.
 def Laws.remove_idem(m, name):
   match m:
-    case M.Manifest{n, e, b, ds, ts}:
+    case M.Manifest{n, e, b, hb, ds, ts}:
       Equal.cong(List<&2, M.Dep>, M.Manifest,
-        xs => M.Manifest{n, e, b, xs, ts},
+        xs => M.Manifest{n, e, b, hb, xs, ts},
         R.without(R.without(ds, name), name), R.without(ds, name),
         Laws.without_idem(ds, name))
 

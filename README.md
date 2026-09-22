@@ -87,11 +87,14 @@ entry = "src/lib.bend"
 
 `[deps.*]` is a package. It is imported, and `ez fetch` puts it on `BEND_LIB`.
 A CLI is a `[tools.*]` pin. It is not imported and it is not put on
-`BEND_LIB`. `ez lock` records it under `[tools.bolt]` in `ez.lock.toml`.
-`ez lock --upgrade` re-resolves the tag and fills `narHash`, the way it does
-for a git dependency. `ez tool sync` builds and links every such pin at the
-lock rev. `ez tool run bolt` uses that rev; `ez tool run owner/repo` is still
-the repo's HEAD.
+`BEND_LIB`. `ez lock` records it under `[tools.bolt]` in `ez.lock.toml`,
+copying `rev` and `narHash` from the ledger; a pin missing either stops
+`ez lock` with exit 1 and the command that fills it,
+`ez lock --upgrade --package bolt`. `ez lock --upgrade` fills an empty pin,
+re-resolves the tag and fills `narHash`, the way it does for a git
+dependency. `ez tool sync` builds and links every such pin at the lock rev.
+`ez tool run bolt` uses that rev; `ez tool run owner/repo` is still the
+repo's HEAD.
 
 ```toml
 [tools.bolt]
@@ -139,23 +142,40 @@ revision's `ez.toml`, then `[package] bin` when `entry` is absent, then
 A dependency with no `git` key lives on the hub. `vendor = true` commits that
 dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.
 Without it, the tree is not committed: `ez fetch` fills `BEND_LIB` from the
-lock. `ez doctor` reports when the ledger and the repo's import lines
-disagree; it never rewrites your source.
+lock, and `ez lock` fetches a git dependency whose tree is not under
+`BEND_LIB` at the ledger's `rev`, checks it against `narHash`, and leaves it
+there. A fetch or a check that fails stops the lock with exit 1. `ez doctor`
+reports when the ledger and the repo's import lines disagree; it never
+rewrites your source.
+
+Hub packages come from `https://hub.bend-lang.com`, or from the hub a `hub`
+key in the ledger's `[package]` table names. `ez lock` does not read
+`BEND_HUB`.
 
 `ez lock --upgrade` re-pins git dependencies and `[tools.*]` pins, then
 writes the lock. `--package NAME` limits that to one dependency or one tool.
 A `tag` is re-resolved. A dependency
 with only a `rev` moves to the default branch tip when the pinned commit is
 an ancestor of it, and stays a commit pin. A hub dependency does not move.
-The upgrade does not fetch the rest of the lock. A dependency marked
+The upgrade itself fetches only the dependencies it re-pins; the lock it
+then writes fetches any other git dependency whose tree is missing, the way
+a plain `ez lock` does. A dependency marked
 `vendor` is laid out again under the new hash, and the gitignore allowlist
 follows it. An import line that names a hash that moved is rewritten to
 name the new one.
 
-The ledger is enough on its own. `root` and `narHash` are there so that
-`ez lock` never has to consult anything a clone does not have, which is what
-lets someone who has just cloned your repo run `ez lock` and get your lock
-back to the byte, without re-running `ez add`.
+The ledger is enough on its own. `ez lock` reads the ledger, the `.bend`
+files `git ls-files` lists (so it refuses outside a git repository, and an
+untracked file is not a root), the committed trees under `.ez/lib`, each git
+dependency's files at its ledger `rev`, and hub content, which it checks
+against the package's hash. It does not read `.ez/origins.toml`, which
+`ez add` writes and `.gitignore` keeps out of the repo: a hash the ledger
+does not name is fetched from the hub, and when the hub does not have it the
+lock says the ledger does not name it and exits 1. It does not record the
+bend that ran it. `root` and `narHash` are there so that `ez lock` never has
+to consult anything a clone does not have, which is what lets someone who
+has just cloned your repo run `ez lock` and get your lock back to the byte,
+without re-running `ez add`.
 
 In a flake — `lib.${system}` builds the program the ledger names and turns
 `ez.lock.toml` into a `BEND_LIB` store path, so there is nothing to copy
