@@ -1,20 +1,22 @@
-# Cuts a vX.Y.Z tag and GitHub Release from workflow_dispatch
-# (a GITHUB_TOKEN tag does not start release.yml).
+# Merges to master patch-bump flake.nix, tag vX.Y.Z, and open a GitHub Release.
+# Actions → Tag still sets an explicit version or bump.
+# Hub publish stays manual: Actions → Publish.
 #
-# How to cut a release
-#   1. Land the version on master in flake.nix (`version = "X.Y.Z"` on the ez package).
-#   2. Actions → Tag → Run workflow, from master:
-#        - leave version empty and bump=none → tag what flake.nix says
-#        - version=X.Y.Z → tag that (fails if flake.nix differs)
-#        - bump=patch|minor|major → rewrite flake.nix, commit, tag the new X.Y.Z
-#   3. Or tag locally: `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`
-#      (release.yml then opens the GitHub Release).
+# The push path skips a commit whose message starts with "Release v"
+# (the bump commit) so it does not bump again.
+#
+# Dispatch, from master:
+#   - leave version empty and bump=none → tag what flake.nix says
+#   - version=X.Y.Z → tag that (fails if flake.nix differs)
+#   - bump=patch|minor|major → rewrite flake.nix, commit, tag the new X.Y.Z
 #
 # Tag and GitHub Release only; GitHub ships the source archive.
 
 name: tag
 
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
     inputs:
       version:
@@ -33,12 +35,12 @@ on:
           - major
         default: none
 
-permissions:
-  contents: write
-
 jobs:
   tag:
+    if: "github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'Release v')"
+    permissions:
+      contents: write
     uses: Emerging-Patterns/actions/.github/workflows/tag.yml@9523e8b294ae014fade5861c32d5ab911866acb2
     with:
-      version: ${{ inputs.version }}
-      bump: ${{ inputs.bump }}
+      version: ${{ case(github.event_name == 'workflow_dispatch', inputs.version, '') }}
+      bump: ${{ case(github.event_name == 'push', 'patch', inputs.bump) }}
