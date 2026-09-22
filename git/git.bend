@@ -82,6 +82,7 @@ def clone.say(+work: String, +url: String, +rev: String, +msg: String) -> IO(Uni
     run("checkout", ["git", "-C", work, "checkout", "-q", rev])
     Say.done(s)
 
+# a shallow clone of one commit into `work`, with a line saying what it fetches
 def clone(+work: String, +url: String, +rev: String) -> IO(Unit):
   clone.say(work, url, rev, Say.git.fetch(url))
 
@@ -802,6 +803,7 @@ def ord.ver(a: Ver, b: Ver) -> Ord:
     case Yes{_na, _pa} No{}:
       Eq{}
 
+# a decimal digit's value
 def dig(c: Char) -> Nat:
   U32.to_nat(U32.sub(Char.to_u32(c), 48))
 
@@ -833,6 +835,7 @@ def digits.at(empty: Bool, +s: String) -> Bool:
     case False{}:
       digits.go(s)
 
+# a non-empty run of decimal digits
 def digits(+s: String) -> Bool:
   digits.at(String.is_empty(s), s)
 
@@ -930,6 +933,8 @@ def split1.step(hit: Bool, h: Char, +t: String, rest: Unit -> Cut) -> Cut:
     case False{}:
       split1.put(h, rest(Unit{}))
 
+# a string cut at the first of a character, the character dropped; no hit leaves
+# the whole string on the left
 def split1(+c: Char, s: String) -> Cut:
   match s:
     case SNil{}:
@@ -944,6 +949,7 @@ def unv.step(drop: Bool, h: Char, t: String) -> String:
     case False{}:
       SCon{h, t}
 
+# a tag with one leading `v` or `V` dropped
 def unv(s: String) -> String:
   match s:
     case SNil{}:

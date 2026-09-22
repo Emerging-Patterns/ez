@@ -178,6 +178,7 @@ def bare.go(slash: Bool, +s: String) -> String:
     case False{}:
       s
 
+# a directory with no trailing slash
 def bare(+s: String) -> String:
   bare.go(String.ends_with(s, "/"), s)
 
@@ -276,8 +277,8 @@ def fetch.go(m: Maybe<&2, String>, +src: String, +lib: String) -> IO(Unit):
   match m:
     case None{}:
       fetch.gone(src)
-    case Some{text}:
-      Restore.restore.at(T.sects(T.parse(text)), lib)
+    case Some{body}:
+      Restore.restore.at(T.sects(T.parse(body)), lib)
 
 # BEND_LIB filled from the checkout's lock
 def fetch(+src: String, +lib: String) -> IO(Unit):
@@ -361,8 +362,8 @@ def load.go(m: Maybe<&2, String>, +src: String) -> IO(M.Read):
   match m:
     case None{}:
       load.missing(src)
-    case Some{text}:
-      IO.pure(M.Read, M.parse(text))
+    case Some{body}:
+      IO.pure(M.Read, M.parse(body))
 
 # the ledger read out of a checkout
 def load(+src: String) -> IO(M.Read):
@@ -526,8 +527,8 @@ def project.go(m: Maybe<&2, String>) -> IO(M.Read):
   match m:
     case None{}:
       IO.pure(M.Read, M.Good{M.Manifest{"", "", "", [], []}})
-    case Some{text}:
-      project.read(M.parse(text))
+    case Some{body}:
+      project.read(M.parse(body))
 
 # the project's own ledger
 def project() -> IO(M.Read):
@@ -540,8 +541,8 @@ def lock.open(m: Maybe<&2, String>) -> IO(String):
   match m:
     case None{}:
       IO.die(String, 1, "ez: ez.lock.toml is not there")
-    case Some{text}:
-      IO.pure(String, text)
+    case Some{body}:
+      IO.pure(String, body)
 
 # a name the lock does not pin
 def lock.have(missing: Bool, +name: String, t: M.Tool) -> IO(M.Tool):
@@ -555,9 +556,9 @@ def lock.have(missing: Bool, +name: String, t: M.Tool) -> IO(M.Tool):
 def locked(+name: String) -> IO(M.Tool):
   do IO<M.Tool>:
     m : Maybe<&2, String> <- F.read("ez.lock.toml")
-    +text : String <- lock.open(m)
+    +body : String <- lock.open(m)
     +t : M.Tool <- IO.pure(M.Tool,
-      M.tool.find(M.tools(T.sects(T.parse(text))), name))
+      M.tool.find(M.tools(T.sects(T.parse(body))), name))
     lock.have(String.is_empty(M.tool.name(t)), name, t)
 
 # `bin` when the pin names one, otherwise `entry`, otherwise "" so the
@@ -605,6 +606,7 @@ def named.go(free: Bool, +target: String, act: Act) -> IO(Unit):
         +pin : M.Tool <- locked(target)
         run.pinned(pin, act)
 
+# a word run as the pin the ledger gives it, or as a free target
 def named(+target: String, act: Act) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- project()

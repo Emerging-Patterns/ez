@@ -30,14 +30,15 @@ def depth.step(more: Bool, acc: Nat, rest: Unit -> Nat) -> Nat:
       rest(Unit{})
 
 # the depth of an array whose capacity, 2^depth, is at least `words`
-def depth.go(fuel: Nat, +words: Nat, +cap: Nat, +acc: Nat) -> Nat:
-  match fuel:
+def depth.go(bits: Nat, +words: Nat, +cap: Nat, +acc: Nat) -> Nat:
+  match bits:
     case 0n:
       acc
     case 1n+p:
       depth.step(Nat.is_lt(cap, words), acc,
         _u => depth.go(p, words, Nat.mul(cap, 2n), Nat.add(acc, 1n)))
 
+# the depth of the array that holds this many words, at most 32
 def depth(words: Nat) -> Nat:
   depth.go(32n, words, 1n, 0n)
 

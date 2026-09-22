@@ -33,16 +33,18 @@ def byte(+x: U32) -> Char:
 def nat.byte(+n: Nat) -> Char:
   byte(U32.from_nat(Nat.mod(n, 256n)))
 
-def le64.go(fuel: Nat, +n: Nat) -> String:
-  match fuel:
+def le64.go(width: Nat, +n: Nat) -> String:
+  match width:
     case 0n:
       ""
     case 1n+f:
       SCon{nat.byte(n), le64.go(f, Nat.div(n, 256n))}
 
+# a length as NAR writes it: eight bytes, little-endian
 def le64(+n: Nat) -> String:
   le64.go(8n, n)
 
+# that many NUL bytes, the padding after a string
 def zeros(n: Nat) -> String:
   match n:
     case 0n:
@@ -53,6 +55,7 @@ def zeros(n: Nat) -> String:
 def pad.of(+n: Nat) -> Nat:
   Nat.mod(Nat.sub(8n, Nat.mod(n, 8n)), 8n)
 
+# one NAR string: its length, its bytes, then zeros up to a multiple of eight
 def str(+s: String) -> String:
   +n = String.length(s)
   le64(n) ++ s ++ zeros(pad.of(n))
@@ -99,6 +102,7 @@ def utf8.put.ascii(ascii: Bool, +u: U32) -> String:
 def utf8.put(+u: U32) -> String:
   utf8.put.ascii(U32.is_lt(u, 128), u)
 
+# the string's characters encoded as UTF-8, each byte a character
 def utf8(+s: String) -> String:
   match s:
     case SNil{}:
@@ -113,19 +117,23 @@ def exec.fields(ex: Bool) -> String:
     case True{}:
       str("executable") ++ str("")
 
+# a regular file's node, marked executable when it is
 def regular(ex: Bool, +contents: String) -> String:
   str("(") ++ str("type") ++ str("regular") ++ exec.fields(ex)
     ++ str("contents") ++ str(utf8(contents)) ++ str(")")
 
+# a symlink's node
 def symlink(+target: String) -> String:
   str("(") ++ str("type") ++ str("symlink") ++ str("target")
     ++ str(utf8(target)) ++ str(")")
 
+# one directory entry: its name and its node
 def entry(+e: Ent) -> String:
   Ent{name, node} = e
   str("entry") ++ str("(") ++ str("name") ++ str(utf8(name))
     ++ str("node") ++ node ++ str(")")
 
+# a directory's entries, in the order given
 def entries(es: List<&2, Ent>) -> String:
   match es:
     case []:
@@ -133,9 +141,11 @@ def entries(es: List<&2, Ent>) -> String:
     case h <> t:
       entry(h) ++ entries(t)
 
+# a directory's node
 def directory(es: List<&2, Ent>) -> String:
   str("(") ++ str("type") ++ str("directory") ++ entries(es) ++ str(")")
 
+# a whole NAR: the magic, then the root node
 def archive(+node: String) -> String:
   str("nix-archive-1") ++ node
 
@@ -189,6 +199,7 @@ def b64.two(+a: U32, +b: U32) -> String:
       SCon{b64.digit(U32.shln((n .&. 15 : U32), 2n)),
         SCon{'=', SNil{}}}}}
 
+# standard base64, padded with `=`
 def b64(s: String) -> String:
   match s:
     case SNil{}:
@@ -237,12 +248,15 @@ def hex.bytes(s: String) -> String:
 def sri.hex(+hex: String) -> String:
   "sha256-" ++ b64(hex.bytes(hex))
 
+# the SRI of some bytes: `sha256-` and the base64 of their digest
 def sri(+bytes: String) -> String:
   sri.hex(Sha.hex(bytes))
 
+# the node of an empty directory
 def empty() -> String:
   directory([])
 
+# a command's output, trimmed, or the walk stopped with why it failed
 def said(ok: Bool, +why: String, +text: String) -> IO(String):
   match ok:
     case False{}:
@@ -250,6 +264,7 @@ def said(ok: Bool, +why: String, +text: String) -> IO(String):
     case True{}:
       IO.pure(String, String.trim(text))
 
+# the lines that are not empty
 def nonblank(ss: List<&2, String>) -> List<&2, String>:
   match ss:
     case []:
@@ -283,6 +298,7 @@ def sort(ss: List<&2, String>) -> List<&2, String>:
     case +h <> t:
       sort.ins(h, sort(t))
 
+# the names in a directory, sorted, without `.` and `..`
 def names(+path: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     +out : String <- R.exec(["find", path, "-mindepth", "1", "-maxdepth", "1",
@@ -441,7 +457,7 @@ def load.go(fuel: Nat, g: Goal) -> IO(String):
 
 # the NAR serial of one path
 def dump(+path: String) -> IO(String):
-  load.go(100000n, Load{path, Done{}})
+  load.go(U32.to_nat(100000), Load{path, Done{}})
 
 # the SRI narHash of a path, the same string `nix hash path --sri` prints
 def path(+work: String) -> IO(String):

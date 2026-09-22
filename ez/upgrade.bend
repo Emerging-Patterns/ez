@@ -234,6 +234,7 @@ def follow.got(+lib: String, +hub: String, +d: M.Dep, +src: M.Source, r: Git.Ref
   ask(lib, hub, d, M.source.url(src), M.dep.entry(d), M.source.rev(src),
     rev, tag, "")
 
+# a tag pin, re-resolved at the remote
 def follow(+lib: String, +hub: String, +d: M.Dep, +ref: String) -> IO(Done):
   +src = M.source.dep(d)
   do IO<Done>:
@@ -285,10 +286,10 @@ def either(a: Bool, b: Bool) -> Bool:
 
 # one dependency in front of the rest of the ledger
 def join(a: Done, b: Out) -> Out:
-  Done{d, +old, +new, +prev, moved} = a
+  Done{d, +old, +new, +prev, changed} = a
   Out{ds, ss, es, any} = b
   Out{d <> ds, swaps.put(String.is_empty(old), old, new, ss),
-    swaps.put(String.is_empty(prev), prev, new, es), either(moved, any)}
+    swaps.put(String.is_empty(prev), prev, new, es), either(changed, any)}
 
 # every dependency, in the order the ledger wrote them
 def walk(+lib: String, +hub: String, +only: String, ds: List<&2, M.Dep>) -> IO(Out):
@@ -423,13 +424,14 @@ def drop(ss: List<&2, U.Swap>) -> IO(Unit):
 # The lock is the caller's to write, from the ledger this just wrote.
 def go.out(+name: String, +entry: String, +bin: String, ts: List<&2, M.Tool>,
   o: Out) -> IO(Unit):
-  Out{+deps, +swaps, +edits, moved} = o
+  Out{+deps, +swaps, +edits, changed} = o
   do IO<Unit>:
-    write.toml(moved, name, entry, bin, deps, ts)
+    write.toml(changed, name, entry, bin, deps, ts)
     write.ignore(swaps)
     write.imports(edits)
     drop(swaps)
 
+# every dependency the filter selects walked, then the ledger rewritten
 def go(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>,
   ts: List<&2, M.Tool>, +only: String) -> IO(Unit):
   do IO<Unit>:

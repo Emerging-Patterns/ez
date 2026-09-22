@@ -199,7 +199,7 @@ def lock.now() -> IO(Unit):
     report.exit(wrote)
 
 # `--package` is only a filter on an upgrade
-def lock.plain(bare: Bool, +name: String) -> IO(Unit):
+def lock.plain(bare: Bool, +_name: String) -> IO(Unit):
   match bare:
     case True{}:
       do IO<Unit>:
@@ -357,8 +357,8 @@ def add.base(ps: List<&2, String>) -> String:
 
 # a dependency is named after its entry file, the way bend names an import
 def add.alias(+at: String) -> String:
-  String.take(add.base(String.split(at, '/')), Nat.sub(String.length(
-    add.base(String.split(at, '/'))), 5n))
+  +leaf = add.base(String.split(at, '/'))
+  String.take(leaf, Nat.sub(String.length(leaf), 5n))
 
 # a vendoring's answer as a ledger entry. The entry file is read twice, once
 # for the name and once for itself, so it arrives through a parameter.

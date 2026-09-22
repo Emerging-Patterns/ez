@@ -43,6 +43,7 @@ def set.go(+n: String, +e: String, +b: String, s: M.Source, +rev: String,
         Bool.pick(String, String.is_empty(tag), old, tag), M.root.or(root),
         nar, False{}}}
 
+# a tool's pin with a commit, a tag and a NAR hash written in
 def set(+t: M.Tool, +rev: String, +tag: String, +nar: String) -> M.Tool:
   M.Tool{n, e, b, s} = t
   set.go(n, e, b, s, rev, tag, nar)
@@ -249,6 +250,7 @@ def follow.got(+t: M.Tool, r: Git.Ref) -> IO(Touched):
   Git.Ref{+rev, tag} = r
   ask(t, M.source.rev(M.tool.source(t)), rev, tag, "")
 
+# a tag pin, re-resolved at the remote
 def follow(+t: M.Tool, +ref: String) -> IO(Touched):
   do IO<Touched>:
     +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(t)))
@@ -261,6 +263,7 @@ def forward.got(+t: M.Tool, tip: Git.Tip) -> IO(Touched):
   Git.Tip{+rev, +branch} = tip
   ask(t, M.source.rev(M.tool.source(t)), rev, "", branch)
 
+# a rev-only pin, against the remote's default branch
 def forward(+t: M.Tool) -> IO(Touched):
   do IO<Touched>:
     +s : Say.Spin <- Say.hold(Say.resolving.at(M.tool.name(t)))
