@@ -24,7 +24,7 @@
       bendLib = ez.bendLib ./ez.lock.toml;
 
       # the `ez` binary, with everything it shells out to on its PATH. curl is
-      # not among them: net/ speaks HTTP and HTTPS itself, and what it needs
+      # not among them: ezhttp speaks HTTP and HTTPS itself, and what it needs
       # instead is libssl by name (it opens it at run time, and no search path
       # reaches a Nix store path) and a CA bundle, which OpenSSL takes from
       # SSL_CERT_FILE. git stays, because `ez add` vendors a repo.
@@ -93,7 +93,7 @@
       devShells.${system}.default = ez.mkShell {
         src = self;
         packages = [ bend bend-cc pkgs.git pkgs.openssl pkgs.cacert ];
-        # EZ_LIBSSL and SSL_CERT_FILE are what the client in net/ needs: it
+        # EZ_LIBSSL and SSL_CERT_FILE are what ezhttp's client needs: it
         # opens libssl by name at run time, and OpenSSL takes its trust store
         # from SSL_CERT_FILE.
         extraHook = ''

@@ -33,9 +33,8 @@ law origin_read:
     == L.Git{url, rev, entry, root, nar, T.value(ts, "tag")} : L.Src}
 
 # The shapes git/git.bend had before this pass rewrote them for cost, kept
-# here so the rewrites' risk can be stated rather than sampled, the way
-# net/LAWS.bend keeps the shapes net/http.bend had before its dechunk
-# rewrite. Nothing but the laws below reads them.
+# here so the rewrites' risk can be stated rather than sampled. Nothing but
+# the laws below reads them.
 #
 # What was wrong with them is not what they answer, it is what they cost.
 # `Bool.pick`, `Bool.and` and `Bool.or` are ordinary functions: every arm and
