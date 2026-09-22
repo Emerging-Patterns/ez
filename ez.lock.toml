@@ -59,3 +59,10 @@ tag = "v0.1.0"
 
 [packages."0xebdf72b20ad527103f6efc0d2aa8f1ec".files]
 "main.bend" = "55beca0b4279a6af51f342b4412ab904064876b95a1d40b248c18ed18e532061"
+
+[tools.bolt]
+git = "https://github.com/Emerging-Patterns/bolt"
+rev = "24b497e294a08f6a83e0b08ece3795f813421b87"
+tag = "v0.4.0"
+root = "."
+narHash = "sha256-ByR8UDGFAfn5HgVa8muRz5IA1DzoOxpOESB9TNezmus="
