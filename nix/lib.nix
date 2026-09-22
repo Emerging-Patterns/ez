@@ -183,6 +183,10 @@ rec {
     name ? "proofs",
     lock ? null,
     bendLib ? null,
+    # accepted and ignored: they were `ez test`'s flags and budget, and a
+    # caller written against the old signature still evaluates
+    extraFlags ? [ ],
+    deadline ? null,
   }:
     pkgs.runCommand name
       (withBendLib (bendLibFor bendLib src lock) {
