@@ -11,7 +11,7 @@
 # sockets and the writing are below, and nothing in the upper half touches IO.
 # Reading a request off a socket and writing an answer back are check/serve.bend,
 # shared with check/framing.bend. Plaintext HTTP only; bend speaks TLS to the
-# real hub, and net/wire.bend explains why a Bend binary cannot.
+# real hub, and check/serve.bend says why a Bend binary cannot.
 #
 # `GET /` answers `ok`, so a script can wait for the oracle before it publishes.
 # One connection is served at a time, each answer states its length and closes

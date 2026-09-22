@@ -2,10 +2,10 @@
 # started here on a port of this test's own and stopped again at the end, so
 # the test is answered by the server it started and never by a stranger's.
 #
-# It is under tests/ rather than net/tests/ because it drives a socket, and the
+# It is under tests/ rather than hub/tests/ because it drives a socket, and the
 # unit tests beside the code are about what can be said without one.
 import Base
-import ../net/client.bend as Client
+import ../hub/hub.bend as Hub
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../check/kit.bend as Check
 import ../check/world.bend as W
@@ -21,19 +21,19 @@ def show(+out: String) -> String:
 # every fetch, once the server is up
 def fetch(+p: String) -> IO(Unit):
   do IO<Unit>:
-    +plain : String <- Client.get(at(p, "/plain"))
+    +plain : String <- Hub.get(at(p, "/plain"))
     Check.eq_str("a Content-Length body comes back whole", show(plain),
       "0 a manifest line\n")
-    +chunked : String <- Client.get(at(p, "/chunked"))
+    +chunked : String <- Hub.get(at(p, "/chunked"))
     Check.eq_str("a chunked body is put back together", show(chunked),
       "0 one two three four\n")
-    +gone : String <- Client.get(at(p, "/gone"))
+    +gone : String <- Hub.get(at(p, "/gone"))
     Check.eq_str("a 404 is a status, never a body", show(gone),
       "22 the server answered 404")
-    +shut : String <- Client.get("http://127.0.0.1:1/plain")
+    +shut : String <- Hub.get("http://127.0.0.1:1/plain")
     Check.eq_str("a port with nothing on it names the host it could not reach",
       show(shut), "6 could not reach 127.0.0.1 port 1")
-    +bad : String <- Client.get("nonsense")
+    +bad : String <- Hub.get("nonsense")
     Check.eq_str("a url that is not one never reaches a socket", show(bad),
       "22 nonsense: has no //")
 
