@@ -221,8 +221,7 @@ def starts_append(a, b):
           Char.is_eq(h, h), True{}, char_eq_self(h)),
         starts_append(t, b))
 
-# LAW: nothing appended to a string leaves the string. This and the law
-# under it were written out in net/PROOF.bend first.
+# LAW: nothing appended to a string leaves the string.
 law append_nil:
   for s: String
   {String.append(s, SNil{}) == s : String}

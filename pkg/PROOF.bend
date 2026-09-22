@@ -1843,7 +1843,7 @@ def Laws.norm_dot(p, e):
         Path.Walk{abs, []})),
       False{}, String.starts_with(p, "/"), e))
 
-# LAW: one character before a slash, the same shape as net's split_cut
+# LAW: one character before a slash
 law split_slash.step:
   for +h: Char
   for +t: String

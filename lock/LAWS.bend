@@ -32,8 +32,7 @@ law origin_agrees:
 
 # The shape lock/lock.bend's "have I read this file" scan had before this pass
 # rewrote it for cost, kept here so the rewrite's risk can be stated rather
-# than sampled, the way net/LAWS.bend keeps the shapes net/http.bend had
-# before its dechunk rewrite. Nothing but the law below reads it.
+# than sampled. Nothing but the law below reads it.
 #
 # `Bool.or` is an ordinary function and reduces both of its sides, so a scan
 # written with it reads the whole list even when the head answers. This list

@@ -9,8 +9,9 @@
 # whatever the server answers with, and a Bend value threaded through a loop is
 # threaded by hand. Each server writes its own loop over `recv` and `send`.
 #
-# Plaintext only. bend speaks TLS to the real hub, and net/wire.bend explains
-# why a Bend binary cannot.
+# Plaintext only. bend speaks TLS to the real hub. A Bend binary cannot serve
+# it: `bend -o` links no -lssl, so ezhttp's client reaches OpenSSL only by
+# opening it at run time, and Base's TCP has no crypto at all.
 import Base
 
 # a string's length where a Nat would be too dear: a body is thousands of

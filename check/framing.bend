@@ -1,8 +1,8 @@
 # check/framing: a plaintext server whose whole subject is how a response is
 # framed. It answers one body by Content-Length, one in chunks, and anything
-# else with a status and no body, which is the three cases net/http.bend has to
-# get right; tests/fetch.bend starts one of these and drives ez's own client
-# against it.
+# else with a status and no body, which is the three cases ezhttp's client has
+# to get right; tests/fetch.bend starts one of these and drives hub/hub.bend's
+# get against it.
 #
 #   bend check/framing.bend <port>
 #

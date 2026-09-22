@@ -116,9 +116,8 @@ law hash_perm:
 # The shapes pkg/ had before this pass rewrote them for cost, kept here so
 # that the rewrites' one real risk can be stated rather than sampled: that the
 # fast definitions answer exactly what the slow ones answered, on every input.
-# These are the specification and pkg/ is the implementation, the way
-# net/LAWS.bend keeps the shapes net/http.bend had before its dechunk
-# rewrite. Nothing but the laws below reads them.
+# These are the specification and pkg/ is the implementation. Nothing but
+# the laws below reads them.
 #
 # What was wrong with them is not what they answer, it is what they cost.
 # `Bool.pick` is an ordinary function, so both of its arms are reduced before
