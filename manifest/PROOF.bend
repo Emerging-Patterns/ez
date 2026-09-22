@@ -65,9 +65,9 @@ def without_append(xs, d):
 
 def Laws.add_idem(m, d):
   match m:
-    case M.Manifest{+n, +e, +b, +ds}:
+    case M.Manifest{+n, +e, +b, +ds, +ts}:
       Equal.cong(List<&2, M.Dep>, M.Manifest,
-        y => M.Manifest{n, e, b, List.append(&2, M.Dep, y, [d])},
+        y => M.Manifest{n, e, b, List.append(&2, M.Dep, y, [d]), ts},
         R.without(List.append(&2, M.Dep, R.without(ds, M.dep.name(d)), [d]),
           M.dep.name(d)),
         R.without(ds, M.dep.name(d)),
@@ -145,6 +145,26 @@ def Laws.deps_skips_other_sections(n, ps, ss, e):
     : List<&2, M.Dep>}
   {==}
 
+def Laws.tool_of_drops_prefix(name, _pairs):
+  drop_zero(name)
+
+def Laws.tools_takes_tool_sections(name, ps, ss):
+  Equal.cong(Bool, List<&2, M.Tool>,
+    b => M.tools.put(b, T.Sect{String.append("tools.", name), ps}, M.tools(ss)),
+    String.starts_with(String.append("tools.", name), "tools."), True{},
+    Eq.starts_append("tools.", name))
+
+def Laws.tools_skips_other_sections(n, ps, ss, e):
+  %e : {M.tools.put(_, T.Sect{n, ps}, M.tools(ss)) == M.tools(ss)
+    : List<&2, M.Tool>}
+  {==}
+
+def Laws.tool_needs_no_hash():
+  {==}
+
+def Laws.tool_is_not_a_dep():
+  {==}
+
 def Laws.missing_finds_first(n, ps, ss, e0, e1):
   %e0 : {M.missing.at(Bool.and(_, String.is_empty(M.value(ps, "hash"))), n,
     M.missing(ss)) == n : String}
@@ -174,7 +194,7 @@ def Laws.parse_reads_the_sections(_text, _bad, _name, _pairs, sects, e):
 def Laws.show_bad_is_marked(why):
   Eq.starts_nil(why)
 
-def Laws.show_good_opens_with_name(n, e, _b, ds):
+def Laws.show_good_opens_with_name(n, e, _b, ds, _ts):
   Eq.starts_append(n,
     " " ++ e ++ " " ++ String.join(M.show.deps(ds), " "))
 
@@ -186,13 +206,13 @@ def Laws.find_first(n, h, en, s, t):
 def Laws.dep_of_unread_is_blank(_why, _name):
   {==}
 
-def Laws.rev_of_names_the_commit(_mn, _me, _mb, n, h, en, url, rev, tag, root, nar, vend, t):
+def Laws.rev_of_names_the_commit(_mn, _me, _mb, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
   Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)),
     M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n),
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}},
     Laws.find_first(n, h, en, M.Git{url, rev, tag, root, nar, vend}, t))
 
-def Laws.tag_of_names_the_tag(_mn, _me, _mb, n, h, en, url, rev, tag, root, nar, vend, t):
+def Laws.tag_of_names_the_tag(_mn, _me, _mb, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
   Equal.cong(M.Dep, String, d => M.source.tag(M.source.dep(d)),
     M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n),
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}},
@@ -208,6 +228,9 @@ def Laws.source_omits_absent_tag(_url, _rev, _root, _nar):
 
 def Laws.dep_opens_its_section(n, h, e, s):
   Eq.starts_append(n, "]\n" ++ R.line("hash", h) ++ R.source(s) ++ R.line("entry", e))
+
+def Laws.tool_opens_its_section(n, e, b, s):
+  Eq.starts_append(n, "]\n" ++ R.source(s) ++ R.line("entry", e) ++ R.line("bin", b))
 
 # By induction on the first list, with the associativity of append carrying
 # each step.
@@ -228,9 +251,9 @@ def Laws.deps_splits(as, bs):
           String.append(R.dep(h), String.append(R.deps(t), R.deps(bs))),
           Eq.append_assoc(R.dep(h), R.deps(t), R.deps(bs))))
 
-def Laws.show_opens_with_package(n, e, b, ds):
+def Laws.show_opens_with_package(n, e, b, ds, ts):
   Eq.starts_nil(R.line("name", n) ++ R.line("entry", e) ++ R.line("bin", b) ++
-    R.deps(ds))
+    R.deps(ds) ++ R.tools(ts))
 
 def Laws.render_of_unread_is_blank(_why):
   {==}
@@ -238,15 +261,24 @@ def Laws.render_of_unread_is_blank(_why):
 # Removing twice is the inner list dropped twice, which is `without_idem`.
 def Laws.remove_idem(m, name):
   match m:
-    case M.Manifest{n, e, b, ds}:
+    case M.Manifest{n, e, b, ds, ts}:
       Equal.cong(List<&2, M.Dep>, M.Manifest,
-        xs => M.Manifest{n, e, b, xs},
+        xs => M.Manifest{n, e, b, xs, ts},
         R.without(R.without(ds, name), name), R.without(ds, name),
         Laws.without_idem(ds, name))
 
 # Both sides are a known ledger, so they reduce to the same file and the
 # proof is the computation itself.
 def Laws.render_parse_roundtrip():
+  {==}
+
+def Laws.bolt_is_a_tool():
+  {==}
+
+def Laws.bolt_rev():
+  {==}
+
+def Laws.bolt_is_not_a_dep():
   {==}
 
 # Each of these is a closed ledger, a closed remote answer, or a closed

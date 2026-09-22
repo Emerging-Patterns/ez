@@ -16,7 +16,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       llvm = pkgs.llvmPackages_19;
       bend = inputs.bend.packages.${system}.default;
-      ez = import ./nix/lib.nix { inherit pkgs; };
+      ez = import ./nix/lib.nix { inherit pkgs bend; };
       bend-cc = ez.bend-cc;
 
       # the BEND_LIB tree ez's own ledger asks for, built from the lock with no
@@ -68,8 +68,10 @@
       #   mkPackage { bend, src, wrapFlags?, pname?, version?, entry?, lock?,
       #               wrapEnv?, defaultWrapEnv?, extraPath?, extraInstall? }
       #   mkProofs { ez, src, name?, extraFlags?, deadline?, lock?, bendLib? }
-      #   mkLint { bolt, src, name?, lock?, bendLib? }
-      #   mkShell { packages, extraHook? }
+      #   mkLint { src, bolt?, bend?, name?, lock?, bendLib? }
+      #   toolPackage { name, src, bend?, lock?, wrapFlags?, ... }
+      #   devPackages src
+      #   mkShell { packages, extraHook?, src? }
       # mkPackage builds `bin` from ez.toml, otherwise `entry`, otherwise
       # main.bend, and wraps $out/bin/<name> with bend on PATH. Version falls
       # back to 0.1.0. mkProofs and mkLint set BEND_LIB from an explicit
@@ -89,6 +91,7 @@
       apps.${system}.default = { type = "app"; program = "${ezBin}/bin/ez"; };
       checks.${system} = { inherit tests; ez = ezBin; };
       devShells.${system}.default = ez.mkShell {
+        src = self;
         packages = [ bend bend-cc pkgs.git pkgs.openssl pkgs.cacert ];
         # EZ_LIBSSL and SSL_CERT_FILE are what the client in net/ needs: it
         # opens libssl by name at run time, and OpenSSL takes its trust store

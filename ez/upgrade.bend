@@ -304,13 +304,14 @@ def wrote(ok: Bool, +at: String) -> IO(Unit):
 # the ledger, rewritten only when a pin moved, so an upgrade that changed
 # nothing does not reformat the file
 def write.toml(moved: Bool, +name: String, +entry: String, +bin: String,
-  ds: List<&2, M.Dep>) -> IO(Unit):
+  ds: List<&2, M.Dep>, ts: List<&2, M.Tool>) -> IO(Unit):
   match moved:
     case False{}:
       IO.pure(Unit, Unit{})
     case True{}:
       do IO<Unit>:
-        ok : Bool <- F.write("ez.toml", Rend.show(M.Manifest{name, entry, bin, ds}))
+        ok : Bool <- F.write("ez.toml",
+          Rend.show(M.Manifest{name, entry, bin, ds, ts}))
         wrote(ok, "ez.toml")
 
 # the ignore file with every committed hash that moved
@@ -411,33 +412,36 @@ def drop(ss: List<&2, U.Swap>) -> IO(Unit):
 
 # pins rewritten, then the allowlist, then the imports, then the old trees.
 # The lock is the caller's to write, from the ledger this just wrote.
-def go.out(+name: String, +entry: String, +bin: String, o: Out) -> IO(Unit):
+def go.out(+name: String, +entry: String, +bin: String, ts: List<&2, M.Tool>,
+  o: Out) -> IO(Unit):
   Out{+deps, +swaps, +edits, moved} = o
   do IO<Unit>:
-    write.toml(moved, name, entry, bin, deps)
+    write.toml(moved, name, entry, bin, deps, ts)
     write.ignore(swaps)
     write.imports(edits)
     drop(swaps)
 
-def go(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>, +only: String) -> IO(Unit):
+def go(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>,
+  ts: List<&2, M.Tool>, +only: String) -> IO(Unit):
   do IO<Unit>:
     +hub : String <- L.hub()
     o : Out <- walk(lib(), hub, only, ds)
-    go.out(name, entry, bin, o)
+    go.out(name, entry, bin, ts, o)
 
-# `--package` has to name a dependency
+# `--package` has to name a dependency or a pinned CLI
 def read.known(ok: Bool, +name: String, +entry: String, +bin: String,
-  ds: List<&2, M.Dep>, +only: String) -> IO(Unit):
+  ds: List<&2, M.Dep>, ts: List<&2, M.Tool>, +only: String) -> IO(Unit):
   match ok:
     case False{}:
-      IO.die(Unit, 1, "ez: no dependency named " ++ only)
+      IO.die(Unit, 1, "ez: no dependency or tool named " ++ only)
     case True{}:
-      go(name, entry, bin, ds, only)
+      go(name, entry, bin, ds, ts, only)
 
 # a ledger that parsed
 def read.good(m: M.Manifest, +only: String) -> IO(Unit):
-  M.Manifest{+name, +entry, +bin, +ds} = m
-  read.known(U.known(only, ds), name, entry, bin, ds, only)
+  M.Manifest{+name, +entry, +bin, +ds, +ts} = m
+  read.known(either(U.known(only, ds), M.tool.known(only, ts)), name, entry,
+    bin, ds, ts, only)
 
 # the ledger on disk, or the reason it was not one
 def read.go(r: M.Read, +only: String) -> IO(Unit):

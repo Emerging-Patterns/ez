@@ -323,6 +323,19 @@ def nar(+work: String) -> IO(String):
       "--sri", work])
     nar.said(R.ok(out), R.text(out))
 
+# the NAR hash of one commit. The checkout is weighed the way `fetchgit`
+# weighs it, then removed. Nothing is laid under BEND_LIB.
+def weigh(+url: String, +rev: String) -> IO(String):
+  +work = ".ez/weigh-" ++ rev
+  do IO<String>:
+    _rm : String <- R.exec(["rm", "-rf", work])
+    _mk : String <- R.exec(["mkdir", "-p", work])
+    clone(work, url, rev)
+    _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
+    +nh : String <- nar(work)
+    _cl : String <- R.exec(["rm", "-rf", work])
+    return nh
+
 # a write that did not happen is a failure, not a silence
 def wrote(ok: Bool, at: String) -> IO(Unit):
   match ok:

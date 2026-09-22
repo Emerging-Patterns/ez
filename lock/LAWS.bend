@@ -6,6 +6,7 @@ import Base
 import ./lock.bend as L
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../pkg/pkg.bend as K
+import ../manifest/manifest.bend as M
 
 # LAW: a package resolves to the origin recorded for it, whatever origins
 # follow. A second record of the same hash never shadows the first, so each of
@@ -113,3 +114,32 @@ law lock_roundtrip:
   {L.packs(T.sects(T.parse(L.render("https://hub.bend-lang.com",
     "2.0.16", sample.packs()))))
     == L.pack.sort(sample.packs()) : List<&2, L.Pack>}
+
+# a pinned CLI, the shape `[tools.*]` records
+def sample.tool() -> M.Tool:
+  M.Tool{"bolt", "bolt/main.bend", "",
+    M.Git{"https://github.com/Emerging-Patterns/bolt",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "v0.4.0", ".",
+      "sha256-zz", False{}}}
+
+# LAW: a lock with no tools is the lock `render` writes. Packages do not
+# move because a tool list was empty.
+law render_keeps_packages_without_tools:
+  for +hub: String
+  for ver: String
+  for ps: List<&2, L.Pack>
+  {L.render.pick(True{}, hub, ver, ps, []) == L.render(hub, ver, ps) : String}
+
+# LAW: a `[tools.*]` table is not a package. `restore` and `bendLib` read
+# `packs`, and a tool pin does not join that list.
+law tools_are_not_packages:
+  {L.packs(T.sects(T.parse(L.render.pick(False{}, "https://hub.bend-lang.com",
+    "2.0.16", sample.packs(), [sample.tool()]))))
+    == L.pack.sort(sample.packs()) : List<&2, L.Pack>}
+
+# LAW: the commit written for a tool is the commit read back
+law tool_pin_reads_back:
+  {M.source.rev(M.tool.source(M.tool.find(M.tools(T.sects(T.parse(
+    L.render.pick(False{}, "https://hub.bend-lang.com", "2.0.16", [],
+      [sample.tool()])))), "bolt")))
+    == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" : String}

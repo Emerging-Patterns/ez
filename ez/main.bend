@@ -25,6 +25,7 @@ type Sub is Data:
   CPublish{}
   CTest{}
   CDoctor{}
+  CToolSync{}
   CToolRun{}
   CToolInstall{}
   CToolUpgrade{}
@@ -54,9 +55,9 @@ def spec() -> Shake.Cli:
       Shake.sub("lock", "resolve every import, write ez.lock.toml",
         [
           Shake.flag("upgrade", None{}, Some{"upgrade"},
-            "re-pin git deps that moved, then write the lock"),
+            "re-pin git deps and tools that moved, then write the lock"),
           Shake.opt("package", None{}, Some{"package"},
-            "with --upgrade, only this dependency", False{}, None{}, [])
+            "with --upgrade, only this dependency or tool", False{}, None{}, [])
         ], []),
       Shake.sub("fetch", "fill BEND_LIB from the lock", [], []),
       Shake.sub("check", "check the entry, without running it", [], []),
@@ -66,6 +67,8 @@ def spec() -> Shake.Cli:
         ], []),
       Shake.sub("run", "check and run the entry", [], []),
       Shake.sub("tool", "build or run another project's binary", [], [
+        Shake.sub("sync", "build and link every pinned tool at its lock rev",
+          [], []),
         Shake.sub("run", "fetch, build and run the binary a repo declares",
           [
             Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
@@ -108,12 +111,13 @@ def command(+name: String) -> Sub:
                   Bool.pick(Sub, String.eq(name, "publish"), CPublish{},
                     Bool.pick(Sub, String.eq(name, "test"), CTest{},
                       Bool.pick(Sub, String.eq(name, "doctor"), CDoctor{},
-                        Bool.pick(Sub, String.eq(name, "tool/run"), CToolRun{},
-                          Bool.pick(Sub, String.eq(name, "tool/install"),
-                            CToolInstall{},
-                            Bool.pick(Sub, String.eq(name, "tool/upgrade"),
-                              CToolUpgrade{},
-                              CHelp{}))))))))))))))
+                        Bool.pick(Sub, String.eq(name, "tool/sync"), CToolSync{},
+                          Bool.pick(Sub, String.eq(name, "tool/run"), CToolRun{},
+                            Bool.pick(Sub, String.eq(name, "tool/install"),
+                              CToolInstall{},
+                              Bool.pick(Sub, String.eq(name, "tool/upgrade"),
+                                CToolUpgrade{},
+                                CHelp{})))))))))))))))
 
 # what a subcommand runs
 def dispatch(sub: Sub, +m: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
@@ -135,6 +139,8 @@ def dispatch(sub: Sub, +m: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
       Cmd.build(Shake.get(m, "out"))
     case CRun{}:
       Cmd.run(Args.rest(as))
+    case CToolSync{}:
+      Tool.sync()
     case CToolRun{}:
       Tool.run(Shake.get(m, "target"), Args.tool.rest(as))
     case CToolInstall{}:

@@ -1,8 +1,9 @@
 # Package builds and checks for a Bend flake. Taken from `lib.${system}`.
 #
 #   ez = inputs.ez.lib.${system};
-#   bolt = ez.mkPackage { inherit bend; src = self; wrapFlags = [ "--gpu" "off" ]; };
-{ pkgs }:
+#   bolt = ez.toolPackage { name = "bolt"; inherit src; };
+#   lint = ez.mkLint { src = self; };
+{ pkgs, bend ? null }:
 
 let
   lib = pkgs.lib;
@@ -66,6 +67,38 @@ let
   withBendLib = tree: attrs:
     attrs // lib.optionalAttrs (tree != null) { BEND_LIB = tree; };
 
+  defaultBend = bend;
+
+  lockDoc = src: lock:
+    let file = lockOf src lock; in
+    if file == null then { } else builtins.fromTOML (builtins.readFile file);
+
+  # The `[tools.<name>]` table of a lock, or null when the lock has none.
+  toolPin = src: lock: name:
+    (lockDoc src lock).tools.${name} or null;
+
+  # `bin` when the pin names one, otherwise `entry`, otherwise null so
+  # mkPackage reads the tool's own ledger.
+  toolFile = pin:
+    let
+      bin = pin.bin or "";
+      entry = pin.entry or "";
+    in
+    if bin != "" then bin else if entry != "" then entry else null;
+
+  # The checkout `fetchgit` rebuilds from the pin. `root` is the directory
+  # inside it the tool's paths are written from.
+  toolSrc = pin:
+    let
+      fetched = pkgs.fetchgit {
+        url = pin.git;
+        rev = pin.rev;
+        hash = pin.narHash;
+      };
+      root = pin.root or ".";
+    in
+    if root == "." || root == "" then fetched else fetched + "/${root}";
+
   copyTree = src: body: ''
     cp -r ${src} src
     chmod -R u+w src
@@ -88,7 +121,7 @@ let
         "--set-default ${lib.escapeShellArg n} ${lib.escapeShellArg (toString v)}") defaultWrapEnv
     );
 in
-{
+rec {
   inherit bend-cc bendLib;
 
   # Build the program the ledger names and wrap it onto $out/bin/<pname>.
@@ -163,27 +196,77 @@ in
       })
       (copyTree src "ez test ${lib.escapeShellArgs extraFlags}");
 
-  # `bolt` in a writable copy of src.
+  # A locked `[tools.<name>]` built with mkPackage. `bend` defaults to the
+  # one this lib was imported with. The derivation's name is the pin's name.
+  toolPackage = {
+    name,
+    src,
+    bend ? defaultBend,
+    lock ? null,
+    wrapFlags ? [ ],
+    version ? null,
+    entry ? null,
+    extraPath ? [ ],
+    nativeBuildInputs ? [ llvm.clang ],
+    wrapEnv ? { },
+    defaultWrapEnv ? { },
+    meta ? { },
+    extraInstall ? "",
+  }:
+    let
+      pin = toolPin src lock name;
+      file = if entry != null then entry else if pin == null then null else toolFile pin;
+    in
+    if pin == null then
+      throw "ez.lock.toml has no [tools.${name}]"
+    else if bend == null then
+      throw "toolPackage needs bend to build ${name}"
+    else mkPackage {
+      inherit bend wrapFlags version extraPath nativeBuildInputs wrapEnv
+        defaultWrapEnv meta extraInstall;
+      pname = name;
+      src = toolSrc pin;
+      entry = file;
+    };
+
+  # Every locked tool, in the order the lock names them.
+  devPackages = src:
+    map (name: toolPackage { inherit name src; })
+      (builtins.attrNames ((lockDoc src null).tools or { }));
+
+  # `bolt` in a writable copy of src. Pass `bolt` to use that derivation.
+  # Otherwise bolt is built from `[tools.bolt]` in the lock.
   # `lock` and `bendLib` match mkProofs: an explicit `bendLib` is BEND_LIB,
   # else the lock's tree, else no BEND_LIB.
   mkLint = {
-    bolt,
+    bolt ? null,
     src,
+    bend ? defaultBend,
     name ? "lint",
     lock ? null,
     bendLib ? null,
   }:
+    let
+      boltPkg =
+        if bolt != null then bolt
+        else toolPackage {
+          name = "bolt";
+          inherit src bend lock;
+          wrapFlags = [ "--gpu" "off" ];
+        };
+    in
     pkgs.runCommand name
       (withBendLib (bendLibFor bendLib src lock) {
-        nativeBuildInputs = [ bolt ];
+        nativeBuildInputs = [ boltPkg ];
       })
       (copyTree src "bolt");
 
   # CC=bend-cc and BEND_LIB=$PWD/.ez/lib. bend-cc belongs in packages.
+  # `src`, when set, puts every locked `[tools.*]` on PATH.
   # extraHook runs after those exports.
-  mkShell = { packages, extraHook ? "" }:
+  mkShell = { packages, extraHook ? "", src ? null }:
     pkgs.mkShellNoCC {
-      inherit packages;
+      packages = packages ++ (if src == null then [ ] else devPackages src);
       shellHook = ''
         export CC=bend-cc
         export BEND_LIB=$PWD/.ez/lib

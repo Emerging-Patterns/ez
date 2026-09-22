@@ -55,6 +55,7 @@ ez fetch                         fill BEND_LIB from the lock
 ez check                         check the entry, without running it
 ez build [out]                   build the entry to a native binary
 ez run [args..]                  check and run the entry
+ez tool sync                      build and link every pinned tool, at its lock rev
 ez tool run <target> [-- args..] fetch, build and run a repo's binary
 ez tool install <target>         build the binary and link it on PATH
 ez tool upgrade <target>         rebuild when the commit moved, refresh the link
@@ -86,6 +87,24 @@ narHash = "sha256-..."
 entry = "src/lib.bend"
 ```
 
+`[deps.*]` is a package. It is imported, and `ez fetch` puts it on `BEND_LIB`.
+A CLI is a `[tools.*]` pin. It is not imported and it is not put on
+`BEND_LIB`. `ez lock` records it under `[tools.bolt]` in `ez.lock.toml`.
+`ez lock --upgrade` re-resolves the tag and fills `narHash`, the way it does
+for a git dependency. `ez tool sync` builds and links every such pin at the
+lock rev. `ez tool run bolt` uses that rev; `ez tool run owner/repo` is still
+the repo's HEAD.
+
+```toml
+[tools.bolt]
+git = "https://github.com/Emerging-Patterns/bolt"
+tag = "v0.4.0"
+rev = "24b497e294a08f6a83e0b08ece3795f813421b87"
+root = "."
+narHash = "sha256-…"
+entry = "bolt/main.bend"
+```
+
 `bin` is the file `ez tool run`, `ez tool install`, `ez tool upgrade`, and
 `ezx` build. With no `bin`, that is the entry. `owner/repo` is
 `https://github.com/owner/repo`. A git URL is kept. Any other target is a
@@ -94,9 +113,10 @@ checkout and the binary are cached under `$XDG_CACHE_HOME/ez/tool/<slug>`
 (`~/.cache/ez/tool/<slug>` when that is unset).
 
 A remote resolves to `git ls-remote <url> HEAD`. A path resolves to a clean
-`HEAD`. The checkout is reused while `rev` is that commit, and the binary
-is reused while it was built from that commit. A dirty worktree, or a path
-that is not a checkout, has no commit and is built every time.
+`HEAD`. A name that matches a `[tools.*]` pin resolves to the rev in
+`ez.lock.toml`. The checkout is reused while `rev` is that commit, and the
+binary is reused while it was built from that commit. A dirty worktree, or a
+path that is not a checkout, has no commit and is built every time.
 
 `ez tool install` fetches the lock and builds `<slug>/bin/<name>.out`, then
 links that file onto PATH as `<name>`. `<name>` is the package name in the
@@ -122,8 +142,9 @@ Without it, the tree is not committed: `ez fetch` fills `BEND_LIB` from the
 lock. `ez doctor` reports when the ledger and the repo's import lines
 disagree; it never rewrites your source.
 
-`ez lock --upgrade` re-pins git dependencies, then writes the lock.
-`--package NAME` limits that to one. A `tag` is re-resolved. A dependency
+`ez lock --upgrade` re-pins git dependencies and `[tools.*]` pins, then
+writes the lock. `--package NAME` limits that to one dependency or one tool.
+A `tag` is re-resolved. A dependency
 with only a `rev` moves to the default branch tip when the pinned commit is
 an ancestor of it, and stays a commit pin. A hub dependency does not move.
 The upgrade does not fetch the rest of the lock. A dependency marked
@@ -154,8 +175,12 @@ checks.${system}.test = ez.mkProofs {
   name = "…-test";
   extraFlags = [ "--unit-only" ]; # add "--js-only" when host ld unavailable in sandbox
 };
-lint = ez.mkLint { inherit bolt; src = self; };
+lint = ez.mkLint { src = self; };
 ```
+
+`mkLint` builds `bolt` from `[tools.bolt]` in the lock. `toolPackage` builds
+one locked tool, and `devPackages src` builds every one. `mkShell` puts those
+on `PATH` when `src` is set. None of these need `inputs.bolt`.
 
 `mkPackage` builds `bin` from `ez.toml` when that is set, otherwise `entry`,
 otherwise `main.bend`, and wraps the binary with `bend` on `PATH`. `lock` is

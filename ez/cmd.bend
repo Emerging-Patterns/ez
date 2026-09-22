@@ -16,6 +16,7 @@ import ./env.bend as Env
 import ./cap.bend as Cap
 import ./target.bend as Tgt
 import ./upgrade.bend as Up
+import ./pin.bend as Pin
 
 # the ledger's path, which is fixed
 def toml() -> String:
@@ -60,7 +61,7 @@ def named(r: M.Read) -> String:
     case M.Bad{_why}:
       "app"
     case M.Good{m}:
-      M.Manifest{n, _e, _b, _ds} = m
+      M.Manifest{n, _e, _b, _ds, _ts} = m
       n
 
 # the entry file of a ledger that was read
@@ -69,7 +70,7 @@ def entry(r: M.Read) -> String:
     case M.Bad{_why}:
       "main.bend"
     case M.Good{m}:
-      M.Manifest{_n, e, _b, _ds} = m
+      M.Manifest{_n, e, _b, _ds, _ts} = m
       entry.or(e)
 
 # a ledger that would not parse stops the command before it does damage
@@ -199,13 +200,16 @@ def lock.now() -> IO(Unit):
 def lock.plain(bare: Bool, +name: String) -> IO(Unit):
   match bare:
     case True{}:
-      lock.now()
+      do IO<Unit>:
+        Pin.fill()
+        lock.now()
     case False{}:
       IO.die(Unit, 1, "ez: --package needs --upgrade")
 
-# `ez lock`, or `ez lock --upgrade` which re-pins git deps first and then
-# resolves. The lock is written from the ledger either way. Fetch stays a
-# separate command; a `vendor = true` dependency is laid out by the upgrade
+# `ez lock`, or `ez lock --upgrade` which re-pins git deps and tools first
+# and then resolves. The lock is written from the ledger either way. A tool
+# pin is recorded under `[tools.*]` and is not laid into BEND_LIB. Fetch stays
+# a separate command; a `vendor = true` dependency is laid out by the upgrade
 # itself, because that tree is committed.
 def lock.up(up: Bool, +name: String) -> IO(Unit):
   match up:
@@ -214,6 +218,7 @@ def lock.up(up: Bool, +name: String) -> IO(Unit):
     case True{}:
       do IO<Unit>:
         Up.run(name)
+        Pin.upgrade(name)
         lock.now()
 
 # `ez lock` and `ez lock --upgrade [--package NAME]`
@@ -333,7 +338,7 @@ def init(+asked: String, +file: String) -> IO(Unit):
     +name : String <- IO.pure(String, init.name(asked))
     +at : String <- IO.pure(String, entry.or(file))
     wrote : Bool <- F.write(toml(),
-      Rend.show(M.Manifest{name, at, "", []}))
+      Rend.show(M.Manifest{name, at, "", [], []}))
     +kept : Bool <- init.ignore(name)
     +made : Bool <- init.entry(at)
     report.exit(Bool.and(wrote, Bool.and(kept, made)))
