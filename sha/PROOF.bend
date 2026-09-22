@@ -13,3 +13,9 @@ def Laws.hex_abc():
 
 def Laws.hex_manifest():
   {==}
+
+def Laws.sri_empty_digest():
+  {==}
+
+def Laws.sri_empty_dir():
+  {==}
