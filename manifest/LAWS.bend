@@ -27,8 +27,8 @@ law add_idem:
 # every one of these is a claim about what ez will do with what they wrote.
 
 # whether a document was read into a ledger rather than into a reason
-def is_good(r: M.Read) -> Bool:
-  match r:
+def is_good(read: M.Read) -> Bool:
+  match read:
     case M.Bad{why}:
       False{}
     case M.Good{m}:
