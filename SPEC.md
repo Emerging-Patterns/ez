@@ -13,7 +13,7 @@ A quantified law that proves a requirement carries the requirement's ID in a com
 law hash_perm:
 ```
 
-A closed law that illustrates a pending requirement is marked `# toward EZ-X-N` directly above its `law` line. It is a trail, not a proof, and we delete it in the same change that lands its requirement's quantified law.
+A closed law that illustrates a pending requirement is marked `# toward EZ-X-N` directly above its `law` line. It is a trail, not a proof, and we delete it in the same change that lands its requirement's quantified law. bolt's `quantify` rule (L004), on at `error` in `bolt.bend`, rejects any other law without a binder.
 
 Untagged quantified laws are allowed. They pass the proof gate like any law, but nothing here protects them, so a change may edit or delete them freely.
 
