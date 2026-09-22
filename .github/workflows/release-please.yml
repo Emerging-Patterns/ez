@@ -1,0 +1,11 @@
+name: release-please
+on:
+  push:
+    branches: [master]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+jobs:
+  release-please:
+    uses: Emerging-Patterns/actions/.github/workflows/release-please.yml@a7b5322fe88c4974e06405cdf33b1aa00aa8d92a
