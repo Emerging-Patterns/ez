@@ -200,6 +200,8 @@ What ez proves today, in one paragraph: the 0x hash of a package's file set is i
 
 ### net/LAWS.bend
 
+The `net/` module is being migrated to ezhttp, which will own these laws. Once that lands they leave ez's gate, and HTTP correctness becomes a Trusted row in ez's specification (see EZ-TRUST-5 in the RFC).
+
 | Law | Kind | Proof | Claim | Points toward |
 | :---- | :---- | :---- | :---- | :---- |
 | path_absolute | Q | struct | The path a URL splits into starts with `/`. | none (net) |
@@ -383,11 +385,11 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 
 ## Findings surfaced by the inventory
 
-These come out of reading the laws and the gate that runs them. The full findings for requirements against code (step 3), the inputs `ez lock` reads (step 4), and missing behavior (step 7) are the next section of this document and are not written yet.
+These come out of reading the laws and the gate that runs them. The findings from reading the command code follow in later sections.
 
-**The proof gate is `ez test`.** `flake.nix` defines `checks.tests = mkProofs { extraFlags = ["--js-only" "--unit-only"]; }`, and `mkProofs` (`nix/lib.nix:183`) runs `ez test`. `ez test` finds every `PROOF.bend` (`ez/test.bend:680`), runs `bend PROOF.bend` on each, and passes a proof only if the first line of output is exactly `All terms check.` (`ez/test.bend:545-558`). That is stricter than the exit status, which is 0 even when bend reports unsafe or foreign defs. So "`bend PROOF.bend` passes" in the RFC currently means "`ez test` saw the bare `All terms check.` line", and the only thing in CI that checks the laws at all is `ez test`. The same run also caches a proof as passed when its key (`C.key("proof", tool, path)`) is unchanged, so a cached pass is trusted rather than re-checked. This conflicts with the RFC's position that `ez test` is outside the specification; it needs a decision, which we record as a REVIEW marker in the revised RFC rather than resolve here.
+**The proof gate is `ez test`.** `flake.nix` defines `checks.tests = mkProofs { extraFlags = ["--js-only" "--unit-only"]; }`, and `mkProofs` (`nix/lib.nix:183`) runs `ez test`. `ez test` finds every `PROOF.bend` (`ez/test.bend:680`), runs `bend PROOF.bend` on each, and passes a proof only if the first line of output is exactly `All terms check.` (`ez/test.bend:545-558`). That is stricter than the exit status, which is 0 even when bend reports unsafe or foreign defs. So "`bend PROOF.bend` passes" in the RFC currently means "`ez test` saw the bare `All terms check.` line", and the only thing in CI that checks the laws at all is `ez test`. The same run also caches a proof as passed when its key (`C.key("proof", tool, path)`, over the bend version, `$CC`, and the package hash of the proof's import closure) is unchanged. The cache lives in `.ez/cache` in the working directory. `mkProofs` copies a clean source tree into the build, so in CI the cache is always empty and every proof is re-checked; the cache only matters locally. This conflicts with the RFC's position that `ez test` is outside the specification; it needs a decision, which we record as a REVIEW marker in the revised RFC rather than resolve here.
 
-**bolt does not run in CI.** `flake.nix` exposes `checks = { tests; ez; }`. It does not include `mkLint`, so the bolt `laws` group set to `error` in `bolt.bend` is not enforced by `nix flake check`. Whether it runs elsewhere is part of step 8.
+**bolt does not run in CI, and it would fail if it did.** `flake.nix` exposes `checks = { tests; ez; }` with no `mkLint`. The bolt ez pins (v0.4.0, `24b497e`) already has three rules in its `laws` group: `closed` flags a law in a LAWS.bend with no `for` or `exs` binder, `law` flags a pure top-level def no law names, and `unsafe` flags an `@unsafe` def a LAWS or PROOF file reaches. ez's `bolt.bend` sets `laws` to `error`, so the 122 closed laws above would each be an error. The `law` rule also exempts any file whose text contains `IO`, which today leaves 11 of ez's 37 non-test modules under it; `lock/lock.bend`, `pkg/pkg.bend`, `git/git.bend` and `sha/nar.bend` are exempt.
 
 **The lock reads a cache.** `lock/origin_agrees` exists because `ez lock` reads `.ez/origins.toml` as well as `ez.toml`. The law proves the ledger wins for any hash the ledger names. It says nothing about a hash only the cache names, which is exactly the fresh-clone case EZ-DOC-3 is about. This is the first input outside ledger plus committed tree, and step 4 traces the rest.
 
@@ -400,3 +402,117 @@ These come out of reading the laws and the gate that runs them. The full finding
 **A large share of ez/LAWS.bend is about `ez test` and wording.** Of its 94 laws, 42 are about the test runner (quiet filter, trailer, shadow layout, clock) and 19 pin progress or error text. Under the RFC's rules, the first group has no requirement to point toward, and the second points toward EZ-OUT-1 only through its prefix.
 
 **Refactor-equivalence laws are a pattern the RFC does not name.** Thirteen laws keep an `old.*` definition beside the new one and prove them equal for all inputs (`net`, `pkg`, `lock`, `git`). They are quantified and they do protect behavior, but they tag no requirement: they say "the rewrite changed nothing", which is the refactoring contract applied once, by hand. The RFC's traceability check would reject them as untagged unless it makes room for them.
+
+## Requirements against code
+
+This section checks each requirement in the RFC draft against what the code does. The verdict is one of: **holds** (the code behaves that way), **partly** (it holds with exceptions listed), or **fails** (the code does not behave that way). We do not resolve disagreements here; each one that needs a decision carries a REVIEW marker in the revised RFC. Citations are `file:line` at `b28ca2c`.
+
+### Hashing
+
+| ID | Verdict | Evidence |
+| :---- | :---- | :---- |
+| EZ-HASH-1 | holds, proved | `pkg/pkg.bend:484` hashes `dedup(file.sort(fs))`, so order cannot matter. `pkg/hash_perm` proves it for file lists with distinct paths. The input is the import closure of an entry (`pkg_of`, `pkg/pkg.bend:556`), not a directory tree. With a repeated path and different sums, `dedup` keeps the last of a run and the result depends on order (`pkg/LAWS.bend:52-55` says so). |
+| EZ-HASH-2 | holds, not stated | `sha/nar.bend:286-291` lists a directory with `find -printf %f\n` and sorts the names by insertion sort on `String.is_le` (codepoint order, which equals nix's byte order for valid UTF-8). No law states it. |
+| EZ-HASH-3 | partly | `Git.lay` (`git/git.bend:375-380`) writes `lib/<hash>` where `hash` is ez's own `K.pkg.hash(K.pkg_of(entry))`, and writes the manifest from the same file list, so it holds when written. `place` ignores `cp` failures (`git/git.bend:349-355`). Nothing re-checks a tree later: `read.git` checks files against the on-disk manifest but never the manifest against the directory name, and `restore` accepts a cached tree whose manifest text matches without re-reading files (`lock/restore.bend:121-132`). |
+| EZ-HASH-4 | as trusted | `ez publish` compares its hash to `bend --publish`'s answer (`pub/pub.bend:220-251`), but only after bend has uploaded. |
+| EZ-HASH-5 | as trusted | `Nar.path` (`sha/nar.bend:447`). Known divergences: the exec bit comes from `test -x` (an access check, not the mode bit); the whole `find` output and each symlink target are trimmed, so leading or trailing whitespace in a name or target is lost; a name containing a newline splits in two; submodules are not fetched by ez, while nixpkgs `fetchgit` (used by `nix/lib.nix`) may fetch them. |
+| EZ-HASH-6 | fails as worded | `Sha.hex` (`sha/sha.bend:16-17`) hashes each character's codepoint masked to its low byte, with the character count as the length. For ASCII text that is SHA-256 of the bytes; for any other text it is not. `nix/bend-lib.nix:28-32` documents the fold as Bend's own, so it may be intentional (and required for EZ-HASH-4). `sha/nar.bend` encodes to UTF-8 before hashing, so the two hashes disagree about what a character is. The digest itself comes from Giulio2002/bend-sha256, which its own laws hold to an executable FIPS 180-4 specification. |
+
+### Ledger and lock documents
+
+| ID | Verdict | Evidence |
+| :---- | :---- | :---- |
+| EZ-DOC-1 | partly | `Lock.render.tools` (`lock/lock.bend:630`) then `T.parse` and `L.packs` gives back the sorted packs on one example (`lock_roundtrip`). `[lock] bend` and `[lock] version` are never read back. |
+| EZ-DOC-2 | unknown | No law or code path re-renders a parsed lock. eztoml's `T.render` does no escaping, so a value holding `"` would not round-trip. |
+| EZ-DOC-3 | fails | See "What ez lock reads" below. On a fresh clone of this repository, the three non-vendored git dependencies (shake, eztoml, snap) have no tree under `.ez/lib`, `read.git` reads the missing manifest as `""` (`lock/lock.bend:287-293`), and the lock is written with empty `files` tables and exit 0. The committed lock is not reproduced. |
+| EZ-DOC-4 | partly | Holds for the lock bytes when the world is unchanged (output is sorted, the old lock is never read). A repeated `--upgrade` re-clones and re-lays every selected pin and rewrites `.ez/origins.toml`. |
+| EZ-DOC-5 | holds | Dependency revs are copied from ez.toml (`ledger.put`, `lock/lock.bend:147-153`). `Pin.fill` only fills an empty tool `rev` or `narHash` (`ez/pin.bend:136-149`). Nothing checks that the tree under `.ez/lib` matches the pinned rev. |
+
+### Resolution
+
+| ID | Verdict | Evidence |
+| :---- | :---- | :---- |
+| EZ-RES-1 | partly | `Git.default.ref` (`git/git.bend:1148-1152`): greatest semver-ish tag, else `main`, else `master`, else `ez: <url> has no main or master`, exit 1. The remote's actual default branch is never asked. "Semver-ish" (`git/git.bend:685-690, 940-998`) is an optional `v`/`V`, one or more dot-separated numeric parts, an optional pre-release, and anything after `+` ignored. The comparator `ord.ver` (`git/git.bend:745-801`) pads missing parts with zero; ties go to the later `ls-remote` row. Pre-releases can win (`v2.0.0-rc1` beats `v1.9.0`). The chosen name is resolved with `ls-remote <url> <ref> refs/tags/<ref>^{}`, which tail-matches, so `main` can resolve to `refs/heads/feature/main`, and a tag sharing a branch's name resolves to the branch. |
+| EZ-RES-2 | holds | `git/git.bend:519-579`. A given entry is used as given; otherwise the checkout's `[package] entry`, then `bin`, then `main.bend`; the file must exist (`git/git.bend:470-475`). |
+| EZ-RES-3 | partly | `Tgt.classify` (`ez/target.bend:130-179`), shared by `ez add` and `ez tool`. Anything containing `://` or starting `git@` is a URL. `/`, `./`, `../`, `~/` prefixes are paths. Exactly two segments of letters, digits, `-`, `_` are GitHub. Everything else is a path, so `vercel/next.js` and `o/r.git` are paths. `ez add` with a relative path passes it to `git -C .ez/lib/.work-<rev> fetch`, which resolves it against the work directory (`ez/cmd.bend:401-404`). |
+| EZ-RES-4 | holds | `aim.src` maps `Hub` to `Hold` (`manifest/upgrade.bend:79-82`). |
+| EZ-RES-5 | holds | `aim.tag` empty gives `Forward`, `judge.move` requires ancestry, `retarget` keeps `tag = ""` (`manifest/upgrade.bend:71-76, 104-109, 155-156`). A non-ancestor tip stops with exit 1. |
+| EZ-RES-6 | partly | Selection is right (`U.chosen`). Other entries are byte-unchanged only if nothing else in the world changed, because the final `lock.now` recomputes everything. ez.toml is re-rendered whole, which drops comments and unknown keys. A name that is both a dependency and a tool upgrades both. |
+| EZ-RES-7 | as trusted | |
+
+### Vendoring and rewriting
+
+| ID | Verdict | Evidence |
+| :---- | :---- | :---- |
+| EZ-VEN-1 | fails | Only `ez lock --upgrade` writes allowlist lines (`manifest/upgrade.bend:165-218`), and only when a vendored hash moves. `ez add` records `vendor = false` and never writes `.gitignore` (`ez/cmd.bend:371-373`). `ez remove` leaves the line and the tree. `ez init` writes `.ez/`, which makes any `!.ez/lib/<h>` line inert because git cannot re-include under an excluded directory (`ez/cmd.bend:247-248`). |
+| EZ-VEN-2 | partly | Lines that start exactly `import 0x<old>/` at column 0 in any `*.bend` outside `.ez` and `.git` are rewritten (`manifest/upgrade.bend:230-254`; `ez/upgrade.bend:350-354`). Indented lines, which the package walk accepts, are not. Swaps apply in sequence, so if one dependency's new hash is another's old one, lines chain. |
+| EZ-VEN-3 | partly | Other lines are kept, but the file is split with `String.lines`, rejoined with `\n`, and re-encoded, so invalid UTF-8 elsewhere in a rewritten file can change. Files with no match are not written. |
+| EZ-VEN-4 | holds | `ez/doctor.bend` has no file write. Like every command, doctor runs `Env.make()` first, which creates `.ez`, `bin` and the library directory (`ez/main.bend:218-222`, `ez/env.bend:37-41`). |
+
+### Tools
+
+| ID | Verdict | Evidence |
+| :---- | :---- | :---- |
+| EZ-TOOL-1 | holds | `ez/tool.bend:141-171`. Empty counts as unset. `mkdir -p` result is ignored; a failed `ln` is reported. |
+| EZ-TOOL-2 | partly | One file, `<dir>/rev`, records both checkout and binary, written after a successful build (`ez/tool.bend:263-268, 395`). It does not record which file was built or the bend version, so a pinned run with an `entry`/`bin` override and a free run of the same repo at the same rev share a binary. After a failed build `src` holds the new commit and `rev` the old one. |
+| EZ-TOOL-3 | holds | Empty rev on a dirty tree (untracked files count) or a non-checkout; `same()` needs a non-empty rev (`ez/tool.bend:244-245, 373-385`). |
+| EZ-TOOL-4 | holds | A name in ez.toml `[tools]` takes the lock's rev, url, entry and bin (`ez/tool.bend:555-596`). A remote is `git ls-remote <url> HEAD`. A malformed local ez.toml blocks every tool command, including free `owner/repo` targets. |
+| EZ-TOOL-5 | partly | Status is forwarded (`ez/tool.bend:310-330`); signals give 128+N and a failed exec 127, from snap. The program runs with stdin at `/dev/null`, stdout and stderr merged, and its output printed only after it exits. |
+| EZ-TOOL-6 | holds | Only `Run` reaches `launch` (`ez/tool.bend:346-353`). Install and upgrade share code and differ only in the final message. |
+
+### Output
+
+| ID | Verdict | Evidence |
+| :---- | :---- | :---- |
+| EZ-OUT-1 | fails | There is no `ez: <area>:` convention. Forms in use: `ez: <prose>`, `ez: <path or url>: ...`, `ez: git <subcmd>: ...`, `ez: nar hash: ...`, `ez: error: <why>` for ledger failures, Shake's unprefixed `error:` for parse errors, `warning:` on stdout, doctor's `name: problem` lines, and many failures that print a subprocess's output and exit 1 with no ez line. What is consistent is the exit status: every failure ez detects exits 1, except `ez tool run`, which forwards the program's status. |
+
+## What ez lock reads
+
+This is the real `agree_on_inputs` for EZ-DOC-3: every input plain `ez lock` touches, and whether it can change the bytes of `ez.lock.toml`. The path is `Cmd.lock` → `lock.plain` → `Pin.fill` then `lock.now` (`ez/cmd.bend:193-228`), and `lock.now` calls `Lock.lock` → `Lock.lock.at` (`lock/lock.bend:817-834`).
+
+| Input | Tracked? | Changes lock bytes? | Evidence |
+| :---- | :---- | :---- | :---- |
+| `ez.toml` | yes | yes (sources, tools) | read three times: `ez/pin.bend:352`, `lock/lock.bend:797-806` |
+| every `*.bend` under cwd except `./.ez/*` | **no, untracked files included** | yes (which packages appear) | `find . -name *.bend -not -path ./.ez/*`, unsorted, exit status unchecked (`ez/cmd.bend:184-186`); `.claude/` worktrees and nested projects are included |
+| local files reached by relative import | usually | yes | `roots` (`lock/lock.bend:498`); a missing file is skipped silently (`:432-446`) |
+| `$BEND_LIB/<hash>/manifest` and files, per git-origin package | **no, unless vendored** | yes; a missing tree gives `files = []` and exit 0 | `read.git` (`lock/lock.bend:287-293`) |
+| `dirname($BEND_LIB)/origins.toml` (`.ez/origins.toml`) | **no** | yes, for hashes the ledger does not name | `lock/lock.bend:787-790`. A hash only this file names locks as git in a working checkout and falls to Hub on a clone |
+| `$BEND_LIB` | env | yes (where trees are read) | `lock/lock.bend:775-778` |
+| `$BEND_HUB` | env | yes (`[lock] hub`, and where hub packages come from) | `lock/lock.bend:753-768`; default `https://hub.bend-lang.com`; written even with no hub packages |
+| `bend version` (fallback `bend --version`) | toolchain | yes (`[lock] bend`) | `lock/lock.bend:809-812`; a missing bend writes `bend = ""` and exits 0 |
+| the hub, over HTTPS, per hub-origin package | network | yes | GET `<hub>/<hash>/manifest` and every file, every run, no cache (`lock/lock.bend:241-255, 320-325`) |
+| `git ls-remote`, `git fetch`, NAR walk | network | yes, and **writes ez.toml** | only when a `[tools.*]` pin lacks `rev` or `narHash` (`Pin.fill`, `ez/pin.bend:136-149`) |
+| `PATH`, git config, proxies | env | indirectly | which `bend` and `git` run; the HTTP client connects directly and ignores `HTTPS_PROXY` (`net/client.bend:41-44`) |
+| cwd | | yes | every path is relative; no search upward for the project root |
+| `ez.lock.toml` | yes | no | never read by lock or upgrade |
+| clock, `HOME`, `XDG_*`, `.ez/cache` | | no | not on this path |
+
+Under `--upgrade`, `ez lock` also reads `.gitignore`, a second `find` (`-not -path */.ez/* -not -path */.git/*`, `ez/upgrade.bend:352-354`) and the files it lists, remote tags, heads, the HEAD symref, ancestry (via a bare blobless clone and `merge-base --is-ancestor`, `git/git.bend:662-683`), checkouts of each selected dependency and their `ez.toml`, `realpath`, and the hub (`hub.check`, `ez/upgrade.bend:105-108`). It writes ez.toml, `.gitignore`, rewritten sources, `.ez/lib/<hash>` for every selected git dependency (vendored or not), `.ez/origins.toml`, removes old vendored trees, then writes ez.toml again if a tool moved, then the lock (`ez/upgrade.bend:424-431`). The upgrade hard-codes `.ez/lib` (`ez/upgrade.bend:34`) while the final lock reads `$BEND_LIB`. Nothing is rolled back when a later step fails.
+
+What the README's reproducibility sentence ("`ez lock` never has to consult anything a clone does not have") gets right is narrower: dependency `root` and `narHash` are copied from the ledger and never recomputed by plain lock.
+
+## Missing behavior
+
+### Behavior the code guarantees that the RFC does not mention
+
+The ledger model has quantified laws and no requirement: `ez add` and `ez remove` edits are idempotent (`manifest/add_idem`, `remove_idem`, `without_idem`), sections are read first-wins in document order, a ledger that fails to parse is never read into a model and renders as `""` (`read_refuses_a_problem`, `render_of_unread_is_blank`), and a rendered ledger parses back (`render_parse_roundtrip`, closed). A tool section is not a dependency and needs no hash.
+
+`ez publish` refuses a dirty tree (any `git status --porcelain --untracked-files=normal` line, `pub/pub.bend:178-215`) and succeeds only when bend's answer is exactly ez's hash (`pub/pub.bend:51-75, 220-251`). The decision functions are proved (`pub/LAWS.bend`); the ordering is not: the comparison runs after the upload.
+
+`ez fetch` checks every restored file against the lock: a hub body's digest must start with the lock's sum, a git file's digest must equal it (`lock/restore.bend:33-89`, `hub/hub.bend:16-17`). It never checks `narHash`, and a cached tree whose manifest text matches is trusted without re-reading files. A missing lock is read as empty and fetch exits 0.
+
+Upgrade refusals: a tag that now names a commit the pin does not descend to stops with exit 1 ("tag X moved off"), and a same-rev pin whose tree no longer hashes to the pin stops with a drift message, exit 1. In the dependency path the drift decision is made by `confirmed` after the new tree and origins entry are already written; `U.judge` is always called with `agree = True` there (`ez/upgrade.bend:221`), so its `Drift` arm is unreachable for dependencies.
+
+Tool build details: the built file is the pin's `bin`, then the pin's `entry`, then the checkout's `bin`, then its `entry`, then `main.bend` (`ez/tool.bend:420-431`); the link name is the checkout's package name, or `app`. A remote slug that is empty, absolute, or contains `..` is refused (`ez/target.bend:85-93`). `ez tool run` forwards the words after the target, dropping one leading `--` (`ez/args.bend:88-89`). `ez tool sync` installs each pin in ledger order at its lock rev and stops at the first failure.
+
+CLI: `ez lock --package X` without `--upgrade` exits 1. A 40-hex ref skips `ls-remote` and records no tag. `ez init` never adds a `.gitignore` rule twice and leaves an existing entry file alone. Every command reads and writes fixed names in the current directory.
+
+### Behavior that looks accidental
+
+Each of these is recorded, not resolved. The RFC carries REVIEW markers for the ones a requirement depends on.
+
+Every command, including `ez help` and a mistyped command, creates `.ez/lib`, `.ez` and `bin` in the current directory (`ez/main.bend:218-222`). `ez init` overwrites an existing ez.toml, losing its dependencies, tools and `bin`. `ez add` names a dependency after its entry's basename minus five characters (`ez/cmd.bend:359-361`), so two packages whose entry is `main.bend` collide, and re-adding a dependency drops `vendor = true`, moves it to the end, and re-renders the whole file. `ez add` vendors before it checks the ledger parses, so a broken ledger leaves trees and origins behind. `ez remove` of an unknown name rewrites the file and exits 0. `ez check`, `build`, `run` and `publish` silently fall back to `main.bend` when the ledger does not parse. `ez build` builds `entry`, not `bin`, and a ledger with an empty `name` builds `bin/.out`. `ez run` does not strip `--` and turns any program failure into exit 1. `ez doctor` fails a project with no dependencies, because the lock grep finds no hashes. README says "Nothing is fetched" for building ez, but only sha256 is vendored; eztoml, snap and shake are not. Comments in `pkg/pkg.bend:4` and `pkg/PROOF.bend:11` cite `tests/publish.sh`, which is `tests/publish.bend`.
+
+### RFC requirements with no corresponding code
+
+EZ-OUT-1's `ez: <area>:` prefix and structured `Failed{area, reason}` outcome do not exist. No code implements a `World`, a `Plan`, a planner or an interpreter. No code checks that a vendored tree's directory name is the hash of its contents after the tree is written (EZ-HASH-3). EZ-DOC-2's "rendering a parsed lock reproduces the bytes" has no code path that exercises it. No traceability check exists, and bolt reads only `.bend` files, so it cannot read a `SPEC.md` today.
