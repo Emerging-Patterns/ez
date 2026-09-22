@@ -3,6 +3,7 @@ import Base
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./manifest.bend as M
 import ./render.bend as R
+import ./ignore.bend as I
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
@@ -295,15 +296,6 @@ def Laws.bolt_is_not_a_dep():
 
 # Each of these is a closed ledger, a closed remote answer, or a closed
 # verdict. Both sides reduce to the same value.
-def Laws.sha256_vendor_flag():
-  {==}
-
-def Laws.vendor_flag_true():
-  {==}
-
-def Laws.vendor_flag_absent():
-  {==}
-
 def Laws.sha256_aims_forward():
   {==}
 
@@ -331,8 +323,689 @@ def Laws.tag_moved_off():
 def Laws.sha256_retarget():
   {==}
 
-def Laws.sha256_allowlist():
-  {==}
-
 def Laws.imports_follow_hash():
   {==}
+
+# The `git` key is there, so the source is a git one, and its bit is the
+# `vendor` key read by `flag`.
+def Laws.source_of_vendor(pairs, e):
+  %e : {M.source.vendor(M.source.go(_, M.value(pairs, "git"),
+    M.value(pairs, "rev"), M.value(pairs, "tag"),
+    M.root.or(M.value(pairs, "root")), M.value(pairs, "narHash"),
+    M.flag(M.value(pairs, "vendor")))) == M.flag(M.value(pairs, "vendor"))
+    : Bool}
+  {==}
+
+# The ledger's bit is true, so the source is marked vendored, and a git
+# source marked vendored says so.
+def Laws.readd_keeps_vendor(ds, n, h, en, url, rev, tag, root, nar, v, e):
+  %Equal.sym(Bool, M.source.vendor(M.source.dep(M.find(ds, n))), True{}, e)
+    : {M.source.vendor(M.source.dep(M.Dep{n, h, en,
+      R.revend(_, M.Git{url, rev, tag, root, nar, v})})) == True{} : Bool}
+  {==}
+
+# The allowlist. Both laws are proved the same way: the walk is taken apart
+# one line at a time, each line's kind is lifted into a parameter so the
+# walk can reduce on it, and what the walk puts in a line's place is shown
+# to add nothing to the side being counted. `hashes` counts the allowlist,
+# `others` the project's lines.
+
+# LAW: nothing appended to a list of lines leaves it
+law lines_app_nil:
+  for xs: List<&2, String>
+  {List.append(&2, String, xs, []) == xs : List<&2, String>}
+
+def lines_app_nil(xs):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.cong(List<&2, String>, List<&2, String>, y => h <> y,
+        List.append(&2, String, t, []), t, lines_app_nil(t))
+
+# LAW: a line's hash goes in front whatever follows it
+law hashes_put_app:
+  for k: I.Rule
+  for a: List<&2, String>
+  for b: List<&2, String>
+  {I.hashes.put(k, List.append(&2, String, a, b))
+    == List.append(&2, String, I.hashes.put(k, a), b) : List<&2, String>}
+
+def hashes_put_app(k, _a, _b):
+  match k:
+    case I.Other{}:
+      {==}
+    case I.Dir{}:
+      {==}
+    case I.Star{}:
+      {==}
+    case I.Lib{}:
+      {==}
+    case I.Pkgs{}:
+      {==}
+    case I.Allow{x}:
+      {==}
+
+# LAW: the allowlist of two runs of lines is the one's then the other's
+law hashes_app:
+  for xs: List<&2, String>
+  for +ys: List<&2, String>
+  {I.hashes(List.append(&2, String, xs, ys))
+    == List.append(&2, String, I.hashes(xs), I.hashes(ys)) : List<&2, String>}
+
+def hashes_app(xs, ys):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.trans(List<&2, String>,
+        I.hashes.put(I.kind(h), I.hashes(List.append(&2, String, t, ys))),
+        I.hashes.put(I.kind(h),
+          List.append(&2, String, I.hashes(t), I.hashes(ys))),
+        List.append(&2, String, I.hashes.put(I.kind(h), I.hashes(t)),
+          I.hashes(ys)),
+        Equal.cong(List<&2, String>, List<&2, String>,
+          y => I.hashes.put(I.kind(h), y),
+          I.hashes(List.append(&2, String, t, ys)),
+          List.append(&2, String, I.hashes(t), I.hashes(ys)),
+          hashes_app(t, ys)),
+        hashes_put_app(I.kind(h), I.hashes(t), I.hashes(ys)))
+
+# LAW: a line the project wrote goes in front whatever follows it
+law others_put_app:
+  for k: I.Rule
+  for +line: String
+  for a: List<&2, String>
+  for b: List<&2, String>
+  {I.others.put(k, line, List.append(&2, String, a, b))
+    == List.append(&2, String, I.others.put(k, line, a), b) : List<&2, String>}
+
+def others_put_app(k, _line, _a, _b):
+  match k:
+    case I.Other{}:
+      {==}
+    case I.Dir{}:
+      {==}
+    case I.Star{}:
+      {==}
+    case I.Lib{}:
+      {==}
+    case I.Pkgs{}:
+      {==}
+    case I.Allow{x}:
+      {==}
+
+# LAW: the project's lines of two runs are the one's then the other's
+law others_app:
+  for xs: List<&2, String>
+  for +ys: List<&2, String>
+  {I.others(List.append(&2, String, xs, ys))
+    == List.append(&2, String, I.others(xs), I.others(ys)) : List<&2, String>}
+
+def others_app(xs, ys):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.trans(List<&2, String>,
+        I.others.put(I.kind(h), h, I.others(List.append(&2, String, t, ys))),
+        I.others.put(I.kind(h), h,
+          List.append(&2, String, I.others(t), I.others(ys))),
+        List.append(&2, String, I.others.put(I.kind(h), h, I.others(t)),
+          I.others(ys)),
+        Equal.cong(List<&2, String>, List<&2, String>,
+          y => I.others.put(I.kind(h), h, y),
+          I.others(List.append(&2, String, t, ys)),
+          List.append(&2, String, I.others(t), I.others(ys)),
+          others_app(t, ys)),
+        others_put_app(I.kind(h), h, I.others(t), I.others(ys)))
+
+# LAW: the line ez writes for a hash reads back as that hash's allowlist
+# line. An empty hash would read back as the library directory, which is
+# why neither `vended` nor `allows` ever takes one.
+law kind_allow:
+  for +x: String
+  for e: {String.is_empty(x) == False{} : Bool}
+  {I.kind(I.allow(x)) == I.Allow{x} : I.Rule}
+
+def kind_allow(x, e):
+  match x:
+    case SNil{}:
+      Eq.bit.absurd2(&2, {I.kind(I.allow(SNil{})) == I.Allow{SNil{}} : I.Rule}, e)
+    case SCon{c, t}:
+      {==}
+
+# LAW: one hash's line names that hash, and a hash that is not there names
+# nothing
+law hashes_allows.hash:
+  for e: Bool
+  for +x: String
+  for ra: List<&2, String>
+  for rv: List<&2, String>
+  for ee: {String.is_empty(x) == e : Bool}
+  for ih: {I.hashes(ra) == rv : List<&2, String>}
+  {I.hashes(I.allows.hash(e, x, ra)) == I.vended.hash(e, x, rv)
+    : List<&2, String>}
+
+def hashes_allows.hash(e, x, ra, rv, ee, ih):
+  match e:
+    case True{}:
+      ih
+    case False{}:
+      Equal.trans(List<&2, String>,
+        I.hashes.put(I.kind(I.allow(x)), I.hashes(ra)),
+        I.hashes.put(I.Allow{x}, I.hashes(ra)),
+        x <> rv,
+        Equal.cong(I.Rule, List<&2, String>, r => I.hashes.put(r, I.hashes(ra)),
+          I.kind(I.allow(x)), I.Allow{x}, kind_allow(x, ee)),
+        Equal.cong(List<&2, String>, List<&2, String>, y => x <> y,
+          I.hashes(ra), rv, ih))
+
+# LAW: and a dependency whose tree is not committed has no line
+law hashes_allows.put:
+  for v: Bool
+  for +x: String
+  for ra: List<&2, String>
+  for rv: List<&2, String>
+  for ih: {I.hashes(ra) == rv : List<&2, String>}
+  {I.hashes(I.allows.put(v, x, ra)) == I.vended.put(v, x, rv)
+    : List<&2, String>}
+
+def hashes_allows.put(v, x, ra, rv, ih):
+  match v:
+    case True{}:
+      hashes_allows.hash(String.is_empty(x), x, ra, rv, {==}, ih)
+    case False{}:
+      ih
+
+# LAW: the lines ez writes for a ledger name exactly its vendored hashes
+law hashes_allows:
+  for ds: List<&2, M.Dep>
+  {I.hashes(I.allows(ds)) == I.vended(ds) : List<&2, String>}
+
+def hashes_allows(ds):
+  match ds:
+    case []:
+      {==}
+    case +d <> +t:
+      hashes_allows.put(M.source.vendor(M.source.dep(d)), M.dep.hash(d),
+        I.allows(t), I.vended(t), hashes_allows(t))
+
+# LAW: one hash's line is ez's, not the project's
+law others_allows.hash:
+  for e: Bool
+  for +x: String
+  for ra: List<&2, String>
+  for ee: {String.is_empty(x) == e : Bool}
+  for ih: {I.others(ra) == [] : List<&2, String>}
+  {I.others(I.allows.hash(e, x, ra)) == [] : List<&2, String>}
+
+def others_allows.hash(e, x, ra, ee, ih):
+  match e:
+    case True{}:
+      ih
+    case False{}:
+      Equal.trans(List<&2, String>,
+        I.others.put(I.kind(I.allow(x)), I.allow(x), I.others(ra)),
+        I.others.put(I.Allow{x}, I.allow(x), I.others(ra)),
+        [],
+        Equal.cong(I.Rule, List<&2, String>,
+          r => I.others.put(r, I.allow(x), I.others(ra)),
+          I.kind(I.allow(x)), I.Allow{x}, kind_allow(x, ee)),
+        ih)
+
+# LAW: and so is a dependency's, when it has one
+law others_allows.put:
+  for v: Bool
+  for +x: String
+  for ra: List<&2, String>
+  for ih: {I.others(ra) == [] : List<&2, String>}
+  {I.others(I.allows.put(v, x, ra)) == [] : List<&2, String>}
+
+def others_allows.put(v, x, ra, ih):
+  match v:
+    case True{}:
+      others_allows.hash(String.is_empty(x), x, ra, {==}, ih)
+    case False{}:
+      ih
+
+# LAW: none of the lines ez writes for a ledger is the project's
+law others_allows:
+  for ds: List<&2, M.Dep>
+  {I.others(I.allows(ds)) == [] : List<&2, String>}
+
+def others_allows(ds):
+  match ds:
+    case []:
+      {==}
+    case +d <> +t:
+      others_allows.put(M.source.vendor(M.source.dep(d)), M.dep.hash(d),
+        I.allows(t), others_allows(t))
+
+# LAW: the three rules name no hash, whichever of them are written
+law rules_name_no_hash:
+  for b1: Bool
+  for b2: Bool
+  for b3: Bool
+  {I.hashes(I.rules.go(b1, b2, b3)) == [] : List<&2, String>}
+
+def rules_name_no_hash(b1, b2, b3):
+  match b1 b2 b3:
+    case True{} True{} True{}:
+      {==}
+    case True{} True{} False{}:
+      {==}
+    case True{} False{} True{}:
+      {==}
+    case True{} False{} False{}:
+      {==}
+    case False{} True{} True{}:
+      {==}
+    case False{} True{} False{}:
+      {==}
+    case False{} False{} True{}:
+      {==}
+    case False{} False{} False{}:
+      {==}
+
+# LAW: and are ez's, not the project's
+law rules_are_ez:
+  for b1: Bool
+  for b2: Bool
+  for b3: Bool
+  {I.others(I.rules.go(b1, b2, b3)) == [] : List<&2, String>}
+
+def rules_are_ez(b1, b2, b3):
+  match b1 b2 b3:
+    case True{} True{} True{}:
+      {==}
+    case True{} True{} False{}:
+      {==}
+    case True{} False{} True{}:
+      {==}
+    case True{} False{} False{}:
+      {==}
+    case False{} True{} True{}:
+      {==}
+    case False{} True{} False{}:
+      {==}
+    case False{} False{} True{}:
+      {==}
+    case False{} False{} False{}:
+      {==}
+
+# LAW: the rules, written or not, name no hash
+law need_hashes:
+  for s: Bool
+  for +rs: List<&2, String>
+  for h: {I.hashes(rs) == [] : List<&2, String>}
+  {I.hashes(I.need(s, rs)) == [] : List<&2, String>}
+
+def need_hashes(s, _rs, h):
+  match s:
+    case True{}:
+      {==}
+    case False{}:
+      h
+
+# LAW: and add none of the project's lines
+law need_others:
+  for s: Bool
+  for +rs: List<&2, String>
+  for h: {I.others(rs) == [] : List<&2, String>}
+  {I.others(I.need(s, rs)) == [] : List<&2, String>}
+
+def need_others(s, _rs, h):
+  match s:
+    case True{}:
+      {==}
+    case False{}:
+      h
+
+# LAW: the block names exactly the vendored hashes
+law block_hashes:
+  for +ds: List<&2, M.Dep>
+  for +ls: List<&2, I.Line>
+  {I.hashes(I.block(ds, ls)) == I.vended(ds) : List<&2, String>}
+
+def block_hashes(ds, ls):
+  Equal.trans(List<&2, String>,
+    I.hashes(List.append(&2, String,
+      I.need(Bool.or(I.has(ls, I.Dir{}), List.is_empty(&2, String, I.vended(ds))),
+        I.rules(ls)), I.allows(ds))),
+    List.append(&2, String,
+      I.hashes(I.need(Bool.or(I.has(ls, I.Dir{}),
+        List.is_empty(&2, String, I.vended(ds))), I.rules(ls))),
+      I.hashes(I.allows(ds))),
+    I.vended(ds),
+    hashes_app(
+      I.need(Bool.or(I.has(ls, I.Dir{}), List.is_empty(&2, String, I.vended(ds))),
+        I.rules(ls)), I.allows(ds)),
+    Equal.trans(List<&2, String>,
+      List.append(&2, String,
+        I.hashes(I.need(Bool.or(I.has(ls, I.Dir{}),
+          List.is_empty(&2, String, I.vended(ds))), I.rules(ls))),
+        I.hashes(I.allows(ds))),
+      I.hashes(I.allows(ds)),
+      I.vended(ds),
+      Equal.cong(List<&2, String>, List<&2, String>,
+        y => List.append(&2, String, y, I.hashes(I.allows(ds))),
+        I.hashes(I.need(Bool.or(I.has(ls, I.Dir{}),
+          List.is_empty(&2, String, I.vended(ds))), I.rules(ls))),
+        [],
+        need_hashes(Bool.or(I.has(ls, I.Dir{}),
+          List.is_empty(&2, String, I.vended(ds))), I.rules(ls),
+          rules_name_no_hash(I.has(ls, I.Star{}), I.has(ls, I.Lib{}),
+            I.has(ls, I.Pkgs{})))),
+      hashes_allows(ds)))
+
+# LAW: and none of the project's lines
+law block_others:
+  for +ds: List<&2, M.Dep>
+  for +ls: List<&2, I.Line>
+  {I.others(I.block(ds, ls)) == [] : List<&2, String>}
+
+def block_others(ds, ls):
+  Equal.trans(List<&2, String>,
+    I.others(List.append(&2, String,
+      I.need(Bool.or(I.has(ls, I.Dir{}), List.is_empty(&2, String, I.vended(ds))),
+        I.rules(ls)), I.allows(ds))),
+    List.append(&2, String,
+      I.others(I.need(Bool.or(I.has(ls, I.Dir{}),
+        List.is_empty(&2, String, I.vended(ds))), I.rules(ls))),
+      I.others(I.allows(ds))),
+    [],
+    others_app(
+      I.need(Bool.or(I.has(ls, I.Dir{}), List.is_empty(&2, String, I.vended(ds))),
+        I.rules(ls)), I.allows(ds)),
+    Equal.trans(List<&2, String>,
+      List.append(&2, String,
+        I.others(I.need(Bool.or(I.has(ls, I.Dir{}),
+          List.is_empty(&2, String, I.vended(ds))), I.rules(ls))),
+        I.others(I.allows(ds))),
+      I.others(I.allows(ds)),
+      [],
+      Equal.cong(List<&2, String>, List<&2, String>,
+        y => List.append(&2, String, y, I.others(I.allows(ds))),
+        I.others(I.need(Bool.or(I.has(ls, I.Dir{}),
+          List.is_empty(&2, String, I.vended(ds))), I.rules(ls))),
+        [],
+        need_others(Bool.or(I.has(ls, I.Dir{}),
+          List.is_empty(&2, String, I.vended(ds))), I.rules(ls),
+          rules_are_ez(I.has(ls, I.Star{}), I.has(ls, I.Lib{}),
+            I.has(ls, I.Pkgs{})))),
+      others_allows(ds)))
+
+# LAW: the block, put down or not, names what it holds or nothing
+law hashes_placed:
+  for +d: Bool
+  for +blk: List<&2, String>
+  {I.hashes(I.placed(d, blk)) == I.placed(d, I.hashes(blk)) : List<&2, String>}
+
+def hashes_placed(d, _blk):
+  match d:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# LAW: and adds none of the project's lines
+law others_placed:
+  for +d: Bool
+  for +blk: List<&2, String>
+  for +ob: {I.others(blk) == [] : List<&2, String>}
+  {I.others(I.placed(d, blk)) == [] : List<&2, String>}
+
+def others_placed(d, _blk, ob):
+  match d:
+    case True{}:
+      {==}
+    case False{}:
+      ob
+
+# LAW: one line of the walk, with its kind given as a parameter. A line of
+# the project's or one of the three rules is kept and names no hash, a
+# `.ez/` gives way to rules that name none, and the first allowlist line
+# gives way to the block, which the rest of the walk does not put down again.
+law walk_hashes.arm:
+  for k: I.Rule
+  for +h: String
+  for +t: List<&2, String>
+  for +fix: List<&2, String>
+  for +blk: List<&2, String>
+  for +d: Bool
+  for ek: {I.kind(h) == k : I.Rule}
+  for +hf: {I.hashes(fix) == [] : List<&2, String>}
+  for ihd: {I.hashes(I.walk(I.tag(t), fix, blk, d)) == I.placed(d, I.hashes(blk))
+    : List<&2, String>}
+  for iht: {I.hashes(I.walk(I.tag(t), fix, blk, True{})) == []
+    : List<&2, String>}
+  {I.hashes(I.walk(I.Line{k, h} <> I.tag(t), fix, blk, d))
+    == I.placed(d, I.hashes(blk)) : List<&2, String>}
+
+def walk_hashes.arm(k, h, t, fix, blk, d, ek, hf, ihd, iht):
+  match k:
+    case I.Other{}:
+      Equal.trans(List<&2, String>,
+        I.hashes.put(I.kind(h), I.hashes(I.walk(I.tag(t), fix, blk, d))),
+        I.hashes(I.walk(I.tag(t), fix, blk, d)),
+        I.placed(d, I.hashes(blk)),
+        Equal.cong(I.Rule, List<&2, String>,
+          r => I.hashes.put(r, I.hashes(I.walk(I.tag(t), fix, blk, d))),
+          I.kind(h), I.Other{}, ek),
+        ihd)
+    case I.Star{}:
+      Equal.trans(List<&2, String>,
+        I.hashes.put(I.kind(h), I.hashes(I.walk(I.tag(t), fix, blk, d))),
+        I.hashes(I.walk(I.tag(t), fix, blk, d)),
+        I.placed(d, I.hashes(blk)),
+        Equal.cong(I.Rule, List<&2, String>,
+          r => I.hashes.put(r, I.hashes(I.walk(I.tag(t), fix, blk, d))),
+          I.kind(h), I.Star{}, ek),
+        ihd)
+    case I.Lib{}:
+      Equal.trans(List<&2, String>,
+        I.hashes.put(I.kind(h), I.hashes(I.walk(I.tag(t), fix, blk, d))),
+        I.hashes(I.walk(I.tag(t), fix, blk, d)),
+        I.placed(d, I.hashes(blk)),
+        Equal.cong(I.Rule, List<&2, String>,
+          r => I.hashes.put(r, I.hashes(I.walk(I.tag(t), fix, blk, d))),
+          I.kind(h), I.Lib{}, ek),
+        ihd)
+    case I.Pkgs{}:
+      Equal.trans(List<&2, String>,
+        I.hashes.put(I.kind(h), I.hashes(I.walk(I.tag(t), fix, blk, d))),
+        I.hashes(I.walk(I.tag(t), fix, blk, d)),
+        I.placed(d, I.hashes(blk)),
+        Equal.cong(I.Rule, List<&2, String>,
+          r => I.hashes.put(r, I.hashes(I.walk(I.tag(t), fix, blk, d))),
+          I.kind(h), I.Pkgs{}, ek),
+        ihd)
+    case I.Dir{}:
+      Equal.trans(List<&2, String>,
+        I.hashes(List.append(&2, String, fix, I.walk(I.tag(t), fix, blk, d))),
+        List.append(&2, String, I.hashes(fix),
+          I.hashes(I.walk(I.tag(t), fix, blk, d))),
+        I.placed(d, I.hashes(blk)),
+        hashes_app(fix, I.walk(I.tag(t), fix, blk, d)),
+        Equal.trans(List<&2, String>,
+          List.append(&2, String, I.hashes(fix),
+            I.hashes(I.walk(I.tag(t), fix, blk, d))),
+          I.hashes(I.walk(I.tag(t), fix, blk, d)),
+          I.placed(d, I.hashes(blk)),
+          Equal.cong(List<&2, String>, List<&2, String>,
+            y => List.append(&2, String, y,
+              I.hashes(I.walk(I.tag(t), fix, blk, d))),
+            I.hashes(fix), [], hf),
+          ihd))
+    case I.Allow{x}:
+      Equal.trans(List<&2, String>,
+        I.hashes(List.append(&2, String, I.placed(d, blk),
+          I.walk(I.tag(t), fix, blk, True{}))),
+        List.append(&2, String, I.hashes(I.placed(d, blk)),
+          I.hashes(I.walk(I.tag(t), fix, blk, True{}))),
+        I.placed(d, I.hashes(blk)),
+        hashes_app(I.placed(d, blk), I.walk(I.tag(t), fix, blk, True{})),
+        Equal.trans(List<&2, String>,
+          List.append(&2, String, I.hashes(I.placed(d, blk)),
+            I.hashes(I.walk(I.tag(t), fix, blk, True{}))),
+          List.append(&2, String, I.hashes(I.placed(d, blk)), []),
+          I.placed(d, I.hashes(blk)),
+          Equal.cong(List<&2, String>, List<&2, String>,
+            y => List.append(&2, String, I.hashes(I.placed(d, blk)), y),
+            I.hashes(I.walk(I.tag(t), fix, blk, True{})), [], iht),
+          Equal.trans(List<&2, String>,
+            List.append(&2, String, I.hashes(I.placed(d, blk)), []),
+            I.hashes(I.placed(d, blk)),
+            I.placed(d, I.hashes(blk)),
+            lines_app_nil(I.hashes(I.placed(d, blk))),
+            hashes_placed(d, blk))))
+
+# LAW: the walk's allowlist is the block, once, or nothing when the block is
+# already down
+law walk_hashes:
+  for raw: List<&2, String>
+  for +fix: List<&2, String>
+  for +blk: List<&2, String>
+  for +d: Bool
+  for +hf: {I.hashes(fix) == [] : List<&2, String>}
+  {I.hashes(I.walk(I.tag(raw), fix, blk, d)) == I.placed(d, I.hashes(blk))
+    : List<&2, String>}
+
+def walk_hashes(raw, fix, blk, d, hf):
+  match raw:
+    case []:
+      hashes_placed(d, blk)
+    case +h <> +t:
+      walk_hashes.arm(I.kind(h), h, t, fix, blk, d, {==}, hf,
+        walk_hashes(t, fix, blk, d, hf), walk_hashes(t, fix, blk, True{}, hf))
+
+# LAW: one line of the walk, counted for the project's lines. A kept line
+# is the line; a `.ez/` and an allowlist line are ez's, and what replaces
+# them is too.
+law walk_others.arm:
+  for k: I.Rule
+  for +h: String
+  for +t: List<&2, String>
+  for +fix: List<&2, String>
+  for +blk: List<&2, String>
+  for +d: Bool
+  for ek: {I.kind(h) == k : I.Rule}
+  for +of: {I.others(fix) == [] : List<&2, String>}
+  for +ob: {I.others(blk) == [] : List<&2, String>}
+  for ihd: {I.others(I.walk(I.tag(t), fix, blk, d)) == I.others(t)
+    : List<&2, String>}
+  for iht: {I.others(I.walk(I.tag(t), fix, blk, True{})) == I.others(t)
+    : List<&2, String>}
+  {I.others(I.walk(I.Line{k, h} <> I.tag(t), fix, blk, d))
+    == I.others.put(I.kind(h), h, I.others(t)) : List<&2, String>}
+
+def walk_others.arm(k, h, t, fix, blk, d, ek, of, ob, ihd, iht):
+  match k:
+    case I.Other{}:
+      Equal.cong(List<&2, String>, List<&2, String>,
+        y => I.others.put(I.kind(h), h, y),
+        I.others(I.walk(I.tag(t), fix, blk, d)), I.others(t), ihd)
+    case I.Star{}:
+      Equal.cong(List<&2, String>, List<&2, String>,
+        y => I.others.put(I.kind(h), h, y),
+        I.others(I.walk(I.tag(t), fix, blk, d)), I.others(t), ihd)
+    case I.Lib{}:
+      Equal.cong(List<&2, String>, List<&2, String>,
+        y => I.others.put(I.kind(h), h, y),
+        I.others(I.walk(I.tag(t), fix, blk, d)), I.others(t), ihd)
+    case I.Pkgs{}:
+      Equal.cong(List<&2, String>, List<&2, String>,
+        y => I.others.put(I.kind(h), h, y),
+        I.others(I.walk(I.tag(t), fix, blk, d)), I.others(t), ihd)
+    case I.Dir{}:
+      Equal.trans(List<&2, String>,
+        I.others(List.append(&2, String, fix, I.walk(I.tag(t), fix, blk, d))),
+        List.append(&2, String, I.others(fix),
+          I.others(I.walk(I.tag(t), fix, blk, d))),
+        I.others.put(I.kind(h), h, I.others(t)),
+        others_app(fix, I.walk(I.tag(t), fix, blk, d)),
+        Equal.trans(List<&2, String>,
+          List.append(&2, String, I.others(fix),
+            I.others(I.walk(I.tag(t), fix, blk, d))),
+          I.others(I.walk(I.tag(t), fix, blk, d)),
+          I.others.put(I.kind(h), h, I.others(t)),
+          Equal.cong(List<&2, String>, List<&2, String>,
+            y => List.append(&2, String, y,
+              I.others(I.walk(I.tag(t), fix, blk, d))),
+            I.others(fix), [], of),
+          Equal.trans(List<&2, String>,
+            I.others(I.walk(I.tag(t), fix, blk, d)),
+            I.others(t),
+            I.others.put(I.kind(h), h, I.others(t)),
+            ihd,
+            Equal.sym(List<&2, String>,
+              I.others.put(I.kind(h), h, I.others(t)), I.others(t),
+              Equal.cong(I.Rule, List<&2, String>,
+                r => I.others.put(r, h, I.others(t)), I.kind(h), I.Dir{}, ek)))))
+    case I.Allow{x}:
+      Equal.trans(List<&2, String>,
+        I.others(List.append(&2, String, I.placed(d, blk),
+          I.walk(I.tag(t), fix, blk, True{}))),
+        List.append(&2, String, I.others(I.placed(d, blk)),
+          I.others(I.walk(I.tag(t), fix, blk, True{}))),
+        I.others.put(I.kind(h), h, I.others(t)),
+        others_app(I.placed(d, blk), I.walk(I.tag(t), fix, blk, True{})),
+        Equal.trans(List<&2, String>,
+          List.append(&2, String, I.others(I.placed(d, blk)),
+            I.others(I.walk(I.tag(t), fix, blk, True{}))),
+          I.others(I.walk(I.tag(t), fix, blk, True{})),
+          I.others.put(I.kind(h), h, I.others(t)),
+          Equal.cong(List<&2, String>, List<&2, String>,
+            y => List.append(&2, String, y,
+              I.others(I.walk(I.tag(t), fix, blk, True{}))),
+            I.others(I.placed(d, blk)), [], others_placed(d, blk, ob)),
+          Equal.trans(List<&2, String>,
+            I.others(I.walk(I.tag(t), fix, blk, True{})),
+            I.others(t),
+            I.others.put(I.kind(h), h, I.others(t)),
+            iht,
+            Equal.sym(List<&2, String>,
+              I.others.put(I.kind(h), h, I.others(t)), I.others(t),
+              Equal.cong(I.Rule, List<&2, String>,
+                r => I.others.put(r, h, I.others(t)), I.kind(h), I.Allow{x},
+                ek)))))
+
+# LAW: the walk keeps every line of the project's, in order
+law walk_others:
+  for raw: List<&2, String>
+  for +fix: List<&2, String>
+  for +blk: List<&2, String>
+  for +d: Bool
+  for +of: {I.others(fix) == [] : List<&2, String>}
+  for +ob: {I.others(blk) == [] : List<&2, String>}
+  {I.others(I.walk(I.tag(raw), fix, blk, d)) == I.others(raw)
+    : List<&2, String>}
+
+def walk_others(raw, fix, blk, d, of, ob):
+  match raw:
+    case []:
+      others_placed(d, blk, ob)
+    case +h <> +t:
+      walk_others.arm(I.kind(h), h, t, fix, blk, d, {==}, of, ob,
+        walk_others(t, fix, blk, d, of, ob),
+        walk_others(t, fix, blk, True{}, of, ob))
+
+# The walk puts the block down once, and the block is the ledger's hashes.
+def Laws.allowlist_is_the_ledger(ds, ls):
+  Equal.trans(List<&2, String>,
+    I.hashes(I.walk(I.tag(ls), I.rules(I.tag(ls)), I.block(ds, I.tag(ls)),
+      False{})),
+    I.hashes(I.block(ds, I.tag(ls))),
+    I.vended(ds),
+    walk_hashes(ls, I.rules(I.tag(ls)), I.block(ds, I.tag(ls)), False{},
+      rules_name_no_hash(I.has(I.tag(ls), I.Star{}), I.has(I.tag(ls), I.Lib{}),
+        I.has(I.tag(ls), I.Pkgs{}))),
+    block_hashes(ds, I.tag(ls)))
+
+# The walk keeps the project's lines, and what it adds is all ez's.
+def Laws.allowlist_keeps_other_lines(ds, ls):
+  walk_others(ls, I.rules(I.tag(ls)), I.block(ds, I.tag(ls)), False{},
+    rules_are_ez(I.has(I.tag(ls), I.Star{}), I.has(I.tag(ls), I.Lib{}),
+      I.has(I.tag(ls), I.Pkgs{})),
+    block_others(ds, I.tag(ls)))

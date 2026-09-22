@@ -94,3 +94,32 @@ def add(manifest: M.Manifest, +dependency: M.Dep) -> M.Manifest:
 def remove(manifest: M.Manifest, name: String) -> M.Manifest:
   M.Manifest{n, e, b, h, ds, ts} = manifest
   M.Manifest{n, e, b, h, without(ds, name), ts}
+
+# a git source with its tree committed
+def vendored(src: M.Source) -> M.Source:
+  match src:
+    case M.Hub{}:
+      M.Hub{}
+    case M.Git{url, rev, tag, root, nar, _vend}:
+      M.Git{url, rev, tag, root, nar, True{}}
+
+# a source that keeps a vendor bit the ledger already set, or is left as given
+def revend(keep: Bool, src: M.Source) -> M.Source:
+  match keep:
+    case True{}:
+      vendored(src)
+    case False{}:
+      src
+
+# a dependency added again keeps the `vendor = true` its entry already had.
+# The command line has no way to say it, so a re-add that dropped it would
+# drop the tree from the allowlist without anyone having asked.
+def readd(ds: List<&2, M.Dep>, dependency: M.Dep) -> M.Dep:
+  M.Dep{+n, h, e, s} = dependency
+  M.Dep{n, h, e, revend(M.source.vendor(M.source.dep(M.find(ds, n))), s)}
+
+# the ledger with a dependency added, keeping the vendor bit of the entry it
+# replaces
+def add.keep(manifest: M.Manifest, dependency: M.Dep) -> M.Manifest:
+  M.Manifest{n, e, b, h, +ds, ts} = manifest
+  add(M.Manifest{n, e, b, h, ds, ts}, readd(ds, dependency))
