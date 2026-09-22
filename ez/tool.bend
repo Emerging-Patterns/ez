@@ -386,8 +386,16 @@ def local.rev(+path: String) -> IO(String):
       String.trim(R.text(st)))
 
 # fetch, build, record the commit, then start the binary or link it
-def miss(+src: String, +lib: String, +entry: String, +out: String,
-  +dir: String, +rev: String, +name: String, act: Act) -> IO(Unit):
+def miss(
+  +src: String,
+  +lib: String,
+  +entry: String,
+  +out: String,
+  +dir: String,
+  +rev: String,
+  +name: String,
+  act: Act
+) -> IO(Unit):
   do IO<Unit>:
     fetch(src, lib)
     +s : Say.Spin <- Say.hold(Say.building(name))
@@ -397,8 +405,17 @@ def miss(+src: String, +lib: String, +entry: String, +out: String,
     finish(act, out, name)
 
 # the binary when it is already this commit, otherwise a build
-def go.hit(hit: Bool, +src: String, +lib: String, +entry: String, +out: String,
-  +dir: String, +rev: String, +name: String, act: Act) -> IO(Unit):
+def go.hit(
+  hit: Bool,
+  +src: String,
+  +lib: String,
+  +entry: String,
+  +out: String,
+  +dir: String,
+  +rev: String,
+  +name: String,
+  act: Act
+) -> IO(Unit):
   match hit:
     case True{}:
       do IO<Unit>:
@@ -408,8 +425,15 @@ def go.hit(hit: Bool, +src: String, +lib: String, +entry: String, +out: String,
       miss(src, lib, entry, out, dir, rev, name, act)
 
 # the package's name and file, then the cached binary
-def go.named(+name: String, +entry: String, +src: String, +lib: String,
-  +dir: String, +rev: String, act: Act) -> IO(Unit):
+def go.named(
+  +name: String,
+  +entry: String,
+  +src: String,
+  +lib: String,
+  +dir: String,
+  +rev: String,
+  act: Act
+) -> IO(Unit):
   +out = dir ++ "/bin/" ++ name ++ ".out"
   do IO<Unit>:
     +cached : String <- text(dir ++ "/rev")
@@ -426,15 +450,29 @@ def go.over(empty: Bool, +over: String, +binary: String, +entry: String) -> Stri
       over
 
 # a ledger that read. `over` is a file the pin named, or "" for the checkout's.
-def go.good(manifest: M.Manifest, +src: String, +lib: String, +dir: String,
-  +rev: String, act: Act, +over: String) -> IO(Unit):
+def go.good(
+  manifest: M.Manifest,
+  +src: String,
+  +lib: String,
+  +dir: String,
+  +rev: String,
+  act: Act,
+  +over: String
+) -> IO(Unit):
   M.Manifest{+n, +e, +b, _ds, _ts} = manifest
   go.named(Tgt.out.name(n), P.join(src, go.over(String.is_empty(over), over, b, e)),
     src, lib, dir, rev, act)
 
 # the ledger, or the reason it did not read
-def go.read(ledger: M.Read, +src: String, +lib: String, +dir: String, +rev: String,
-  act: Act, +over: String) -> IO(Unit):
+def go.read(
+  ledger: M.Read,
+  +src: String,
+  +lib: String,
+  +dir: String,
+  +rev: String,
+  act: Act,
+  +over: String
+) -> IO(Unit):
   match ledger:
     case M.Bad{why}:
       IO.die(Unit, 1, "ez: error: " ++ why)
@@ -442,8 +480,7 @@ def go.read(ledger: M.Read, +src: String, +lib: String, +dir: String, +rev: Stri
       go.good(m, src, lib, dir, rev, act, over)
 
 # the checkout's ledger, built into `dir`. `Run` starts the binary.
-def go(+src: String, +lib: String, +dir: String, +rev: String,
-  act: Act, +over: String) -> IO(Unit):
+def go(+src: String, +lib: String, +dir: String, +rev: String, act: Act, +over: String) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- load(src)
     go.read(r, src, lib, dir, rev, act, over)
@@ -456,8 +493,7 @@ def clone(+src: String, +url: String, +rev: String, +label: String) -> IO(Unit):
     Git.clone.say(src, url, rev, Say.fetching(label, rev))
 
 # clone when the checkout is not already this commit
-def freshen(need: Bool, +src: String, +url: String, +rev: String,
-  +label: String) -> IO(Unit):
+def freshen(need: Bool, +src: String, +url: String, +rev: String, +label: String) -> IO(Unit):
   match need:
     case False{}:
       IO.print_err(Say.kept(label))
@@ -466,8 +502,7 @@ def freshen(need: Bool, +src: String, +url: String, +rev: String,
 
 # the checkout and the binary for one remote, once the cache root and the
 # commit are known
-def run.remote.at(+root: String, +url: String, +slug: String, +rev: String,
-  act: Act, +over: String) -> IO(Unit):
+def run.remote.at(+root: String, +url: String, +slug: String, +rev: String, act: Act, +over: String) -> IO(Unit):
   +dir = root ++ "/" ++ slug
   +src = dir ++ "/src"
   do IO<Unit>:

@@ -252,8 +252,7 @@ def sent(reply: Said, +ours: String, +entry: String, +text: String) -> IO(Unit):
 
 # a `bend --publish` that failed fails the command with what bend said. Only a
 # run that finished has an answer worth checking.
-def publish.said(ok: Bool, +ours: String, +entry: String,
-  +text: String) -> IO(Unit):
+def publish.said(ok: Bool, +ours: String, +entry: String, +text: String) -> IO(Unit):
   match ok:
     case False{}:
       IO.die(Unit, 1, "ez: bend " ++ entry ++ " --publish: " ++ text)

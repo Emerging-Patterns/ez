@@ -390,8 +390,14 @@ def origin.tag(+tag: String) -> List<&2, T.Kv>:
 # one side fails the proof rather than the next lock. The tag arrives already
 # made into pairs, because whether there is one is the caller's question and
 # the law has to hold either way.
-def origin.kvs(url: String, rev: String, entry: String, root: String,
-  nar: String, ts: List<&2, T.Kv>) -> List<&2, T.Kv>:
+def origin.kvs(
+  url: String,
+  rev: String,
+  entry: String,
+  root: String,
+  nar: String,
+  ts: List<&2, T.Kv>
+) -> List<&2, T.Kv>:
   List.append(&2, T.Kv,
     [T.Kv{"kind", "git"}, T.Kv{"url", url}, T.Kv{"rev", rev},
       T.Kv{"entry", entry}, T.Kv{"root", root}, T.Kv{"narHash", nar}],
@@ -404,8 +410,7 @@ def origin.name(hash: String) -> String:
   "origins." ++ T.quote(hash)
 
 # one package's origin as a table
-def origin(hash: String, url: String, rev: String, entry: String, root: String,
-  nar: String, tag: String) -> T.Sect:
+def origin(hash: String, url: String, rev: String, entry: String, root: String, nar: String, tag: String) -> T.Sect:
   T.Sect{origin.name(hash),
     origin.kvs(url, rev, entry, root, nar, origin.tag(tag))}
 
@@ -502,8 +507,7 @@ def said(+hash: String, +entry: String, tag: String, rev: String) -> IO(Unit):
     IO.print("import " ++ hash ++ "/" ++ base ++ " as " ++ title(P.unbend(base)))
 
 # the checkout weighed, walked and laid out, once it is on disk
-def vendor.tree(+lib: String, +work: String, +url: String, +rev: String,
-  +tag: String, +entry: String) -> IO(Got):
+def vendor.tree(+lib: String, +work: String, +url: String, +rev: String, +tag: String, +entry: String) -> IO(Got):
   +at = P.join(work, entry)
   do IO<Got>:
     +nh : String <- nar(work)
@@ -660,8 +664,7 @@ def descendant.code(+code: String, +text: String) -> IO(Bool):
 
 # the clone, the question, the clone gone. The same commit is a descendant
 # of itself and needs no clone to say so.
-def descendant.clone(+work: String, +url: String, +pin: String,
-  +tip: String) -> IO(Bool):
+def descendant.clone(+work: String, +url: String, +pin: String, +tip: String) -> IO(Bool):
   do IO<Bool>:
     _rm : String <- R.exec(["rm", "-rf", work])
     clone.bare(work, url)
@@ -671,8 +674,7 @@ def descendant.clone(+work: String, +url: String, +pin: String,
     descendant.code(R.code(out), R.text(out))
 
 # whether `tip` descends from `pin`, the same commit included
-def descendant.go(same: Bool, work: String, url: String, pin: String,
-  tip: String) -> IO(Bool):
+def descendant.go(same: Bool, work: String, url: String, pin: String, tip: String) -> IO(Bool):
   match same:
     case True{}:
       IO.pure(Bool, True{})
@@ -846,8 +848,7 @@ def nums.cons(value: Nat, rest: Maybe<&2, List<&2, Nat>>) -> Maybe<&2, List<&2, 
     case Some{ns}:
       Some{value <> ns}
 
-def nums.put(ok: Bool, +part: String, rest: Maybe<&2, List<&2, Nat>>) ->
-  Maybe<&2, List<&2, Nat>>:
+def nums.put(ok: Bool, +part: String, rest: Maybe<&2, List<&2, Nat>>) -> Maybe<&2, List<&2, Nat>>:
   match ok:
     case False{}:
       None{}
@@ -885,16 +886,14 @@ def ids.cons(ident: Id, rest: Maybe<&2, List<&2, Id>>) -> Maybe<&2, List<&2, Id>
     case Some{xs}:
       Some{ident <> xs}
 
-def ids.ok(ok: Bool, num: Bool, +part: String, rest: Maybe<&2, List<&2, Id>>) ->
-  Maybe<&2, List<&2, Id>>:
+def ids.ok(ok: Bool, num: Bool, +part: String, rest: Maybe<&2, List<&2, Id>>) -> Maybe<&2, List<&2, Id>>:
   match ok:
     case False{}:
       None{}
     case True{}:
       ids.cons(id.make(num, part), rest)
 
-def ids.put(empty: Bool, ok: Bool, num: Bool, +part: String,
-  rest: Maybe<&2, List<&2, Id>>) -> Maybe<&2, List<&2, Id>>:
+def ids.put(empty: Bool, ok: Bool, num: Bool, +part: String, rest: Maybe<&2, List<&2, Id>>) -> Maybe<&2, List<&2, Id>>:
   match empty:
     case True{}:
       None{}

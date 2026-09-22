@@ -9,8 +9,7 @@ def slurp.end(file: File, acc: String) -> IO(String):
     return acc
 
 # an empty chunk means the end of the file
-def slurp.cut(chunk: String, file: File, acc: String,
-  rest: File -> String -> IO(String)) -> IO(String):
+def slurp.cut(chunk: String, file: File, acc: String, rest: File -> String -> IO(String)) -> IO(String):
   match chunk:
     case SNil{}:
       slurp.end(file, acc)
@@ -18,8 +17,12 @@ def slurp.cut(chunk: String, file: File, acc: String,
       rest(file, acc ++ SCon{c, t})
 
 # a failed read ends the file as surely as an empty one
-def slurp.more(res: Result<&1, &1, U32 & String, String>, file: File, acc: String,
-  rest: File -> String -> IO(String)) -> IO(String):
+def slurp.more(
+  res: Result<&1, &1, U32 & String, String>,
+  file: File,
+  acc: String,
+  rest: File -> String -> IO(String)
+) -> IO(String):
   match res:
     case Fail{_e}:
       slurp.end(file, acc)
@@ -27,8 +30,11 @@ def slurp.more(res: Result<&1, &1, U32 & String, String>, file: File, acc: Strin
       slurp.cut(chunk, file, acc, rest)
 
 # the handle comes back paired with what it read
-def slurp.next(got: File & Result<&1, &1, U32 & String, String>, acc: String,
-  rest: File -> String -> IO(String)) -> IO(String):
+def slurp.next(
+  got: File & Result<&1, &1, U32 & String, String>,
+  acc: String,
+  rest: File -> String -> IO(String)
+) -> IO(String):
   (file, r) = got
   slurp.more(r, file, acc, rest)
 

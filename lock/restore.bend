@@ -48,8 +48,7 @@ def hub.all(+hub: String, +lib: String, +hash: String, fs: List<&2, K.File>) -> 
 
 # a file of a checkout that does not hash to what the lock says is not the file
 # the lock meant
-def git.judge(ok: Bool, at: String, lib: String, hash: String, to: String,
-  text: String) -> IO(Unit):
+def git.judge(ok: Bool, at: String, lib: String, hash: String, to: String, text: String) -> IO(Unit):
   match ok:
     case True{}:
       put(lib, hash, to, text)
@@ -78,8 +77,15 @@ def git.all(+from: String, +lib: String, +hash: String, fs: List<&2, K.File>) ->
 # a vendored package, rebuilt from the rev the lock pins. Its paths are written
 # from the package's root inside the repo, which is not always the entry's own
 # directory. The line names the package and the repo before the fetch starts.
-def git.pkg(+lib: String, +hash: String, +url: String, rev: String, +entry: String,
-  root: String, fs: List<&2, K.File>) -> IO(Unit):
+def git.pkg(
+  +lib: String,
+  +hash: String,
+  +url: String,
+  rev: String,
+  +entry: String,
+  root: String,
+  fs: List<&2, K.File>
+) -> IO(Unit):
   +work = lib ++ "/.work-" ++ hash
   do IO<Unit>:
     _rm : String <- R.exec(["rm", "-rf", work])
@@ -96,8 +102,7 @@ def source.hub(+hub: String, +lib: String, +hash: String, fs: List<&2, K.File>) 
     Say.done(s)
 
 # a package, from wherever the lock says it comes from
-def source(hub: String, +lib: String, +hash: String, src: L.Src,
-  fs: List<&2, K.File>) -> IO(Unit):
+def source(hub: String, +lib: String, +hash: String, src: L.Src, fs: List<&2, K.File>) -> IO(Unit):
   match src:
     case L.Hub{}:
       source.hub(hub, lib, hash, fs)
@@ -129,8 +134,7 @@ def one.pick(hit: Bool, hub: String, +lib: String, +pack: L.Pack) -> IO(Unit):
     case False{}:
       one.live(hub, lib, pack)
 
-def one.seen(got: Maybe<&2, String>, +man: String, hub: String, +lib: String,
-  +pack: L.Pack) -> IO(Unit):
+def one.seen(got: Maybe<&2, String>, +man: String, hub: String, +lib: String, +pack: L.Pack) -> IO(Unit):
   match got:
     case None{}:
       one.live(hub, lib, pack)

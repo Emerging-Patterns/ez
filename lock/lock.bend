@@ -308,8 +308,7 @@ def read.hub.have(+text: String, +hub: String, +hash: String, spin: Say.Spin) ->
     Say.done(spin)
     return Body{files, srcs}
 
-def read.hub.got(got: Web.Got, +hub: String, +hash: String, +url: String,
-  spin: Say.Spin) -> IO(Body):
+def read.hub.got(got: Web.Got, +hub: String, +hash: String, +url: String, spin: Say.Spin) -> IO(Body):
   match got:
     case Web.Miss{why}:
       read.hub.miss(hash, url, why, spin)
@@ -361,25 +360,43 @@ def has(ds: List<&2, Pack>, +wanted: String) -> Bool:
       any.step(String.eq(pack.hash(x), wanted), _u => has(t, wanted))
 
 # a package resolved, and every package it imports queued behind what is left
-def resolve.done(body: Body, hash: String, src: Src, rest: List<&2, String>,
+def resolve.done(
+  body: Body,
+  hash: String,
+  src: Src,
+  rest: List<&2, String>,
   done: List<&2, Pack>,
-  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
+  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
   Body{files, srcs} = body
   go(List.append(&2, String, rest, kids(srcs)), Pack{hash, src, files} <> done)
 
 # one package read, then recorded
-def resolve.step(hub: String, lib: String, orgs: List<&2, Origin>, +hash: String,
-  rest: List<&2, String>, done: List<&2, Pack>,
-  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
+def resolve.step(
+  hub: String,
+  lib: String,
+  orgs: List<&2, Origin>,
+  +hash: String,
+  rest: List<&2, String>,
+  done: List<&2, Pack>,
+  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
   do IO<List<&2, Pack>>:
     +src : Src <- IO.pure(Src, origin(orgs, hash))
     b : Body <- read.pkg(hub, lib, hash, src)
     resolve.done(b, hash, src, rest, done, go)
 
 # a package already resolved is not resolved twice
-def resolve.pick(hit: Bool, hub: String, lib: String, orgs: List<&2, Origin>,
-  hash: String, rest: List<&2, String>, done: List<&2, Pack>,
-  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
+def resolve.pick(
+  hit: Bool,
+  hub: String,
+  lib: String,
+  orgs: List<&2, Origin>,
+  hash: String,
+  rest: List<&2, String>,
+  done: List<&2, Pack>,
+  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
   match hit:
     case True{}:
       go(rest, done)
@@ -387,14 +404,23 @@ def resolve.pick(hit: Bool, hub: String, lib: String, orgs: List<&2, Origin>,
       resolve.step(hub, lib, orgs, hash, rest, done, go)
 
 # one hash off the queue
-def resolve.next(hub: String, lib: String, orgs: List<&2, Origin>, +hash: String,
-  rest: List<&2, String>, +done: List<&2, Pack>,
-  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
+def resolve.next(
+  hub: String,
+  lib: String,
+  orgs: List<&2, Origin>,
+  +hash: String,
+  rest: List<&2, String>,
+  +done: List<&2, Pack>,
+  go: List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
   resolve.pick(has(done, hash), hub, lib, orgs, hash, rest, done, go)
 
 # the next hash of the queue, handed on with what is left of it
-def resolve.pop(queue: List<&2, String>, +done: List<&2, Pack>,
-  go: String -> List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)) -> IO(List<&2, Pack>):
+def resolve.pop(
+  queue: List<&2, String>,
+  +done: List<&2, Pack>,
+  go: String -> List<&2, String> -> List<&2, Pack> -> IO(List<&2, Pack>)
+) -> IO(List<&2, Pack>):
   match queue:
     case []:
       IO.pure(List<&2, Pack>, done)
@@ -403,8 +429,14 @@ def resolve.pop(queue: List<&2, String>, +done: List<&2, Pack>,
 
 # every package the queue reaches, each one resolved once. The carrying on
 # arrives as a function, since two defs in Bend may not call each other.
-def resolve(fuel: Nat, +hub: String, +lib: String, +orgs: List<&2, Origin>,
-  queue: List<&2, String>, done: List<&2, Pack>) -> IO(List<&2, Pack>):
+def resolve(
+  fuel: Nat,
+  +hub: String,
+  +lib: String,
+  +orgs: List<&2, Origin>,
+  queue: List<&2, String>,
+  done: List<&2, Pack>
+) -> IO(List<&2, Pack>):
   match fuel:
     case 0n:
       IO.pure(List<&2, Pack>, done)
@@ -432,22 +464,29 @@ def root.tasks(+dir: String, ms: List<&2, String>) -> List<&2, String>:
 # what one file of the project adds: the packages it imports, and the files it
 # reaches. A file that is not there is passed over, the way a project with a
 # stale import still locks.
-def root.found(+at: String, +ms: List<&2, String>, st: Seen,
-  go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.found(
+  +at: String,
+  +ms: List<&2, String>,
+  st: Seen,
+  go: List<&2, String> -> Seen -> IO(List<&2, String>)
+) -> IO(List<&2, String>):
   Seen{files, hits} = st
   go(root.tasks(P.dir(at), ms),
     Seen{at <> files, List.append(&2, String, hits, specs(ms))})
 
 # one file of the project, read and scanned
-def root.read(+at: String, st: Seen,
-  go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.read(+at: String, st: Seen, go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     m : Maybe<&2, String> <- F.read(at)
     root.found(at, K.scan.mods(K.scan(F.text_of(m))), st, go)
 
 # a file already read adds nothing
-def root.pick(hit: Bool, at: String, st: Seen,
-  go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.pick(
+  hit: Bool,
+  at: String,
+  st: Seen,
+  go: List<&2, String> -> Seen -> IO(List<&2, String>)
+) -> IO(List<&2, String>):
   match hit:
     case True{}:
       go([], st)
@@ -479,13 +518,15 @@ def seen.holds(xs: List<&2, String>, +needle: String) -> Bool:
       any.step(String.eq(h, needle), _u => seen.holds(t, needle))
 
 # one file off the queue, skipped when it has been read already
-def root.next(+at: String, +st: Seen,
-  go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.next(+at: String, +st: Seen, go: List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
   root.pick(seen.holds(seen.files(st), at), at, st, go)
 
 # the next file of the queue, handed on with what is left of it
-def root.pop(queue: List<&2, String>, +st: Seen,
-  go: String -> List<&2, String> -> Seen -> IO(List<&2, String>)) -> IO(List<&2, String>):
+def root.pop(
+  queue: List<&2, String>,
+  +st: Seen,
+  go: String -> List<&2, String> -> Seen -> IO(List<&2, String>)
+) -> IO(List<&2, String>):
   match queue:
     case []:
       IO.pure(List<&2, String>, seen.hits(st))
@@ -554,8 +595,7 @@ def pack.le(left: Pack, right: Pack) -> Bool:
 # where a package goes among the packages already in order. The rest of the
 # insertion is a parameter, because two defs that call each other are not
 # allowed.
-def pack.ins.put(le: Bool, item: Pack, head: Pack, tail: List<&2, Pack>,
-  rest: List<&2, Pack>) -> List<&2, Pack>:
+def pack.ins.put(le: Bool, item: Pack, head: Pack, tail: List<&2, Pack>, rest: List<&2, Pack>) -> List<&2, Pack>:
   match le:
     case True{}:
       item <> (head <> tail)
@@ -618,8 +658,7 @@ def tool.sects(ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
 
 # the lock with its tools after the packages. An empty tool list is the
 # lock `render` writes, so a ledger with no tools is unchanged.
-def render.pick(empty: Bool, hub: String, ver: String, ps: List<&2, Pack>,
-  ts: List<&2, M.Tool>) -> String:
+def render.pick(empty: Bool, hub: String, ver: String, ps: List<&2, Pack>, ts: List<&2, M.Tool>) -> String:
   match empty:
     case True{}:
       render(hub, ver, ps)
@@ -627,8 +666,7 @@ def render.pick(empty: Bool, hub: String, ver: String, ps: List<&2, Pack>,
       T.render(List.append(&2, T.Sect, doc(hub, ver, ps), tool.sects(ts)))
 
 # the same choice, made by matching the list so it is read once
-def render.tools(ts: List<&2, M.Tool>, hub: String, ver: String,
-  ps: List<&2, Pack>) -> String:
+def render.tools(ts: List<&2, M.Tool>, hub: String, ver: String, ps: List<&2, Pack>) -> String:
   match ts:
     case []:
       render(hub, ver, ps)
@@ -814,8 +852,7 @@ def version() -> IO(String):
 # the lock of a project, resolved against a named hub, ledger and BEND_LIB. The
 # ledger's path is a parameter rather than the fixed name, so a test can lock a
 # project that is not the one it was started in.
-def lock.at(+hub: String, +toml: String, +at: String,
-  entries: List<&2, String>) -> IO(String):
+def lock.at(+hub: String, +toml: String, +at: String, entries: List<&2, String>) -> IO(String):
   do IO<String>:
     led : List<&2, Origin> <- ledger_of(toml)
     cache : List<&2, Origin> <- origins_of(at)

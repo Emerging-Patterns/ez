@@ -131,8 +131,7 @@ def stmt_of(+line: String) -> Stmt:
 
 # a module named after the header has ended is not part of the header, so the
 # line is ignored rather than followed
-def scan.mod(+head: Bool, spec: String, mods: List<&2, String>,
-  foreign: List<&2, String>) -> Head:
+def scan.mod(+head: Bool, spec: String, mods: List<&2, String>, foreign: List<&2, String>) -> Head:
   match head:
     case True{}:
       Head{True{}, spec <> mods, foreign}
@@ -265,8 +264,15 @@ def raw_of(+ns: String, eb: String) -> String:
   Bool.pick(String, String.is_empty(ns), eb, ns ++ ".bend")
 
 # a file that was read: itself, its foreign bodies, and the modules it imports
-def visit.found(sc: Scan, sum: String, +file: String, +ns: String, eb: String,
-  seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
+def visit.found(
+  sc: Scan,
+  sum: String,
+  +file: String,
+  +ns: String,
+  eb: String,
+  seen: List<&2, String>,
+  out: List<&2, Found>
+) -> IO(Step):
   Scan{mods, foreign} = sc
   +d = P.dir(file)
   +nd = nsdir(ns)
@@ -278,8 +284,14 @@ def visit.found(sc: Scan, sum: String, +file: String, +ns: String, eb: String,
 
 # a module that is imported but not on disk stops the walk, since a package
 # missing a file is not the package bend would publish
-def visit.have(got: Maybe<&2, String>, +file: String, ns: String, eb: String,
-  seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
+def visit.have(
+  got: Maybe<&2, String>,
+  +file: String,
+  ns: String,
+  eb: String,
+  seen: List<&2, String>,
+  out: List<&2, Found>
+) -> IO(Step):
   match got:
     case None{}:
       IO.die(Step, 1, "ez: " ++ file ++ " is imported but not there")
@@ -287,16 +299,14 @@ def visit.have(got: Maybe<&2, String>, +file: String, ns: String, eb: String,
       visit.found(scan(src), Sha.hex(src), file, ns, eb, seen, out)
 
 # a file not visited before, read and taken apart
-def visit.read(+file: String, ns: String, eb: String, seen: List<&2, String>,
-  out: List<&2, Found>) -> IO(Step):
+def visit.read(+file: String, ns: String, eb: String, seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
   do IO<Step>:
     m : Maybe<&2, String> <- F.read(file)
     visit.have(m, file, ns, eb, seen, out)
 
 # a file already visited keeps the name it was first reached through, the way
 # bend's own walk does
-def visit.go(hit: Bool, file: String, ns: String, eb: String,
-  seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
+def visit.go(hit: Bool, file: String, ns: String, eb: String, seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
   match hit:
     case True{}:
       IO.pure(Step, Step{State{seen, out}, []})
@@ -334,15 +344,13 @@ def visit(eb: String, tk: Task, st: State) -> IO(Step):
 
 # what a visit answered, with its modules put at the front of the queue, so the
 # walk goes depth first the way bend's does
-def walk.rest(step: Step, rest: List<&2, Task>,
-  go: State -> List<&2, Task> -> IO(State)) -> IO(State):
+def walk.rest(step: Step, rest: List<&2, Task>, go: State -> List<&2, Task> -> IO(State)) -> IO(State):
   Step{st, kids} = step
   go(st, List.append(&2, Task, kids, rest))
 
 # the next file of the queue, handed on with what is left of it. An empty queue
 # is the end of the walk.
-def walk.pop(queue: List<&2, Task>, +st: State,
-  go: State -> Task -> List<&2, Task> -> IO(State)) -> IO(State):
+def walk.pop(queue: List<&2, Task>, +st: State, go: State -> Task -> List<&2, Task> -> IO(State)) -> IO(State):
   match queue:
     case []:
       IO.pure(State, st)
@@ -351,8 +359,13 @@ def walk.pop(queue: List<&2, Task>, +st: State,
 
 # one file visited, and the walk carried on. The carrying on arrives as a
 # function, since two defs in Bend may not call each other.
-def walk.step(+eb: String, task: Task, st: State, rest: List<&2, Task>,
-  go: State -> List<&2, Task> -> IO(State)) -> IO(State):
+def walk.step(
+  +eb: String,
+  task: Task,
+  st: State,
+  rest: List<&2, Task>,
+  go: State -> List<&2, Task> -> IO(State)
+) -> IO(State):
   do IO<State>:
     r : Step <- visit(eb, task, st)
     walk.rest(r, rest, go)
@@ -452,8 +465,7 @@ def dedup(fs: List<&2, File>) -> List<&2, File>:
 # where a file goes among the files already in order: before the one it is not
 # after, otherwise behind it. The rest of the insertion is a parameter, because
 # two defs that call each other are not allowed.
-def file.ins.put(le: Bool, item: File, head: File, tail: List<&2, File>,
-  rest: List<&2, File>) -> List<&2, File>:
+def file.ins.put(le: Bool, item: File, head: File, tail: List<&2, File>, rest: List<&2, File>) -> List<&2, File>:
   match le:
     case True{}:
       item <> (head <> tail)
@@ -533,8 +545,7 @@ def hash_of(fs: List<&2, File>) -> String:
 # the verdict, with the escaping path's name already found. `hash_of` is a
 # sha256 over the whole package manifest; under a `Bool.pick` a package that
 # escapes its root paid for that hash before being refused for it.
-def pkg.judge.step(ok: Bool, bad: String, root: String,
-  +fs: List<&2, File>) -> IO(Pkg):
+def pkg.judge.step(ok: Bool, bad: String, root: String, +fs: List<&2, File>) -> IO(Pkg):
   match ok:
     case True{}:
       IO.pure(Pkg, Pkg{hash_of(fs), root, files_of(fs)})

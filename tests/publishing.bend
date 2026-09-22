@@ -41,8 +41,7 @@ def path() -> IO(String):
 # `ez` run in the project with these variables set for it. `env` takes the
 # assignments before the command, and `W.inside` has already put an `env`
 # there.
-def ez(+repo: String, +app: String, vars: List<&2, String>,
-  args: List<&2, String>) -> List<&2, String>:
+def ez(+repo: String, +app: String, vars: List<&2, String>, args: List<&2, String>) -> List<&2, String>:
   W.inside(app, List.append(&2, String, vars,
     List.append(&2, String, [repo ++ "/bin/ez.bin"], args)))
 
@@ -110,8 +109,7 @@ def consumer(+root: String, +hub: String, +hash: String) -> IO(Unit):
 
 # the tree clean, the hub up, and the package sent. Two lines come back: the
 # name ez computed, and the import line a consumer would write.
-def publishes(+repo: String, +app: String, +root: String,
-  +hub: String) -> IO(String):
+def publishes(+repo: String, +app: String, +root: String, +hub: String) -> IO(String):
   do IO<String>:
     +out : String <- R.exec(ez(repo, app, ["BEND_HUB=" ++ hub], ["publish"]))
     yes("publish sends from a tree whose only extra files are ignored",
@@ -156,8 +154,7 @@ def liar(+repo: String, +root: String) -> IO(String):
 # bend naming a different package. Neither number is reported as the package's
 # name: the command exits non-zero, prints no import line, and says both so
 # that the next question, which walk drifted, can be asked.
-def refuses.differs(+repo: String, +app: String, +liar: String,
-  +hash: String) -> IO(Unit):
+def refuses.differs(+repo: String, +app: String, +liar: String, +hash: String) -> IO(Unit):
   do IO<Unit>:
     +out : String <- R.exec(ez(repo, app, [liar], ["publish"]))
     yes("publish stops when bend names a different package",

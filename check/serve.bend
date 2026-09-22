@@ -135,14 +135,22 @@ def answer(sock: Socket, text: String) -> IO(Unit):
 
 # the socket handed back once a piece has gone out, so the next one can follow
 # it down the same connection
-def piece.sent(sr: Socket & Result<&1, &1, U32 & String, Unit>, left: String,
-  rest: Socket -> String -> IO(Socket)) -> IO(Socket):
+def piece.sent(
+  sr: Socket & Result<&1, &1, U32 & String, Unit>,
+  left: String,
+  rest: Socket -> String -> IO(Socket)
+) -> IO(Socket):
   (sock, _r) = sr
   rest(sock, left)
 
 # nothing left to write is the end of the answer
-def piece.more(done: Bool, head: String, tail: String, sock: Socket,
-  rest: Socket -> String -> IO(Socket)) -> IO(Socket):
+def piece.more(
+  done: Bool,
+  head: String,
+  tail: String,
+  sock: Socket,
+  rest: Socket -> String -> IO(Socket)
+) -> IO(Socket):
   match done:
     case True{}:
       IO.pure(Socket, sock)
@@ -171,8 +179,12 @@ def pieces(sock: Socket, width: Nat, +text: String) -> IO(Unit):
     Socket.close(sock2)
 
 # an empty chunk means the client stopped writing, whole request or not
-def recv.chunk(chunk: String, sock: Socket, acc: String,
-  rest: Socket -> String -> IO(Socket & String)) -> IO(Socket & String):
+def recv.chunk(
+  chunk: String,
+  sock: Socket,
+  acc: String,
+  rest: Socket -> String -> IO(Socket & String)
+) -> IO(Socket & String):
   match chunk:
     case SNil{}:
       IO.pure(Socket & String, (sock, acc))
@@ -180,8 +192,12 @@ def recv.chunk(chunk: String, sock: Socket, acc: String,
       rest(sock, acc ++ SCon{c, t})
 
 # a failed read ends the request as surely as an empty one
-def recv.got(received: Result<&1, &1, U32 & String, String>, sock: Socket, acc: String,
-  rest: Socket -> String -> IO(Socket & String)) -> IO(Socket & String):
+def recv.got(
+  received: Result<&1, &1, U32 & String, String>,
+  sock: Socket,
+  acc: String,
+  rest: Socket -> String -> IO(Socket & String)
+) -> IO(Socket & String):
   match received:
     case Fail{_e}:
       IO.pure(Socket & String, (sock, acc))
@@ -189,14 +205,21 @@ def recv.got(received: Result<&1, &1, U32 & String, String>, sock: Socket, acc: 
       recv.chunk(chunk, sock, acc, rest)
 
 # the socket comes back paired with what it read
-def recv.next(got: Socket & Result<&1, &1, U32 & String, String>, acc: String,
-  rest: Socket -> String -> IO(Socket & String)) -> IO(Socket & String):
+def recv.next(
+  got: Socket & Result<&1, &1, U32 & String, String>,
+  acc: String,
+  rest: Socket -> String -> IO(Socket & String)
+) -> IO(Socket & String):
   (sock, r) = got
   recv.got(r, sock, acc, rest)
 
 # nothing more is asked for once the whole request is in hand
-def recv.more(done: Bool, sock: Socket, acc: String,
-  rest: Socket -> String -> IO(Socket & String)) -> IO(Socket & String):
+def recv.more(
+  done: Bool,
+  sock: Socket,
+  acc: String,
+  rest: Socket -> String -> IO(Socket & String)
+) -> IO(Socket & String):
   match done:
     case True{}:
       IO.pure(Socket & String, (sock, acc))

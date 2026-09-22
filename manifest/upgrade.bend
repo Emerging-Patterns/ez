@@ -136,8 +136,7 @@ def agree.go(same_hash: Bool, same_nar: Bool, same_root: Bool) -> Bool:
       agree.nar(same_nar, same_root)
 
 # whether a recomputed pin is the one the ledger already recorded
-def agree(+oh: String, +nh: String, +onar: String, +nnar: String,
-  +oroot: String, +nroot: String) -> Bool:
+def agree(+oh: String, +nh: String, +onar: String, +nnar: String, +oroot: String, +nroot: String) -> Bool:
   agree.go(String.eq(oh, nh), String.eq(onar, nnar), String.eq(oroot, nroot))
 
 # a hub miss is a different digest only when the body arrived and hashed
@@ -147,8 +146,15 @@ def hub.bad(+why: String) -> Bool:
 
 # the dependency with a new commit written in, and the name, the entry, the
 # tag and the vendor bit left as they were
-def retarget.go(+name: String, +entry: String, source: M.Source, +rev: String, +hash: String,
-  +root: String, +nar: String) -> M.Dep:
+def retarget.go(
+  +name: String,
+  +entry: String,
+  source: M.Source,
+  +rev: String,
+  +hash: String,
+  +root: String,
+  +nar: String
+) -> M.Dep:
   match source:
     case M.Hub{}:
       M.Dep{name, hash, entry, M.Hub{}}
@@ -156,8 +162,7 @@ def retarget.go(+name: String, +entry: String, source: M.Source, +rev: String, +
       M.Dep{name, hash, entry, M.Git{url, rev, tag, root, nar, vend}}
 
 # the dependency with a new commit written in
-def retarget(dep: M.Dep, +rev: String, +hash: String, +root: String,
-  +nar: String) -> M.Dep:
+def retarget(dep: M.Dep, +rev: String, +hash: String, +root: String, +nar: String) -> M.Dep:
   M.Dep{n, _h, e, s} = dep
   retarget.go(n, e, s, rev, hash, root, nar)
 

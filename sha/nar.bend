@@ -275,8 +275,13 @@ def nonblank(ss: List<&2, String>) -> List<&2, String>:
 
 # where one name belongs in a list already sorted. Insertion keeps the
 # termination check happy; Base's List.sort does not.
-def sort.ins.put(le: Bool, +item: String, head: String, tail: List<&2, String>,
-  rest: List<&2, String>) -> List<&2, String>:
+def sort.ins.put(
+  le: Bool,
+  +item: String,
+  head: String,
+  tail: List<&2, String>,
+  rest: List<&2, String>
+) -> List<&2, String>:
   match le:
     case True{}:
       item <> (head <> tail)
@@ -339,16 +344,27 @@ def ents.rev(es: List<&2, Ent>) -> List<&2, Ent>:
   ents.rev.go(es, [])
 
 # apply a finished serial to its continuation; uses `go` at most once
-def cont.next(+dir: String, rest: List<&2, String>, acc: List<&2, Ent>,
-  parent: After, go: Goal -> IO(String)) -> IO(String):
+def cont.next(
+  +dir: String,
+  rest: List<&2, String>,
+  acc: List<&2, Ent>,
+  parent: After,
+  go: Goal -> IO(String)
+) -> IO(String):
   match rest:
     case []:
       go(FinishDir{ents.rev(acc), parent})
     case +h <> t:
       go(Load{dir ++ "/" ++ h, ChildOf{dir, h, t, acc, parent}})
 
-def cont.rest(empty: Bool, +dir: String, rest: List<&2, String>,
-  +acc: List<&2, Ent>, parent: After, go: Goal -> IO(String)) -> IO(String):
+def cont.rest(
+  empty: Bool,
+  +dir: String,
+  rest: List<&2, String>,
+  +acc: List<&2, Ent>,
+  parent: After,
+  go: Goal -> IO(String)
+) -> IO(String):
   match empty:
     case True{}:
       go(FinishDir{ents.rev(acc), parent})
@@ -368,8 +384,7 @@ def load.dir.empty(after: After, go: Goal -> IO(String)) -> IO(String):
   go(FinishDir{[], after})
 
 # a non-empty directory: start with its first child
-def load.dir.kids(+path: String, ns: List<&2, String>, after: After,
-  go: Goal -> IO(String)) -> IO(String):
+def load.dir.kids(+path: String, ns: List<&2, String>, after: After, go: Goal -> IO(String)) -> IO(String):
   match ns:
     case []:
       load.dir.empty(after, go)
@@ -377,8 +392,7 @@ def load.dir.kids(+path: String, ns: List<&2, String>, after: After,
       go(Load{path ++ "/" ++ h, ChildOf{path, h, t, [], after}})
 
 # a directory after its child names are known
-def load.dir(+path: String, ns: List<&2, String>, after: After,
-  go: Goal -> IO(String)) -> IO(String):
+def load.dir(+path: String, ns: List<&2, String>, after: After, go: Goal -> IO(String)) -> IO(String):
   load.dir.kids(path, ns, after, go)
 
 # a regular file's serial handed to its continuation
@@ -400,8 +414,7 @@ def load.open(+path: String, after: After, go: Goal -> IO(String)) -> IO(String)
     ns : List<&2, String> <- names(path)
     load.dir(path, ns, after, go)
 
-def load.file.only(file: Bool, +path: String, after: After,
-  go: Goal -> IO(String)) -> IO(String):
+def load.file.only(file: Bool, +path: String, after: After, go: Goal -> IO(String)) -> IO(String):
   match file:
     case True{}:
       load.file(path, after, go)
@@ -409,8 +422,7 @@ def load.file.only(file: Bool, +path: String, after: After,
       IO.die(String, 1, "ez: nar hash: " ++ path ++ ": not a file, directory, or symlink")
 
 # non-symlink
-def load.plain(is_dir: Bool, file: Bool, +path: String, after: After,
-  go: Goal -> IO(String)) -> IO(String):
+def load.plain(is_dir: Bool, file: Bool, +path: String, after: After, go: Goal -> IO(String)) -> IO(String):
   match is_dir:
     case True{}:
       load.open(path, after, go)
@@ -418,8 +430,7 @@ def load.plain(is_dir: Bool, file: Bool, +path: String, after: After,
       load.file.only(file, path, after, go)
 
 # probes answered for a Load goal
-def load.kind(link: Bool, is_dir: Bool, file: Bool, +path: String, after: After,
-  go: Goal -> IO(String)) -> IO(String):
+def load.kind(link: Bool, is_dir: Bool, file: Bool, +path: String, after: After, go: Goal -> IO(String)) -> IO(String):
   match link:
     case True{}:
       load.link(path, after, go)

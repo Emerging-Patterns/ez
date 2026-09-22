@@ -117,8 +117,7 @@ def off.why(+name: String, +tag: String, +pin: String, +tip: String) -> String:
 # the same commit, whose tree no longer hashes to the pin. Upgrade does not
 # invent a replacement hash: the pin and the tree disagree, and a person
 # has to say which one is meant.
-def drift.why(+name: String, +tag: String, +rev: String, +old: String,
-  +new: String) -> String:
+def drift.why(+name: String, +tag: String, +rev: String, +old: String, +new: String) -> String:
   Say.drift(name, tag, rev, old, new)
 
 # the branch a rev-only pin followed, said when there is one
@@ -195,8 +194,17 @@ def tip.of(+branch: String, +tip: String) -> String:
 # `branch` is the default-branch name for a rev-only pin and "" for a tag,
 # which is what the move line puts in parentheses. Off quotes the branch
 # when there is one and the tip commit otherwise.
-def judged(verdict: U.Verdict, +lib: String, +hub: String, +dep: M.Dep, +url: String,
-  +entry: String, +pin: String, +tip: String, +branch: String) -> IO(Done):
+def judged(
+  verdict: U.Verdict,
+  +lib: String,
+  +hub: String,
+  +dep: M.Dep,
+  +url: String,
+  +entry: String,
+  +pin: String,
+  +tip: String,
+  +branch: String
+) -> IO(Done):
   match verdict:
     case U.Keep{}:
       do IO<Done>:
@@ -216,14 +224,33 @@ def judged(verdict: U.Verdict, +lib: String, +hub: String, +dep: M.Dep, +url: St
 # ancestry's answer turned into a verdict. `agree` is true here because the
 # tree has not been weighed yet; a same commit is weighed in Keep, and a
 # disagreement there is the drift.
-def resolved(+lib: String, +hub: String, +dep: M.Dep, +url: String, +entry: String,
-  +pin: String, +tip: String, +tag: String, +branch: String, onward: Bool) -> IO(Done):
+def resolved(
+  +lib: String,
+  +hub: String,
+  +dep: M.Dep,
+  +url: String,
+  +entry: String,
+  +pin: String,
+  +tip: String,
+  +tag: String,
+  +branch: String,
+  onward: Bool
+) -> IO(Done):
   judged(U.judge(String.eq(pin, tip), onward, True{}, tip, tag),
     lib, hub, dep, url, entry, pin, tip, branch)
 
 # ancestry, then the verdict. The same commit skips the clone.
-def ask(+lib: String, +hub: String, dep: M.Dep, +url: String, +entry: String,
-  +pin: String, +tip: String, +tag: String, +branch: String) -> IO(Done):
+def ask(
+  +lib: String,
+  +hub: String,
+  dep: M.Dep,
+  +url: String,
+  +entry: String,
+  +pin: String,
+  +tip: String,
+  +tag: String,
+  +branch: String
+) -> IO(Done):
   do IO<Done>:
     +on : Bool <- Git.descendant.at(work(), url, pin, tip)
     resolved(lib, hub, dep, url, entry, pin, tip, tag, branch, on)
@@ -313,8 +340,14 @@ def wrote(ok: Bool, +at: String) -> IO(Unit):
 
 # the ledger, rewritten only when a pin moved, so an upgrade that changed
 # nothing does not reformat the file
-def write.toml(moved: Bool, +name: String, +entry: String, +bin: String,
-  ds: List<&2, M.Dep>, ts: List<&2, M.Tool>) -> IO(Unit):
+def write.toml(
+  moved: Bool,
+  +name: String,
+  +entry: String,
+  +bin: String,
+  ds: List<&2, M.Dep>,
+  ts: List<&2, M.Tool>
+) -> IO(Unit):
   match moved:
     case False{}:
       IO.pure(Unit, Unit{})
@@ -422,8 +455,7 @@ def drop(ss: List<&2, U.Swap>) -> IO(Unit):
 
 # pins rewritten, then the allowlist, then the imports, then the old trees.
 # The lock is the caller's to write, from the ledger this just wrote.
-def go.out(+name: String, +entry: String, +bin: String, ts: List<&2, M.Tool>,
-  out: Out) -> IO(Unit):
+def go.out(+name: String, +entry: String, +bin: String, ts: List<&2, M.Tool>, out: Out) -> IO(Unit):
   Out{+deps, +swaps, +edits, changed} = out
   do IO<Unit>:
     write.toml(changed, name, entry, bin, deps, ts)
@@ -432,16 +464,29 @@ def go.out(+name: String, +entry: String, +bin: String, ts: List<&2, M.Tool>,
     drop(swaps)
 
 # every dependency the filter selects walked, then the ledger rewritten
-def go(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>,
-  ts: List<&2, M.Tool>, +only: String) -> IO(Unit):
+def go(
+  +name: String,
+  +entry: String,
+  +bin: String,
+  ds: List<&2, M.Dep>,
+  ts: List<&2, M.Tool>,
+  +only: String
+) -> IO(Unit):
   do IO<Unit>:
     +hub : String <- L.hub()
     o : Out <- walk(lib(), hub, only, ds)
     go.out(name, entry, bin, ts, o)
 
 # `--package` has to name a dependency or a pinned CLI
-def read.known(ok: Bool, +name: String, +entry: String, +bin: String,
-  ds: List<&2, M.Dep>, ts: List<&2, M.Tool>, +only: String) -> IO(Unit):
+def read.known(
+  ok: Bool,
+  +name: String,
+  +entry: String,
+  +bin: String,
+  ds: List<&2, M.Dep>,
+  ts: List<&2, M.Tool>,
+  +only: String
+) -> IO(Unit):
   match ok:
     case False{}:
       IO.die(Unit, 1, "ez: no dependency or tool named " ++ only)

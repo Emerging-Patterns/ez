@@ -62,8 +62,7 @@ def flag(+word: String) -> Bool:
   String.eq(word, "true")
 
 # no `git` key means the package lives on the hub
-def source.go(hub: Bool, url: String, rev: String, tag: String, root: String,
-  nar: String, vend: Bool) -> Source:
+def source.go(hub: Bool, url: String, rev: String, tag: String, root: String, nar: String, vend: Bool) -> Source:
   match hub:
     case True{}:
       Hub{}

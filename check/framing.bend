@@ -121,8 +121,7 @@ type Run is Type:
   RGo{l: Listener}
 
 # a listener that will not accept is a listener that is finished
-def turn.got(accepted: Result<&1, &1, U32 & String, Socket>, listener: Listener,
-  rest: Listener -> IO(Run)) -> IO(Run):
+def turn.got(accepted: Result<&1, &1, U32 & String, Socket>, listener: Listener, rest: Listener -> IO(Run)) -> IO(Run):
   match accepted:
     case Fail{_e}:
       do IO<Run>:
@@ -134,8 +133,7 @@ def turn.got(accepted: Result<&1, &1, U32 & String, Socket>, listener: Listener,
         rest(listener)
 
 # the listener comes back paired with the connection it accepted
-def turn.at(got: Listener & Result<&1, &1, U32 & String, Socket>,
-  rest: Listener -> IO(Run)) -> IO(Run):
+def turn.at(got: Listener & Result<&1, &1, U32 & String, Socket>, rest: Listener -> IO(Run)) -> IO(Run):
   (l, r) = got
   turn.got(r, l, rest)
 

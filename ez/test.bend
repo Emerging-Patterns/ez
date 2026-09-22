@@ -238,8 +238,7 @@ def section(+path: String, +lane: String, +text: String, score: Tally) -> IO(Tal
       observed(G.solitary(body), text, path), score)
 
 # every test of a project, each against its own slice
-def sections(ts: List<&2, String>, +lane: String, +text: String,
-  score: Tally) -> IO(Tally):
+def sections(ts: List<&2, String>, +lane: String, +text: String, score: Tally) -> IO(Tally):
   match ts:
     case Nil{}:
       IO.pure(Tally, score)
@@ -256,8 +255,7 @@ def miss(+path: String, +lane: String, +why: String, score: Tally) -> IO(Tally):
 
 # every test of a project that never ran. They are failed one by one rather
 # than skipped: a project whose binary will not build has answered for nothing.
-def missed(ts: List<&2, String>, +lane: String, +why: String,
-  score: Tally) -> IO(Tally):
+def missed(ts: List<&2, String>, +lane: String, +why: String, score: Tally) -> IO(Tally):
   match ts:
     case Nil{}:
       IO.pure(Tally, score)
@@ -280,8 +278,7 @@ def blame(+dir: String, +lane: String, +text: String) -> IO(Unit):
 # the project. A test that runs as a `main` can still fail to import, and then
 # nothing of the project ran: the run reaching no marker at all is how that
 # looks, and it is loud rather than silent.
-def answer(ok: Bool, ts: List<&2, String>, +dir: String, +lane: String,
-  +text: String, score: Tally) -> IO(Tally):
+def answer(ok: Bool, ts: List<&2, String>, +dir: String, +lane: String, +text: String, score: Tally) -> IO(Tally):
   match ok:
     case True{}:
       sections(ts, lane, text, score)
@@ -348,8 +345,7 @@ def idle() -> List<&2, String>:
 
 # a `bend` the runner starts: inside the memory cap, inside the budget, and
 # with this project's BEND_LIB set for it
-def under(cap: Bool, +gigs: String, +at: String,
-  args: List<&2, String>) -> List<&2, String>:
+def under(cap: Bool, +gigs: String, +at: String, args: List<&2, String>) -> List<&2, String>:
   Cap.argv(cap, gigs, at, args)
 
 # what running a lane means: the aggregate compiled to a binary, or the
@@ -410,16 +406,30 @@ def seconds(ws: List<&2, Work>) -> List<&2, List<&2, String>>:
 
 # a project's two lanes: the aggregates written, the keys taken, and each lane
 # asked whether it has already held over exactly this evidence
-def plan.lanes(js_on: Bool, native_on: Bool, hj: Bool, hn: Bool, +dir: String,
-  jts: List<&2, String>, ts: List<&2, String>, +kj: String,
-  +kn: String) -> List<&2, Work>:
+def plan.lanes(
+  js_on: Bool,
+  native_on: Bool,
+  hj: Bool,
+  hn: Bool,
+  +dir: String,
+  jts: List<&2, String>,
+  ts: List<&2, String>,
+  +kj: String,
+  +kn: String
+) -> List<&2, Work>:
   List.append(&2, Work,
     Bool.pick(List<&2, Work>, js_on, [Work.lane{hj, False{}, dir, jts, kj}], []),
     Bool.pick(List<&2, Work>, native_on, [Work.lane{hn, True{}, dir, ts, kn}], []))
 
 # one project planned, on both lanes
-def plan.project(+dir: String, +ts: List<&2, String>, +on: Bool, +full: Bool,
-  +tool: String, +loud: Bool) -> IO(List<&2, Work>):
+def plan.project(
+  +dir: String,
+  +ts: List<&2, String>,
+  +on: Bool,
+  +full: Bool,
+  +tool: String,
+  +loud: Bool
+) -> IO(List<&2, Work>):
   do IO<List<&2, Work>>:
     saying(loud, dir)
     +jts : List<&2, String> <- js_of(ts)
@@ -433,8 +443,14 @@ def plan.project(+dir: String, +ts: List<&2, String>, +on: Bool, +full: Bool,
     return plan.lanes(any(jts), on, hj, hn, dir, jts, ts, kj, kn)
 
 # every project with unit tests, in order
-def plan.projects(ds: List<&2, String>, +ts: List<&2, String>, +on: Bool,
-  +full: Bool, +tool: String, +loud: Bool) -> IO(List<&2, Work>):
+def plan.projects(
+  ds: List<&2, String>,
+  +ts: List<&2, String>,
+  +on: Bool,
+  +full: Bool,
+  +tool: String,
+  +loud: Bool
+) -> IO(List<&2, Work>):
   match ds:
     case Nil{}:
       IO.pure(List<&2, Work>, Nil{})
@@ -459,8 +475,7 @@ def plan.solos(es: List<&2, String>, +loud: Bool) -> IO(List<&2, Work>):
 
 # one proof, keyed on what it reads. A proof reads its own closure and nothing
 # else, so it keys the way a lane does.
-def plan.proof(+path: String, +full: Bool, +tool: String,
-  +loud: Bool) -> IO(Work):
+def plan.proof(+path: String, +full: Bool, +tool: String, +loud: Bool) -> IO(Work):
   do IO<Work>:
     saying(loud, path)
     +k : String <- C.key("proof", tool, path)
@@ -468,8 +483,7 @@ def plan.proof(+path: String, +full: Bool, +tool: String,
     return Work.proof{hot, path, k}
 
 # every proof in the tree
-def plan.proofs(ps: List<&2, String>, +full: Bool, +tool: String,
-  +loud: Bool) -> IO(List<&2, Work>):
+def plan.proofs(ps: List<&2, String>, +full: Bool, +tool: String, +loud: Bool) -> IO(List<&2, Work>):
   match ps:
     case Nil{}:
       IO.pure(List<&2, Work>, Nil{})
@@ -480,9 +494,16 @@ def plan.proofs(ps: List<&2, String>, +full: Bool, +tool: String,
         return w <> more
 
 # the whole run's work, in the order the report will walk it
-def plan(ds: List<&2, String>, +us: List<&2, String>, es: List<&2, String>,
-  ps: List<&2, String>, +on: Bool, +full: Bool, +tool: String,
-  +loud: Bool) -> IO(List<&2, Work>):
+def plan(
+  ds: List<&2, String>,
+  +us: List<&2, String>,
+  es: List<&2, String>,
+  ps: List<&2, String>,
+  +on: Bool,
+  +full: Bool,
+  +tool: String,
+  +loud: Bool
+) -> IO(List<&2, Work>):
   do IO<List<&2, Work>>:
     ls : List<&2, Work> <- plan.projects(ds, us, on, full, tool, loud)
     ss : List<&2, Work> <- plan.solos(es, loud)
@@ -494,8 +515,14 @@ def plan(ds: List<&2, String>, +us: List<&2, String>, es: List<&2, String>,
 
 # the JS lane's answer: the run's output, with a memory kill turned into a
 # sentence in front of it
-def report.js(+dir: String, ts: List<&2, String>, +key: String, +gigs: String,
-  +output: String, +score: Tally) -> IO(Tally):
+def report.js(
+  +dir: String,
+  ts: List<&2, String>,
+  +key: String,
+  +gigs: String,
+  +output: String,
+  +score: Tally
+) -> IO(Tally):
   do IO<Tally>:
     +text : String <- IO.pure(String, Cap.why(output, gigs) ++ Q.filter(R.text(output)))
     after : Tally <- answer(G.started(text), ts, dir, "js", text, score)
@@ -503,8 +530,15 @@ def report.js(+dir: String, ts: List<&2, String>, +key: String, +gigs: String,
 
 # the native lane once its binary is either built or not. A build that failed
 # is itself the failure, and its output is what is reported.
-def report.cpu(ok: Bool, +dir: String, ts: List<&2, String>, +key: String,
-  +why: String, +output: String, +score: Tally) -> IO(Tally):
+def report.cpu(
+  ok: Bool,
+  +dir: String,
+  ts: List<&2, String>,
+  +key: String,
+  +why: String,
+  +output: String,
+  +score: Tally
+) -> IO(Tally):
   match ok:
     case False{}:
       do IO<Tally>:
@@ -517,8 +551,16 @@ def report.cpu(ok: Bool, +dir: String, ts: List<&2, String>, +key: String,
         remember(score, after, key, dir ++ " (cpu)")
 
 # a lane that ran, on whichever side it was
-def report.lane(native: Bool, +dir: String, ts: List<&2, String>, +key: String,
-  +gigs: String, +a1: String, +a2: String, score: Tally) -> IO(Tally):
+def report.lane(
+  native: Bool,
+  +dir: String,
+  ts: List<&2, String>,
+  +key: String,
+  +gigs: String,
+  +a1: String,
+  +a2: String,
+  score: Tally
+) -> IO(Tally):
   match native:
     case False{}:
       report.js(dir, ts, key, gigs, a1, score)
@@ -528,8 +570,17 @@ def report.lane(native: Bool, +dir: String, ts: List<&2, String>, +key: String,
 
 # a lane, unless it has already held, in which case its tests are counted
 # without being run
-def report.hot(hot: Bool, native: Bool, +dir: String, ts: List<&2, String>,
-  +key: String, +gigs: String, +a1: String, +a2: String, score: Tally) -> IO(Tally):
+def report.hot(
+  hot: Bool,
+  native: Bool,
+  +dir: String,
+  ts: List<&2, String>,
+  +key: String,
+  +gigs: String,
+  +a1: String,
+  +a2: String,
+  score: Tally
+) -> IO(Tally):
   match hot:
     case True{}:
       IO.pure(Tally, hit(ts, score))
@@ -547,8 +598,7 @@ def report.solo(+path: String, +output: String, score: Tally) -> IO(Tally):
 # `All terms check, but N defs rely on unsafe or foreign code:` exit 0, so a
 # gate reading the status alone goes green on a claim that leans on code
 # nothing proved. Only the bare line means every term was proved outright.
-def report.proof(hot: Bool, +path: String, +key: String, +output: String,
-  +score: Tally) -> IO(Tally):
+def report.proof(hot: Bool, +path: String, +key: String, +output: String, +score: Tally) -> IO(Tally):
   match hot:
     case True{}:
       IO.pure(Tally, tally(True{}, score))
@@ -558,8 +608,7 @@ def report.proof(hot: Bool, +path: String, +key: String, +output: String,
         remember(score, after, key, path)
 
 # one unit against the two answers its place in the order gave it
-def report.one(work: Work, +gigs: String, +a1: String, +a2: String,
-  score: Tally) -> IO(Tally):
+def report.one(work: Work, +gigs: String, +a1: String, +a2: String, score: Tally) -> IO(Tally):
   match work:
     case Work.lane{hot, native, +dir, ts, +key}:
       report.hot(hot, native, dir, ts, key, gigs, a1, a2, score)
@@ -583,8 +632,7 @@ def report.short(ws: List<&2, Work>, score: Tally) -> IO(Tally):
 
 # every unit, in the tree's order however the run happened to interleave. The
 # three lists are the same length by construction, so they are walked as one.
-def report(ws: List<&2, Work>, a1: List<&2, String>, a2: List<&2, String>,
-  +gigs: String, score: Tally) -> IO(Tally):
+def report(ws: List<&2, Work>, a1: List<&2, String>, a2: List<&2, String>, +gigs: String, score: Tally) -> IO(Tally):
   match ws a1 a2:
     case Con{h, wt} Con{+x, xt} Con{+y, yt}:
       do IO<Tally>:

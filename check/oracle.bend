@@ -574,8 +574,7 @@ def post.said(sock: Socket, ok: Bool, digest: String) -> IO(Unit):
       answer(sock, "500 Internal Server Error", "the package could not be written")
 
 # the package written out under its hash, then that hash answered
-def post.at(sock: Socket, +at: String, digest: String, listing: String,
-  es: List<&2, Ent>) -> IO(Unit):
+def post.at(sock: Socket, +at: String, digest: String, listing: String, es: List<&2, Ent>) -> IO(Unit):
   do IO<Unit>:
     a : Bool <- write.all(at, es)
     b : Bool <- write.file(at ++ "/manifest", listing)
@@ -597,8 +596,7 @@ def post.go(sock: Socket, dir: String, parsed: Obj) -> IO(Unit):
       post.write(sock, dir, sorted(items))
 
 # a POST publishes, anything else fetches
-def serve.pick(post: Bool, sock: Socket, dir: String, +path: String,
-  body: String) -> IO(Unit):
+def serve.pick(post: Bool, sock: Socket, dir: String, +path: String, body: String) -> IO(Unit):
   match post:
     case True{}:
       post.go(sock, dir, parse(body))
@@ -635,8 +633,12 @@ type Run is Type:
   RGo{l: Listener}
 
 # a listener that will not accept is a listener that is finished
-def turn.got(accepted: Result<&1, &1, U32 & String, Socket>, listener: Listener, +dir: String,
-  rest: String -> Listener -> IO(Run)) -> IO(Run):
+def turn.got(
+  accepted: Result<&1, &1, U32 & String, Socket>,
+  listener: Listener,
+  +dir: String,
+  rest: String -> Listener -> IO(Run)
+) -> IO(Run):
   match accepted:
     case Fail{_e}:
       do IO<Run>:
@@ -648,8 +650,11 @@ def turn.got(accepted: Result<&1, &1, U32 & String, Socket>, listener: Listener,
         rest(dir, listener)
 
 # the listener comes back paired with the connection it accepted
-def turn.at(got: Listener & Result<&1, &1, U32 & String, Socket>, dir: String,
-  rest: String -> Listener -> IO(Run)) -> IO(Run):
+def turn.at(
+  got: Listener & Result<&1, &1, U32 & String, Socket>,
+  dir: String,
+  rest: String -> Listener -> IO(Run)
+) -> IO(Run):
   (l, r) = got
   turn.got(r, l, dir, rest)
 
@@ -694,8 +699,7 @@ def begin.fail(err: U32 & String) -> IO(Unit):
 # the listener, once the port is open. The line printed here is the oracle
 # saying it is up, though a caller that waits on `GET /` waits on the socket
 # itself and not on a pipe it would have to drain.
-def begin.at(bound: Result<&1, &1, U32 & String, Listener>, +dir: String,
-  port: U32) -> IO(Unit):
+def begin.at(bound: Result<&1, &1, U32 & String, Listener>, +dir: String, port: U32) -> IO(Unit):
   match bound:
     case Fail{e}:
       begin.fail(e)

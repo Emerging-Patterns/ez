@@ -10,8 +10,13 @@ import Base
 # where one string belongs in a list already sorted, once the rest of that list
 # has been placed. The recursion is done before the choice, because a def may
 # not call itself inside a branch.
-def sort.ins.put(le: Bool, +item: String, head: String, tail: List<&2, String>,
-  rest: List<&2, String>) -> List<&2, String>:
+def sort.ins.put(
+  le: Bool,
+  +item: String,
+  head: String,
+  tail: List<&2, String>,
+  rest: List<&2, String>
+) -> List<&2, String>:
   match le:
     case True{}:
       item <> (head <> tail)

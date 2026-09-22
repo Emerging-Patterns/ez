@@ -203,8 +203,11 @@ def go.done(+as: List<&2, String>, +matched: Shake.Matched) -> IO(Unit):
   dispatch(command(String.join(Shake.path_of(matched), "/")), matched, as)
 
 # the parse result
-def go.parsed(+app: Shake.Cli, +as: List<&2, String>,
-  parsed: Result<&2, &2, Shake.ParseErr, Shake.Matched>) -> IO(Unit):
+def go.parsed(
+  +app: Shake.Cli,
+  +as: List<&2, String>,
+  parsed: Result<&2, &2, Shake.ParseErr, Shake.Matched>
+) -> IO(Unit):
   match parsed:
     case Fail{e}:
       fail(app, e)

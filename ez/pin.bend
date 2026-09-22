@@ -33,8 +33,15 @@ def moved(+tool: M.Tool) -> Touched:
 # the pin with a commit and a NAR hash written in. An empty tag leaves the
 # one the ledger already had. The vendor bit is off: a tool is not committed
 # under `.ez/lib`.
-def set.go(+name: String, +entry: String, +bin: String, source: M.Source, +rev: String,
-  +tag: String, +nar: String) -> M.Tool:
+def set.go(
+  +name: String,
+  +entry: String,
+  +bin: String,
+  source: M.Source,
+  +rev: String,
+  +tag: String,
+  +nar: String
+) -> M.Tool:
   match source:
     case M.Hub{}:
       M.Tool{name, entry, bin, M.Hub{}}
@@ -71,8 +78,14 @@ def wrote(ok: Bool, +at: String) -> IO(Unit):
       IO.die(Unit, 1, "ez: " ++ at ++ " could not be written")
 
 # the ledger, rewritten only when a pin moved
-def write(mved: Bool, +name: String, +entry: String, +bin: String,
-  ds: List<&2, M.Dep>, ts: List<&2, M.Tool>) -> IO(Unit):
+def write(
+  mved: Bool,
+  +name: String,
+  +entry: String,
+  +bin: String,
+  ds: List<&2, M.Dep>,
+  ts: List<&2, M.Tool>
+) -> IO(Unit):
   match mved:
     case False{}:
       IO.pure(Unit, Unit{})
@@ -218,8 +231,7 @@ def up.move(+tool: M.Tool, +rev: String, +tag: String, +branch: String) -> IO(To
     return moved(set(tool, rev, tag, nar))
 
 # the verdict, once the remote has been asked and the ancestry read
-def judged(verdict: U.Verdict, +tool: M.Tool, +pin: String, +tip: String,
-  +branch: String) -> IO(Touched):
+def judged(verdict: U.Verdict, +tool: M.Tool, +pin: String, +tip: String, +branch: String) -> IO(Touched):
   match verdict:
     case U.Keep{}:
       up.keep(tool, pin)
@@ -233,14 +245,12 @@ def judged(verdict: U.Verdict, +tool: M.Tool, +pin: String, +tip: String,
 
 # ancestry's answer turned into a verdict. The tree has not been weighed yet;
 # a same commit is weighed in Keep.
-def resolved(+tool: M.Tool, +pin: String, +tip: String, +tag: String,
-  +branch: String, onward: Bool) -> IO(Touched):
+def resolved(+tool: M.Tool, +pin: String, +tip: String, +tag: String, +branch: String, onward: Bool) -> IO(Touched):
   judged(U.judge(String.eq(pin, tip), onward, True{}, tip, tag), tool, pin, tip,
     branch)
 
 # ancestry, then the verdict
-def ask(+tool: M.Tool, +pin: String, +tip: String, +tag: String,
-  +branch: String) -> IO(Touched):
+def ask(+tool: M.Tool, +pin: String, +tip: String, +tag: String, +branch: String) -> IO(Touched):
   do IO<Touched>:
     +on : Bool <- Git.descendant.at(work(), M.source.url(M.tool.source(tool)), pin, tip)
     resolved(tool, pin, tip, tag, branch, on)
@@ -313,8 +323,7 @@ def up.walk(+only: String, ts: List<&2, M.Tool>) -> IO(Bunch):
         return join(a, b)
 
 # the walk, written when a pin moved
-def bunch.put(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>,
-  tally: Bunch) -> IO(Unit):
+def bunch.put(+name: String, +entry: String, +bin: String, ds: List<&2, M.Dep>, tally: Bunch) -> IO(Unit):
   match tally:
     case Bunch{tools, mved}:
       write(mved, name, entry, bin, ds, tools)

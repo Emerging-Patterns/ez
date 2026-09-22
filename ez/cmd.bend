@@ -368,8 +368,7 @@ def add.alias(+at: String) -> String:
 # come straight off the vendoring that computed them: it weighed the tree for
 # the NAR hash and worked the root out from where the entry sat, so asking the
 # cache it just wrote would be reading back our own answer.
-def add.dep.go(hash: String, url: String, rev: String, +at: String,
-  tag: String, root: String, nar: String) -> M.Dep:
+def add.dep.go(hash: String, url: String, rev: String, +at: String, tag: String, root: String, nar: String) -> M.Dep:
   M.Dep{add.alias(at), hash, at, M.Git{url, rev, tag, root, nar, False{}}}
 
 # what a vendoring answered, as the ledger records it
