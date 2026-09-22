@@ -1,14 +1,13 @@
-# Cuts a vX.Y.Z tag and GitHub Release from workflow_dispatch
-# (a GITHUB_TOKEN tag does not start release.yml).
+# Manual hatch: workflow_dispatch cuts a vX.Y.Z tag and GitHub Release
+# (softprops in the shared tag workflow). Automatic releases are release-please.
+# Pushing a v* tag by itself does not open a GitHub Release.
 #
-# How to cut a release
+# How to cut a release by hand
 #   1. Land the version on master in flake.nix (`version = "X.Y.Z"` on the ez package).
 #   2. Actions → Tag → Run workflow, from master:
 #        - leave version empty and bump=none → tag what flake.nix says
 #        - version=X.Y.Z → tag that (fails if flake.nix differs)
 #        - bump=patch|minor|major → rewrite flake.nix, commit, tag the new X.Y.Z
-#   3. Or tag locally: `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`
-#      (release.yml then opens the GitHub Release).
 #
 # Tag and GitHub Release only; GitHub ships the source archive.
 
