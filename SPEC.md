@@ -28,7 +28,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | EZ-HASH-3 | When ez writes a package under `<lib>/<h>`, `h` is the 0x hash of the file list whose manifest it writes beside the files. | Proved | pending | |
 | EZ-HASH-4 | ez's 0x hash for an entry equals the hash `bend --publish` assigns to it. | Trusted | | |
 | EZ-HASH-5 | ez's narHash equals `nix hash path --type sha256 --sri` of the same tree. | Trusted | | |
-| EZ-HASH-6 | `Sha.hex(s)` is the SHA-256 of the bytes formed by each character of `s` reduced to its low eight bits. For ASCII text that is SHA-256 of the file's bytes. | Trusted | | |
+| EZ-HASH-6 | `Sha.hex(s)` is the SHA-256 of the UTF-8 bytes of `s`. For a file's text that is SHA-256 of the file's bytes, which is what `bend --publish` and the hub compute. | Trusted | | |
 
 ### Ledger (EZ-LED)
 
@@ -120,4 +120,4 @@ These assumptions sit outside the proofs. They are the complete list of Trusted 
 | EZ-RES-7 | git reports refs, tags, and ancestry accurately. | The World model takes git's answers as given. |
 | EZ-HASH-4 | ez's 0x hash matches `bend --publish`. | The publisher is a separate program. |
 | EZ-HASH-5 | ez's narHash matches nix. | nix is a separate program. |
-| EZ-HASH-6 | `Sha.hex` computes the SHA-256 digest of its folded bytes. | Proved in Giulio2002/bend-sha256 against an executable FIPS 180-4 specification, at the hash ez vendors; ez's gate does not re-check it. Collision resistance is also assumed. |
+| EZ-HASH-6 | `Sha.raw` computes the SHA-256 digest of its bytes, and `Sha.hex` of its text's UTF-8. | Proved in Giulio2002/bend-sha256 against an executable FIPS 180-4 specification, at the hash ez vendors; ez's gate does not re-check it. Collision resistance is also assumed. |

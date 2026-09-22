@@ -72,12 +72,78 @@ def show(answer: Maybe<&1, Array<U32>>) -> String:
     case Some{digest}:
       S.hex(digest)
 
-# the hex sha256 digest of a string's bytes. The match is what a symbolic
-# string sticks on, so a proof that only unfolds `hash_of` does not enter
-# the digest.
-def hex(+text: String) -> String:
+# the hex sha256 digest of a string whose characters are bytes: each one is
+# reduced to its low eight bits. NAR serials are held this way.
+def raw(+text: String) -> String:
   match text:
     case SNil{}:
       show(S.sha256(bytes(text), 0n))
     case SCon{_c, _t}:
       show(S.sha256(bytes(text), String.length(text)))
+
+# one byte as a character: a UTF-8 string is held in a Bend string one byte to
+# a character, the shape `raw` hashes
+def utf8.byte(+code: U32) -> Char:
+  Chr{(code .&. 255 : U32)}
+
+def utf8.1(+code: U32) -> String:
+  SCon{utf8.byte(code), SNil{}}
+
+def utf8.2(+code: U32) -> String:
+  SCon{utf8.byte((192 .|. U32.shrn(code, 6n) : U32)),
+    SCon{utf8.byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}
+
+def utf8.3(+code: U32) -> String:
+  SCon{utf8.byte((224 .|. U32.shrn(code, 12n) : U32)),
+    SCon{utf8.byte((128 .|. (U32.shrn(code, 6n) .&. 63 : U32) : U32)),
+      SCon{utf8.byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}}
+
+def utf8.4(+code: U32) -> String:
+  SCon{utf8.byte((240 .|. U32.shrn(code, 18n) : U32)),
+    SCon{utf8.byte((128 .|. (U32.shrn(code, 12n) .&. 63 : U32) : U32)),
+      SCon{utf8.byte((128 .|. (U32.shrn(code, 6n) .&. 63 : U32) : U32)),
+        SCon{utf8.byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}}}
+
+def utf8.put.3(three: Bool, +code: U32) -> String:
+  match three:
+    case True{}:
+      utf8.3(code)
+    case False{}:
+      utf8.4(code)
+
+def utf8.put.2(two: Bool, +code: U32) -> String:
+  match two:
+    case True{}:
+      utf8.2(code)
+    case False{}:
+      utf8.put.3(U32.is_lt(code, 65536), code)
+
+def utf8.put.ascii(ascii: Bool, +code: U32) -> String:
+  match ascii:
+    case True{}:
+      utf8.1(code)
+    case False{}:
+      utf8.put.2(U32.is_lt(code, 2048), code)
+
+def utf8.put(+code: U32) -> String:
+  utf8.put.ascii(U32.is_lt(code, 128), code)
+
+# the string's characters encoded as UTF-8, each byte a character
+def utf8(+text: String) -> String:
+  match text:
+    case SNil{}:
+      ""
+    case SCon{c, t}:
+      utf8.put(Char.to_u32(c)) ++ utf8(t)
+
+# the hex sha256 digest of a text's UTF-8 bytes, which is what `sha256sum`
+# says of the file the text was read from, and what `bend --publish` and the
+# hub hash a package file and its manifest by. The match is what a symbolic
+# string sticks on, so a proof that only unfolds `hash_of` does not enter
+# the digest.
+def hex(+text: String) -> String:
+  match text:
+    case SNil{}:
+      raw(text)
+    case SCon{_c, _t}:
+      raw(utf8(text))

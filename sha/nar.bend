@@ -60,56 +60,6 @@ def str(+text: String) -> String:
   +n = String.length(text)
   le64(n) ++ text ++ zeros(pad.of(n))
 
-def utf8.1(+code: U32) -> String:
-  SCon{byte(code), SNil{}}
-
-def utf8.2(+code: U32) -> String:
-  SCon{byte((192 .|. U32.shrn(code, 6n) : U32)),
-    SCon{byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}
-
-def utf8.3(+code: U32) -> String:
-  SCon{byte((224 .|. U32.shrn(code, 12n) : U32)),
-    SCon{byte((128 .|. (U32.shrn(code, 6n) .&. 63 : U32) : U32)),
-      SCon{byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}}
-
-def utf8.4(+code: U32) -> String:
-  SCon{byte((240 .|. U32.shrn(code, 18n) : U32)),
-    SCon{byte((128 .|. (U32.shrn(code, 12n) .&. 63 : U32) : U32)),
-      SCon{byte((128 .|. (U32.shrn(code, 6n) .&. 63 : U32) : U32)),
-        SCon{byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}}}
-
-def utf8.put.3(three: Bool, +code: U32) -> String:
-  match three:
-    case True{}:
-      utf8.3(code)
-    case False{}:
-      utf8.4(code)
-
-def utf8.put.2(two: Bool, +code: U32) -> String:
-  match two:
-    case True{}:
-      utf8.2(code)
-    case False{}:
-      utf8.put.3(U32.is_lt(code, 65536), code)
-
-def utf8.put.ascii(ascii: Bool, +code: U32) -> String:
-  match ascii:
-    case True{}:
-      utf8.1(code)
-    case False{}:
-      utf8.put.2(U32.is_lt(code, 2048), code)
-
-def utf8.put(+code: U32) -> String:
-  utf8.put.ascii(U32.is_lt(code, 128), code)
-
-# the string's characters encoded as UTF-8, each byte a character
-def utf8(+text: String) -> String:
-  match text:
-    case SNil{}:
-      ""
-    case SCon{c, t}:
-      utf8.put(Char.to_u32(c)) ++ utf8(t)
-
 def exec.fields(ex: Bool) -> String:
   match ex:
     case False{}:
@@ -120,17 +70,17 @@ def exec.fields(ex: Bool) -> String:
 # a regular file's node, marked executable when it is
 def regular(ex: Bool, +contents: String) -> String:
   str("(") ++ str("type") ++ str("regular") ++ exec.fields(ex)
-    ++ str("contents") ++ str(utf8(contents)) ++ str(")")
+    ++ str("contents") ++ str(Sha.utf8(contents)) ++ str(")")
 
 # a symlink's node
 def symlink(+target: String) -> String:
   str("(") ++ str("type") ++ str("symlink") ++ str("target")
-    ++ str(utf8(target)) ++ str(")")
+    ++ str(Sha.utf8(target)) ++ str(")")
 
 # one directory entry: its name and its node
 def entry(+ent: Ent) -> String:
   Ent{name, node} = ent
-  str("entry") ++ str("(") ++ str("name") ++ str(utf8(name))
+  str("entry") ++ str("(") ++ str("name") ++ str(Sha.utf8(name))
     ++ str("node") ++ node ++ str(")")
 
 # a directory's entries, in the order given
@@ -250,7 +200,7 @@ def sri.hex(+hex: String) -> String:
 
 # the SRI of some bytes: `sha256-` and the base64 of their digest
 def sri(+bytes: String) -> String:
-  sri.hex(Sha.hex(bytes))
+  sri.hex(Sha.raw(bytes))
 
 # the node of an empty directory
 def empty() -> String:

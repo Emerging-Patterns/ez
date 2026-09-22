@@ -13,12 +13,16 @@ import ../check/kit.bend as Check
 import ../check/world.bend as W
 
 # the repo being published: a nested layout with an import across it, which is
-# the shape that makes the file walk worth checking
+# the shape that makes the file walk worth checking. One comment is not ASCII,
+# with characters two, three and four bytes long in UTF-8, because bend hashes
+# a file's UTF-8 bytes: a digest over anything else, such as each character
+# cut to its low byte, agrees with bend on ASCII and nowhere else.
 def repo(+at: String) -> IO(Unit):
   do IO<Unit>:
     W.mkdir(at ++ "/src/util")
     _m : Bool <- F.write(at ++ "/src/util/math.bend",
-      "import Base\n\n# double the number\ndef double(+x: U32) -> U32:\n" ++
+      "import Base\n\n# double the number: x → 2·x — naïve 🙂\n" ++
+      "def double(+x: U32) -> U32:\n" ++
       "  (x * 2 : U32)\n")
     _l : Bool <- F.write(at ++ "/src/lib.bend",
       "import Base\nimport ./util/math.bend as M\n\n" ++

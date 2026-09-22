@@ -14,7 +14,7 @@ Items for review:
 - [x] <!-- REVIEW (resolved): The requirement list was derived from the README. Each requirement has been checked against the code; the verdicts are in the inventory, and requirements were corrected, added or removed to match. -->
 - [x] <!-- REVIEW (resolved): bolt is the home for the traceability check, as a rule in its `laws` group beside `closed`, `law` and `unsafe`. -->
 - [x] <!-- REVIEW (resolved): EZ-DOC-3 stays the headline guarantee. `ez lock` may read the ledger, the committed `.bend` files, the vendored trees, and hub content verified by hash, and nothing else. The changes that make that true are listed under "Decided behavior changes". -->
-- [x] <!-- REVIEW (resolved): `Sha.hex` keeps its low-byte fold, since EZ-HASH-4 needs it to match `bend --publish`, and `sha/nar.bend` keeps encoding to UTF-8, since nix hashes bytes. Both are documented. The fold is confirmed once by publishing a file with a non-ASCII character. -->
+- [x] <!-- REVIEW (resolved, then reversed): `Sha.hex` first kept its low-byte fold, on the belief that EZ-HASH-4 needed it to match `bend --publish`. The publish check refuted it: `bend --publish` hashes with `crypto.createHash("sha256").update(text)` (bend2/main.ts `cli_publish`), which is the text's UTF-8 bytes, and the hub checks bodies with `TextEncoder` (bend2/bend.ts `hub_get`). A non-ASCII file published as a different hash from the one ez computed; snap, shake and ezhttp all hold one. `Sha.hex` now hashes the UTF-8 bytes, `Sha.raw` keeps the byte-level digest for NAR serials, and `tests/publish.bend` publishes a non-ASCII file so the gate catches a regression. -->
 - [x] <!-- REVIEW (resolved): The gitignore allowlist is derived from the ledger by one pure function, called by `ez add`, `ez remove` and `ez lock --upgrade`. `ez init` writes `.ez/*`, `!.ez/lib` and `.ez/lib/*` instead of `.ez/`. EZ-VEN-1 is restored to "names exactly the vendored hashes". -->
 - [x] <!-- REVIEW (resolved): No message prefix becomes a requirement. EZ-OUT-1 is the exit-status rule; wording is incidental. -->
 - [x] <!-- REVIEW (resolved): Tag selection changes: a release beats any pre-release, the default branch is asked of the remote, and refs resolve exactly. EZ-RES-1 states the new behavior. -->
@@ -215,7 +215,7 @@ The requirements below are the first version of `SPEC.md`. Each one is stated as
 | EZ-HASH-3 | When ez writes a package under `<lib>/<h>`, `h` is the 0x hash of the file list whose manifest it writes beside the files. | Proved | pending |
 | EZ-HASH-4 | ez's 0x hash for an entry equals the hash `bend --publish` assigns to it. | Trusted | |
 | EZ-HASH-5 | ez's narHash equals `nix hash path --type sha256 --sri` of the same tree. | Trusted | |
-| EZ-HASH-6 | `Sha.hex(s)` is the SHA-256 of the bytes formed by each character of `s` reduced to its low eight bits. For ASCII text that is SHA-256 of the file's bytes. | Trusted | |
+| EZ-HASH-6 | `Sha.hex(s)` is the SHA-256 of the UTF-8 bytes of `s`. For a file's text that is SHA-256 of the file's bytes. | Trusted | |
 
 EZ-HASH-1 is already true and already proved. The law is `pkg/hash_perm`, over the file list the import walk produces rather than a directory tree, with distinct paths as a precondition:
 
@@ -234,7 +234,7 @@ EZ-HASH-2 is true by construction: `sha/nar.bend` lists a directory with `find` 
 
 EZ-HASH-3 holds when a tree is written, because `Git.lay` names the directory and writes the manifest from the same file list. Nothing re-checks it afterwards, which is why it is stated about the write and not about the directory at rest.
 
-The split in this group shows how the two levels work together. We cannot prove that ez agrees with nix or with Bend's publisher, because those are other programs, so EZ-HASH-4 and EZ-HASH-5 are Trusted. The inventory lists the ways EZ-HASH-5 can diverge today (exec bit from `test -x`, trimmed names and symlink targets, names with newlines, submodules). EZ-HASH-6 is restated from "computes FIPS 180-4 SHA-256" to what `Sha.hex` does, since for non-ASCII input it is not SHA-256 of the file. The fold is kept because EZ-HASH-4 needs ez's hash to be Bend's, and `nix/bend-lib.nix` records it as Bend's own; one publish of a file with a non-ASCII character confirms it. `sha/nar.bend` keeps encoding to UTF-8, because nix hashes bytes.
+The split in this group shows how the two levels work together. We cannot prove that ez agrees with nix or with Bend's publisher, because those are other programs, so EZ-HASH-4 and EZ-HASH-5 are Trusted. The inventory lists the ways EZ-HASH-5 can diverge today (exec bit from `test -x`, trimmed names and symlink targets, names with newlines, submodules). EZ-HASH-6 is restated from "computes FIPS 180-4 SHA-256" to say what is hashed: the UTF-8 bytes of the text. `Sha.hex` used to cut each character to its low eight bits, which is SHA-256 of the file only for ASCII. That fold was believed to be Bend's own, but a publish of a file with a non-ASCII character refuted it: `bend --publish` hashes `createHash("sha256").update(text)`, the UTF-8 bytes (bend2/main.ts `cli_publish`), so the fold broke EZ-HASH-4 for every package holding such a file. `Sha.hex` now encodes to UTF-8 before hashing, the same encoding `sha/nar.bend` always used, because both nix and Bend hash bytes.
 
 The closed laws for the FIPS `abc` vector, the empty string and the empty NAR directory back these requirements only as examples. They are removed in the first rollout phase.
 
@@ -451,7 +451,7 @@ These assumptions sit outside the proofs. They are the complete list of Trusted 
 | EZ-RES-7 | git reports refs, tags, and ancestry accurately. | The World model takes git's answers as given. |
 | EZ-HASH-4 | ez's 0x hash matches `bend --publish`. | The publisher is a separate program. |
 | EZ-HASH-5 | ez's narHash matches nix. | nix is a separate program. |
-| EZ-HASH-6 | `Sha.hex` computes the SHA-256 digest of its folded bytes. | Proved in Giulio2002/bend-sha256 against an executable FIPS 180-4 specification, at the hash ez vendors; ez's gate does not re-check it. Collision resistance is also assumed. |
+| EZ-HASH-6 | `Sha.hex` computes the SHA-256 digest of its text's UTF-8 bytes. | Proved in Giulio2002/bend-sha256 against an executable FIPS 180-4 specification, at the hash ez vendors; ez's gate does not re-check it. Collision resistance is also assumed. |
 
 EZ-TRUST-3 is narrowed from the first draft: ez verifies hub content itself (EZ-FETCH-1), so what remains is that the hub serves the hash at all, which is what lets EZ-DOC-3 leave hub content out of `inputs`.
 
