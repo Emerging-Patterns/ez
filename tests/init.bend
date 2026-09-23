@@ -1,5 +1,5 @@
 # `ez init` scaffolds a project: the ledger, the ignore rules, and an entry
-# that checks. A second run leaves an entry that is already there.
+# that checks. A second run is refused and leaves everything it found.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
@@ -35,12 +35,17 @@ def fresh(+repo: String, +app: String) -> IO(Unit):
     +ck : String <- R.exec(W.ez(repo, app, ["check"]))
     Check.eq_str("and that entry checks", Q.chomp(R.text(ck)), "ok main.bend")
 
-# a second init leaves a program that is already there
+# a second init is refused, and leaves the ledger and the program it found
 def kept(+repo: String, +app: String) -> IO(Unit):
   do IO<Unit>:
     _w : Bool <- F.write(app ++ "/main.bend",
       "import Base\n\ndef main() -> U32:\n  7\n")
-    _i : String <- R.exec(W.ez(repo, app, ["init"]))
+    +again : String <- R.exec(W.ez(repo, app, ["init", "other"]))
+    yes("a second init is refused", Bool.not(R.ok(again)))
+    t : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
+    Check.eq_str("and leaves the ledger it found",
+      Q.chomp(F.text_of(t)),
+      "[package]\nname = \"app\"\nentry = \"main.bend\"")
     e : Maybe<&2, String> <- F.read(app ++ "/main.bend")
     Check.eq_str("a second init leaves the entry it found",
       Q.chomp(F.text_of(e)), "import Base\n\ndef main() -> U32:\n  7")
@@ -97,6 +102,8 @@ def main() -> IO(Unit):
 #|ok and the ignore rules for what ez will generate
 #|ok and an entry that checks and runs
 #|ok and that entry checks
+#|ok a second init is refused
+#|ok and leaves the ledger it found
 #|ok a second init leaves the entry it found
 #|ok and does not rewrite the ignore file
 #|ok init succeeds with a nested entry

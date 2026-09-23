@@ -1171,6 +1171,10 @@ def Laws.root_skips_ez(p):
     k => Bool.pick(List<&2, String>, k, [], [".ez/" ++ p]),
     String.starts_with(".ez/" ++ p, ".ez/"), True{}, Eq.starts_append(".ez/", p))
 
+# A ledger that is there picks the arm that plans nothing.
+def Laws.init_keeps_ledger(_s, _name, _at):
+  {==}
+
 # A pin's two emptiness tests are rewritten to the False each premise gives,
 # and what is left is the arm that passes or the reason written out.
 def Laws.gap_of_full_pin(n, _e, _b, _url, _rev, _tag, _root, nar, _vend, fr, fn):

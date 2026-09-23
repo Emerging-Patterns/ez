@@ -331,8 +331,8 @@ def init.tail(+text: String) -> String:
 def init.ignored(+text: String, ms: List<&2, String>) -> String:
   init.tail(text) ++ "# written by ez\n" ++ String.join(ms, "\n") ++ "\n"
 
-# nothing to add means nothing written, so a second `ez init` leaves the file
-# it read exactly as it found it
+# nothing to add means nothing written, so an `ez init` in a directory whose
+# ignore file already has the rules leaves it exactly as it found it
 def init.ignore.put(ms: List<&2, String>, +text: String) -> IO(Bool):
   match ms:
     case Nil{}:
@@ -359,7 +359,7 @@ def init.entry.put(+at: String) -> IO(Bool):
     _mk : String <- R.exec(["mkdir", "-p", P.dir(at)])
     F.write(at, init.stub())
 
-# an entry that is already there is left alone, so a second `ez init` does not
+# an entry that is already there is left alone, so `ez init` does not
 # overwrite the program
 def init.entry.go(got: Maybe<&2, String>, +at: String) -> IO(Bool):
   match got:
@@ -374,18 +374,39 @@ def init.entry(+at: String) -> IO(Bool):
     g : Maybe<&2, String> <- F.read(at)
     init.entry.go(g, at)
 
+# the ledger a new project starts from, or nothing when there already is one.
+# A ledger on disk holds dependencies, tools and a `bin` that a fresh one would
+# lose, so `ez init` writes over none of it, whatever the file holds.
+def init.plan(got: Maybe<&2, String>, +name: String, +at: String) -> Maybe<&2, String>:
+  match got:
+    case Some{_s}:
+      None{}
+    case None{}:
+      Some{Rend.show(M.Manifest{name, at, "", "", [], []})}
+
+# the ledger written, then the ignore rules for what ez will generate beside
+# it, and the entry itself when the directory does not already hold one. A
+# project that already has a ledger is refused before anything is written.
+def init.go(plan: Maybe<&2, String>, +name: String, +at: String) -> IO(Unit):
+  match plan:
+    case None{}:
+      IO.die(Unit, 1, "ez: " ++ toml() ++
+        " already exists; ez init writes a new project and leaves it alone")
+    case Some{text}:
+      do IO<Unit>:
+        wrote : Bool <- F.write(toml(), text)
+        +kept : Bool <- init.ignore(name)
+        +made : Bool <- init.entry(at)
+        report.exit(Bool.and(wrote, Bool.and(kept, made)))
+
 # a new project: a ledger naming this directory and its entry file, the
-# ignore rules for what ez will generate beside them, and the entry itself
-# when the directory does not already hold one
+# ignore rules and the entry
 def init(+asked: String, +file: String) -> IO(Unit):
   do IO<Unit>:
     +name : String <- IO.pure(String, init.name(asked))
     +at : String <- IO.pure(String, entry.or(file))
-    wrote : Bool <- F.write(toml(),
-      Rend.show(M.Manifest{name, at, "", "", [], []}))
-    +kept : Bool <- init.ignore(name)
-    +made : Bool <- init.entry(at)
-    report.exit(Bool.and(wrote, Bool.and(kept, made)))
+    got : Maybe<&2, String> <- F.read(toml())
+    init.go(init.plan(got, name, at), name, at)
 
 # the last path component
 def add.base(ps: List<&2, String>) -> String:

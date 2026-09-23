@@ -75,6 +75,9 @@ ez doctor                        report on the toolchain and the project
 `ez help` prints that list, and `ez help test` the flags of one command. The
 Bend runtime keeps `--help` for itself.
 
+`ez init` starts a project and never writes over one: in a directory that
+already has an `ez.toml` it exits 1 and writes nothing.
+
 A ledger, and a dependency vendored from a repo that never published:
 
 ```toml

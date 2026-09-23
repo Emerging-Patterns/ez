@@ -513,6 +513,14 @@ Each of these is recorded, not resolved. The RFC carries REVIEW markers for the 
 
 Every command, including `ez help` and a mistyped command, creates `.ez/lib`, `.ez` and `bin` in the current directory (`ez/main.bend:218-222`). `ez init` overwrites an existing ez.toml, losing its dependencies, tools and `bin`. `ez add` names a dependency after its entry's basename minus five characters (`ez/cmd.bend:359-361`), so two packages whose entry is `main.bend` collide, and re-adding a dependency drops `vendor = true`, moves it to the end, and re-renders the whole file. `ez add` vendors before it checks the ledger parses, so a broken ledger leaves trees and origins behind. `ez remove` of an unknown name rewrites the file and exits 0. `ez check`, `build`, `run` and `publish` silently fall back to `main.bend` when the ledger does not parse. `ez build` builds `entry`, not `bin`, and a ledger with an empty `name` builds `bin/.out`. `ez run` does not strip `--` and turns any program failure into exit 1. `ez doctor` fails a project with no dependencies, because the lock grep finds no hashes. README says "Nothing is fetched" for building ez, but only sha256 is vendored; eztoml, snap and shake are not. Comments in `pkg/pkg.bend:4` and `pkg/PROOF.bend:11` cite `tests/publish.sh`, which is `tests/publish.bend`.
 
+The RFC's "Decided behavior changes" picks five of these to fix, in this order. Each fix is a pure decision with quantified laws in `ez/LAWS.bend`; none is a requirement.
+
+- [x] `ez init` overwrites an existing ledger. **Fixed:** `Cmd.init.plan` plans no write when `ez.toml` exists, and `ez init` then exits 1 having written nothing, the ignore file and the entry included (`init_keeps_ledger`).
+- [ ] `ez add` names a dependency after its entry file, so two `main.bend` entries collide, and re-adding a dependency drops `vendor = true`.
+- [ ] `ez add` with a relative path fetches relative to the wrong directory.
+- [ ] Every command, `ez help` included, creates `.ez` and `bin` in the current directory.
+- [ ] `ez doctor` fails a project with no dependencies.
+
 ### RFC requirements with no corresponding code
 
 EZ-OUT-1's `ez: <area>:` prefix and structured `Failed{area, reason}` outcome do not exist. No code implements a `World`, a `Plan`, a planner or an interpreter. No code checks that a vendored tree's directory name is the hash of its contents after the tree is written (EZ-HASH-3). EZ-DOC-2's "rendering a parsed lock reproduces the bytes" has no code path that exercises it. No traceability check exists, and bolt reads only `.bend` files, so it cannot read a `SPEC.md` today.
