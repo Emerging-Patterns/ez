@@ -18,6 +18,7 @@ import ./target.bend as Tgt
 import ./upgrade.bend as Up
 import ./pin.bend as Pin
 import ./sorted.bend as Sorted
+import ./named.bend as Named
 import ../ez/say.bend as Say
 
 # the ledger's path, which is fixed
@@ -408,36 +409,30 @@ def init(+asked: String, +file: String) -> IO(Unit):
     got : Maybe<&2, String> <- F.read(toml())
     init.go(init.plan(got, name, at), name, at)
 
-# the last path component
-def add.base(ps: List<&2, String>) -> String:
-  match ps:
-    case []:
-      ""
-    case Con{h, Nil{}}:
-      h
-    case Con{_h, t}:
-      add.base(t)
-
-# a dependency is named after its entry file, the way bend names an import
-def add.alias(+at: String) -> String:
-  +leaf = add.base(String.split(at, '/'))
-  String.take(leaf, Nat.sub(String.length(leaf), 5n))
-
-# a vendoring's answer as a ledger entry. The entry file is read twice, once
-# for the name and once for itself, so it arrives through a parameter.
+# a vendoring's answer as a ledger entry, under the name `ez/named.bend` gave
+# it.
 #
 # `root` and the NAR hash are in the ledger because `ez lock` needs them and a
 # clone, which never sees .ez/origins.toml, would otherwise have to guess. They
 # come straight off the vendoring that computed them: it weighed the tree for
 # the NAR hash and worked the root out from where the entry sat, so asking the
 # cache it just wrote would be reading back our own answer.
-def add.dep.go(hash: String, url: String, rev: String, +at: String, tag: String, root: String, nar: String) -> M.Dep:
-  M.Dep{add.alias(at), hash, at, M.Git{url, rev, tag, root, nar, False{}}}
+def add.dep.go(
+  name: String,
+  hash: String,
+  url: String,
+  rev: String,
+  at: String,
+  tag: String,
+  root: String,
+  nar: String
+) -> M.Dep:
+  M.Dep{name, hash, at, M.Git{url, rev, tag, root, nar, False{}}}
 
 # what a vendoring answered, as the ledger records it
-def add.dep(got: Git.Got) -> M.Dep:
+def add.dep(name: String, got: Git.Got) -> M.Dep:
   Git.Got{h, u, v, e, t, r, n} = got
-  add.dep.go(h, u, v, e, t, r, n)
+  add.dep.go(name, h, u, v, e, t, r, n)
 
 # the dependencies of a ledger that was read
 def deps.of(manifest: M.Manifest) -> List<&2, M.Dep>:
@@ -451,24 +446,40 @@ def edit.write(+next: M.Manifest) -> IO(Unit):
     Up.allowlist(deps.of(next))
     report.exit(wrote)
 
-# the ledger with this dependency written into it. A dependency added again
-# keeps the `vendor = true` its entry already had.
-def add.write(ledger: M.Read, dep: M.Dep) -> IO(Unit):
+# a name the ledger can take: the dependency vendored, then written into the
+# ledger. A dependency added again keeps the `vendor = true` its entry already
+# had. The vendoring comes first: a ledger naming a package that is not on
+# disk is worse than no entry at all.
+def add.take(
+  ok: Bool,
+  why: String,
+  manifest: M.Manifest,
+  +name: String,
+  +url: String,
+  +ref: String,
+  +entry: String
+) -> IO(Unit):
+  match ok:
+    case False{}:
+      IO.die(Unit, 1, why)
+    case True{}:
+      do IO<Unit>:
+        lib : String <- Env.lib()
+        g : Git.Got <- Git.vendor(lib, url, ref, entry)
+        edit.write(Rend.add.keep(manifest, add.dep(name, g)))
+
+# a git dependency recorded under the name the ledger already gives its
+# source, or else the one the source gives itself. The ledger is asked before
+# anything is fetched, so one that does not parse, or that gives the name to
+# another source, stops the command with nothing vendored.
+def add.go(ledger: M.Read, fresh: String, +url: String, +ref: String, +entry: String) -> IO(Unit):
   match ledger:
     case M.Bad{why}:
       refuse(M.Bad{why})
-    case M.Good{m}:
-      edit.write(Rend.add.keep(m, dep))
-
-# a git dependency vendored, and then recorded in the ledger under its own
-# name. The vendoring comes first: a ledger naming a package that is not on
-# disk is worse than no entry at all.
-def add.go(+url: String, +ref: String, +entry: String) -> IO(Unit):
-  do IO<Unit>:
-    lib : String <- Env.lib()
-    g : Git.Got <- Git.vendor(lib, url, ref, entry)
-    r : M.Read <- load()
-    add.write(r, add.dep(g))
+    case M.Good{+manifest}:
+      +name = Named.had(deps.of(manifest), url, fresh)
+      +why = Named.why(deps.of(manifest), name, url)
+      add.take(String.is_empty(why), why, manifest, name, url, ref, entry)
 
 # a path, with `~` expanded the way `ez tool run` expands it
 def add.local(+path: String) -> IO(String):
@@ -499,10 +510,12 @@ def add.ref.at(given: Bool, +url: String, +ref: String) -> IO(String):
 # `owner/repo`, a git url, or a path, the same shapes `ez tool run` takes.
 # A missing ref is resolved, and a missing entry is read from the checkout.
 def add(+target: String, +ref: String, +entry: String) -> IO(Unit):
+  +place = Tgt.classify(target)
   do IO<Unit>:
-    +url : String <- add.url(Tgt.classify(target))
+    +url : String <- add.url(place)
     +got : String <- add.ref.at(Bool.not(String.is_empty(ref)), url, ref)
-    add.go(url, got, entry)
+    r : M.Read <- load()
+    add.go(r, Named.called(place, url), url, got, entry)
 
 # the ledger with a dependency dropped, and its allowlist line with it
 def remove.write(ledger: M.Read, name: String) -> IO(Unit):

@@ -10,6 +10,8 @@ import ./drift.bend as D
 import ./gate.bend as G
 import ./pin.bend as Pin
 import ./target.bend as Tgt
+import ./named.bend as Named
+import ../manifest/manifest.bend as M
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
@@ -1173,6 +1175,77 @@ def Laws.root_skips_ez(p):
 
 # A ledger that is there picks the arm that plans nothing.
 def Laws.init_keeps_ledger(_s, _name, _at):
+  {==}
+
+# named: a walk from the end of a text has passed a slash once it has passed
+# the one in front of `n`, and nothing to its left changes that. The name laws
+# rewrite the one `String.eq` each branch turns on.
+
+# LAW: past the slash in front of a slashless `n`, the walk has seen a slash
+# and kept `n`, whatever is to the left of it
+law last_after:
+  for p: String
+  for +n: String
+  for e: {Named.Seen{False{}, n} == Named.last(n) : Named.Seen}
+  {Named.last(p ++ ("/" ++ n)) == Named.Seen{True{}, n} : Named.Seen}
+
+def last_after(p, n, e):
+  match p:
+    case SNil{}:
+      %e : {Named.last.step('/', _) == Named.Seen{True{}, n} : Named.Seen}
+      {==}
+    case SCon{+h, +t}:
+      %Equal.sym(Named.Seen, Named.last(t ++ ("/" ++ n)), Named.Seen{True{}, n},
+        last_after(t, n, e)) :
+        {Named.last.step(h, _) == Named.Seen{True{}, n} : Named.Seen}
+      {==}
+
+def Laws.leaf_is_last(p, n, e):
+  Equal.cong(Named.Seen, String, Named.leaf.of,
+    Named.last(p ++ ("/" ++ n)), Named.Seen{True{}, n}, last_after(p, n, e))
+
+def Laws.had_fresh(_url, _fresh):
+  {==}
+
+def Laws.had_keeps(n, _h, _en, url, _rev, _tag, _root, _nar, _vend, t, fresh):
+  %Equal.sym(Bool, String.eq(url, url), True{}, Eq.string_eq_self(url)) :
+    {Named.had.at(_, n, Named.had(t, url, fresh)) == n : String}
+  {==}
+
+def Laws.had_skips_git(n, _h, _en, _u, url, _rev, _tag, _root, _nar, _vend, t, fresh, ne):
+  %ne : {Named.had.at(_, n, Named.had(t, url, fresh)) == Named.had(t, url, fresh)
+    : String}
+  {==}
+
+def Laws.had_skips_hub(_n, _h, _en, _url, _t, _fresh):
+  {==}
+
+def Laws.clash_none(_name, _url):
+  {==}
+
+def Laws.clash_skips(_m, _h, _en, s, t, name, url, ne):
+  %ne : {Named.clash.at(_, s, url, Named.clash(t, name, url))
+    == Named.clash(t, name, url) : Bool}
+  {==}
+
+def Laws.clash_same(n, _h, _en, url, rev, tag, root, nar, vend, t):
+  %Equal.sym(Bool, String.eq(n, n), True{}, Eq.string_eq_self(n)) :
+    {Named.clash.at(_, M.Git{url, rev, tag, root, nar, vend}, url,
+      Named.clash(t, n, url)) == False{} : Bool}
+  %Equal.sym(Bool, String.eq(url, url), True{}, Eq.string_eq_self(url)) :
+    {Bool.not(_) == False{} : Bool}
+  {==}
+
+def Laws.clash_other(n, _h, _en, u, url, rev, tag, root, nar, vend, t, ne):
+  %Equal.sym(Bool, String.eq(n, n), True{}, Eq.string_eq_self(n)) :
+    {Named.clash.at(_, M.Git{u, rev, tag, root, nar, vend}, url,
+      Named.clash(t, n, url)) == True{} : Bool}
+  %ne : {Bool.not(_) == True{} : Bool}
+  {==}
+
+def Laws.clash_hub(n, _h, _en, url, t):
+  %Equal.sym(Bool, String.eq(n, n), True{}, Eq.string_eq_self(n)) :
+    {Named.clash.at(_, M.Hub{}, url, Named.clash(t, n, url)) == True{} : Bool}
   {==}
 
 # A pin's two emptiness tests are rewritten to the False each premise gives,

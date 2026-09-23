@@ -516,7 +516,7 @@ Every command, including `ez help` and a mistyped command, creates `.ez/lib`, `.
 The RFC's "Decided behavior changes" picks five of these to fix, in this order. Each fix is a pure decision with quantified laws in `ez/LAWS.bend`; none is a requirement.
 
 - [x] `ez init` overwrites an existing ledger. **Fixed:** `Cmd.init.plan` plans no write when `ez.toml` exists, and `ez init` then exits 1 having written nothing, the ignore file and the entry included (`init_keeps_ledger`).
-- [ ] `ez add` names a dependency after its entry file, so two `main.bend` entries collide, and re-adding a dependency drops `vendor = true`.
+- [x] `ez add` names a dependency after its entry file, so two `main.bend` entries collide, and re-adding a dependency drops `vendor = true`. **Fixed:** `ez/named.bend` names a dependency after its source: a remote by its slug's last component (the repository, `.git` dropped), a path by its directory. A source the ledger already records keeps its name there (`had_keeps`, `had_skips_git`, `had_skips_hub`, `had_fresh`), and a name the ledger gives another source, hub or git, is refused with exit 1 before anything is fetched (`clash_same`, `clash_other`, `clash_hub`, `clash_skips`, `clash_none`); `leaf_is_last` holds the name to what follows the last slash. `ez add` has no hub target, so no hub dependency is ever named by it. The vendor bit was already kept on a re-add by `Rend.add.keep` (`readd_keeps_vendor`, from the EZ-VEN-1 change); the moved and re-rendered entry is unchanged.
 - [ ] `ez add` with a relative path fetches relative to the wrong directory.
 - [ ] Every command, `ez help` included, creates `.ez` and `bin` in the current directory.
 - [ ] `ez doctor` fails a project with no dependencies.

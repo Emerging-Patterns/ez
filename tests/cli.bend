@@ -88,8 +88,8 @@ def ledger(+repo: String, +app: String, +url: String, +rev: String) -> IO(String
     +hash : String <- IO.pure(String, W.value(F.text_of(t2), "hash"))
     +nar : String <- IO.pure(String, W.value(F.text_of(t2), "narHash"))
     Check.eq_str("add records the package under its name",
-      stanza(F.text_of(t2), "[deps.lib]"),
-      "[deps.lib]\nhash = \"" ++ hash ++ "\"\ngit = \"" ++ url ++
+      stanza(F.text_of(t2), "[deps.upstream]"),
+      "[deps.upstream]\nhash = \"" ++ hash ++ "\"\ngit = \"" ++ url ++
       "\"\nrev = \"" ++ rev ++ "\"\nroot = \"src\"\nnarHash = \"" ++ nar ++
       "\"\nentry = \"src/lib.bend\"")
     yes("and records the NAR hash the ledger locks it by",
@@ -146,10 +146,10 @@ def drifted(+repo: String, +app: String, +hash: String) -> IO(Unit):
   do IO<Unit>:
     +ok : String <- R.exec(W.ez(repo, app, ["doctor"]))
     yes("doctor passes a project with nothing wrong", R.ok(ok))
-    _r : String <- R.exec(W.ez(repo, app, ["remove", "lib"]))
+    _r : String <- R.exec(W.ez(repo, app, ["remove", "upstream"]))
     +t : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
     yes("remove drops it from the ledger",
-      Bool.not(String.contains(F.text_of(t), "deps.lib")))
+      Bool.not(String.contains(F.text_of(t), "deps.upstream")))
     Check.eq_str("and leaves the package stanza alone",
       W.value(F.text_of(t), "name"), "myapp")
     +bad : String <- R.exec(W.ez(repo, app, ["doctor"]))

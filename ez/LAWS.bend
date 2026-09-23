@@ -13,6 +13,7 @@ import ./target.bend as Tgt
 import ../manifest/manifest.bend as M
 import ./pin.bend as Pin
 import ./cmd.bend as Cmd
+import ./named.bend as Named
 
 # a ledger naming two packages, the one the drift laws read
 def ledger() -> String:
@@ -281,6 +282,133 @@ law init_keeps_ledger:
   for name: String
   for at: String
   {Cmd.init.plan(Some{s}, name, at) == None{} : Maybe<&2, String>}
+
+# named: what `ez add` records a dependency under. Its source names it, never
+# its entry file; the ledger keeps the name it already gave that source, and
+# refuses to hand a name it gave one source to another.
+
+# LAW: a source is named by what follows its last slash, whatever comes
+# before. A slug, a url and a resolved directory are all named this way, so
+# two packages whose entry is `main.bend` are named after their repositories.
+law leaf_is_last:
+  for p: String
+  for +n: String
+  for e: {Named.Seen{False{}, n} == Named.last(n) : Named.Seen}
+  {Named.leaf(p ++ ("/" ++ n)) == n : String}
+
+# LAW: a ledger that holds no dependency takes the name the source gives
+# itself
+law had_fresh:
+  for url: String
+  for fresh: String
+  {Named.had([], url, fresh) == fresh : String}
+
+# LAW: a ledger that already holds this git source keeps the name it gave it,
+# so adding it again replaces that entry rather than adding a second
+law had_keeps:
+  for n: String
+  for h: String
+  for en: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for fresh: String
+  {Named.had(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+    fresh) == n : String}
+
+# LAW: an entry from another git source does not lend this one its name
+law had_skips_git:
+  for n: String
+  for h: String
+  for en: String
+  for u: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for fresh: String
+  for ne: {False{} == String.eq(u, url) : Bool}
+  {Named.had(M.Dep{n, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, url,
+    fresh) == Named.had(t, url, fresh) : String}
+
+# LAW: nor does a hub entry, which has no git source to be
+law had_skips_hub:
+  for n: String
+  for h: String
+  for en: String
+  for +url: String
+  for t: List<&2, M.Dep>
+  for fresh: String
+  {Named.had(M.Dep{n, h, en, M.Hub{}} <> t, url, fresh)
+    == Named.had(t, url, fresh) : String}
+
+# LAW: an empty ledger clashes with no name
+law clash_none:
+  for name: String
+  for url: String
+  {Named.clash([], name, url) == False{} : Bool}
+
+# LAW: an entry of another name is not a clash, whatever its source
+law clash_skips:
+  for m: String
+  for h: String
+  for en: String
+  for s: M.Source
+  for t: List<&2, M.Dep>
+  for +name: String
+  for +url: String
+  for ne: {False{} == String.eq(m, name) : Bool}
+  {Named.clash(M.Dep{m, h, en, s} <> t, name, url)
+    == Named.clash(t, name, url) : Bool}
+
+# LAW: the name held by this same git source is not a clash: that is a re-add
+law clash_same:
+  for +n: String
+  for h: String
+  for en: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  {Named.clash(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n,
+    url) == False{} : Bool}
+
+# LAW: the name held by another git source is a clash, and is refused rather
+# than written over
+law clash_other:
+  for +n: String
+  for h: String
+  for en: String
+  for u: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for ne: {False{} == String.eq(u, url) : Bool}
+  {Named.clash(M.Dep{n, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, n,
+    url) == True{} : Bool}
+
+# LAW: and so is the name held by a hub dependency
+law clash_hub:
+  for +n: String
+  for h: String
+  for en: String
+  for +url: String
+  for t: List<&2, M.Dep>
+  {Named.clash(M.Dep{n, h, en, M.Hub{}} <> t, n, url) == True{} : Bool}
 
 # pin: a plain `ez lock` copies every `[tools.*]` pin as the ledger has it,
 # and refuses one it would have to fill. Filling is `--upgrade`'s alone.
