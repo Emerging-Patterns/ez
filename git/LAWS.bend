@@ -112,3 +112,73 @@ law root_rel_up:
   for +entry: String
   for e: {Nat.is_eq(G.depth(P.dir(at)), 1n+G.depth(root)) == True{} : Bool}
   {G.root.rel(at, root, entry) == P.climb(1n, P.dir(entry)) : String}
+
+# What `ez add` pins. With no ref named, it takes a tag chosen from every tag
+# on the remote, and with no semver-ish tag, the branch HEAD's symref names.
+# A named ref is looked up by its whole name. Each decision is a pure
+# function over what `git ls-remote` printed, and these are its laws.
+
+# LAW: whenever any tag is a release, the tag chosen is a release. No
+# pre-release beats one, however much greater its numbers are.
+law choose_release:
+  for +names: List<&2, String>
+  for e: {G.has.release(names) == True{} : Bool}
+  {G.release(G.choose(names)) == True{} : Bool}
+
+# LAW: with no release among the tags, the choice is the greatest of them by
+# the same comparator, and every semver-ish one of them is a pre-release
+law choose_prerelease:
+  for +names: List<&2, String>
+  for e: {G.has.release(names) == False{} : Bool}
+  {G.choose(names) == G.latest(names) : String}
+
+# LAW: the default branch is the one HEAD's symref row names
+law branch_of_symref:
+  for +b: String
+  for rest: List<&2, G.Row>
+  for e: {False{} == String.is_empty(b) : Bool}
+  {G.tip.branch(G.Row{"ref: refs/heads/" ++ b, "HEAD"} <> rest) == b : String}
+
+# LAW: a row that is not HEAD's says nothing about the default branch
+law branch_skips_other:
+  for rev: String
+  for +name: String
+  for rest: List<&2, G.Row>
+  for e: {False{} == String.eq(name, "HEAD") : Bool}
+  {G.tip.branch(G.Row{rev, name} <> rest) == G.tip.branch(rest) : String}
+
+# LAW: nor does HEAD's commit row, which is not a symref
+law branch_skips_commit:
+  for +rev: String
+  for rest: List<&2, G.Row>
+  for e: {False{} == String.starts_with(rev, "ref: ") : Bool}
+  {G.tip.branch(G.Row{rev, "HEAD"} <> rest) == G.tip.branch(rest) : String}
+
+# LAW: a row whose ref name is not exactly `refs/tags/<ref>`, its peeled
+# `^{}` form, or `refs/heads/<ref>` is never picked: taking it away changes
+# nothing. `refs/heads/feature/main` is such a row for `main`.
+law exact_skips:
+  for rev: String
+  for +name: String
+  for +rs: List<&2, G.Row>
+  for +ref: String
+  for e0: {False{} == String.eq(name, "refs/tags/" ++ ref ++ "^{}") : Bool}
+  for e1: {False{} == String.eq(name, "refs/tags/" ++ ref) : Bool}
+  for e2: {False{} == String.eq(name, "refs/heads/" ++ ref) : Bool}
+  {G.exact(G.Row{rev, name} <> rs, ref) == G.exact(rs, ref) : String}
+
+# LAW: a tag the remote has is the answer, whatever branch shares its name
+law exact_tag_first:
+  for +rs: List<&2, G.Row>
+  for +ref: String
+  for e: {False{} == String.is_empty(G.named(rs, "refs/tags/" ++ ref)) : Bool}
+  {G.exact(rs, ref) == G.or_else(G.named(rs, "refs/tags/" ++ ref ++ "^{}"),
+    G.named(rs, "refs/tags/" ++ ref)) : String}
+
+# LAW: a branch is the answer only when no tag of that name is
+law exact_branch:
+  for +rs: List<&2, G.Row>
+  for +ref: String
+  for e0: {"" == G.named(rs, "refs/tags/" ++ ref ++ "^{}") : String}
+  for e1: {"" == G.named(rs, "refs/tags/" ++ ref) : String}
+  {G.exact(rs, ref) == G.named(rs, "refs/heads/" ++ ref) : String}

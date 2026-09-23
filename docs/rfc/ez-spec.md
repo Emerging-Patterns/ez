@@ -301,7 +301,7 @@ The inventory's table lists every input with its source line.
 | :---- | :---- | :---- | :---- |
 | EZ-RES-1 | `ez add` with no ref pins the greatest semver-ish release tag on the remote; with no release, the greatest pre-release; with no semver-ish tag, the remote's default branch as its `HEAD` symref names it. A named ref resolves exactly, as `refs/tags/<ref>` and then `refs/heads/<ref>`. A 40-hex ref is used as a commit without asking the remote. | Proved | pending |
 | EZ-RES-2 | `ez add` with no entry uses the revision's `[package] entry`, then `[package] bin`, then `main.bend`, and refuses if that file is not in the revision. | Proved | pending |
-| EZ-RES-3 | A target containing `://` or starting `git@` is a git URL. A target starting `/`, `./`, `../` or `~/` is a path. A target of exactly two segments of letters, digits, `-`, `_` and `.` is `https://github.com/<target>`. Anything else is a path. | Proved | pending |
+| EZ-RES-3 | A target containing `://` or starting `git@` is a git URL. A target starting `/`, `./`, `../` or `~/` is a path. A target of exactly two segments of letters, digits, `-`, `_` and `.`, neither of them `.` or `..`, is `https://github.com/<target>`, unless its second segment ends in `.bend`, which makes it a path. Anything else is a path, except the empty word, which is refused. | Proved | pending |
 | EZ-RES-4 | `ez lock --upgrade` never moves a hub dependency. | Proved | pending |
 | EZ-RES-5 | An upgraded rev-only dependency moves to the default branch tip only when its pin is an ancestor of that tip, and stays a commit pin. Otherwise the upgrade refuses with exit 1. | Proved | pending |
 | EZ-RES-6 | `--package NAME` asks the remote only for the named dependency or tool, and every other ledger entry keeps its rev, tag and hash. | Proved | pending |
@@ -463,7 +463,7 @@ For EZ-DOC-3, `ez lock` stops reading anything outside `inputs`. It fetches each
 
 For EZ-RES-1, a release tag beats any pre-release, the default branch is the remote's `HEAD` symref rather than a guess of `main` then `master`, and a named ref resolves exactly, as `refs/tags/<ref>` and then `refs/heads/<ref>`.
 
-For EZ-RES-3, `owner/repo` allows `.` in both segments.
+For EZ-RES-3, `owner/repo` allows `.` in both segments, and a second segment ending in `.bend` makes the target a path, so `vercel/next.js` is GitHub and `src/main.bend` is a path.
 
 For EZ-VEN-1, one pure function derives the gitignore allowlist from the ledger, and `ez add`, `ez remove` and `ez lock --upgrade` call it. `ez init` writes `.ez/*`, `!.ez/lib` and `.ez/lib/*` instead of `.ez/`.
 
