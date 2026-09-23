@@ -1317,10 +1317,11 @@ law reupgrade_writes_only_lock:
 law lock_needs_ledger:
   for up: Bool
   for +only: String
+  for here: String
   for listing: W.Listing
   for rs: List<&2, W.Reply>
   for us: List<&2, Up.Reply>
-  {P.refuses(W.World{W.Args{up, only}, None{}, listing, rs, us}) == True{} : Bool}
+  {P.refuses(W.World{W.Args{up, only, here}, None{}, listing, rs, us}) == True{} : Bool}
 
 # LAW: and a ledger that does not parse is refused the same way, so no lock
 # is made from a guess
@@ -1328,10 +1329,199 @@ law lock_needs_ledger:
 law lock_refuses_unread:
   for up: Bool
   for +only: String
+  for here: String
   for +s: String
   for listing: W.Listing
   for rs: List<&2, W.Reply>
   for us: List<&2, Up.Reply>
   for why: String
   for bad: {M.Bad{why} == M.parse(s) : M.Read}
-  {P.refuses(W.World{W.Args{up, only}, Some{s}, listing, rs, us}) == True{} : Bool}
+  {P.refuses(W.World{W.Args{up, only, here}, Some{s}, listing, rs, us}) == True{} : Bool}
+
+# LAW: every tree `ez lock` lays, plain or `--upgrade`, has the manifest of
+# the texts it lays as its last file, each weighed by its own text, and is
+# named by that manifest's `0x` hash. A package whose manifest hashes to its
+# name but is not written the way the name is taken is refused, not laid.
+# EZ-HASH-3
+law lock_lays_named:
+  for +w: W.World
+  {P.lays.named(P.effects(P.plan(w))) == True{} : Bool}
+
+# EZ-LED-8 for `ez lock` and `ez lock --upgrade`: a source is recorded as the
+# ledger gives it, and every question git is asked about it names it anchored
+# at the project, as the planner computes it. The directory the lock runs in,
+# which is the project root, is `W.args.here`.
+
+# the origins of the ledger the lock is made from: ez.toml's for a plain
+# lock, the ledger the upgrade leaves for `--upgrade`
+def origins(world: W.World) -> List<&2, L.Origin>:
+  W.next.origins(up.next(world))
+
+# the package questions a step asks, none when it runs its plan
+def step.pkgs(st: P.Step) -> List<&2, W.Ask>:
+  match st:
+    case P.Asking{asks, _ups}:
+      asks
+    case P.Run{_plan}:
+      []
+
+# the upgrade's queries a step asks, none when it runs its plan
+def step.queries(st: P.Step) -> List<&2, P.Query>:
+  match st:
+    case P.Asking{_asks, ups}:
+      ups
+    case P.Run{_plan}:
+      []
+
+# whether a package question names the source `orgs` records for its hash,
+# anchored at `here`
+def pkg.anchored(+here: String, +orgs: List<&2, L.Origin>, ask: W.Ask) -> Bool:
+  W.Pkg{+h, src, _hub} = ask
+  String.eq(L.src.url(src), L.src.url(P.anchor.src(here, L.origin(orgs, h))))
+
+# whether every package question does
+def pkgs.anchored(+here: String, +orgs: List<&2, L.Origin>, as: List<&2, W.Ask>) -> Bool:
+  match as:
+    case []:
+      True{}
+    case h <> t:
+      +rest = pkgs.anchored(here, orgs, t)
+      Bool.and(pkg.anchored(here, orgs, h), rest)
+
+# whether git is asked a query as the upgrade's question with its source
+# anchored at `here`
+def query.anchored(+here: String, query: P.Query) -> Bool:
+  P.Query{ask, git} = query
+  String.eq(Up.key(git), Up.key(Up.anchor(here, ask)))
+
+# whether every query is
+def queries.anchored(+here: String, qs: List<&2, P.Query>) -> Bool:
+  match qs:
+    case []:
+      True{}
+    case h <> t:
+      +rest = queries.anchored(here, t)
+      Bool.and(query.anchored(here, h), rest)
+
+# the upgrade's questions a list of queries asks
+def queries.asks(qs: List<&2, P.Query>) -> List<&2, Up.Ask>:
+  match qs:
+    case []:
+      []
+    case P.Query{ask, _git} <> t:
+      ask <> queries.asks(t)
+
+# LAW: every package question `ez lock` asks, plain or `--upgrade`, names the
+# source the ledger it is made from records for that package, anchored at
+# the project: a URL and an absolute path as they are, and a relative path
+# joined to the project root
+# EZ-LED-8
+law lock_asks_anchored:
+  for +w: W.World
+  {pkgs.anchored(W.args.here(w), origins(w), step.pkgs(P.step(w))) == True{} : Bool}
+
+# LAW: the upgrade's questions a step puts to git are exactly the questions
+# the upgrade still has (`P.wants.up`), the ones EZ-RES-4 to 8 are stated
+# over
+# EZ-LED-8
+law upgrade_asks_its_questions:
+  for +w: W.World
+  {queries.asks(step.queries(P.step(w))) == P.wants.up(w) : List<&2, Up.Ask>}
+
+# LAW: and git is asked each with the source it names anchored at the
+# project, while the upgrade looks the answer up by the source as the ledger
+# records it
+# EZ-LED-8
+law upgrade_asks_anchored:
+  for +w: W.World
+  {queries.anchored(W.args.here(w), step.queries(P.step(w))) == True{} : Bool}
+
+# LAW: every package `ez lock` resolves, plain or `--upgrade`, and so every
+# package its lock renders, carries the source the ledger it is made from
+# records for its hash, as that ledger gives it, never anchored
+# EZ-LED-8
+law lock_records_as_given:
+  for +w: W.World
+  {pinned.all(origins(w), P.packs(w)) == P.packs(w) : List<&2, L.Pack>}
+
+# the source a dependency records
+def dep.url(dep: M.Dep) -> String:
+  M.source.url(M.source.dep(dep))
+
+# the sources dependencies record, in order
+def dep.urls(ds: List<&2, M.Dep>) -> List<&2, String>:
+  match ds:
+    case []:
+      []
+    case h <> t:
+      dep.url(h) <> dep.urls(t)
+
+# the source a tool pin records
+def tool.url(pin: M.Tool) -> String:
+  M.source.url(M.tool.source(pin))
+
+# the sources tool pins record, in order
+def tool.urls(ts: List<&2, M.Tool>) -> List<&2, String>:
+  match ts:
+    case []:
+      []
+    case h <> t:
+      tool.url(h) <> tool.urls(t)
+
+# the tool pins of a ledger model, none when it did not parse
+def ledger.tools(read: M.Read) -> List<&2, M.Tool>:
+  match read:
+    case M.Bad{_why}:
+      []
+    case M.Good{m}:
+      M.Manifest{_n, _e, _b, _h, _ds, ts} = m
+      ts
+
+# whether a ledger parsed
+def ledger.good(read: M.Read) -> Bool:
+  match read:
+    case M.Bad{_why}:
+      False{}
+    case M.Good{_m}:
+      True{}
+
+# LAW: the ledger model `ez lock --upgrade` renders into ez.toml records every
+# dependency's source as ez.toml gave it: the same sources, in the same
+# order, a relative path still relative to the project. A pin that moves is
+# retargeted to a new commit of the same source. A plain lock renders
+# ez.toml's model as it is.
+# EZ-LED-8
+law upgrade_records_as_given:
+  for +w: W.World
+  {dep.urls(ledger.deps(P.ledger.next(w))) == dep.urls(ledger.deps(W.parsed(W.ledger.of(w))))
+    : List<&2, String>}
+
+# LAW: and every tool pin's source the same way
+# EZ-LED-8
+law upgrade_records_tools_as_given:
+  for +w: W.World
+  {tool.urls(ledger.tools(P.ledger.next(w))) == tool.urls(ledger.tools(W.parsed(W.ledger.of(w))))
+    : List<&2, String>}
+
+# LAW: when `ez lock --upgrade` does not refuse and leaves `.gitignore`
+# unwritten, it leaves it because it was in sync already: the file it read
+# has the allowlist of exactly the hashes the upgrade commits, each once. No
+# vendored hash holds a newline.
+# EZ-VEN-1
+law upgrade_allowlist_kept_in_sync:
+  for +w: W.World
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +ok: {P.refuses(w) == False{} : Bool}
+  for kept: {P.put(w, ".gitignore") == P.Kept{} : P.Wrote}
+  for +ev: {Str.clear.all(vends(w), '\n') == True{} : Bool}
+  {I.hashes(I.file.lines(ignore.read(w))) == vends(w) : List<&2, String>}
+
+# LAW: and when it leaves ez.toml unwritten, which it does when no pin
+# moved, the hashes it commits are the vendored hashes of ez.toml as it is
+# EZ-VEN-1
+law upgrade_unmoved_vends_the_ledger:
+  for +w: W.World
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +ok: {P.refuses(w) == False{} : Bool}
+  for kept: {P.put(w, "ez.toml") == P.Kept{} : P.Wrote}
+  {vends(w) == I.vended(ledger.deps(W.parsed(W.ledger.of(w)))) : List<&2, String>}

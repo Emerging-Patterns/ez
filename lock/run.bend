@@ -202,18 +202,17 @@ def clone.weigh(+work: String, +url: String, +rev: String, +entry: String) -> IO
     clone.entry(R.ok(ck), work, entry, url, rev, nar)
 
 # a git package whose tree is not under BEND_LIB: a shallow clone at the rev
-# the ledger pins, the way `ez add` and `ez fetch` clone, with a relative path
-# source resolved against the project root (`Git.anchored`). Nothing is laid
-# here; the plan lays the tree once it has checked it.
+# the ledger pins, the way `ez add` and `ez fetch` clone, from the source the
+# question names, which the planner anchored at the project root. Nothing is
+# laid here; the plan lays the tree once it has checked it.
 def answer.clone(+lib: String, +hash: String, +url: String, +rev: String, +entry: String) -> IO(W.Answer):
   +work = lib ++ "/.work-" ++ hash
   do IO<W.Answer>:
     _rm : String <- R.exec(["rm", "-rf", work])
     _mk : String <- R.exec(["mkdir", "-p", work])
     +s : Say.Spin <- Say.hold(Say.dep.git(Say.label(hash, entry), url))
-    +from : String <- Git.anchored(url)
     a : W.Answer <- clone.run(work, "init", ["git", "init", "-q", work], _u =>
-      clone.run(work, "fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", from, rev], _v =>
+      clone.run(work, "fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", url, rev], _v =>
         clone.run(work, "checkout", ["git", "-C", work, "checkout", "-q", rev], _w =>
           clone.weigh(work, url, rev, entry))))
     Say.done(s)
@@ -271,25 +270,23 @@ def git.said(+what: String, args: List<&2, String>) -> IO(Up.Answer):
     Say.done(s)
     return Up.Printed{R.ok(out), R.text(out)}
 
+# The upgrade's questions, and `ez add`'s and `ez fetch`'s, name the source
+# as git is to read it, anchored at the project by their planners
+# (`Up.anchor`, `P.Query`), so each is handed to git as it is.
+
 # the refs a ref could name: a tag, its peeled form, and a branch, all at
 # once, because which of them exists is the question
 def answer.refs(+url: String, +ref: String) -> IO(Up.Answer):
-  do IO<Up.Answer>:
-    +from : String <- Git.anchored(url)
-    git.said(Say.resolving.at(url), ["git", "ls-remote", from, "refs/tags/" ++ ref,
-      "refs/tags/" ++ ref ++ "^{}", "refs/heads/" ++ ref])
+  git.said(Say.resolving.at(url), ["git", "ls-remote", url, "refs/tags/" ++ ref,
+    "refs/tags/" ++ ref ++ "^{}", "refs/heads/" ++ ref])
 
 # HEAD on the remote, with the branch it is a symref to
 def answer.head(+url: String) -> IO(Up.Answer):
-  do IO<Up.Answer>:
-    +from : String <- Git.anchored(url)
-    git.said(Say.resolving.at(url), ["git", "ls-remote", "--symref", from, "HEAD"])
+  git.said(Say.resolving.at(url), ["git", "ls-remote", "--symref", url, "HEAD"])
 
 # every tag on the remote
 def answer.tags(+url: String) -> IO(Up.Answer):
-  do IO<Up.Answer>:
-    +from : String <- Git.anchored(url)
-    git.said(Say.resolving.at(url), ["git", "ls-remote", "--tags", from])
+  git.said(Say.resolving.at(url), ["git", "ls-remote", "--tags", url])
 
 # whether `tip` descends from `pin`, asked of a blobless bare clone
 def answer.above(+lib: String, +url: String, +pin: String, +tip: String) -> IO(Up.Answer):
@@ -456,9 +453,8 @@ def whole.dir(ok: Bool, +work: String, +url: String, +rev: String) -> IO(Up.Answ
     case True{}:
       do IO<Up.Answer>:
         +s : Say.Spin <- Say.hold(Say.git.fetch(url))
-        +from : String <- Git.anchored(url)
         a : Up.Answer <- whole.run(work, "init", ["git", "init", "-q", work], _u =>
-          whole.run(work, "fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", from, rev], _v =>
+          whole.run(work, "fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", url, rev], _v =>
             whole.run(work, "checkout", ["git", "-C", work, "checkout", "-q", rev], _w =>
               whole.weigh(work, rev))))
         Say.done(s)
@@ -507,6 +503,19 @@ def answer.ups(+lib: String, asks: List<&2, Up.Ask>) -> IO(List<&2, Up.Reply>):
         a : Up.Answer <- answer.up(lib, h)
         rest : List<&2, Up.Reply> <- answer.ups(lib, t)
         return Up.Reply{h, a} <> rest
+
+# every query of the lock's upgrade: git is asked the question as the planner
+# anchored it, and the answer is recorded under the question the upgrade
+# looks it up by
+def answer.queries(+lib: String, qs: List<&2, Plan.Query>) -> IO(List<&2, Up.Reply>):
+  match qs:
+    case []:
+      IO.pure(List<&2, Up.Reply>, [])
+    case Plan.Query{ask, git} <> t:
+      do IO<List<&2, Up.Reply>>:
+        a : Up.Answer <- answer.up(lib, git)
+        rest : List<&2, Up.Reply> <- answer.queries(lib, t)
+        return Up.Reply{ask, a} <> rest
 
 # the World with more answers in it
 def more(world: W.World, rs: List<&2, W.Reply>, us: List<&2, Up.Reply>) -> W.World:
@@ -602,7 +611,7 @@ def loop.step(st: Plan.Step, +lib: String, world: W.World, go: W.World -> IO(Uni
     case Plan.Asking{asks, ups}:
       do IO<Unit>:
         rs : List<&2, W.Reply> <- answer.all(lib, asks)
-        us : List<&2, Up.Reply> <- answer.ups(lib, ups)
+        us : List<&2, Up.Reply> <- answer.queries(lib, ups)
         go(more(world, rs, us))
     case Plan.Run{pl}:
       exec.plan(lib, pl)
@@ -616,12 +625,15 @@ def loop(fuel: Nat, +lib: String, +world: W.World) -> IO(Unit):
     case 1n+f:
       loop.step(Plan.step(world), lib, world, w => loop(f, lib, w))
 
-# `ez lock`: the ledger and the listing read, every question answered, and
-# the plan run
-def run(args: W.Args) -> IO(Unit):
+# `ez lock` and `ez lock --upgrade [--package only]`: the directory it runs
+# in, the ledger and the listing read, every question answered, and the plan
+# run
+def run(up: Bool, +only: String) -> IO(Unit):
   do IO<Unit>:
     IO.print_err(Say.resolving())
     lib : String <- bend.lib()
+    +pwd : String <- R.exec(["pwd"])
     led : Maybe<&2, String> <- read.ledger()
     ls : W.Listing <- read.listing()
-    loop(U32.to_nat(100000), lib, W.World{args, led, ls, [], []})
+    loop(U32.to_nat(100000), lib,
+      W.World{W.Args{up, only, String.trim(R.text(pwd))}, led, ls, [], []})

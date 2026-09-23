@@ -19,9 +19,13 @@ import ../hub/hub.bend as Web
 import ../sha/sha.bend as Sha
 import ../ez/say.bend as Say
 
-# the flags: `--upgrade`, and the name `--package` gave, "" for none
+# the command as it was run: `--upgrade`, the name `--package` gave ("" for
+# none), and the directory it runs in, which is the project root. A relative
+# path source is recorded as it was given, relative to that root, and every
+# question the lock asks about it names it anchored there, as the planner
+# computes it (`P.anchor.src`, `Up.anchor`).
 type Args is Data:
-  Args{upgrade: Bool, only: String}
+  Args{upgrade: Bool, only: String, here: String}
 
 # one committed `.bend` file: its path and its text
 type Source is Data:
@@ -87,14 +91,24 @@ type Inputs is Data:
 # whether the command was `ez lock --upgrade`
 def args.upgrade(world: World) -> Bool:
   World{args, _ledger, _listing, _replies, _ups} = world
-  Args{up, _only} = args
+  Args{up, _only, _here} = args
   up
 
 # the name `--package` gave, "" for none
 def args.only(world: World) -> String:
   World{args, _ledger, _listing, _replies, _ups} = world
-  Args{_up, only} = args
+  Args{_up, only, _here} = args
   only
+
+# the directory the command runs in
+def here.of(args: Args) -> String:
+  Args{_up, _only, here} = args
+  here
+
+# the directory the lock runs in, which is the project root
+def args.here(world: World) -> String:
+  World{args, _ledger, _listing, _replies, _ups} = world
+  here.of(args)
 
 # the ledger's text
 def ledger.of(world: World) -> Maybe<&2, String>:
@@ -123,11 +137,59 @@ def sums.ok(fs: List<&2, K.File>, ss: List<&2, String>) -> Bool:
       +rest = sums.ok(g, t)
       Bool.and(String.eq(Sha.hex(s), K.file.sum(f)), rest)
 
-# the verdict once the texts were weighed against the manifest
-def body.sums(ok: Bool, +hash: String, fs: List<&2, K.File>, ss: List<&2, String>) -> Verdict:
+# each file with its text, as it is laid
+def laid(fs: List<&2, K.File>, ss: List<&2, String>) -> List<&2, Source>:
+  match fs ss:
+    case Nil{} Nil{}:
+      []
+    case Nil{} Con{_s, _t}:
+      []
+    case Con{_f, _g} Nil{}:
+      []
+    case Con{f, g} Con{s, t}:
+      Source{K.file.at(f), s} <> laid(g, t)
+
+# a laid file weighed by its own text
+def weigh(src: Source) -> K.File:
+  Source{at, +text} = src
+  K.File{at, Sha.hex(text)}
+
+# every laid file weighed by its own text
+def weighs(ls: List<&2, Source>) -> List<&2, K.File>:
+  match ls:
+    case []:
+      []
+    case h <> t:
+      weigh(h) <> weighs(t)
+
+# the manifest of the files laid, weighed by their own texts, which is the
+# manifest a tree is laid with
+def manifest(+ls: List<&2, Source>) -> String:
+  K.manifest_of(K.files_of(weighs(ls)))
+
+# the `0x` name of that manifest
+def named(+ls: List<&2, Source>) -> String:
+  K.hash_of(K.files_of(weighs(ls)))
+
+# the verdict once the files, weighed by their own texts, were asked whether
+# they hash to the name. Their manifest is the one the tree is laid with, and
+# the manifest that was read hashes to the name already, so a package whose
+# manifest is not written the way ez writes one (a line per file, in path
+# order, each file once) is refused here rather than laid under a name its
+# laid manifest does not hash to.
+def body.laid(ok: Bool, +hash: String, fs: List<&2, K.File>, ss: List<&2, String>) -> Verdict:
   match ok:
     case True{}:
       Ok{fs, ss}
+    case False{}:
+      No{"ez: " ++ hash ++ ": its manifest is not written the way its name is taken" ++
+        " (one line per file, in path order, each file once)"}
+
+# the verdict once the texts were weighed against the manifest
+def body.sums(ok: Bool, +hash: String, +fs: List<&2, K.File>, +ss: List<&2, String>) -> Verdict:
+  match ok:
+    case True{}:
+      body.laid(String.eq(hash, named(laid(fs, ss))), hash, fs, ss)
     case False{}:
       No{"ez: " ++ hash ++ ": a file does not match its manifest"}
 
@@ -154,9 +216,10 @@ def body.named(ok: Bool, +hash: String, +manifest: String, +ss: List<&2, String>
 
 # a package's bytes, checked the same way whatever they came from: the
 # manifest is the one the `0x` name is the digest of, no path leaves the
-# package, and each text hashes to its file's sum. A tree under BEND_LIB is
-# checked against its name like any other, so a stale or edited tree there is
-# refused rather than locked.
+# package, each text hashes to its file's sum, and the files, weighed by their
+# own texts, hash to the name, which is `ez fetch`'s check too. A tree under
+# BEND_LIB is checked against its name like any other, so a stale or edited
+# tree there is refused rather than locked.
 def body(+hash: String, +manifest: String, +ss: List<&2, String>) -> Verdict:
   body.named(Web.matches(L.want(hash), manifest), hash, manifest, ss)
 
@@ -292,7 +355,7 @@ def next.up(up: Bool, +only: String, +ledger: Maybe<&2, String>, ups: List<&2, U
 
 # what the upgrade decides on a World, or nothing around a plain lock
 def next(args: Args, +ledger: Maybe<&2, String>, ups: List<&2, Up.Reply>) -> Up.Next:
-  Args{up, +only} = args
+  Args{up, +only, _here} = args
   next.up(up, only, ledger, ups)
 
 # the origins the lock reads packages by
