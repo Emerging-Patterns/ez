@@ -1123,6 +1123,17 @@ def model.next(moved: Bool, next: M.Manifest, old: M.Manifest) -> M.Read:
     case False{}:
       M.Good{old}
 
+# why an upgrade that moved a pin stops, "" when it does not: the ledger it
+# would write cannot be written so that it reads back as the model it renders
+# (EZ-LED-4), so it is refused, with no effect, rather than written as
+# something else
+def fit.why(moved: Bool, next: M.Manifest) -> String:
+  match moved:
+    case True{}:
+      Bool.pick(String, Rend.renderable(next), "", Rend.unrenderable())
+    case False{}:
+      ""
+
 # every answer in: the ledger, the allowlist and the imports, and the trees
 def done(
   +old: M.Manifest,
@@ -1138,7 +1149,8 @@ def done(
   +text = Rend.show(M.Manifest{name, entry, bin, hub, ds, ts})
   +allow = I.sync(ds, ignore)
   Next{model.next(moved, M.Manifest{name, entry, bin, hub, ds, ts}, old),
-    read.next(moved, text, old), "", [], trees, I.vended(ds),
+    read.next(moved, text, old), fit.why(moved, M.Manifest{name, entry, bin, hub, ds, ts}), [],
+    trees, I.vended(ds),
     List.append(&2, String, dsays, tsays),
     edit.toml(moved, text, edit.if(String.eq(allow, ignore), ".gitignore", allow, [])),
     fs, drops.of(swaps), edits}

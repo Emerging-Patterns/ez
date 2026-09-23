@@ -16041,7 +16041,7 @@ law kp_done.arm:
   for emv: {Bool.or(dm, tm) == moved : Bool}
   for hf: kp.facts(ds, ts, dm, ods, ots)
   kp.parts(Up.model.next(moved, M.Manifest{pn, pe, pb, hb, ds, ts},
-      M.Manifest{pn, pe, pb, hb, ods, ots}), "",
+      M.Manifest{pn, pe, pb, hb, ods, ots}), Up.fit.why(moved, M.Manifest{pn, pe, pb, hb, ds, ts}),
     Up.read.next(moved, Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts}),
       M.Manifest{pn, pe, pb, hb, ods, ots}),
     Up.edit.toml(moved, Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts}),
