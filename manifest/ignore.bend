@@ -319,29 +319,55 @@ def lines.go(+ds: List<&2, M.Dep>, +ls: List<&2, Line>) -> List<&2, String>:
 def lines(ds: List<&2, M.Dep>, ls: List<&2, String>) -> List<&2, String>:
   lines.go(ds, tag(ls))
 
-# the text of a file less the newline it ends with, so its lines are the
-# lines a person wrote and not one more empty one
-def text.body(+text: String) -> String:
-  Bool.pick(String, String.ends_with(text, "\n"),
-    String.take(text, Nat.sub(String.length(text), 1n)), text)
+# The text layer. A file is its lines, each ending with a newline, and `sync`
+# reads the file into lines, derives the allowlist over them, and writes them
+# back. A file of one blank line is one empty line and not an empty file, so a
+# blank line the project wrote is kept like any other line.
 
-# an empty file has no lines, not one empty one
-def text.lines(+body: String) -> List<&2, String>:
-  Bool.pick(List<&2, String>, String.is_empty(body), [], String.lines(body))
+# the last piece of a file cut at its newlines, dropped when it is empty: it
+# is what follows the newline the file ends with, and not a line a person
+# wrote
+def unend.go(t: List<&2, String>, +h: String) -> List<&2, String>:
+  match t:
+    case []:
+      Bool.pick(List<&2, String>, String.is_empty(h), [], [h])
+    case +h2 <> t2:
+      h <> unend.go(t2, h2)
+
+def unend(ps: List<&2, String>) -> List<&2, String>:
+  match ps:
+    case []:
+      []
+    case +h <> t:
+      unend.go(t, h)
+
+# the lines of a file. An empty file has none, a file of one newline has one
+# empty line, and a last line with no newline after it is a line all the same.
+def file.lines(text: String) -> List<&2, String>:
+  unend(String.lines(text))
+
+# lines written out as a file, each ending with a newline, which `file.lines`
+# reads back as those lines
+def file.text(ls: List<&2, String>) -> String:
+  match ls:
+    case []:
+      ""
+    case h <> t:
+      String.append(h, SCon{'\n', file.text(t)})
 
 # a file whose lines did not change comes back byte for byte, whatever it
-# ended with. One that did ends with a newline, unless nothing is left.
+# ended with. One whose lines did is its new lines, each ending with a newline.
 def text.out(same: Bool, +text: String, +out: String) -> String:
   match same:
     case True{}:
       text
     case False{}:
-      Bool.pick(String, String.is_empty(out), "", out ++ "\n")
+      out
 
 # the ignore file with the allowlist the ledger calls for. `ez add`,
 # `ez remove` and `ez lock --upgrade` write this when it differs from what
 # they read.
 def sync(ds: List<&2, M.Dep>, +text: String) -> String:
-  +kept = text.body(text)
-  +out = String.join(lines(ds, text.lines(kept)), "\n")
-  text.out(String.eq(out, kept), text, out)
+  +was = file.lines(text)
+  +out = file.text(lines(ds, was))
+  text.out(String.eq(out, file.text(was)), text, out)

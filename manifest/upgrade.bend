@@ -6,7 +6,7 @@
 # `vend` says the tree under `.ez/lib/<hash>` is committed, so a move lays the
 # new tree there; the allowlist that names it is `manifest/ignore.bend`'s,
 # derived from the ledger the move writes. A move also rewrites an
-# `import 0x<hash>` line that names the old hash.
+# `import 0x<hash>/` line that names the old hash.
 import Base
 import ./manifest.bend as M
 
@@ -167,39 +167,27 @@ def retarget(dep: M.Dep, +rev: String, +hash: String, +root: String, +nar: Strin
   M.Dep{n, _h, e, s} = dep
   retarget.go(n, e, s, rev, hash, root, nar)
 
-# the first of a list of strings, or ""
-def reimport.head(ps: List<&2, String>) -> String:
-  match ps:
-    case []:
-      ""
-    case h <> _t:
-      h
+# what an import line that names a package starts with: `import <hash>/`.
+# `import 0x<hash>/<file>.bend as P` is the only shape bend has, and the match
+# is exact at column 0, so an indented import is not rewritten, and neither is
+# a line that names the hash with no `/` after it.
+def reimport.head(+hash: String) -> String:
+  String.append("import ", String.append(hash, "/"))
 
-# the package hash an import line names, or "" when the line names none.
-# `import 0x<hash>/<file>.bend as P` is the only shape bend has.
-def reimport.hash.go(named: Bool, +line: String) -> String:
-  match named:
-    case True{}:
-      reimport.head(String.split(String.drop(line, 7n), '/'))
-    case False{}:
-      ""
-
-def reimport.hash(+line: String) -> String:
-  reimport.hash.go(String.starts_with(line, "import 0x"), line)
-
-# an empty hash matches every line that names none, so it rewrites nothing
+# an empty hash names no package, so it rewrites nothing
 def reimport.hit(empty: Bool, +line: String, +old: String) -> Bool:
   match empty:
     case True{}:
       False{}
     case False{}:
-      String.eq(reimport.hash(line), old)
+      String.starts_with(line, reimport.head(old))
 
 # one line, with the branch already chosen. A match cannot scrutinise a call.
 def reimport.line.go(hit: Bool, +line: String, +old: String, +new: String) -> String:
   match hit:
     case True{}:
-      "import " ++ new ++ String.drop(line, Nat.add(7n, String.length(old)))
+      String.append(reimport.head(new),
+        String.drop(line, String.length(reimport.head(old))))
     case False{}:
       line
 
@@ -207,23 +195,25 @@ def reimport.line.go(hit: Bool, +line: String, +old: String, +new: String) -> St
 def reimport.line(+line: String, +old: String, +new: String) -> String:
   reimport.line.go(reimport.hit(String.is_empty(old), line, old), line, old, new)
 
+# one line through every replacement, in order
+def reimport.many.line(ss: List<&2, Swap>, +line: String) -> String:
+  match ss:
+    case []:
+      line
+    case Swap{+old, +new} <> t:
+      reimport.many.line(t, reimport.line(line, old, new))
+
 # every line, in order
-def reimport.lines(ls: List<&2, String>, +old: String, +new: String) -> List<&2, String>:
+def reimport.many.lines(+ss: List<&2, Swap>, ls: List<&2, String>) -> List<&2, String>:
   match ls:
     case []:
       []
     case +h <> t:
-      reimport.line(h, old, new) <> reimport.lines(t, old, new)
+      reimport.many.line(ss, h) <> reimport.many.lines(ss, t)
 
-# a source file with one import hash replaced by another. A line that does
-# not name it is left as it was, including the newline `String.lines` keeps.
-def reimport(+text: String, +old: String, +new: String) -> String:
-  String.join(reimport.lines(String.lines(text), old, new), "\n")
-
-# every replacement, in order
-def reimport.many(ss: List<&2, Swap>, +text: String) -> String:
-  match ss:
-    case []:
-      text
-    case Swap{+old, +new} <> t:
-      reimport.many(t, reimport(text, old, new))
+# a source file with every moved import hash replaced, in order. The text is
+# cut at its newlines once and joined back with them, so a line that names no
+# moved hash is left as it was, and so is the newline the file ends with, or
+# its lack of one.
+def reimport.many(+ss: List<&2, Swap>, +text: String) -> String:
+  String.join(reimport.many.lines(ss, String.lines(text)), "\n")
