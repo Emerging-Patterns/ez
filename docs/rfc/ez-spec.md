@@ -555,7 +555,7 @@ EZ-HASH-5 can diverge from nix in ways we know of: the NAR walk takes the exec b
 
 Bend 2.0.26 adds named hub imports, and issue #84 tracks what ez does about them. `ez publish` builds the words it uploads with by a pure function (`PP.upload.line`), so a bend that publishes `<name>@<version>` changes that function and the Upload question's fields and no law, but the package walk, the import scan and the lock have not been looked at for named imports.
 
-When WP9 landed, bolt v1.2.1's own lock recorded `snap/par.c` under the sum the old `Sha.hex` gave, before it hashed UTF-8 bytes, so `ez tool sync` of this repository stopped at the fetch with exit 1. That is the tool's lock to refresh, not ez's to change.
+bolt v1.2.1's own lock records `snap/par.c` under the sum the old `Sha.hex` gave, before it hashed UTF-8 bytes, so `ez tool sync` of this repository stops at the fetch with exit 1. That is the tool's lock to refresh, not ez's to change, and it goes away once bolt moves its ez pin forward and relocks.
 
 ### How we will know it worked
 
