@@ -1259,11 +1259,23 @@ law upgrade_tag_resolves:
 # it keeps the pin. Nothing moves, so it writes no ez.toml, no source and no
 # tree, and the lock it writes is the one the first run wrote.
 #
-# The second run reads ez.toml's bytes, so these laws take as a premise that
-# the ledger the first run wrote reads back as the model it rendered: EZ-LED-4
-# for that model, which is `P.ledger.next`. An upgrade that moved nothing
-# wrote no ledger, and the premise holds of it as it is. The upgrade laws of
-# EZ-RES-4 to 8 are stated over the same model.
+# The second run reads ez.toml's bytes, and the ledger the first run wrote
+# reads back as the model it rendered, `P.ledger.next` (`upgrade_reads_back`,
+# EZ-LED-4). An upgrade that moved nothing wrote no ledger, and reads back as
+# it is. The upgrade laws of EZ-RES-4 to 8 are stated over the same model.
+
+# LAW: `ez lock --upgrade` that does not refuse leaves an ez.toml that reads
+# back as the ledger model it rendered, `P.ledger.next`: the one it wrote when
+# a pin moved, or the one it read when none did. An upgrade whose model is not
+# renderable (`Rend.renderable`) stops, with no effect, rather than write a
+# ledger that reads back as something else. So every law stated over
+# `P.ledger.next` holds of ez.toml's bytes.
+# EZ-LED-4
+law upgrade_reads_back:
+  for +w: W.World
+  for u: {W.args.upgrade(w) == True{} : Bool}
+  for +ok: {P.refuses(w) == False{} : Bool}
+  {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
 
 # LAW: `ez lock --upgrade`, run again on the World it leaves, writes the same
 # bytes to ez.lock.toml, or, when it refused, refuses again and writes none
@@ -1271,7 +1283,6 @@ law upgrade_tag_resolves:
 law upgrade_idempotent:
   for +w: W.World
   for u: {W.args.upgrade(w) == True{} : Bool}
-  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
   {P.put(after(w), "ez.lock.toml") == P.put(w, "ez.lock.toml") : P.Wrote}
 
 # LAW: and it moves nothing: the ledger model it renders is the one the first
@@ -1280,7 +1291,6 @@ law upgrade_idempotent:
 law reupgrade_moves_nothing:
   for +w: W.World
   for u: {W.args.upgrade(w) == True{} : Bool}
-  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
   {P.ledger.next(after(w)) == P.ledger.next(w) : M.Read}
 
 # LAW: so, after one that succeeded, it does not write ez.toml
@@ -1289,7 +1299,6 @@ law upgrade_settles:
   for +w: W.World
   for u: {W.args.upgrade(w) == True{} : Bool}
   for +ok: {P.refuses(w) == False{} : Bool}
-  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
   {P.put(after(w), "ez.toml") == P.Kept{} : P.Wrote}
 
 # LAW: and it lays nothing new: every tree the first run laid is read from
@@ -1299,7 +1308,6 @@ law reupgrade_lays_nothing:
   for +w: W.World
   for u: {W.args.upgrade(w) == True{} : Bool}
   for +ok: {P.refuses(w) == False{} : Bool}
-  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
   {fresh(after(w)) == [] : List<&2, String>}
 
 # LAW: and it writes no path but the lock: no ez.toml, no source and no
@@ -1312,7 +1320,6 @@ law reupgrade_writes_only_lock:
   for +p: String
   for u: {W.args.upgrade(w) == True{} : Bool}
   for +ok: {P.refuses(w) == False{} : Bool}
-  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
   for ev: {Str.clear.all(I.vended(ledger.deps(P.ledger.next(w))), '\n') == True{} : Bool}
   for ne: {String.eq("ez.lock.toml", p) == False{} : Bool}
   {P.put(after(w), p) == P.Kept{} : P.Wrote}
