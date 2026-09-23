@@ -18,8 +18,10 @@
 # and the package is checked before anything is laid (`good`): every file's
 # digest equals the sum the lock records for it (EZ-FETCH-1), no path leaves
 # the package, and the files hash to the name the lock records them under
-# (EZ-HASH-3). Only then is the tree laid under BEND_LIB, the files the lock
-# names and their manifest last.
+# (EZ-HASH-3). A git package's checkout must also weigh to the narHash the
+# lock records (`weighed`), so the files laid come from the tree the lock
+# pins, the tree nix rebuilds from the same pin. Only then is the tree laid
+# under BEND_LIB, the files the lock names and their manifest last.
 #
 # The plan of a fetch that succeeds lays every tree that was fetched, and
 # nothing else: no ledger, no lock. A fetch that refuses, for any package,
@@ -324,6 +326,97 @@ def part(
 ) -> Part:
   part.laid(F.heard(rs, F.Laid{hash}), rs, src, fs, here, hub, hash)
 
+# ---------------------------------------------------------------------------
+# the checkout around a git package
+
+# why a checkout may not be laid for the narHash it weighed to, "" when it
+# may: the lock records a narHash and the checkout weighed to it
+def nar.why(
+  none: Bool,
+  same: Bool,
+  +hash: String,
+  +want: String,
+  +got: String,
+  +url: String,
+  +rev: String
+) -> String:
+  match none:
+    case True{}:
+      "ez: " ++ hash ++ ": the lock records no narHash for " ++ url ++ " at " ++ rev ++
+        ", so its checkout cannot be checked; run `ez lock --upgrade` to pin it"
+    case False{}:
+      match same:
+        case True{}:
+          ""
+        case False{}:
+          "ez: " ++ hash ++ ": " ++ url ++ " at " ++ rev ++ " has narHash " ++ got ++
+            ", and the lock records " ++ want
+
+# why a package stands without a weighed checkout
+def unweighed(+hash: String) -> String:
+  "ez: " ++ hash ++ ": its checkout was not weighed"
+
+# what a checkout question was answered with, against the lock's narHash
+def weighed.up(answer: Up.Answer, +hash: String, +nar: String, +url: String, +rev: String) -> String:
+  match answer:
+    case Up.Cloned{+got, _fs}:
+      nar.why(String.is_empty(nar), String.eq(got, nar), hash, nar, got, url, rev)
+    case _:
+      unweighed(hash)
+
+def weighed.answer(answer: F.Answer, +hash: String, +nar: String, +url: String, +rev: String) -> String:
+  match answer:
+    case F.Said{a}:
+      weighed.up(a, hash, nar, url, rev)
+    case F.Read{_a}:
+      unweighed(hash)
+
+def weighed.heard(got: F.Heard, +hash: String, +nar: String, +url: String, +rev: String) -> String:
+  match got:
+    case F.Heard{a}:
+      weighed.answer(a, hash, nar, url, rev)
+    case F.Open{}:
+      unweighed(hash)
+
+def weighed.src(src: L.Src, +rs: List<&2, F.Reply>, +here: String, +hash: String) -> String:
+  match src:
+    case L.Hub{}:
+      ""
+    case L.Git{+url, +rev, _entry, _root, nar, _tag}:
+      weighed.heard(F.heard(rs, F.Git{hash, Up.Clone{Path.anchor(here, url), rev}}),
+        hash, nar, url, rev)
+
+# why the checkout a package of the lock was fetched as may not be laid, ""
+# when it may. A hub package has no checkout. A git package's checkout, the
+# one its fetch question was answered with, must weigh to the narHash the
+# lock records, so what is laid comes from the tree the lock pins and not
+# only from files that happen to match their sums.
+def weighed(+ss: List<&2, T.Sect>, +rs: List<&2, F.Reply>, +here: String, +hash: String) -> String:
+  weighed.src(L.pack.src(L.pack_of(ss, hash)), rs, here, hash)
+
+def weigh.got(ok: Bool, +why: String, ls: List<&2, W.Source>) -> Part:
+  match ok:
+    case True{}:
+      Got{ls}
+    case False{}:
+      No{why}
+
+# files that arrived stand only when the checkout they came from weighed to
+# the lock's narHash. A tree kept from BEND_LIB was not fetched, and is
+# checked file by file as before.
+def weigh.part(+why: String, part: Part) -> Part:
+  match part:
+    case AskLaid{}:
+      AskLaid{}
+    case AskFetch{}:
+      AskFetch{}
+    case Have{}:
+      Have{}
+    case Got{ls}:
+      weigh.got(String.is_empty(why), why, ls)
+    case No{w}:
+      No{w}
+
 # one package of the lock, and where it stands
 type Pt is Data:
   Pt{hash: String, src: L.Src, files: List<&2, K.File>, part: Part}
@@ -343,7 +436,8 @@ def parts(
       +pk = L.pack_of(ss, h)
       +src = L.pack.src(pk)
       +fs = L.pack.files(pk)
-      Pt{h, src, fs, part(rs, src, fs, here, hub, h)} <> parts(ss, rs, here, hub, t)
+      Pt{h, src, fs, weigh.part(weighed(ss, rs, here, h), part(rs, src, fs, here, hub, h))}
+        <> parts(ss, rs, here, hub, t)
 
 # ---------------------------------------------------------------------------
 # the verdict
@@ -636,3 +730,31 @@ def asks.anchored(+here: String, +ss: List<&2, T.Sect>, as: List<&2, F.Ask>) -> 
     case +h <> t:
       +rest = asks.anchored(here, ss, t)
       Bool.and(ask.anchored(here, L.pack.src(L.pack_of(ss, ask.hash(h))), h), rest)
+
+# whether an effect that lays a tree lays a package whose checkout, when it
+# has one, weighed to the narHash the lock records
+def weighed.lay(
+  +ss: List<&2, T.Sect>,
+  +rs: List<&2, F.Reply>,
+  +here: String,
+  effect: P.Effect
+) -> Bool:
+  match effect:
+    case P.Lay{_place, hash, _fs}:
+      String.is_empty(weighed(ss, rs, here, hash))
+    case _:
+      True{}
+
+# whether every tree a list of effects lays does
+def lays.weighed(
+  +ss: List<&2, T.Sect>,
+  +rs: List<&2, F.Reply>,
+  +here: String,
+  es: List<&2, P.Effect>
+) -> Bool:
+  match es:
+    case []:
+      True{}
+    case h <> t:
+      +rest = lays.weighed(ss, rs, here, t)
+      Bool.and(weighed.lay(ss, rs, here, h), rest)
