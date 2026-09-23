@@ -430,8 +430,9 @@ def stray(+world: PW.World) -> Kept:
 # ---------------------------------------------------------------------------
 # the upload
 
-# the words the upload runs. bend 2.0.25 takes the entry alone; a bend that
-# also wants the package's name and version reads them from here.
+# the words the upload runs: the entry alone. bend 2.0.27 also takes a
+# `<name>@<version>` after `--publish` to name the package; ez does not ask
+# for a name yet, and a publish that does reads it from here.
 def upload.line(+entry: String) -> List<&2, String>:
   ["bend", entry, "--publish"]
 

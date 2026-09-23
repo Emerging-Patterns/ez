@@ -18,8 +18,8 @@ jobs:
   readme:
     runs-on: ubuntu-latest
     env:
-      BEND_VERSION: 2.0.25
-      BEND_SHA256: 91c0e2640f8d2e3e73fd3dd62ed4d178ce9a6f7ce8f8980b4dc4abf7a6f9ccd4
+      BEND_VERSION: 2.0.27
+      BEND_SHA256: 58adc86af6605ed0c48f7d84e4c23028f78893ce4a867a20a4f004b11582687b
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Install bend
