@@ -39,6 +39,39 @@ law clone_reproduces:
   {W.plan(W.World{ledger, listing, W.reclone(W.origins(ledger), rs)})
     == W.plan(W.World{ledger, listing, rs}) : W.Outcome}
 
+# A plain lock copies each package's source from the ledger and asks nothing
+# about it. The walk is where that happens, one package at a time.
+
+# a package with the source the ledger records for its hash. Law vocabulary:
+# ez never calls it.
+def pinned(+orgs: List<&2, L.Origin>, pack: L.Pack) -> L.Pack:
+  L.Pack{+hash, _src, files} = pack
+  L.Pack{hash, L.origin(orgs, hash), files}
+
+# every package, so
+def pinned.all(+orgs: List<&2, L.Origin>, ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
+  match ps:
+    case []:
+      []
+    case h <> t:
+      pinned(orgs, h) <> pinned.all(orgs, t)
+
+# the packages a walk has resolved
+def packs.of(wk: W.Walk) -> List<&2, L.Pack>:
+  W.Walk{_queue, packs, _asks, _bad} = wk
+  packs
+
+# LAW: every package the walk resolves carries the source the ledger records
+# for its hash, so a plain lock pins every dependency where the ledger pins it
+law walk_pins_ledger_sources:
+  for +fuel: Nat
+  for +orgs: List<&2, L.Origin>
+  for +js: List<&2, W.Judged>
+  for +wk: W.Walk
+  for +e: {pinned.all(orgs, packs.of(wk)) == packs.of(wk) : List<&2, L.Pack>}
+  {pinned.all(orgs, packs.of(W.walk(fuel, orgs, js, wk)))
+    == packs.of(W.walk(fuel, orgs, js, wk)) : List<&2, L.Pack>}
+
 # The lock document. EZ-DOC-1 is a round trip through eztoml's reader, and
 # the reader trims every line and strips the quotes off every value. These two
 # laws are its first step: a quoted value survives both, whatever it holds.

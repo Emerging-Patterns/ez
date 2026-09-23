@@ -239,45 +239,33 @@ def look(js: List<&2, Judged>, +hash: String) -> Look:
     case Judged{+h, v} <> t:
       look.at(String.eq(h, hash), v, look(t, hash))
 
-# a walk in progress: the packages resolved, the hashes still to be asked
-# about, and the first refusal, "" while there is none
+# a walk in progress: the hashes still queued, the packages resolved, the
+# hashes still to be asked about, and the first refusal, "" while there is
+# none. The walk is one step, which does not recurse, iterated; so a fact
+# about the walk is a fact about one step, carried by induction on the fuel.
 type Walk is Data:
-  Walk{packs: List<&2, L.Pack>, asks: List<&2, String>, bad: String}
+  Walk{queue: List<&2, String>, packs: List<&2, L.Pack>, asks: List<&2, String>, bad: String}
 
 # the first refusal wins
 def first(+bad: String, why: String) -> String:
   Bool.pick(String, String.is_empty(bad), why, bad)
 
-# a walk that has to ask about one more hash
-def walk.ask(wk: Walk, +hash: String) -> Walk:
-  Walk{packs, asks, bad} = wk
-  Walk{packs, hash <> asks, bad}
-
-# a walk that met a refusal
-def walk.bad(wk: Walk, why: String) -> Walk:
-  Walk{packs, asks, bad} = wk
-  Walk{packs, asks, first(bad, why)}
-
-# a walk that resolved one more package
-def walk.pack(wk: Walk, pack: L.Pack) -> Walk:
-  Walk{packs, asks, bad} = wk
-  Walk{pack <> packs, asks, bad}
-
-# one package, by its verdict, with the queue it leaves behind
+# one package, by its verdict
 def step.verdict(
   verdict: Verdict,
   +src: L.Src,
   +hash: String,
   rest: List<&2, String>,
-  wk: Walk,
-  go: List<&2, String> -> Walk -> Walk
+  packs: List<&2, L.Pack>,
+  asks: List<&2, String>,
+  bad: String
 ) -> Walk:
   match verdict:
     case No{why}:
-      go(rest, walk.bad(wk, why))
+      Walk{rest, packs, asks, first(bad, why)}
     case Ok{fs, ss}:
-      go(List.append(&2, String, rest, L.kids(ss)),
-        walk.pack(wk, L.Pack{hash, src, fs}))
+      Walk{List.append(&2, String, rest, L.kids(ss)), L.Pack{hash, src, fs} <> packs,
+        asks, bad}
 
 # one package, asked about when nothing has answered for it yet
 def step.look(
@@ -285,14 +273,15 @@ def step.look(
   +src: L.Src,
   +hash: String,
   rest: List<&2, String>,
-  wk: Walk,
-  go: List<&2, String> -> Walk -> Walk
+  packs: List<&2, L.Pack>,
+  asks: List<&2, String>,
+  bad: String
 ) -> Walk:
   match found:
     case Absent{}:
-      go(rest, walk.ask(wk, hash))
+      Walk{rest, packs, hash <> asks, bad}
     case Found{v}:
-      step.verdict(v, src, hash, rest, wk, go)
+      step.verdict(v, src, hash, rest, packs, asks, bad)
 
 # a hash already resolved, or already asked about, is passed over
 def step.pick(
@@ -301,64 +290,73 @@ def step.pick(
   +js: List<&2, Judged>,
   +hash: String,
   rest: List<&2, String>,
-  wk: Walk,
-  go: List<&2, String> -> Walk -> Walk
+  packs: List<&2, L.Pack>,
+  asks: List<&2, String>,
+  bad: String
 ) -> Walk:
   match seen:
     case True{}:
-      go(rest, wk)
+      Walk{rest, packs, asks, bad}
     case False{}:
-      step.look(look(js, hash), L.origin(orgs, hash), hash, rest, wk, go)
+      step.look(look(js, hash), L.origin(orgs, hash), hash, rest, packs, asks, bad)
 
-# whether a walk has resolved or asked about a hash
-def walk.seen(+wk: Walk, +hash: String) -> Bool:
-  Walk{packs, asks, _bad} = wk
-  Bool.or(L.has(packs, hash), L.seen.holds(asks, hash))
-
-# one hash off the queue
-def step.next(
+# the next hash of the queue, or the walk as it is when the queue is empty
+def step.pop(
   +orgs: List<&2, L.Origin>,
   +js: List<&2, Judged>,
-  +hash: String,
-  rest: List<&2, String>,
-  +wk: Walk,
-  go: List<&2, String> -> Walk -> Walk
-) -> Walk:
-  step.pick(walk.seen(wk, hash), orgs, js, hash, rest, wk, go)
-
-# the next hash of the queue, handed on with what is left of it
-def step.pop(
   queue: List<&2, String>,
-  +wk: Walk,
-  go: String -> List<&2, String> -> Walk -> Walk
+  +packs: List<&2, L.Pack>,
+  +asks: List<&2, String>,
+  bad: String
 ) -> Walk:
   match queue:
     case []:
-      wk
-    case h <> t:
-      go(h, t, wk)
+      Walk{[], packs, asks, bad}
+    case +h <> t:
+      step.pick(Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, js, h, t,
+        packs, asks, bad)
 
-# a walk that ran out of fuel, refused
+# one step of the walk
+def step(+orgs: List<&2, L.Origin>, +js: List<&2, Judged>, wk: Walk) -> Walk:
+  Walk{queue, packs, asks, bad} = wk
+  step.pop(orgs, js, queue, packs, asks, bad)
+
+# whether a walk has nothing left in its queue
+def walk.done(+wk: Walk) -> Bool:
+  Walk{queue, _packs, _asks, _bad} = wk
+  List.is_empty(&2, String, queue)
+
+# a walk that ran out of fuel with its queue not empty, refused
 def walk.spent(wk: Walk) -> Walk:
-  Walk{packs, asks, bad} = wk
-  Walk{packs, asks, first(bad, "ez: the import graph is too deep to lock")}
+  Walk{queue, packs, asks, bad} = wk
+  Walk{queue, packs, asks, first(bad, "ez: the import graph is too deep to lock")}
+
+# the walk as it is when it is done, or one step further when it is not. The
+# rest of the walk arrives as a function, since a def may not call itself from
+# another def.
+def walk.more(done: Bool, wk: Walk, go: Walk -> Walk) -> Walk:
+  match done:
+    case True{}:
+      wk
+    case False{}:
+      go(wk)
+
+# the fuel ran out: refused, unless the walk had just finished
+def walk.out(done: Bool, wk: Walk) -> Walk:
+  match done:
+    case True{}:
+      wk
+    case False{}:
+      walk.spent(wk)
 
 # every package the queue reaches, each one once. A walk that runs out of fuel
 # with the queue not empty is a refusal, never a lock of what it had so far.
-def walk(
-  fuel: Nat,
-  +orgs: List<&2, L.Origin>,
-  +js: List<&2, Judged>,
-  queue: List<&2, String>,
-  wk: Walk
-) -> Walk:
+def walk(fuel: Nat, +orgs: List<&2, L.Origin>, +js: List<&2, Judged>, +wk: Walk) -> Walk:
   match fuel:
     case 0n:
-      walk.spent(wk)
+      walk.out(walk.done(wk), wk)
     case 1n+f:
-      step.pop(queue, wk, h => t => now =>
-        step.next(orgs, js, h, t, now,
-          q => w2 => walk(f, orgs, js, q, w2)))
+      walk.more(walk.done(wk), wk, now => walk(f, orgs, js, step(orgs, js, now)))
 
 # ---------------------------------------------------------------------------
 # the plan
@@ -405,15 +403,15 @@ def outcome.bad(
 
 # the walk's result as an outcome: a refusal, a request, or the lock
 def outcome(wk: Walk, +hub: String, ts: List<&2, M.Tool>) -> Outcome:
-  Walk{packs, asks, +bad} = wk
+  Walk{_queue, packs, asks, +bad} = wk
   outcome.bad(String.is_empty(bad), bad, asks, hub, packs, ts)
 
 # the lock of a listing, once the tool pins were found complete
 def plan.listed.go(complete: Bool, +why: String, +led: M.Read, fs: List<&2, Source>, +js: List<&2, Judged>) -> Outcome:
   match complete:
     case True{}:
-      outcome(walk(U32.to_nat(100000), L.ledger.read(led), js, roots(fs),
-        Walk{[], [], ""}), M.hub_of(led), M.tools_of(led))
+      outcome(walk(U32.to_nat(100000), L.ledger.read(led), js,
+        Walk{roots(fs), [], [], ""}), M.hub_of(led), M.tools_of(led))
     case False{}:
       Refused{why}
 

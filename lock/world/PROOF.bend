@@ -601,3 +601,165 @@ def Laws.join_split(s, c):
     case SCon{+h, +t}:
       join_split.arm(h, t, c, String.split(t, c), Char.is_eq(h, c), {==},
         split_cons(t, c), Laws.join_split(t, c))
+
+# The walk's sources, one step at a time. Each lemma is one def of the step,
+# with the value it branches on given as a parameter.
+
+# LAW: a package resolved by its verdict carries the ledger's source
+law verdict_pins:
+  for v: W.Verdict
+  for +orgs: List<&2, L.Origin>
+  for +hash: String
+  for rest: List<&2, String>
+  for +packs: List<&2, L.Pack>
+  for asks: List<&2, String>
+  for bad: String
+  for e: {Laws.pinned.all(orgs, packs) == packs : List<&2, L.Pack>}
+  {Laws.pinned.all(orgs, Laws.packs.of(W.step.verdict(v, L.origin(orgs, hash),
+    hash, rest, packs, asks, bad)))
+    == Laws.packs.of(W.step.verdict(v, L.origin(orgs, hash), hash, rest, packs,
+      asks, bad)) : List<&2, L.Pack>}
+
+def verdict_pins(v, orgs, hash, _rest, packs, _asks, _bad, e):
+  match v:
+    case W.No{_why}:
+      e
+    case W.Ok{fs, _ss}:
+      Equal.cong(List<&2, L.Pack>, List<&2, L.Pack>,
+        ps => L.Pack{hash, L.origin(orgs, hash), fs} <> ps,
+        Laws.pinned.all(orgs, packs), packs, e)
+
+# LAW: and one looked up, whether it was answered or not
+law look_pins:
+  for found: W.Look
+  for +orgs: List<&2, L.Origin>
+  for +hash: String
+  for rest: List<&2, String>
+  for +packs: List<&2, L.Pack>
+  for asks: List<&2, String>
+  for bad: String
+  for e: {Laws.pinned.all(orgs, packs) == packs : List<&2, L.Pack>}
+  {Laws.pinned.all(orgs, Laws.packs.of(W.step.look(found, L.origin(orgs, hash),
+    hash, rest, packs, asks, bad)))
+    == Laws.packs.of(W.step.look(found, L.origin(orgs, hash), hash, rest, packs,
+      asks, bad)) : List<&2, L.Pack>}
+
+def look_pins(found, orgs, hash, rest, packs, asks, bad, e):
+  match found:
+    case W.Absent{}:
+      e
+    case W.Found{v}:
+      verdict_pins(v, orgs, hash, rest, packs, asks, bad, e)
+
+# LAW: and one passed over, or picked
+law pick_pins:
+  for seen: Bool
+  for +orgs: List<&2, L.Origin>
+  for +js: List<&2, W.Judged>
+  for +hash: String
+  for rest: List<&2, String>
+  for +packs: List<&2, L.Pack>
+  for asks: List<&2, String>
+  for bad: String
+  for e: {Laws.pinned.all(orgs, packs) == packs : List<&2, L.Pack>}
+  {Laws.pinned.all(orgs, Laws.packs.of(W.step.pick(seen, orgs, js, hash, rest,
+    packs, asks, bad)))
+    == Laws.packs.of(W.step.pick(seen, orgs, js, hash, rest, packs, asks, bad))
+    : List<&2, L.Pack>}
+
+def pick_pins(seen, orgs, js, hash, rest, packs, asks, bad, e):
+  match seen:
+    case True{}:
+      e
+    case False{}:
+      look_pins(W.look(js, hash), orgs, hash, rest, packs, asks, bad, e)
+
+# LAW: and one step of the walk, whatever the queue held
+law pop_pins:
+  for +orgs: List<&2, L.Origin>
+  for +js: List<&2, W.Judged>
+  for queue: List<&2, String>
+  for +packs: List<&2, L.Pack>
+  for +asks: List<&2, String>
+  for bad: String
+  for e: {Laws.pinned.all(orgs, packs) == packs : List<&2, L.Pack>}
+  {Laws.pinned.all(orgs, Laws.packs.of(W.step.pop(orgs, js, queue, packs, asks,
+    bad)))
+    == Laws.packs.of(W.step.pop(orgs, js, queue, packs, asks, bad))
+    : List<&2, L.Pack>}
+
+def pop_pins(orgs, js, queue, packs, asks, bad, e):
+  match queue:
+    case []:
+      e
+    case +h <> t:
+      pick_pins(Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, js, h, t,
+        packs, asks, bad, e)
+
+# LAW: one step keeps every resolved package on the ledger's source
+law step_pins:
+  for +orgs: List<&2, L.Origin>
+  for +js: List<&2, W.Judged>
+  for wk: W.Walk
+  for e: {Laws.pinned.all(orgs, Laws.packs.of(wk)) == Laws.packs.of(wk)
+    : List<&2, L.Pack>}
+  {Laws.pinned.all(orgs, Laws.packs.of(W.step(orgs, js, wk)))
+    == Laws.packs.of(W.step(orgs, js, wk)) : List<&2, L.Pack>}
+
+def step_pins(orgs, js, wk, e):
+  match wk:
+    case W.Walk{queue, packs, asks, bad}:
+      pop_pins(orgs, js, queue, packs, asks, bad, e)
+
+# LAW: a walk that ran out of fuel keeps the packages it had
+law out_pins:
+  for done: Bool
+  for +orgs: List<&2, L.Origin>
+  for wk: W.Walk
+  for e: {Laws.pinned.all(orgs, Laws.packs.of(wk)) == Laws.packs.of(wk)
+    : List<&2, L.Pack>}
+  {Laws.pinned.all(orgs, Laws.packs.of(W.walk.out(done, wk)))
+    == Laws.packs.of(W.walk.out(done, wk)) : List<&2, L.Pack>}
+
+def out_pins(done, _orgs, wk, e):
+  match done:
+    case True{}:
+      e
+    case False{}:
+      match wk:
+        case W.Walk{_queue, _packs, _asks, _bad}:
+          e
+
+# LAW: a walk that is done is what it was, and one that is not goes on
+law more_pins:
+  for done: Bool
+  for +orgs: List<&2, L.Origin>
+  for +js: List<&2, W.Judged>
+  for f: Nat
+  for +wk: W.Walk
+  for e: {Laws.pinned.all(orgs, Laws.packs.of(wk)) == Laws.packs.of(wk)
+    : List<&2, L.Pack>}
+  for ih: {Laws.pinned.all(orgs, Laws.packs.of(W.walk(f, orgs, js,
+    W.step(orgs, js, wk))))
+    == Laws.packs.of(W.walk(f, orgs, js, W.step(orgs, js, wk)))
+    : List<&2, L.Pack>}
+  {Laws.pinned.all(orgs, Laws.packs.of(W.walk.more(done, wk,
+    now => W.walk(f, orgs, js, W.step(orgs, js, now)))))
+    == Laws.packs.of(W.walk.more(done, wk,
+      now => W.walk(f, orgs, js, W.step(orgs, js, now)))) : List<&2, L.Pack>}
+
+def more_pins(done, _orgs, _js, _f, _wk, e, ih):
+  match done:
+    case True{}:
+      e
+    case False{}:
+      ih
+
+def Laws.walk_pins_ledger_sources(fuel, orgs, js, wk, e):
+  match fuel:
+    case 0n:
+      out_pins(W.walk.done(wk), orgs, wk, e)
+    case 1n+f:
+      more_pins(W.walk.done(wk), orgs, js, f, wk, e,
+        Laws.walk_pins_ledger_sources(f, orgs, js, W.step(orgs, js, wk),
+          step_pins(orgs, js, wk, e)))
