@@ -17,6 +17,7 @@ curl -fsSL https://bend-lang.com/install.sh | sh
 git clone https://github.com/Emerging-Patterns/ez
 cd ez
 sh bootstrap.sh
+mkdir -p bin
 BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
 ```
 
