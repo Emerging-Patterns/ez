@@ -340,8 +340,8 @@ EZ-RES-5 and EZ-RES-8 are proved relative to EZ-RES-7. The law says ez moves a p
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
 | EZ-VEN-1 | After `ez add`, `ez remove` or `ez lock --upgrade`, the `.gitignore` allowlist names exactly the hashes of dependencies marked `vendor = true`, and every other line of `.gitignore` is unchanged. | Proved | pending |
-| EZ-VEN-2 | When an upgrade moves a hash, every line of a `.bend` file outside `.ez` and `.git` that starts `import <old>/` names `<new>` afterwards. | Proved | pending |
-| EZ-VEN-3 | Import rewriting leaves every other line of every file byte-identical, and does not write a file with no matching line. | Proved | pending |
+| EZ-VEN-2 | When an upgrade moves a hash, every line of a `.bend` file outside `.ez` and `.git` that starts `import <old>/` names `<new>` afterwards. | Proved | proved |
+| EZ-VEN-3 | Import rewriting leaves every other line of every file byte-identical, and does not write a file with no matching line. | Proved | proved |
 | EZ-VEN-4 | `ez doctor` never writes to the project's source files. | Proved | pending |
 | EZ-VEN-5 | `ez doctor` reports every hash an import line names that the ledger does not, and every ledger dependency no import line names, and exits 1 when it reports any. | Proved | pending |
 
@@ -484,6 +484,8 @@ For EZ-RES-1, a release tag beats any pre-release, the default branch is the rem
 For EZ-RES-3, `owner/repo` allows `.` in both segments, and a second segment ending in `.bend` makes the target a path, so `vercel/next.js` is GitHub and `src/main.bend` is a path.
 
 For EZ-VEN-1, one pure function derives the gitignore allowlist from the ledger, and `ez add`, `ez remove` and `ez lock --upgrade` call it. `ez init` writes `.ez/*`, `!.ez/lib` and `.ez/lib/*` instead of `.ez/`.
+
+Three more for EZ-VEN, found while proving WP7 of the phase-three design and shown on the binary first. The allowlist names each vendored hash once, where the ledger first names it: two dependencies that share a tree (one repository at one rev, under two names) wrote its `!.ez/lib/<hash>` line twice, and cargo and uv dedupe such entries. A `.gitignore` is its lines, each ending with a newline, so a file of a blank line and a stale allowlist line keeps its blank line; it was written empty. And an upgrade rewrites only a line that starts `import <old>/`, as EZ-VEN-2 says; it also rewrote `import <old>` with nothing after the hash, which EZ-VEN-3 forbids.
 
 For EZ-TOOL-2, the tool cache records the built file and the bend version beside the commit.
 

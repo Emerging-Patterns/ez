@@ -7,6 +7,8 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./manifest.bend as M
 import ./render.bend as R
 import ./ignore.bend as I
+import ./upgrade.bend as U
+import ../check/str.bend as Str
 
 # LAW: dropping a dependency drops every entry of that name, so dropping twice
 # is dropping once. `ez remove` on a ledger it already edited is a no-op.
@@ -397,8 +399,8 @@ law readd_keeps_vendor:
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, v}}))) == True{} : Bool}
 
 # LAW: the gitignore allowlist names exactly the hashes of the dependencies
-# the ledger marks `vendor = true`, in the ledger's order, whatever the file
-# said before. `ez add`, `ez remove` and `ez lock --upgrade` write the file
+# the ledger marks `vendor = true`, each once, in the order the ledger first
+# names them, whatever the file said before. `ez add`, `ez remove` and `ez lock --upgrade` write the file
 # `I.sync` makes from these lines, so after any of them the allowlist is the
 # ledger's and no one else's.
 # EZ-VEN-1
@@ -415,3 +417,181 @@ law allowlist_keeps_other_lines:
   for +ds: List<&2, M.Dep>
   for +ls: List<&2, String>
   {I.others(I.lines(ds, ls)) == I.others(ls) : List<&2, String>}
+
+# The text layer. `I.sync` reads `.gitignore` into its lines, derives the
+# allowlist over them with `I.lines`, and writes them back, each ending with a
+# newline; a file whose lines did not change comes back as it was, byte for
+# byte. `I.file.lines` is how a file reads as lines: an empty file has none,
+# and a last line with no newline after it is a line. Every law below takes a
+# ledger whose vendored hashes hold no newline, as a `0x` name never does.
+
+# LAW: after `I.sync`, the allowlist of the file names exactly the vendored
+# hashes, each once, in the order the ledger first names them
+# EZ-VEN-1
+law sync_allowlist_is_the_ledger:
+  for +ds: List<&2, M.Dep>
+  for +text: String
+  for +ev: {Str.clear.all(I.vended(ds), '\n') == True{} : Bool}
+  {I.hashes(I.file.lines(I.sync(ds, text))) == I.vended(ds) : List<&2, String>}
+
+# LAW: and every line of the file that is not ez's is kept, byte for byte and
+# in order
+# EZ-VEN-1
+law sync_keeps_other_lines:
+  for +ds: List<&2, M.Dep>
+  for +text: String
+  for +ev: {Str.clear.all(I.vended(ds), '\n') == True{} : Bool}
+  {I.others(I.file.lines(I.sync(ds, text))) == I.others(I.file.lines(text))
+    : List<&2, String>}
+
+# whether a list of hashes names each hash once. Law vocabulary: ez never
+# calls it.
+def distinct(hs: List<&2, String>) -> Bool:
+  match hs:
+    case []:
+      True{}
+    case +h <> +t:
+      +rest = distinct(t)
+      Bool.and(Bool.not(I.named(t, h)), rest)
+
+# LAW: the allowlist names each vendored hash once. Two dependencies that
+# share a tree share its one line, where the first of them is.
+# EZ-VEN-1
+law vended_once:
+  for ds: List<&2, M.Dep>
+  {distinct(I.vended(ds)) == True{} : Bool}
+
+# LAW: applying `I.sync` twice is applying it once: the file it writes is
+# already in sync, and comes back byte for byte
+# EZ-VEN-1
+law sync_idempotent:
+  for +ds: List<&2, M.Dep>
+  for +text: String
+  for +ev: {Str.clear.all(I.vended(ds), '\n') == True{} : Bool}
+  {I.sync(ds, I.sync(ds, text)) == I.sync(ds, text) : String}
+
+# Import rewriting (EZ-VEN-2, EZ-VEN-3). When an upgrade moves hashes it
+# rewrites every source with `U.reimport.many`, which cuts the text at its
+# newlines, rewrites each line through every move in order, and joins the
+# lines back. A line names a hash when it starts `import <hash>/`, at column
+# 0. The moves are the upgrade's: each old hash names something, no hash
+# holds `/` or a newline, as a `0x` name never does, and no move's new hash is
+# the old hash of a move after it, which would move a rewritten line again.
+
+# the line at a place in a list of lines, "" past its end. Law vocabulary: ez
+# never calls it.
+def line.at(ls: List<&2, String>, at: Nat) -> String:
+  match ls at:
+    case Nil{} _:
+      ""
+    case h <> t 0n:
+      h
+    case h <> t 1n+p:
+      line.at(t, p)
+
+# whether a hash holds neither `/` nor a newline
+def plain(+hash: String) -> Bool:
+  Bool.and(Str.clear(hash, '/'), Str.clear(hash, '\n'))
+
+# whether no move of a list has a hash as its old one
+def olds.miss(ss: List<&2, U.Swap>, +hash: String) -> Bool:
+  match ss:
+    case []:
+      True{}
+    case U.Swap{o, _n} <> t:
+      +rest = olds.miss(t, hash)
+      Bool.and(Bool.not(String.eq(o, hash)), rest)
+
+# whether a list of moves is one an upgrade makes: every old hash names
+# something, every hash is plain, and no new hash is the old hash of a move
+# after it
+def moves.ok(ss: List<&2, U.Swap>) -> Bool:
+  match ss:
+    case []:
+      True{}
+    case U.Swap{+o, +n} <> +t:
+      +rest = moves.ok(t)
+      Bool.and(Bool.and(Bool.and(Bool.not(String.is_empty(o)), plain(o)),
+        Bool.and(plain(n), olds.miss(t, n))), rest)
+
+# the hash a list of moves sends an old hash to: the first move of it
+def moved.to(ss: List<&2, U.Swap>, +old: String) -> Maybe<&2, String>:
+  match ss:
+    case []:
+      None{}
+    case U.Swap{o, n} <> t:
+      +rest = moved.to(t, old)
+      Bool.pick(Maybe<&2, String>, String.eq(o, old), Some{n}, rest)
+
+# whether a line names none of the old hashes of a list of moves
+def names.none(ss: List<&2, U.Swap>, +line: String) -> Bool:
+  match ss:
+    case []:
+      True{}
+    case U.Swap{o, _n} <> t:
+      +rest = names.none(t, line)
+      Bool.and(Bool.not(String.starts_with(line, U.reimport.head(o))), rest)
+
+# whether no line of a list names an old hash of a list of moves
+def names.none.all(+ss: List<&2, U.Swap>, ls: List<&2, String>) -> Bool:
+  match ls:
+    case []:
+      True{}
+    case h <> t:
+      +rest = names.none.all(ss, t)
+      Bool.and(names.none(ss, h), rest)
+
+# LAW: a source is rewritten line by line: its lines afterwards are its lines
+# before, each put through every move, and no more
+law rewrite_by_line:
+  for +ss: List<&2, U.Swap>
+  for +text: String
+  for +ok: {moves.ok(ss) == True{} : Bool}
+  {String.lines(U.reimport.many(ss, text))
+    == U.reimport.many.lines(ss, String.lines(text)) : List<&2, String>}
+
+# LAW: when an upgrade moves a hash, every line of a source that starts
+# `import <old>/` starts `import <new>/` afterwards, `<new>` being where the
+# first move of `<old>` sends it
+# EZ-VEN-2
+law rewrite_names_new:
+  for +ss: List<&2, U.Swap>
+  for +text: String
+  for +i: Nat
+  for +old: String
+  for +new: String
+  for +ok: {moves.ok(ss) == True{} : Bool}
+  for +to: {moved.to(ss, old) == Some{new} : Maybe<&2, String>}
+  for hit: {String.starts_with(line.at(String.lines(text), i), U.reimport.head(old))
+    == True{} : Bool}
+  {String.starts_with(line.at(String.lines(U.reimport.many(ss, text)), i),
+    U.reimport.head(new)) == True{} : Bool}
+
+# LAW: and every other line is left byte for byte as it was
+# EZ-VEN-3
+law rewrite_keeps_other_lines:
+  for +ss: List<&2, U.Swap>
+  for +text: String
+  for +i: Nat
+  for +ok: {moves.ok(ss) == True{} : Bool}
+  for miss: {names.none(ss, line.at(String.lines(text), i)) == True{} : Bool}
+  {line.at(String.lines(U.reimport.many(ss, text)), i)
+    == line.at(String.lines(text), i) : String}
+
+# LAW: and no line is added or dropped
+# EZ-VEN-3
+law rewrite_keeps_line_count:
+  for +ss: List<&2, U.Swap>
+  for +text: String
+  for +ok: {moves.ok(ss) == True{} : Bool}
+  {List.length(&2, String, String.lines(U.reimport.many(ss, text)))
+    == List.length(&2, String, String.lines(text)) : Nat}
+
+# LAW: a source none of whose lines names a moved hash comes back byte for
+# byte, newline or none at its end, so the upgrade has nothing to write
+# EZ-VEN-3
+law rewrite_nothing_named:
+  for +ss: List<&2, U.Swap>
+  for +text: String
+  for none: {names.none.all(ss, String.lines(text)) == True{} : Bool}
+  {U.reimport.many(ss, text) == text : String}
