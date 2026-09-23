@@ -245,6 +245,7 @@ law expand_home:
   {Tgt.expand(home, "~/" ++ rest) == home ++ ("/" ++ rest) : String}
 
 # LAW: a URL is fetched as it is, wherever ez was run
+# EZ-LED-8
 law anchor_url:
   for here: String
   for +a: String
@@ -252,6 +253,7 @@ law anchor_url:
   {P.anchor(here, a ++ ("://" ++ b)) == a ++ ("://" ++ b) : String}
 
 # LAW: an absolute path is fetched as it is, wherever ez was run
+# EZ-LED-8
 law anchor_absolute:
   for here: String
   for +rest: String
@@ -261,6 +263,7 @@ law anchor_absolute:
 # LAW: a relative path, which the ledger keeps as it was given, is taken from
 # the directory ez runs in, the project's, and not from the work directory or
 # the repository top git would read it from
+# EZ-LED-8
 law anchor_relative:
   for +here: String
   for +path: String
@@ -447,6 +450,7 @@ law dirs_build_out:
 
 # LAW: a missing ledger reads, for any command that edits it, as one that did
 # not parse, which renders as nothing, so no edit is ever written in its place
+# EZ-LED-6
 law ledger_missing_unwritten:
   for +cmd: String
   {Rend.render(Cmd.ledger.of(None{}, cmd)) == "" : String}
@@ -461,6 +465,7 @@ law ledger_present_parsed:
 
 # LAW: a ledger already on disk, whatever it holds, leaves `ez init` nothing to
 # write, so its dependencies, tools and `bin` survive a second `ez init`
+# EZ-LED-6
 law init_keeps_ledger:
   for s: String
   for name: String
@@ -474,6 +479,7 @@ law init_keeps_ledger:
 # LAW: a source is named by what follows its last slash, whatever comes
 # before. A slug, a url and a resolved directory are all named this way, so
 # two packages whose entry is `main.bend` are named after their repositories.
+# EZ-LED-7
 law leaf_is_last:
   for p: String
   for +n: String
@@ -481,6 +487,7 @@ law leaf_is_last:
   {Named.leaf(p ++ ("/" ++ n)) == n : String}
 
 # LAW: a package whose own `[package] name` is a TOML bare key is named by it
+# EZ-LED-7
 law own_package:
   for +pkg: String
   for +fresh: String
@@ -489,6 +496,7 @@ law own_package:
 
 # LAW: a package name that is not a bare key, or none at all, falls through to
 # the name the source gives itself rather than being refused
+# EZ-LED-7
 law own_invalid:
   for +pkg: String
   for +fresh: String
@@ -504,6 +512,7 @@ law bare_no_dot:
 
 # LAW: the name the ledger already gives this source beats the package's own
 # name and the source's
+# EZ-LED-7
 law name_keeps:
   for n: String
   for h: String
@@ -522,6 +531,7 @@ law name_keeps:
 
 # LAW: `--rename`, when given, is the name, ahead of the ledger's, the
 # package's and the source's
+# EZ-LED-7
 law rename_wins:
   for ds: List<&2, M.Dep>
   for +url: String
@@ -532,6 +542,7 @@ law rename_wins:
   {Named.as(ds, url, rename, pkg, fresh) == rename : String}
 
 # LAW: a `--rename` that is not a bare key, like `a.b`, is refused
+# EZ-LED-7
 law rename_dotted:
   for +a: String
   for +b: String
@@ -539,6 +550,7 @@ law rename_dotted:
 
 # LAW: a `--rename` of a source the ledger already records under another name
 # is refused, rather than recorded twice or renamed behind the ledger's back
+# EZ-LED-7
 law rename_moved:
   for +n: String
   for +h: String
@@ -558,6 +570,7 @@ law rename_moved:
     rename) == True{} : Bool}
 
 # LAW: and a `--rename` the ledger gives to another source still clashes
+# EZ-LED-7
 law rename_clash:
   for +r: String
   for +h: String
@@ -651,6 +664,7 @@ law clash_skips:
     == Named.clash(t, name, url) : Bool}
 
 # LAW: the name held by this same git source is not a clash: that is a re-add
+# EZ-LED-7
 law clash_same:
   for +n: String
   for h: String
@@ -667,6 +681,7 @@ law clash_same:
 
 # LAW: the name held by another git source is a clash, and is refused rather
 # than written over
+# EZ-LED-7
 law clash_other:
   for +n: String
   for h: String
@@ -684,6 +699,7 @@ law clash_other:
     url) == True{} : Bool}
 
 # LAW: and so is the name held by a hub dependency
+# EZ-LED-7
 law clash_hub:
   for +n: String
   for h: String
