@@ -375,7 +375,7 @@ EZ-TOOL-5 is stated over the planner's outcome, not over a real process. The pla
 | EZ-PUB-1 | `ez publish` refuses when `git status --porcelain --untracked-files=normal` names any path. | Proved | pending |
 | EZ-PUB-2 | `ez publish` succeeds only when a line of bend's output is exactly a `0x` name and equals ez's own hash. Any other answer exits 1. | Proved | pending |
 
-Both are new. `pub/LAWS.bend` already proves the decision functions for all inputs (`clean_is_all_blank`, `answer_is_a_name`, `unread_never_agrees`, `differs_never_agrees`); what is pending is stating them over the command's plan. EZ-PUB-2 describes the verdict, not the ordering, and the comparison runs after bend has uploaded. We looked for a way to compare first and found none. bend 2.0.25 has no flag that stops short of the upload: `bend --help` lists none, and `cli_file` accepts only `--check-only`, `--checkup`, `--publish` and `-o`. `cli_publish` computes the hash, prints it in its `publishing N files, ... as 0x... (mining its proof of work)` progress line on stderr, mines the proof of work and posts to the hub, all in one function with no exit between the hash and the post. The only way to stop it early is to point the undocumented `BEND_HUB` variable at an address that refuses connections and read the hash out of that progress line, which mines the proof of work twice (about 25 seconds for a 37-byte package here) and trusts a dead address to stay dead, so we did not take it. The check stays after the upload. EZ-PUB-2 promises that a disagreement exits 1 and prints no import line, not that nothing was sent.
+Both are new. `pub/LAWS.bend` already proves the decision functions for all inputs (`clean_is_all_blank`, `answer_is_a_name`, `unread_never_agrees`, `differs_never_agrees`); what is pending is stating them over the command's plan. EZ-PUB-2 describes the verdict, not the ordering, and the comparison runs after bend has uploaded. We looked for a way to compare first and found none: bend 2.0.25 has no option that stops `--publish` between computing the hash and posting it, and the only workaround, pointing `BEND_HUB` at a dead address and reading the hash from a progress line, depends on output bend does not promise and mines the proof of work twice. The check stays after the upload. EZ-PUB-2 promises that a disagreement exits 1 and prints no import line, not that nothing was sent.
 
 ### Outcomes and incidental output
 
@@ -469,7 +469,7 @@ For EZ-VEN-1, one pure function derives the gitignore allowlist from the ledger,
 
 For EZ-TOOL-2, the tool cache records the built file and the bend version beside the commit.
 
-For EZ-PUB-2, nothing changes. bend 2.0.25 cannot report a package's hash without uploading, because `cli_publish` hashes, mines and posts in one step with no flag to stop before the post, so the check stays after the upload.
+For EZ-PUB-2, nothing changes. bend 2.0.25 cannot report a package's hash without uploading, so the check stays after the upload.
 
 For the proof gate, a new `ez prove` command runs `bend` on every PROOF.bend and applies the exact `All terms check.` rule, and `mkProofs` runs it instead of `ez test`.
 
