@@ -128,9 +128,11 @@ unset); the slug of a URL or of
 
 A remote resolves to `git ls-remote <url> HEAD`. A path resolves to a clean
 `HEAD`. A name that matches a `[tools.*]` pin resolves to the rev in
-`ez.lock.toml`. The checkout is reused while `rev` is that commit, and the
-binary is reused while it was built from that commit. A dirty worktree, or a
-path that is not a checkout, has no commit and is built every time.
+`ez.lock.toml`. The checkout is reused while `rev` is that commit. The binary
+is reused while `key` names that commit, the same built file and the same
+`bend version`, so a pin's `bin` or `entry` and a free run of the same commit
+do not share a binary, and a new bend rebuilds it. A dirty worktree, or a path
+that is not a checkout, has no commit and is built every time.
 
 `ez tool install` fetches the lock and builds `<slug>/bin/<name>.out`, then
 links that file onto PATH as `<name>`. Each long step says what it is doing
