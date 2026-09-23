@@ -2,26 +2,26 @@
 
 ## Draft Status
 
-State: Draft. Nothing here changes `ez add` or `ez remove` yet; the work packages below do.
+State: Accepted. Nothing here changes `ez add` or `ez remove` yet; the work packages below do.
 
 This is the design for the phase after [ez-lock-planner.md](ez-lock-planner.md): converting `ez add` and `ez remove` to pure planners and thin interpreters, then proving the pending rows they touch. It follows the lock design's pattern (a World, a planner that asks or plans, an interpreter that answers and executes) and does not repeat it; read that design's "Summary", "Laziness without losing purity" and "The Plan and the outcome" first. It was written from the code at `0f8f179`, where WP1 of the lock design has landed, and it builds on the shapes WP1 built (see that design's "Update" note) rather than on its sketches. A spike in `pkg/tree/` makes the package walk pure; nothing imports it, so `ez add` behaves exactly as before. [ez-law-inventory.md](ez-law-inventory.md) stays the progress tracker, and `SPEC.md` does not change until a requirement's law lands.
 
 ### Open questions
 
-Each question has a recommendation. The first six, and the vendor key, change behavior; the seventh rewords a requirement.
+Every question below was the maintainer's, and each is resolved. The maintainer accepted every recommendation. The seven behavior changes are recorded in [ez-spec.md](ez-spec.md) under "Decided behavior changes", and EZ-LED-8's new wording in `SPEC.md`.
 
-- [ ] <!-- REVIEW: A refused `ez add` lays nothing. Today the tree is laid under BEND_LIB, and `.ez/origins.toml` written, before the name is checked, so a refused add leaves both behind. Recommendation: lay only in a plan that succeeds. A cache fill is not a contractual write, but a refusal whose plan has no effect at all is the simplest EZ-OUT-2 law, and it is the lock's shape. -->
-- [ ] <!-- REVIEW: `ez add` stops writing `.ez/origins.toml`. Nothing reads it since the lock's input changes, and `ez lock --upgrade` is decided to stop writing it in WP2. Recommendation: stop, and delete `Git.note`, `Git.origin*`, `Git.but` and their three untagged laws. -->
-- [ ] <!-- REVIEW: Where a re-add of a `vendor = true` dependency lays its tree. Today it lays under `$BEND_LIB`, which is not `.ez/lib` in every shell, so the allowlist can name a tree that is not committed; and when the hash moves, the old committed tree stays. Recommendation: lay a vendored tree under `.ez/lib` (`Committed`) and drop the old one, as the upgrade does. -->
-- [ ] <!-- REVIEW: `ez remove` of a vendored dependency. Today it drops the allowlist line and leaves `.ez/lib/<hash>` committed, where git keeps tracking it. Recommendation: the plan drops the committed tree, unless another dependency still names that hash. -->
-- [ ] <!-- REVIEW: `ez remove` of a name the ledger does not have. Today it re-renders the ledger (dropping comments and unknown keys) and exits 0. Recommendation: refuse with exit 1 and write nothing, as `cargo remove` does. EZ-LED-3 is about the model edit and is unaffected. -->
-- [ ] <!-- REVIEW: A package whose modules climb out of the checkout. `K.pkg_of` re-roots it under the trailing components `realpath` reports, which include `.work-<rev>` and the directories above it, so its hash depends on where BEND_LIB is. Recommendation: the pure walk refuses it. -->
-- [ ] <!-- REVIEW: `ez add ~/x` records the path with `~/` expanded, so EZ-LED-8's "as it was given" is not quite true. Recommendation: keep the expansion and reword EZ-LED-8 to "as it was given, with a leading `~/` expanded", since a `~/` in the ledger would make the lock read HOME, which EZ-DOC-3 forbids. -->
-- [ ] <!-- REVIEW: `vendor = true` is written as a bare boolean, and read either way. Recommendation: yes; see "The vendor key" below. -->
-- [ ] <!-- REVIEW: The checkout answer holds the text of every file in the checkout, rather than the planner asking file by file. Recommendation: every file. The NAR hash already reads every file, so it costs no new IO, and it keeps `ez add` to at most three rounds. -->
-- [ ] <!-- REVIEW: One package walk. `K.pkg_of` stays IO for `ez publish` until publish is converted. Recommendation: rewrite `K.pkg_of` in the first work package as an ask/answer loop over the pure walk, answered by `F.read`, so the two cannot drift. -->
-- [ ] <!-- REVIEW: EZ-LED-8 for the lock. Today every git command anchors its source inside `git/git.bend`, which is interpreter code. Recommendation: every git question a planner asks carries `from = P.anchor(here, url)`, computed by the planner, and the lock's World gains `here` in WP2; the row flips when `ez fetch` does the same. -->
-- [ ] <!-- REVIEW: `ez init` in planner form. EZ-LED-6 cannot flip without it. Recommendation: include it here as a small work package; its World is three `Maybe` texts. -->
+- [x] <!-- REVIEW (resolved): A refused `ez add` lays nothing. The tree is laid only by a plan that succeeds, so a refused add leaves no tree under BEND_LIB. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): `ez add` stops writing `.ez/origins.toml`, which nothing reads. `Git.note`, `Git.origin*`, `Git.but` and their three untagged laws are deleted with it. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): A re-added `vendor = true` dependency is laid under `.ez/lib` (`Committed`), and the old committed tree is dropped when the hash moved, as the upgrade does. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): `ez remove` of a vendored dependency drops its committed tree under `.ez/lib`, unless another dependency still names that hash. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): `ez remove` of a name the ledger does not have refuses with exit 1 and writes nothing. EZ-LED-3 is about the model edit and is unaffected. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): A package whose modules climb out of the checkout is refused by the pure walk, rather than named after the directories above it. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): EZ-LED-8 now reads "as it was given, with a leading `~/` expanded". `ez add` keeps expanding `~/`, since a `~/` in the ledger would make the lock read HOME. -->
+- [x] <!-- REVIEW (resolved): ez writes `vendor = true` as a bare boolean and reads either spelling; see "The vendor key". This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): The checkout answer holds the text of every file in the checkout, so `ez add` takes at most three rounds. -->
+- [x] <!-- REVIEW (resolved): There is one package walk. `K.pkg_of` becomes an ask/answer loop over the pure walk, answered by `F.read`, in A0. -->
+- [x] <!-- REVIEW (resolved): Every git question a planner asks carries `from = P.anchor(here, url)`, computed by the planner. The lock's World gains `here` in WP2, and EZ-LED-8 flips when `ez fetch` does the same. -->
+- [x] <!-- REVIEW (resolved): `ez init` is converted in this phase, as A4, so that EZ-LED-6 can flip. -->
 
 ---
 
@@ -43,7 +43,7 @@ With both commands in planner form, EZ-LED-7, EZ-RES-1, EZ-RES-2, EZ-LED-2 and E
 | a shallow clone at the rev: its `ez.toml`, the entry's presence, the files the walk reaches, `realpath` of the entry's directory, the NAR hash | `Git.vendor.at`, `K.pkg_of`, `Git.nar` | Yes, as one answer: the NAR hash and every file's text. `realpath` is not needed (see the package walk). |
 | `BEND_LIB`, as a path | `Env.lib` | No. Only the interpreter needs it, as for the lock. |
 | `.gitignore` | `Up.allowlist` | Yes, as `ignore`, "" when missing. |
-| `.ez/origins.toml` | `Git.note` reads it to rewrite it | No. See the second open question. |
+| `.ez/origins.toml` | `Git.note` reads it to rewrite it | No. See the second decision under "Open questions". |
 
 Two findings from this reading shape the design, beyond the questions above. `ez add` resolves the ref before it reads the ledger, so a directory with no ledger still asks the remote; the planner reads the ledger first and asks nothing when it will refuse. And `Git.root.rel` recovers the package root relative to the repository by counting components of absolute paths; the pure walk works in checkout-relative paths, so the root it returns is the ledger's `root` directly.
 
@@ -121,7 +121,7 @@ EZ-HASH-3 is stated about every `Lay`, cached or committed: whether a cache fill
 
 ### A refused add and the cache
 
-Today a refused `ez add` has already laid the tree under `$BEND_LIB/<hash>` and written `.ez/origins.toml`. In planner form the checkout is read into an answer, in a scratch directory the interpreter removes, and nothing is laid until the plan says so. We recommend keeping that consequence rather than adding a `Lay` to refused plans: the cache fill is not contractual, so EZ-OUT-2 would allow it, but a refused plan with no effect at all is the same law as the lock's (`lock_refusal_writes_nothing`), proved the same way, and a refusal that fills the cache with a package the ledger does not name is a tree nothing will ever read. `.ez/origins.toml` is a contractual write under EZ-OUT-2's wording ("every file it would otherwise write"), which is one more reason to stop writing it.
+Today a refused `ez add` has already laid the tree under `$BEND_LIB/<hash>` and written `.ez/origins.toml`. In planner form the checkout is read into an answer, in a scratch directory the interpreter removes, and nothing is laid until the plan says so. We keep that consequence rather than adding a `Lay` to refused plans: the cache fill is not contractual, so EZ-OUT-2 would allow it, but a refused plan with no effect at all is the same law as the lock's (`lock_refusal_writes_nothing`), proved the same way, and a refusal that fills the cache with a package the ledger does not name is a tree nothing will ever read. `.ez/origins.toml` is a contractual write under EZ-OUT-2's wording ("every file it would otherwise write"), which is one more reason to stop writing it.
 
 ## The package walk, made pure
 
@@ -129,7 +129,7 @@ Today a refused `ez add` has already laid the tree under `$BEND_LIB/<hash>` and 
 
 - A file is looked up in the list. A module that is not there stops the walk, and the package is refused naming it, as `K.pkg_of` dies naming it.
 - The walk keeps each found file's text beside its name, so the plan lays exactly the bytes it hashed, and the interpreter writes texts rather than copying files.
-- A package that climbs `n` levels re-roots under the last `n` components of the entry's checkout-relative directory, which is what `realpath` returned whenever the climb stayed inside the checkout. A climb past the checkout's top is refused (sixth open question).
+- A package that climbs `n` levels re-roots under the last `n` components of the entry's checkout-relative directory, which is what `realpath` returned whenever the climb stayed inside the checkout. A climb past the checkout's top is refused (the sixth decision).
 
 The walk is one step iterated under fuel, the shape the lock spike used, and a walk that runs out of fuel with files queued is refused rather than hashed short, which fixes the same silent truncation the lock design found in `resolve`.
 
@@ -139,7 +139,7 @@ What a pure walk enables:
 - **EZ-HASH-3.** The hash, the laid texts and the manifest all come from one list inside the planner, so "`h` is the 0x hash of the file list whose manifest it writes" is a statement about one `Lay` effect. The spike proves its key step: hashing the found files and hashing the laid files, each weighed by its own text, give the same file list (`walked_named_by_texts`, `walked_manifest_of_texts`).
 - **EZ-DOC-3 for upgrades.** WP2's `Tree` answer stops depending on an interpreter walk, so the upgrade's new hash is a planner decision like everything else.
 
-We recommend one walk. The pure walk reports a file it was not given as a question rather than a refusal (a third case beside "here" and "absent"); `ez add`'s interpreter gives it every file, so it never asks, and `K.pkg_of`, which `ez publish` and `pkg/main.bend` still call, becomes a loop that answers those questions with `F.read`. Then there is one implementation of the walk, and a later conversion of `ez publish` changes only its interpreter.
+We decided on one walk. The pure walk reports a file it was not given as a question rather than a refusal (a third case beside "here" and "absent"); `ez add`'s interpreter gives it every file, so it never asks, and `K.pkg_of`, which `ez publish` and `pkg/main.bend` still call, becomes a loop that answers those questions with `F.read`. Then there is one implementation of the walk, and a later conversion of `ez publish` changes only its interpreter.
 
 ## Laws
 
@@ -233,7 +233,7 @@ law add_asks_anchored:
   {AP.asks.from(AP.wants(w), P.anchor(A.here(w), A.url(w))) == True{} : Bool}
 ```
 
-`asks.from(as, f)` says every question names `f` as its source. With the three `P.anchor` laws, these state the add half of the row. The row flips when the lock's questions carry `from` too (eleventh open question) and `ez fetch` is converted. Effort: small.
+`asks.from(as, f)` says every question names `f` as its source. With the three `P.anchor` laws, these state the add half of the row. The row flips when the lock's questions carry `from` too (the eleventh decision) and `ez fetch` is converted. Effort: small.
 
 ### EZ-RES-1 and EZ-RES-2: what is pinned, and from which entry
 
@@ -336,13 +336,13 @@ law remove_edits_ledger:
 
 ### Trails, and what stays Trusted
 
-No `# toward` trail points at a row this phase proves, so none is deleted. With `.ez/origins.toml` gone, the untagged `origin_read`, `but_drops` and `but_keeps` in `git/LAWS.bend` go with the code they describe. The EZ-LED-4 trails (`render_parse_roundtrip`, `bolt_rev`) stay.
+Every `# toward` trail was deleted before this phase (#69), so none is left to delete. With `.ez/origins.toml` gone, the untagged `origin_read`, `but_drops` and `but_keeps` in `git/LAWS.bend` go with the code they describe.
 
 Nothing here should be Trusted. What the laws cannot say is covered by existing rows: that the interpreter reads every file of the checkout and writes each laid text faithfully (EZ-TRUST-2), that git serves the tree at a rev (EZ-RES-7), and that the NAR hash, which the interpreter still computes, matches nix (EZ-HASH-5). Once WP8's pure `Nar.dir` has a pure tree to run on, the `Checkout` answer could carry modes and symlinks and the planner compute the NAR hash too; no requirement needs it this phase.
 
 ## The vendor key
 
-`Rend.source` writes `vendor = "true"` through `line`, which quotes every value; the README, and every ledger a person writes, says `vendor = true`. `M.flag` compares the value after eztoml has stripped its quotes, so both spellings already read as true. In TOML they are not the same: `builtins.fromTOML`, which `nix/lib.nix` uses on ez.toml, reads the first as a string. We propose rendering a bare `true` and reading both, which is a one-line change to `Rend.vendor.word` and a new `line.bare`.
+`Rend.source` writes `vendor = "true"` through `line`, which quotes every value; the README, and every ledger a person writes, says `vendor = true`. `M.flag` compares the value after eztoml has stripped its quotes, so both spellings already read as true. In TOML they are not the same: `builtins.fromTOML`, which `nix/lib.nix` uses on ez.toml, reads the first as a string. We decided to render a bare `true` and read both, which is a one-line change to `Rend.vendor.word` and a new `line.bare`.
 
 For EZ-LED-4 nothing changes in the statement, since the model holds a `Bool` either way. Its eventual proof gains one small lemma, that eztoml's `strip` leaves an unquoted value as it is, the unquoted twin of the lock spike's `strip_quoted`. Existing ledgers keep reading as before, and each is rewritten with the bare spelling the next time `ez add`, `ez remove` or `ez lock --upgrade` renders it, a one-line diff per vendored dependency. ez's own ez.toml has no vendored dependency, so it does not change.
 
@@ -383,7 +383,7 @@ All terms check.
 $ BEND_LIB=$PWD/.ez/lib bin/ez.bin prove
 PASS: 11 / 11
 $ bolt.bin --gpu off
-0 errors, 378 warnings        (374 before the spike; the new ones are L001, defs no law names)
+0 errors, 378 warnings        (bolt v0.9.0 at the time; 374 before the spike, the new ones L001)
 ```
 
 What the spike does not tell us: it has no planner around the walk, no interpreter, and no timing. The interpreter running the walk from a 101-file list needed the compiled binary; `bend try.bend` overflowed the interpreter's stack, which `bin/ez.bin` does not use. We have not measured a checkout much larger than this repository.
