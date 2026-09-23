@@ -2,26 +2,26 @@
 
 ## Draft Status
 
-State: Draft, for maintainer review. Nothing here changes `ez lock` yet.
+State: Accepted. Nothing here changes `ez lock` yet; the work packages below do.
 
 This is the design for phase three of [ez-spec.md](ez-spec.md): converting `ez lock` to a pure planner and a thin interpreter, then proving EZ-DOC-1 through EZ-DOC-5, EZ-RES-4 through EZ-RES-6 and EZ-RES-8, EZ-VEN-1 through EZ-VEN-3, and EZ-HASH-2. It was written from the code at `bec3435`. A spike in `lock/world/` checks the riskiest parts against bend 2.0.25; nothing imports it, so `ez lock` behaves exactly as before. [ez-law-inventory.md](ez-law-inventory.md) stays the progress tracker, and `SPEC.md` does not change until a requirement's law lands.
 
 ### Open questions
 
-Each question is the maintainer's to decide. Where we have a recommendation, it is stated, and the rest of this document assumes it.
+Every question below was the maintainer's, and each is resolved. The maintainer accepted every recommendation, and made "a refused command writes nothing" a requirement, EZ-OUT-2, for every command. The spec's changes are recorded in [ez-spec.md](ez-spec.md) and `SPEC.md`.
 
-- [ ] <!-- REVIEW: Local imports. Today the lock starts from every tracked `.bend` file and then follows local imports, which can read a file git does not track (`root.found`, `lock/lock.bend:563`). Since every tracked file is already a root, the only thing the local walk adds is untracked files. We propose the planner takes the hub imports of every tracked file and follows no local import. That is a behavior change: an import of an untracked local file no longer reaches the lock. Recommended: yes, since it is exactly the read EZ-DOC-3 forbids. -->
-- [ ] <!-- REVIEW: Trees under BEND_LIB. Today a git tree already under `$BEND_LIB/<hash>` is read without checking that its manifest hashes to `<hash>`, and a freshly cloned tree is laid under the ledger's hash without checking either (`read.tree`, `fetch.git`). We propose the planner checks every package's manifest against its `0x` name, and judges a tree read from BEND_LIB exactly as a clone that weighed to the ledger's narHash. A cached tree still cannot be re-weighed, because it holds the package's files and not the whole checkout. So a ledger with a wrong narHash still locks in a working checkout and is refused on a fresh clone. Recommended: accept that, since the lock's bytes agree whenever both succeed; the alternative is a clone on every lock. -->
-- [ ] <!-- REVIEW: EZ-DOC-5 wording. "changes a tool's only when the ledger left it empty" predates the change that makes a plain lock refuse an incomplete tool pin. A plain lock now never writes ez.toml at all. Proposed: "`ez lock` without `--upgrade` never writes ez.toml, and records every dependency's and tool's pin exactly as ez.toml has it." -->
-- [ ] <!-- REVIEW: EZ-RES-6 wording. "`--package NAME` asks the remote only for the named dependency or tool" conflicts with the decided lock behavior: the lock that follows an upgrade fetches every non-vendored git tree missing from BEND_LIB at its ledger rev, which is asking the remote. Proposed: "asks the remote to resolve only the named dependency or tool", where resolving means refs, the default branch, ancestry and checkouts at a new rev. -->
-- [ ] <!-- REVIEW: Ledger model versus bytes. The upgrade laws (EZ-RES-4 to 8, EZ-VEN-1) are stated over the ledger model the plan renders into ez.toml, not over the bytes parsed back. EZ-LED-4 (render then parse) is what connects the two, and it is not in phase three. Recommended: accept that the phase-three laws are proved relative to the pending EZ-LED-4, and say so in "Left to prove". -->
-- [ ] <!-- REVIEW: EZ-DOC-1 route. (a) Prove the whole text round trip in ez against the pinned eztoml v0.1.0 reader. The spike proved its hardest string lemmas (trim, strip, join after split with char equality reflected), so this is large but not blocked. (b) Prove it at the level of TOML sections and make the text round trip a Trusted row with eztoml as the reason, which needs eztoml to state it, and eztoml's main line has since become a different, full TOML parser. Recommended: (a), landed in two steps, sections first. -->
-- [ ] <!-- REVIEW: What a lock may hold. `T.render` does no escaping, so a key or value holding `"`, `\` or a newline is written as TOML that neither eztoml nor nix reads back as written. We propose the planner refuses to write such a lock (a `lockable` check), which turns EZ-DOC-1's precondition into behavior instead of an assumption. -->
-- [ ] <!-- REVIEW: A refused upgrade writes nothing. Planner form computes the whole plan before any effect runs, so a refusal leaves every file as it was, where today a later failure leaves earlier writes in place. Should this be a requirement (a new EZ-OUT-2), or an untagged law? -->
-- [ ] <!-- REVIEW: `.ez/origins.toml`. `ez lock --upgrade` writes it through `Git.vendor.at`, and nothing in ez reads it. Recommended: the upgrade plan stops writing it. -->
-- [ ] <!-- REVIEW: The package walk of a new checkout. Under `--upgrade`, which files a moved package holds, and so its new hash, is computed by `K.pkg_of`, an IO walk. Recommended: keep it in the interpreter for phase three and list it under EZ-TRUST-2, since its result is trusted to match `bend --publish` anyway (EZ-HASH-4); make it pure when `ez add` is converted, which needs the same walk for EZ-RES-2 and EZ-HASH-3. -->
-- [ ] <!-- REVIEW: Where upgraded trees go. Today the upgrade lays every selected git dependency under `.ez/lib`, vendored or not, while the lock reads `$BEND_LIB`. Recommended: the plan lays a vendored tree under `.ez/lib` (committed) and any other one under `$BEND_LIB` (a cache fill). -->
-- [ ] <!-- REVIEW: One World per command, or one shared World. Recommended: one per command. A shared World makes every law quantify over fields the command never reads, which is the divergence the RFC's risk "The model can diverge from reality" warns about. -->
+- [x] <!-- REVIEW (resolved): Local imports. The planner takes the hub imports of every tracked `.bend` file and follows no local import, so an untracked file a tracked one imports never reaches the lock. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): Trees under BEND_LIB. The planner checks every package's manifest against its `0x` name, and judges a tree read from BEND_LIB as the same bytes cloned at the ledger rev and weighed to the ledger's narHash. We accept that a wrong narHash still locks in a working checkout and is refused on a fresh clone, since the lock's bytes agree whenever both succeed. -->
+- [x] <!-- REVIEW (resolved): EZ-DOC-5 now reads "`ez lock` without `--upgrade` never writes ez.toml, and records every dependency's and tool's pin exactly as ez.toml has it." -->
+- [x] <!-- REVIEW (resolved): EZ-RES-6 now says `--package NAME` asks the remote to resolve only the named entry, where resolving is asking for refs, the default branch, ancestry, or a checkout at a new rev. Fetching an unchanged tree at its ledger rev is not resolving. -->
+- [x] <!-- REVIEW (resolved): The phase-three upgrade laws are stated over the ledger model the plan renders, and hold of ez.toml's bytes relative to EZ-LED-4. `SPEC.md` records the dependency under "Left to prove". -->
+- [x] <!-- REVIEW (resolved): EZ-DOC-1 takes route (a): the whole text round trip is proved in ez against the pinned eztoml v0.1.0 reader, sections first, then text. -->
+- [x] <!-- REVIEW (resolved): The planner refuses to write a lock that is not `lockable`, so EZ-DOC-1's precondition is behavior and not an assumption. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): "A command that refuses writes nothing" is a requirement, EZ-OUT-2, stated for every command. `ez lock` meets it in this phase, and each other command when it is converted. -->
+- [x] <!-- REVIEW (resolved): `ez lock --upgrade` stops writing `.ez/origins.toml`. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): `K.pkg_of` stays in the interpreter for new upgrade checkouts in this phase, under EZ-TRUST-2, and becomes pure when `ez add` is converted. -->
+- [x] <!-- REVIEW (resolved): An upgrade lays a moved vendored tree under `.ez/lib` and any other moved tree under `$BEND_LIB`. This is a decided behavior change. -->
+- [x] <!-- REVIEW (resolved): Each command has its own World, holding only what that command reads. -->
 
 ---
 
@@ -44,7 +44,7 @@ Recent changes already narrowed plain `ez lock` to the inputs EZ-DOC-3 allows. R
 | :---- | :---- | :---- |
 | `ez.toml`, three times | `Pin.need` (`ez/pin.bend:417`), `Lock.lock.at` (`lock/lock.bend:916`) | Yes, once, as `ledger`. |
 | `git ls-files -- '*.bend'` | `sources` (`ez/cmd.bend:215`) | Yes, as `listing`, with each file's text. |
-| every local file a tracked file imports, tracked or not | `root.found` (`lock/lock.bend:563`) | No. See the first open question. |
+| every local file a tracked file imports, tracked or not | `root.found` (`lock/lock.bend:563`) | No. See the first decision under "Open questions". |
 | `$BEND_LIB/<hash>/manifest` and its files, per git package | `read.git` (`lock/lock.bend:364`) | Yes, as an answer, marked as read from BEND_LIB. |
 | a clone at the ledger rev, when the tree is missing | `fetch.git` (`lock/lock.bend:304`) | Yes, as an answer, marked as cloned with the narHash it weighed. |
 | the hub's manifest and files, per hub package | `read.hub` (`lock/lock.bend:404`) | Yes, as an answer, marked as served. |
@@ -53,7 +53,7 @@ Recent changes already narrowed plain `ez lock` to the inputs EZ-DOC-3 allows. R
 
 Under `--upgrade` it also reads what the remote says about refs, the default branch and ancestry, checkouts at new revs, `.gitignore`, and every `.bend` file `find` lists outside `.ez` and `.git` (`ez/upgrade.bend:400`), and it asks the hub whether it holds a moved hash (`hub.check`, `ez/upgrade.bend:105`).
 
-Three findings from this reading shape the design, beyond the open questions:
+Three findings from this reading shape the design, beyond the decisions above:
 
 - A package under BEND_LIB is never checked against its own name, so a stale or edited tree there can reach the lock. The planner checks every package's manifest against its `0x` name, whatever it came from.
 - Both walks stop silently when their fuel runs out: `resolve` and `roots` return what they have (`lock/lock.bend:537, 637`). With fuel at 100000 this is unlikely, but a truncated lock written with exit 0 is the failure EZ-DOC-3 exists to prevent. The planner refuses when fuel runs out with work left.
@@ -136,7 +136,7 @@ Every field is something the code reads today or reads under a decided change, a
 | `Ignore` | `F.read(".gitignore")` | `--upgrade` |
 | `Sources` | `find . -name '*.bend' -not -path '*/.ez/*' -not -path '*/.git/*'`, then `F.read` of each | `--upgrade`, only after a hash moved |
 
-The interpreter reads a package's files in the order its manifest names them. That reading of the manifest is a parse in IO, but it only decides what to fetch: the planner parses the same manifest again and checks every text against its sum, so a wrong parse is a refusal, never a wrong lock. The same holds for `K.pkg_of` on a plain lock's clone, since the planner checks the result against the ledger's hash. It does not hold for `Tree` under `--upgrade`, where the walk's result is the new hash; see the open question on the package walk.
+The interpreter reads a package's files in the order its manifest names them. That reading of the manifest is a parse in IO, but it only decides what to fetch: the planner parses the same manifest again and checks every text against its sum, so a wrong parse is a refusal, never a wrong lock. The same holds for `K.pkg_of` on a plain lock's clone, since the planner checks the result against the ledger's hash. It does not hold for `Tree` under `--upgrade`, where the walk's result is the new hash; see the decision on the package walk under "Open questions".
 
 ### Laziness without losing purity
 
@@ -178,7 +178,17 @@ type Step is Data:
   Run{plan: Plan}
 ```
 
-The interpreter executes the effects in order, stopping with exit 1 at the first write that fails, and then exits 0 for `Done` and 1 for `Refused`. A refused plan has no `Write`, `Lay` or `Drop` effect, which is what "a refused upgrade writes nothing" means in the open questions.
+The interpreter executes the effects in order, stopping with exit 1 at the first write that fails, and then exits 0 for `Done` and 1 for `Refused`. A refused plan has no `Write`, `Lay` or `Drop` effect, which is EZ-OUT-2 for `ez lock`:
+
+```
+# EZ-OUT-2
+law lock_refusal_writes_nothing:
+  for +w: W.World
+  for r: {P.refuses(w) == True{} : Bool}
+  {P.writes(P.plan(w)) == False{} : Bool}
+```
+
+It is small: every arm of the planner that refuses builds its plan from `Say` effects alone. WP1 lands it for a plain lock and WP2 for `--upgrade`.
 
 The plan's effects come in this order: lay new trees, write ez.toml once (dependencies and tools together, where today `Up.run` and `Pin.upgrade` each write it), write `.gitignore`, rewrite sources, drop old committed trees, write ez.lock.toml. A plain lock's plan is at most one `Lay` per cloned tree (a cache fill) and the lock's `Write`.
 
@@ -314,7 +324,7 @@ with two companions for the hub (`L.lock.hub(...) == hub`) and the tools (`M.too
 
 The proof has seven layers. Values survive trim and strip, and a split at `=` joins back (proved in the spike: `trim_quoted`, `strip_quoted`, `join_split`, with `char_eq_true`, reflecting `Char.is_eq` into equality by induction over the 32-bit word). Keys: a bare key computes, a quoted path is a value. Line classification: a pair line is not blank, not a comment, not a header, and holds `=`. Headers: `segments` of `packages."<h>".files` is three segments, a walk like trim's. Lines: `String.lines` of the rendered text is the concatenation of each section's lines, by the `spec_split` lemma generalized from `/` to any separator. The reader's state machine, over sections. And the ez side: `hashes`, `at3`, `pack_of` and `T.value` find the section and key that were written, which needs distinct hashes and string equality reflected, the latter following from `char_eq_true`.
 
-Reuses `lock/PROOF.bend spec_split`, `check/eq.bend`, and the spike's string lemmas. Replaces `lock/LAWS.bend lock_roundtrip` and `tool_pin_reads_back` (toward EZ-DOC-1). `tools_are_not_packages` points toward EZ-LED-5 and stays. Effort: large, the largest in the phase; we estimate 1500 to 3000 lines of proof. The spike's first layer took about 250 lines and went through with only linearity and ordering fixes, which is why we do not propose moving it to Trusted. If it stalls, the fallback is the sections-level law alone plus a Trusted row for the text layer (open question on the route).
+Reuses `lock/PROOF.bend spec_split`, `check/eq.bend`, and the spike's string lemmas. Replaces `lock/LAWS.bend lock_roundtrip` and `tool_pin_reads_back` (toward EZ-DOC-1). `tools_are_not_packages` points toward EZ-LED-5 and stays. Effort: large, the largest in the phase; we estimate 1500 to 3000 lines of proof. The spike's first layer took about 250 lines and went through with only linearity and ordering fixes, which is why we do not propose moving it to Trusted. Route (a) is decided. If it stalls, the sections-level law alone is a useful stopping point, and moving the text layer to Trusted would be a new decision.
 
 ### EZ-DOC-4: idempotence
 
@@ -517,13 +527,13 @@ What it does not tell us. It has no upgrade, no interpreter, and no performance 
 | WP | Scope | Needs | Effort |
 | :---- | :---- | :---- | :---- |
 | WP0 | Move the spike's string lemmas into a shared `check/str.bend`: list reversal, `to_list` and `from_list`, `join_split`, `char_eq_true`, and add `string_eq_true` and `split_join` for pieces without the separator. No behavior change. | nothing | small |
-| WP1 | Plain `ez lock` in planner form: `lock/world.bend`, `lock/plan.bend`, `lock/run.bend` seeded from the spike; `wants` and `plan`; `lockable`; delete the IO half of `lock/lock.bend` and the spike. Behavior changes as decided in the open questions. Lands EZ-DOC-3 and EZ-DOC-5 (tagged). | open questions on local imports and BEND_LIB trees | medium |
-| WP2 | `ez lock --upgrade` in the same planner: the upgrade questions, `lock/up.bend` from `ez/upgrade.bend` and `ez/pin.bend`, one ez.toml write, effects in the stated order, a refused plan writes nothing; delete `Up.run`, `Pin.upgrade` and their IO. | WP1; open questions on origins.toml, the package walk and laying | large |
+| WP1 | Plain `ez lock` in planner form: `lock/world.bend`, `lock/plan.bend`, `lock/run.bend` seeded from the spike; `wants` and `plan`; `lockable`; delete the IO half of `lock/lock.bend` and the spike. The behavior changes decided above. Lands EZ-DOC-3 and EZ-DOC-5 (tagged), and EZ-OUT-2's law for a plain lock (untagged until WP2 covers `--upgrade`). | nothing | medium |
+| WP2 | `ez lock --upgrade` in the same planner: the upgrade questions, `lock/up.bend` from `ez/upgrade.bend` and `ez/pin.bend`, one ez.toml write, effects in the stated order; delete `Up.run`, `Pin.upgrade` and their IO. Lands EZ-OUT-2 for `ez lock` (tagged). | WP1 | large |
 | WP3 | EZ-DOC-2: render packages as sorted `K.File` blocks, the distinct-hash walk invariant, the law. | WP1 | medium |
-| WP4 | EZ-DOC-1, sections first, then text. | WP0, WP3 (the render it reads back), open question on the route | large |
+| WP4 | EZ-DOC-1, sections first, then text. | WP0, WP3 (the render it reads back) | large |
 | WP5a | EZ-DOC-4 for a plain lock, as a corollary of `clone_reproduces`. | WP1 | small |
 | WP5b | EZ-DOC-4 for `--upgrade`: `after`, and a pin at its own tip is kept. | WP2 | medium to large |
-| WP6 | EZ-RES-4, 5, 6, 8, and quantified laws for `Git.tip.*` and `Git.exact`. | WP0, WP2, open questions on EZ-RES-6 wording and the ledger model | medium each; they can run as two agents (4 and 6, then 5 and 8) |
+| WP6 | EZ-RES-4, 5, 6, 8, and quantified laws for `Git.tip.*` and `Git.exact`. | WP0, WP2 | medium each; they can run as two agents (4 and 6, then 5 and 8) |
 | WP7 | EZ-VEN-1 text layer, EZ-VEN-2, EZ-VEN-3. | WP0, WP2 | medium to large |
 | WP8 | EZ-HASH-2: pure `Nar.dir`, `sha/nar.bend` sorting loaded entries, the law. | nothing | small |
 

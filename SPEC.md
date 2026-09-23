@@ -50,7 +50,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | EZ-DOC-2 | Packages are written in hash order and each package's files in path order, so the lock's text does not depend on the order the walk found them in. | Proved | pending | |
 | EZ-DOC-3 | `ez lock` output is a function of the ledger and the committed tree. A fresh clone reproduces the lock byte for byte. | Proved | pending | |
 | EZ-DOC-4 | `ez lock` is idempotent: run on the world it just produced, it writes the same bytes. | Proved | pending | |
-| EZ-DOC-5 | `ez lock` without `--upgrade` never changes a dependency's pinned rev, and changes a tool's only when the ledger left it empty. | Proved | pending | |
+| EZ-DOC-5 | `ez lock` without `--upgrade` never writes ez.toml, and records every dependency's and tool's pin exactly as ez.toml has it. | Proved | pending | |
 
 ### Resolution (EZ-RES)
 
@@ -61,7 +61,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | EZ-RES-3 | A target containing `://` or starting `git@` is a git URL. A target starting `/`, `./`, `../` or `~/` is a path. A target of exactly two segments of letters, digits, `-`, `_` and `.`, neither of them `.` or `..`, is `https://github.com/<target>`, unless its second segment ends in `.bend`, which makes it a path. Anything else is a path, except the empty word, which is refused. | Proved | proved | ez/LAWS.bend classify_url, classify_scp, classify_abs, classify_here, classify_up, classify_home, classify_github, classify_else |
 | EZ-RES-4 | `ez lock --upgrade` never moves a hub dependency. | Proved | pending | |
 | EZ-RES-5 | An upgraded rev-only dependency moves to the default branch tip only when its pin is an ancestor of that tip, and stays a commit pin. Otherwise the upgrade refuses with exit 1. | Proved | pending | |
-| EZ-RES-6 | `--package NAME` asks the remote only for the named dependency or tool, and every other ledger entry keeps its rev, tag and hash. | Proved | pending | |
+| EZ-RES-6 | `--package NAME` asks the remote to resolve only the named dependency or tool, and every other ledger entry keeps its rev, tag and hash. Resolving is asking for refs, the default branch, ancestry, or a checkout at a new rev. | Proved | pending | |
 | EZ-RES-7 | Tags, refs, and ancestry reported by git are accurate. | Trusted | | |
 | EZ-RES-8 | An upgraded tagged dependency re-resolves its tag. A tag that now names a commit the pin does not descend to, or a pinned commit whose tree no longer hashes to the pin, stops the upgrade with exit 1. | Proved | pending | |
 
@@ -107,6 +107,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | ID | Requirement | Level | Status | Law |
 | :---- | :---- | :---- | :---- | :---- |
 | EZ-OUT-1 | Every command exits 0 on success and 1 on any failure ez detects, except `ez tool run`, which exits with the program's status. | Proved | pending | |
+| EZ-OUT-2 | A command that refuses writes nothing: every file it would otherwise write or remove is left as it found it. | Proved | pending | |
 
 ## Left to prove
 
@@ -114,7 +115,9 @@ What stands between a pending requirement that has tagged laws and the status pr
 
 | ID | Proved so far | Left to prove |
 | :---- | :---- | :---- |
-| EZ-VEN-1 | Over the line-level function `I.lines` (manifest/ignore.bend): its allowlist lines are exactly the vendored hashes, in ledger order, and every other line is kept in order. | The text layer: `I.sync` splitting `.gitignore` into lines and joining them back, including the trailing newline, so that "every other line is unchanged" holds of the file's bytes. That applying it twice is applying it once. The commands calling it are interpreter code and stay trusted (EZ-TRUST-2). |
+| EZ-VEN-1 | Over the line-level function `I.lines` (manifest/ignore.bend): its allowlist lines are exactly the vendored hashes, in ledger order, and every other line is kept in order. | The text layer: `I.sync` splitting `.gitignore` into lines and joining them back, including the trailing newline, so that "every other line is unchanged" holds of the file's bytes. That applying it twice is applying it once. The commands calling it are interpreter code and stay trusted (EZ-TRUST-2). For `ez lock --upgrade`, EZ-LED-4 as well (below). |
+
+The upgrade laws of phase three, for EZ-RES-4, EZ-RES-5, EZ-RES-6, EZ-RES-8 and the `ez lock --upgrade` half of EZ-VEN-1, are stated over the ledger model the upgrade renders into ez.toml, not over the file's bytes read back. They carry over to the bytes only once EZ-LED-4 (a rendered ledger parses back to its model) is proved. Until then each of them, once its law lands, is proved relative to EZ-LED-4, and this section says so. The design is in [docs/rfc/ez-lock-planner.md](docs/rfc/ez-lock-planner.md).
 
 ## Trust boundary
 

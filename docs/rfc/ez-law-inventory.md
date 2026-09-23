@@ -491,7 +491,7 @@ Under `--upgrade`, `ez lock` also reads `.gitignore`, a second `find` (`-not -pa
 
 What the README's reproducibility sentence ("`ez lock` never has to consult anything a clone does not have") gets right is narrower: dependency `root` and `narHash` are copied from the ledger and never recomputed by plain lock.
 
-**Update:** the decided input changes have landed. At `bec3435` plain `ez lock` reads the ledger, `git ls-files '*.bend'` and those files, trees under `$BEND_LIB` or clones at the ledger rev checked against `narHash`, and hub content, plus any untracked local file a tracked file imports. The planner design for phase three, [ez-lock-planner.md](ez-lock-planner.md), re-traces the inputs and proposes the World that models them.
+**Update:** the decided input changes have landed. At `bec3435` plain `ez lock` reads the ledger, `git ls-files '*.bend'` and those files, trees under `$BEND_LIB` or clones at the ledger rev checked against `narHash`, and hub content, plus any untracked local file a tracked file imports. The planner design for phase three, [ez-lock-planner.md](ez-lock-planner.md), re-traces the inputs and proposes the World that models them. The maintainer accepted that design with every recommendation it made, which adds five behavior changes to the RFC's "Decided behavior changes", rewords EZ-DOC-5 and EZ-RES-6, and adds EZ-OUT-2. Its work packages are how phase three is tracked from here: each lands its requirements' laws, deletes the trails the design names, and updates this inventory.
 
 ## Missing behavior
 
