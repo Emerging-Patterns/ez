@@ -140,8 +140,31 @@ def main.put(got: Maybe<&2, String>, +at: String, rest: List<&2, P.Effect>) -> L
 
 # the ledger a new project starts from: this package, its entry, and nothing
 # else
+def model(+name: String, +at: String) -> M.Manifest:
+  M.Manifest{name, at, "", "", [], []}
+
+# its text
 def fresh(+name: String, +at: String) -> String:
-  Rend.show(M.Manifest{name, at, "", "", [], []})
+  Rend.show(model(name, at))
+
+# the new project's files, once its ledger is known to read back. A name or
+# entry the ledger cannot carry, such as one holding a quote, is refused with
+# no effect at all (EZ-LED-4).
+def plan.new(
+  ok: Bool,
+  +name: String,
+  +at: String,
+  ignore: Maybe<&2, String>,
+  main: Maybe<&2, String>
+) -> P.Plan:
+  match ok:
+    case True{}:
+      +text = text.of(ignore)
+      P.Plan{P.Write{toml(), fresh(name, at)} <>
+        ignore.put(missing(rules(name), String.lines(text)), text,
+          main.put(main, at, [])), P.Success{}}
+    case False{}:
+      P.Plan{[], P.Refused{Rend.unrenderable()}}
 
 # the plan, once the name and entry are settled. A ledger on disk holds
 # dependencies, tools and a `bin` that a fresh one would lose, so `ez init`
@@ -158,10 +181,7 @@ def plan.go(
       P.Plan{[], P.Refused{"ez: " ++ toml() ++
         " already exists; ez init writes a new project and leaves it alone"}}
     case None{}:
-      +text = text.of(ignore)
-      P.Plan{P.Write{toml(), fresh(name, at)} <>
-        ignore.put(missing(rules(name), String.lines(text)), text,
-          main.put(main, at, [])), P.Success{}}
+      plan.new(Rend.renderable(model(name, at)), name, at, ignore, main)
 
 # `ez init` over a World
 def plan(world: World) -> P.Plan:
