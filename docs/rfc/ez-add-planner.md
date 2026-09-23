@@ -143,7 +143,7 @@ We decided on one walk. The pure walk reports a file it was not given as a quest
 
 ## Laws
 
-`A` is `add/world.bend`, `AP` is `add/plan.bend`, `RP` is `remove/plan.bend`, `P` is the shared `plan/plan.bend`, `T` is the promoted `pkg/tree.bend`. Names that do not exist yet, such as `M.read.ok` or `AP.asks.from`, are law vocabulary the work packages add. `AP.added(w)` is the `M.Dep` the plan records, `AP.ledger.next(w)` and `RP.ledger.next(w)` the ledger model the plan renders (the old one when it refuses), and `AP.answered(w)` is `AP.wants(w) == []`. As in the lock design, a World on which the planner still asks has no effects, so laws about writes need no completeness premise.
+`A` is `add/world.bend`, `AP` is `add/plan.bend`, `RP` is `remove/plan.bend`, `P` is the shared `plan/plan.bend`, `T` is the promoted walk, which landed in `pkg/pkg.bend` (see the update under "The spike"). Names that do not exist yet, such as `M.read.ok` or `AP.asks.from`, are law vocabulary the work packages add. `AP.added(w)` is the `M.Dep` the plan records, `AP.ledger.next(w)` and `RP.ledger.next(w)` the ledger model the plan renders (the old one when it refuses), and `AP.answered(w)` is `AP.wants(w) == []`. As in the lock design, a World on which the planner still asks has no effects, so laws about writes need no completeness premise.
 
 ### EZ-OUT-2 and EZ-LED-6: refusals, and no ledger
 
@@ -387,6 +387,15 @@ $ bolt.bin --gpu off
 ```
 
 What the spike does not tell us: it has no planner around the walk, no interpreter, and no timing. The interpreter running the walk from a 101-file list needed the compiled binary; `bend try.bend` overflowed the interpreter's stack, which `bin/ez.bin` does not use. We have not measured a checkout much larger than this repository.
+
+**Update (A0, the walk).** The spike is promoted into `pkg/pkg.bend` rather than a `pkg/tree.bend` of its own. The walk hashes with `K.File`, `K.placed` and `K.hash_of`, and `K.pkg_of` now runs it, so a module of its own would both import `pkg/pkg.bend` and be imported by it, and Bend refuses an import cycle. Read `T.` in the law sketches as `K.`, and `T.sums` as `K.laid.sums`.
+
+- The walk is given a `Tree`: a whole checkout, where a path it does not list is absent, or the files read so far, where such a path is not given. A path not given stops the walk with `Asking{at}` and the file still queued, and `K.of` returns `Asks{at}`.
+- `K.pkg_in(top, entry)` answers each question with `F.read` of the path under `top` and takes the walk up where it stopped, so each file is read once and the walk is never restarted. `K.pkg_of(entry)` is the same walk over the working directory, or over `/` for an absolute entry. `Git.vendor.tree` and the lock's `clone.walk` pass the clone as `top`, a one-line change each.
+- A module or foreign body whose checkout-relative path climbs above `top` is refused before it is read, naming the import (`escaping_import_refused`); this is the sixth decision. `absent_entry_refused` gains the premise that the entry is inside the checkout, since an entry that is not is refused by that law instead.
+- `Walked` also carries the laid files weighed, in path order (`sums`), so `K.pkg_of` does not weigh each text twice. With that, `bend pkg/main.bend` succeeds and overflows under the interpreter on the same entries as the walk it replaced; the compiled binaries run all of them.
+
+The rewritten `K.pkg_of`, and `K.of` over every tracked file, give the hash, root and manifest of the walk they replace on every `.bend` file of this repository and of the pinned checkouts of eztoml, ezhttp, sha256, snap, shake and bolt, 251 entries.
 
 ## Work packages
 

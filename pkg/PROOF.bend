@@ -2187,3 +2187,160 @@ def tail_one.go(ps):
 
 def Laws.tail_one(p):
   tail_one.go(String.split(p, '/'))
+
+# The walk.
+
+# LAW: the first step of a walk over a whole checkout, whose entry is inside
+# it and not held, stops on the entry with nothing found and nothing queued
+law first_step_stops:
+  for +eb: String
+  for +entry: String
+  for +fs: List<&2, P.Source>
+  for inside: {False{} == P.outside(entry) : Bool}
+  for miss: {None{} == P.look(fs, entry) : Maybe<&2, String>}
+  {P.step(P.Tree{True{}, fs, []}, eb, P.start(entry))
+    == P.State{[], [], P.Missing{entry}, []} : P.State}
+
+def first_step_stops(eb, entry, fs, inside, miss):
+  %inside : {P.visit.in(_, P.Tree{True{}, fs, []}, entry, "", eb, [], [], [])
+    == P.State{[], [], P.Missing{entry}, []} : P.State}
+  %miss : {P.visit.have(P.find.got(_, True{}, [], entry), P.Tree{True{}, fs, []},
+    entry, "", eb, [], [], [])
+    == P.State{[], [], P.Missing{entry}, []} : P.State}
+  {==}
+
+# LAW: a walk that has stopped on a missing file stays stopped, whatever
+# fuel is left
+law missing_stays:
+  for f: Nat
+  for +tree: P.Tree
+  for +eb: String
+  for +at: String
+  {P.walk(f, tree, eb, P.State{[], [], P.Missing{at}, []})
+    == P.State{[], [], P.Missing{at}, []} : P.State}
+
+def missing_stays(f, _tree, _eb, _at):
+  match f:
+    case 0n:
+      {==}
+    case 1n+g:
+      {==}
+
+# LAW: so the whole walk ends where the first step stopped
+law walk_stops:
+  for f: Nat
+  for +entry: String
+  for +fs: List<&2, P.Source>
+  for inside: {False{} == P.outside(entry) : Bool}
+  for miss: {None{} == P.look(fs, entry) : Maybe<&2, String>}
+  {P.walk((1n + f : Nat), P.Tree{True{}, fs, []}, Path.base(entry), P.start(entry))
+    == P.State{[], [], P.Missing{entry}, []} : P.State}
+
+def walk_stops(f, entry, fs, inside, miss):
+  Equal.trans(P.State,
+    P.walk(f, P.Tree{True{}, fs, []}, Path.base(entry),
+      P.step(P.Tree{True{}, fs, []}, Path.base(entry), P.start(entry))),
+    P.walk(f, P.Tree{True{}, fs, []}, Path.base(entry),
+      P.State{[], [], P.Missing{entry}, []}),
+    P.State{[], [], P.Missing{entry}, []},
+    Equal.cong(P.State, P.State,
+      s => P.walk(f, P.Tree{True{}, fs, []}, Path.base(entry), s),
+      P.step(P.Tree{True{}, fs, []}, Path.base(entry), P.start(entry)),
+      P.State{[], [], P.Missing{entry}, []},
+      first_step_stops(Path.base(entry), entry, fs, inside, miss)),
+    missing_stays(f, P.Tree{True{}, fs, []}, Path.base(entry), entry))
+
+def Laws.absent_entry_refused(f, entry, fs, inside, miss):
+  Equal.cong(P.State, P.Walked, s => P.made(entry, s),
+    P.walk((1n + f : Nat), P.Tree{True{}, fs, []}, Path.base(entry), P.start(entry)),
+    P.State{[], [], P.Missing{entry}, []},
+    walk_stops(f, entry, fs, inside, miss))
+
+# LAW: a step whose next file is new and above the checkout's top stops the
+# walk on it, naming the import, and reads nothing
+law escape_step:
+  for +tree: P.Tree
+  for +eb: String
+  for +seen: List<&2, String>
+  for +out: List<&2, P.Hit>
+  for +file: String
+  for +ns: String
+  for +rest: List<&2, P.Task>
+  for fresh: {False{} == P.seen.has(seen, file) : Bool}
+  for up: {True{} == P.outside(file) : Bool}
+  {P.step(tree, eb, P.State{seen, out, P.Going{}, P.Task{file, ns} <> rest})
+    == P.State{seen, out, P.Climbs{P.climbs.name(ns, file)}, rest} : P.State}
+
+def escape_step(tree, eb, seen, out, file, ns, rest, fresh, up):
+  %fresh : {P.visit.go(_, tree, file, ns, eb, seen, out, rest)
+    == P.State{seen, out, P.Climbs{P.climbs.name(ns, file)}, rest} : P.State}
+  %up : {P.visit.in(_, tree, file, ns, eb, seen, out, rest)
+    == P.State{seen, out, P.Climbs{P.climbs.name(ns, file)}, rest} : P.State}
+  {==}
+
+# LAW: a walk that has stopped on a climb stays stopped, whatever fuel is
+# left and whatever is still queued
+law climbed_stays:
+  for f: Nat
+  for +tree: P.Tree
+  for +eb: String
+  for +seen: List<&2, String>
+  for +out: List<&2, P.Hit>
+  for +at: String
+  for +rest: List<&2, P.Task>
+  {P.walk(f, tree, eb, P.State{seen, out, P.Climbs{at}, rest})
+    == P.State{seen, out, P.Climbs{at}, rest} : P.State}
+
+def climbed_stays(f, _tree, _eb, _seen, _out, _at, rest):
+  match f rest:
+    case 0n Nil{}:
+      {==}
+    case 0n Con{_h, _t}:
+      {==}
+    case 1n+g Nil{}:
+      {==}
+    case 1n+g Con{_h, _t}:
+      {==}
+
+def Laws.escaping_import_refused(f, entry, tree, eb, seen, out, file, ns, rest, fresh, up):
+  Equal.cong(P.State, P.Walked, s => P.made(entry, s),
+    P.walk((1n + f : Nat), tree, eb,
+      P.State{seen, out, P.Going{}, P.Task{file, ns} <> rest}),
+    P.State{seen, out, P.Climbs{P.climbs.name(ns, file)}, rest},
+    Equal.trans(P.State,
+      P.walk(f, tree, eb,
+        P.step(tree, eb, P.State{seen, out, P.Going{}, P.Task{file, ns} <> rest})),
+      P.walk(f, tree, eb, P.State{seen, out, P.Climbs{P.climbs.name(ns, file)}, rest}),
+      P.State{seen, out, P.Climbs{P.climbs.name(ns, file)}, rest},
+      Equal.cong(P.State, P.State, s => P.walk(f, tree, eb, s),
+        P.step(tree, eb, P.State{seen, out, P.Going{}, P.Task{file, ns} <> rest}),
+        P.State{seen, out, P.Climbs{P.climbs.name(ns, file)}, rest},
+        escape_step(tree, eb, seen, out, file, ns, rest, fresh, up)),
+      climbed_stays(f, tree, eb, seen, out, P.climbs.name(ns, file), rest)))
+
+# LAW: placing found files and weighing laid ones give the same file list:
+# each is the found name under the root, with the sha256 of the found text
+law placed_is_laid:
+  for +pre: String
+  for +out: List<&2, P.Hit>
+  {P.placed(pre, P.hit.sums(out)) == P.laid.sums(P.laid(pre, out)) : List<&2, P.File>}
+
+def placed_is_laid(pre, out):
+  match out:
+    case []:
+      {==}
+    case P.Hit{+raw, +text} <> t:
+      Equal.cong(List<&2, P.File>, List<&2, P.File>,
+        xs => P.File{Path.join(pre, raw), Sha.hex(text)} <> xs,
+        P.placed(pre, P.hit.sums(t)), P.laid.sums(P.laid(pre, t)),
+        placed_is_laid(pre, t))
+
+def Laws.walked_named_by_texts(pre, out):
+  Equal.cong(List<&2, P.File>, String, fs => P.hash_of(fs),
+    P.placed(pre, P.hit.sums(out)), P.laid.sums(P.laid(pre, out)),
+    placed_is_laid(pre, out))
+
+def Laws.walked_manifest_of_texts(pre, out):
+  Equal.cong(List<&2, P.File>, String, fs => P.manifest_of(fs),
+    P.placed(pre, P.hit.sums(out)), P.laid.sums(P.laid(pre, out)),
+    placed_is_laid(pre, out))

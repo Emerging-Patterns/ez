@@ -190,8 +190,8 @@ The law sketches below use these names. Where no definition exists, the sketch i
 
 | Name in a sketch | Real definition |
 | :---- | :---- |
-| `K.hash_of` | `pkg/pkg.bend:530`. The 0x name of a file list. |
-| `K.pkg_of` | `pkg/pkg.bend:556`. Walks an entry's import closure and returns the package (IO). |
+| `K.hash_of` | `pkg/pkg.bend:381`. The 0x name of a file list. |
+| `K.pkg_of` | `pkg/pkg.bend:959`. Walks an entry's import closure and returns the package (IO): the pure walk `K.of` (`pkg/pkg.bend:856`), with each file it asks for read from disk. |
 | `perm` | `pkg/LAWS.bend`. Lehmer-coded rearrangement of a file list; law vocabulary only. |
 | `Nar.path` | `sha/nar.bend:447`. The narHash of a directory (IO). No pure `Nar.of_tree` exists yet. |
 | `Lock.render.tools` | `lock/lock.bend:630`. The text of `ez.lock.toml`. |
