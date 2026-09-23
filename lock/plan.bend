@@ -1,8 +1,15 @@
-# lock/plan: plain `ez lock` as a pure planner. It reads a World
-# (lock/world.bend) and returns either the packages it still needs answered
-# (`wants`) or a Plan: the effects to run and how the command ends (`plan`).
-# The interpreter (lock/run.bend) loops on `wants`, answering each question by
-# IO, until nothing is left to ask, then runs `plan` once and executes it.
+# lock/plan: `ez lock` as a pure planner. It reads a World (lock/world.bend)
+# and returns either the questions it still needs answered (`step`) or a Plan:
+# the effects to run and how the command ends (`plan`). The interpreter
+# (lock/run.bend) loops on `step`, answering each question by IO, until
+# nothing is left to ask, then executes the plan.
+#
+# Under `--upgrade` the upgrade's questions come first (lock/up.bend): what
+# the remote says each selected pin moves to. Once they are answered, the
+# lock is planned exactly as a plain lock is, over the ledger the upgrade
+# leaves rather than ez.toml as it was, and the upgrade's writes go around it
+# in one plan: trees laid, ez.toml written once, `.gitignore`, the rewritten
+# sources, the committed trees that moved removed, and the lock last.
 #
 # `wants` only scans the answers it has for imports; `plan` checks every
 # package once, so a lock pays for each file's SHA-256 once however deep the
@@ -10,12 +17,14 @@
 # than the lock needs, which costs a fetch and changes nothing, since `plan`
 # refuses it.
 #
-# What a plain lock decides depends on a World only through `W.inputs`: the
-# ledger, the committed sources, and the verdict on every answer. How a tree
-# arrived only decides whether it is laid under BEND_LIB for the build that
-# follows, which is a cache and not something the lock records.
+# What a lock decides depends on a World only through `W.inputs`: the ledger
+# it is made from, the upgrade's refusal if any, the committed sources, and
+# the verdict on every answer. How a tree arrived only decides whether it is
+# laid under BEND_LIB for the build that follows, which is a cache and not
+# something the lock records.
 import Base
 import ./world.bend as W
+import ./up.bend as Up
 import ./lock.bend as L
 import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
@@ -346,10 +355,18 @@ def decide.led(+led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> Doc
   doc.gap(String.is_empty(gap), gap, walk.of(led, listing, js), M.hub_of(led),
     M.tools_of(led))
 
-# plain `ez lock` over what the lock may depend on
+# an upgrade that refused, or still asks, stops the lock before anything else
+def decide.stop(clean: Bool, +stop: String, +led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> Doc:
+  match clean:
+    case True{}:
+      decide.led(led, listing, js)
+    case False{}:
+      Stop{stop}
+
+# `ez lock` over what the lock may depend on
 def decide(ins: W.Inputs) -> Doc:
-  W.Inputs{ledger, listing, js} = ins
-  decide.led(W.parsed(ledger), listing, js)
+  W.Inputs{+ledger, +stop, listing, +js} = ins
+  decide.stop(String.is_empty(stop), stop, ledger, listing, js)
 
 # ---------------------------------------------------------------------------
 # the plan
@@ -362,10 +379,12 @@ type Place is Data:
 
 # one thing the interpreter does. A `Lay` writes each file under
 # `<place>/<hash>`, in order; the manifest comes last, so a tree that has one
-# is a tree that finished.
+# is a tree that finished. A `Drop` removes `.ez/lib/<hash>`, a committed tree
+# an upgrade moved off. A `Say` is a line a person is told.
 type Effect is Data:
   Write{path: String, text: String}
   Lay{place: Place, hash: String, files: List<&2, W.Source>}
+  Drop{hash: String}
   Say{text: String}
 
 # how the command ends: exit 0, or exit 1 with the reason
@@ -377,9 +396,10 @@ type Outcome is Data:
 type Plan is Data:
   Plan{effects: List<&2, Effect>, outcome: Outcome}
 
-# the questions still open, or the plan once there are none
+# the questions still open, the lock's and the upgrade's, or the plan once
+# there are none
 type Step is Data:
-  Asking{asks: List<&2, W.Ask>}
+  Asking{asks: List<&2, W.Ask>, ups: List<&2, Up.Ask>}
   Run{plan: Plan}
 
 # what a plan leaves at one path: nothing written, or this text
@@ -429,44 +449,98 @@ def laid(fs: List<&2, K.File>, ss: List<&2, String>) -> List<&2, W.Source>:
     case Con{f, g} Con{s, t}:
       W.Source{K.file.at(f), s} <> laid(g, t)
 
-# a checked tree laid in the cache, ahead of what follows
-def lay.verdict(verdict: W.Verdict, +hash: String, rest: List<&2, Effect>) -> List<&2, Effect>:
+# where a tree is laid: under `.ez/lib`, committed, when the ledger the lock
+# is made from vendors its hash, and under BEND_LIB otherwise
+def place.of(vend: Bool) -> Place:
+  match vend:
+    case True{}:
+      Committed{}
+    case False{}:
+      Cache{}
+
+# a checked tree laid, ahead of what follows
+def lay.verdict(verdict: W.Verdict, place: Place, +hash: String, rest: List<&2, Effect>) -> List<&2, Effect>:
   match verdict:
     case W.No{_why}:
       rest
     case W.Ok{+fs, ss}:
-      Lay{Cache{}, hash, List.append(&2, W.Source, laid(fs, ss),
+      Lay{place, hash, List.append(&2, W.Source, laid(fs, ss),
         [W.Source{"manifest", K.manifest_of(fs)}])} <> rest
 
-def lay.pick(hit: Bool, verdict: W.Verdict, +hash: String, rest: List<&2, Effect>) -> List<&2, Effect>:
+def lay.pick(hit: Bool, verdict: W.Verdict, place: Place, +hash: String, rest: List<&2, Effect>) -> List<&2, Effect>:
   match hit:
     case True{}:
-      lay.verdict(verdict, hash, rest)
+      lay.verdict(verdict, place, hash, rest)
     case False{}:
       rest
 
-# every cloned tree that passed its checks, laid ahead of what follows
-def lays(+cs: List<&2, String>, js: List<&2, W.Judged>, rest: List<&2, Effect>) -> List<&2, Effect>:
+# every cloned tree that passed its checks, laid ahead of what follows. `vs`
+# are the hashes committed under `.ez/lib`; a plain lock has none, and lays
+# every tree in the cache.
+def lays(
+  +cs: List<&2, String>,
+  +vs: List<&2, String>,
+  js: List<&2, W.Judged>,
+  rest: List<&2, Effect>
+) -> List<&2, Effect>:
   match js:
     case []:
       rest
     case W.Judged{+h, v} <> t:
-      lay.pick(L.seen.holds(cs, h), v, h, lays(cs, t, rest))
+      lay.pick(L.seen.holds(cs, h), v, place.of(L.seen.holds(vs, h)), h,
+        lays(cs, vs, t, rest))
+
+# the lines a person is told, ahead of what follows
+def says.of(ss: List<&2, String>, rest: List<&2, Effect>) -> List<&2, Effect>:
+  match ss:
+    case []:
+      rest
+    case h <> t:
+      Say{h} <> says.of(t, rest)
+
+# the files the upgrade writes, in order, ahead of what follows
+def edits.of(es: List<&2, Up.Edit>, rest: List<&2, Effect>) -> List<&2, Effect>:
+  match es:
+    case []:
+      rest
+    case Up.Edit{at, text} <> t:
+      Write{at, text} <> edits.of(t, rest)
+
+# the committed trees the upgrade moved off, removed ahead of what follows
+def drops.of(ds: List<&2, String>, rest: List<&2, Effect>) -> List<&2, Effect>:
+  match ds:
+    case []:
+      rest
+    case h <> t:
+      Drop{h} <> drops.of(t, rest)
 
 # the plan for what was decided. A refusal has no effect at all, so a refused
-# lock writes nothing and lays nothing; its reason is how it ends.
-def made(cs: List<&2, String>, js: List<&2, W.Judged>, doc: Doc) -> Plan:
+# lock, plain or upgrade, writes nothing, lays nothing and removes nothing; its
+# reason is how it ends. A lock that is made runs, in order: what a person is
+# told, the trees laid, the upgrade's files (ez.toml once, `.gitignore`, the
+# rewritten sources), the committed trees removed, and the lock last. A plain
+# lock has only the trees and the lock.
+def made(+nx: Up.Next, cs: List<&2, String>, js: List<&2, W.Judged>, doc: Doc) -> Plan:
   match doc:
     case Doc{text}:
-      Plan{lays(cs, js, [Write{lockfile(), text}]), Success{}}
+      Plan{says.of(Up.next.says(nx),
+        lays(cs, Up.next.vends(nx), js,
+          edits.of(Up.next.edits(nx),
+            edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              drops.of(Up.next.drops(nx), [Write{lockfile(), text}]))))), Success{}}
     case Stop{why}:
       Plan{[], Refused{why}}
 
-# plain `ez lock` over a World: every package checked once, and the plan
+# `ez lock` once the upgrade decided: every package checked once, and the plan
+def plan.of(+nx: Up.Next, listing: W.Listing, +replies: List<&2, W.Reply>) -> Plan:
+  +js = W.judged.of(nx, replies)
+  made(nx, cloned(W.replies.of(nx, replies)), js,
+    decide(W.Inputs{Up.next.read(nx), Up.next.stop(nx), W.listing.of(nx, listing), js}))
+
+# `ez lock` over a World
 def plan(world: W.World) -> Plan:
-  W.World{_args, +ledger, listing, +replies} = world
-  +js = W.judge(W.origins(ledger), W.ledger.hub(ledger), replies)
-  made(cloned(replies), js, decide(W.Inputs{ledger, listing, js}))
+  W.World{args, +ledger, listing, replies, ups} = world
+  plan.of(W.next(args, ledger, ups), listing, replies)
 
 # whether what was decided is a refusal
 def refuses.doc(doc: Doc) -> Bool:
@@ -476,16 +550,28 @@ def refuses.doc(doc: Doc) -> Bool:
     case Stop{_why}:
       True{}
 
-# whether plain `ez lock` refuses on a World
+# whether `ez lock` refuses on a World
 def refuses(world: W.World) -> Bool:
   refuses.doc(decide(W.inputs(world)))
 
-# the packages plain `ez lock` resolves on a World, which are the packages its
-# lock renders when it writes one
+# the packages `ez lock` resolves once the upgrade decided
+def packs.of(+nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> List<&2, L.Pack>:
+  walk.packs(walk.of(Up.next.read(nx), W.listing.of(nx, listing),
+    W.judged.of(nx, replies)))
+
+# the packages `ez lock` resolves on a World, which are the packages its lock
+# renders when it writes one
 def packs(world: W.World) -> List<&2, L.Pack>:
-  W.World{_args, +ledger, listing, replies} = world
-  walk.packs(walk.of(W.parsed(ledger), listing,
-    W.judge(W.origins(ledger), W.ledger.hub(ledger), replies)))
+  W.World{args, +ledger, listing, replies, ups} = world
+  packs.of(W.next(args, ledger, ups), listing, replies)
+
+# the ledger model an upgrade renders into ez.toml; ez.toml as it was when
+# the upgrade refuses, still asks, or moves nothing, and for a plain lock. The
+# upgrade's decisions (EZ-RES-4 to 6 and 8) are stated over it, and hold of
+# ez.toml's bytes relative to EZ-LED-4.
+def ledger.next(world: W.World) -> M.Read:
+  W.World{args, +ledger, _listing, _replies, ups} = world
+  Up.next.model(W.next(args, ledger, ups))
 
 # ---------------------------------------------------------------------------
 # what a plan writes
@@ -501,6 +587,8 @@ def put.one(effect: Effect, +path: String, rest: Wrote) -> Wrote:
         case Put{later}:
           Put{later}
     case Lay{_place, _hash, _files}:
+      rest
+    case Drop{_hash}:
       rest
     case Say{_text}:
       rest
@@ -518,8 +606,8 @@ def put.plan(pl: Plan, +path: String) -> Wrote:
   Plan{es, _outcome} = pl
   put.in(es, path)
 
-# the bytes plain `ez lock` writes to a path on a World, or Kept when it
-# writes none
+# the bytes `ez lock` writes to a path on a World, or Kept when it writes
+# none
 def put(world: W.World, +path: String) -> Wrote:
   put.plan(plan(world), path)
 
@@ -529,6 +617,8 @@ def writes.one(effect: Effect) -> Bool:
     case Write{_at, _text}:
       True{}
     case Lay{_place, _hash, _files}:
+      True{}
+    case Drop{_hash}:
       True{}
     case Say{_text}:
       False{}
@@ -598,20 +688,55 @@ def wants.led(+led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> List
   wants.gap(String.is_empty(need.why(led)), walk.of(led, listing, js),
     L.ledger.read(led), M.hub_of(led))
 
-# the questions a World still leaves open: every package the walk reaches
-# that nothing has answered for yet. None once the lock is known to refuse.
-def wants(world: W.World) -> List<&2, W.Ask>:
-  W.World{_args, ledger, listing, replies} = world
-  wants.led(W.parsed(ledger), listing, scan(replies))
+# nothing is asked about packages while the upgrade refuses or still asks
+def wants.stop(clean: Bool, +led: M.Read, listing: W.Listing, js: List<&2, W.Judged>) -> List<&2, W.Ask>:
+  match clean:
+    case True{}:
+      wants.led(led, listing, js)
+    case False{}:
+      []
 
-# the questions still open, or the plan once there are none
-def step.of(asks: List<&2, W.Ask>, world: W.World) -> Step:
+# the package questions still open once the upgrade decided
+def wants.of(+nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> List<&2, W.Ask>:
+  wants.stop(String.is_empty(Up.next.stop(nx)), Up.next.read(nx),
+    W.listing.of(nx, listing), scan(W.replies.of(nx, replies)))
+
+# the package questions a World still leaves open: every package the walk
+# reaches that nothing has answered for yet. None once the lock is known to
+# refuse, and none while the upgrade still asks.
+def wants(world: W.World) -> List<&2, W.Ask>:
+  W.World{args, +ledger, listing, replies, ups} = world
+  wants.of(W.next(args, ledger, ups), listing, replies)
+
+# the upgrade's questions a World still leaves open; none for a plain lock
+def wants.up(world: W.World) -> List<&2, Up.Ask>:
+  W.World{args, +ledger, _listing, _replies, ups} = world
+  Up.next.asks(W.next(args, ledger, ups))
+
+# whether the upgrade has every answer it needs
+def answered(world: W.World) -> Bool:
+  List.is_empty(&2, Up.Ask, wants.up(world))
+
+# the package questions still open, or the plan once there are none
+def step.pkgs(asks: List<&2, W.Ask>, +nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> Step:
   match asks:
     case []:
-      Run{plan(world)}
+      Run{plan.of(nx, listing, replies)}
     case h <> t:
-      Asking{h <> t}
+      Asking{h <> t, []}
 
-# what the interpreter does next on a World
-def step(+world: W.World) -> Step:
-  step.of(wants(world), world)
+# the upgrade's questions first, since the packages the lock reads depend on
+# where the pins move
+def step.ups(ups: List<&2, Up.Ask>, +nx: Up.Next, +listing: W.Listing, +replies: List<&2, W.Reply>) -> Step:
+  match ups:
+    case []:
+      step.pkgs(wants.of(nx, listing, replies), nx, listing, replies)
+    case h <> t:
+      Asking{[], h <> t}
+
+# what the interpreter does next on a World. The upgrade is decided once per
+# round, and every answer of the round is read from that one decision.
+def step(world: W.World) -> Step:
+  W.World{args, +ledger, +listing, +replies, ups} = world
+  +nx = W.next(args, ledger, ups)
+  step.ups(Up.next.asks(nx), nx, listing, replies)
