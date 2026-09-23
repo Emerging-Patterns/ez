@@ -204,7 +204,8 @@ The file is only written when this changes it.
 Without `vendor = true`, the tree is not committed: `ez fetch` fills `BEND_LIB` from the
 lock, and `ez lock` fetches a git dependency whose tree is not under
 `BEND_LIB` at the ledger's `rev`, checks it against `narHash`, and leaves it
-there. A fetch or a check that fails stops the lock with exit 1. `ez doctor`
+there once the lock is written. A fetch or a check that fails stops the lock
+with exit 1, and a lock that stops writes nothing: not the lock, and no tree. `ez doctor`
 reports when the ledger and the repo's import lines disagree; it never
 rewrites your source.
 
@@ -225,10 +226,15 @@ follows it. An import line that names a hash that moved is rewritten to
 name the new one.
 
 The ledger is enough on its own. `ez lock` reads the ledger, the `.bend`
-files `git ls-files` lists (so it refuses outside a git repository, and an
-untracked file is not a root), the committed trees under `.ez/lib`, each git
-dependency's files at its ledger `rev`, and hub content, which it checks
-against the package's hash. It does not read `.ez/origins.toml`, which
+files `git ls-files` lists (so it refuses outside a git repository), the
+committed trees under `.ez/lib`, each git dependency's files at its ledger
+`rev`, and hub content. It takes the hub imports of every listed file and
+follows no local import, so an untracked file never reaches the lock, even
+one a tracked file imports. Every package is checked against its `0x` name
+and every file against its sum, whatever it was read from; a tree already
+under `BEND_LIB` is judged as the same bytes cloned at the ledger's `rev`
+with the ledger's `narHash`. A lock whose hashes, paths or values would not
+read back (a repeated hash, or a `"`, `\` or newline in one) is refused. It does not read `.ez/origins.toml`, which
 `ez add` writes and `.gitignore` keeps out of the repo: a hash the ledger
 does not name is fetched from the hub, and when the hub does not have it the
 lock says the ledger does not name it and exits 1. It does not record the
