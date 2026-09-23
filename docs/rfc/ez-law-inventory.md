@@ -402,7 +402,7 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | :---- | :---- | :---- | :---- |
 | EZ-HASH-1 | sort_perm, manifest_perm, hash_perm, dedup_dup, dedup_keeps, hash_is_prefix | none | Proved, over file lists with distinct paths. The law is over the file set the import walk produces, not a directory tree. |
 | EZ-HASH-2 | none | none (sri_empty_dir only fixes the empty tree) | No law. **Update:** proved by `sha/nar_dir_order_free` (WP8). |
-| EZ-HASH-3 | spec_hash (the read side only) | none | Not stated. Nothing relates a vendored tree's directory name to its hash. |
+| EZ-HASH-3 | spec_hash (the read side only) | none | Not stated. Nothing relates a vendored tree's directory name to its hash. **Update:** `pkg/walked_named_by_texts` and `pkg/walked_manifest_of_texts` state it over the package walk (A0); the row waits for the commands to lay trees from a plan. |
 | EZ-HASH-4 | path and header-scan lemmas (supporting) | none | Trusted, as the RFC says. |
 | EZ-HASH-5 | none | sri_empty_digest, sri_empty_dir | Trusted, two examples. |
 | EZ-HASH-6 | none | hex_empty, hex_abc, hex_manifest | Trusted, three examples. The sha/LAWS.bend header says the digest comes from Giulio2002/bend-sha256 and is proved there against an executable FIPS spec. |
@@ -412,7 +412,7 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | EZ-DOC-4 | none | same_rev_keeps (supporting) | No law. **Update:** proved for a plain lock by `lock/lock_idempotent` and `lock/relock_lays_nothing` over the planner (WP5a); the `--upgrade` half is WP5b. |
 | EZ-DOC-5 | rev_of_names_the_commit, tag_of_names_the_tag (supporting) | none | No law about the command. **Update:** proved by `lock/plain_lock_keeps_ledger` and `lock/plain_lock_pins_ledger_sources` over the planner (WP1). |
 | EZ-RES-1 | is_rev_* (supporting), peeled_agrees | none | No law about tag selection. |
-| EZ-RES-2 | none | none | No law. |
+| EZ-RES-2 | none | none | No law. **Update:** `pkg/absent_entry_refused` states the refusal over the package walk (A0); the precedence and the command wait for A2. |
 | EZ-RES-3 | none | target_* , expand_* | Examples only. |
 | EZ-RES-4 | source_of_hub (supporting) | hub_holds | One example. |
 | EZ-RES-5 | none | sha256_aims_forward, sha256_advances, sha256_remote_tip, sha256_remote_branch, sha256_retarget | Examples only. |
@@ -554,7 +554,7 @@ The design for converting `ez add` and `ez remove`, [ez-add-planner.md](ez-add-p
 
 | WP | State | Scope |
 | :---- | :---- | :---- |
-| A0 | open | Shared plan types in `plan/plan.bend`, git questions in `git/ask.bend`, the pure walk promoted and `K.pkg_of` rewritten over it. |
+| A0 | in part | The walk is done: the spike's walk is in `pkg/pkg.bend` (`K.of`), with a third answer for a file it was not given, and `K.pkg_of` is a loop that answers those from disk, so there is one walk. An import that climbs above the checkout is refused, naming it (`pkg/escaping_import_refused`), and the spike's laws moved to `pkg/LAWS.bend`, tagged EZ-RES-2 and EZ-HASH-3. Left: shared plan types in `plan/plan.bend` and git questions in `git/ask.bend`, which wait for WP2. |
 | A1 | open | `ez remove` in planner form. |
 | A2 | open | `ez add` in planner form. |
 | A3 | open | Bare `vendor = true`. |
