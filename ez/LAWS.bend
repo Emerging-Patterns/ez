@@ -3,7 +3,9 @@
 # `#|` trailer asks for. The clock's by.effect deadline lives here too.
 # The OS half of the clock is not among them. The statuses a line exits with
 # before any command runs (ez/line.bend), and the ends of the commands that
-# are not planners (ez/ends.bend), are here too, for EZ-OUT-1.
+# are not planners (ez/ends.bend), are here too, for EZ-OUT-1, and so are
+# what `ez check`, `ez build` and `ez run` start (ez/start.bend) and the
+# status `ez run` exits with.
 import Base
 import ./quiet.bend as Q
 import ./gate.bend as G
@@ -18,6 +20,7 @@ import ../ez/named.bend as Named
 import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
+import ../ez/start.bend as S
 import ../lock/plan.bend as LP
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 
@@ -665,10 +668,9 @@ law command_ends_its_own:
 # ends: the commands that are not planners (ez/ends.bend). Each ends with an
 # outcome, as a plan does, and the interpreter exits with its `LP.status`.
 
-# LAW: `ez build` and `ez run` exit 1 exactly when bend did not exit 0, and 0
-# when it did
+# LAW: `ez build` exits 1 exactly when bend did not exit 0, and 0 when it did
 # EZ-OUT-1
-law ran_exits_as_bend:
+law build_exits_as_bend:
   for +out: String
   {LP.status(E.ran(out)) == LP.status.of(Bool.not(R.ok(out))) : U32}
 
@@ -694,3 +696,71 @@ law package_needs_upgrade:
   for +name: String
   for ne: {String.is_empty(name) == False{} : Bool}
   {LP.status(E.lock.flags(False{}, name)) == 1 : U32}
+
+# ---------------------------------------------------------------------------
+# start: what `ez check`, `ez build` and `ez run` start (ez/start.bend). Each
+# reads ez.toml and starts one bend on the entry it names, or refuses and
+# starts nothing.
+
+# LAW: with no ez.toml, `ez check`, `ez build` and `ez run` refuse, and say
+# that `ez init` makes one
+# EZ-OUT-1
+law start_needs_ledger:
+  for +ask: S.Ask
+  {S.start(ask, None{}) == S.Refused{S.none(ask)} : S.Start}
+
+# LAW: with an ez.toml that does not parse, they refuse, and say why
+# EZ-OUT-1
+law start_needs_parse:
+  for +ask: S.Ask
+  for +t: String
+  for +why: String
+  for bad: {M.Bad{why} == M.parse(t) : M.Read}
+  {S.start(ask, Some{t}) == S.Refused{"ez: error: " ++ why} : S.Start}
+
+# LAW: `ez run` starts bend on the entry ez.toml names, with every word after
+# `run`
+# EZ-TOOL-9
+law run_starts_entry:
+  for +t: String
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +a: String
+  for +ws: List<&2, String>
+  for good: {M.Good{M.Manifest{n, e, b, h, ds, ts}} == M.parse(t) : M.Read}
+  for named: {False{} == String.is_empty(e) : Bool}
+  {S.start(S.Run{a <> ws}, Some{t}) == S.Starts{"bend" <> (e <> ws)} : S.Start}
+
+# LAW: and on `main.bend` when ez.toml names no entry
+# EZ-TOOL-9
+law run_starts_main:
+  for +t: String
+  for +n: String
+  for +b: String
+  for +h: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +a: String
+  for +ws: List<&2, String>
+  for good: {M.Good{M.Manifest{n, "", b, h, ds, ts}} == M.parse(t) : M.Read}
+  {S.start(S.Run{a <> ws}, Some{t}) == S.Starts{"bend" <> ("main.bend" <> ws)}
+    : S.Start}
+
+# LAW: `ez run` that refused exits 1, whatever a program would have said,
+# since none was started
+# EZ-OUT-1
+law run_refusal_exits_one:
+  for +why: String
+  for +program: U32
+  {S.code(S.Refused{why}, program) == 1 : U32}
+
+# LAW: `ez run` that started the program exits with the program's status
+# EZ-OUT-1
+law run_exits_with_program:
+  for +line: List<&2, String>
+  for +program: U32
+  {S.code(S.Starts{line}, program) == program : U32}

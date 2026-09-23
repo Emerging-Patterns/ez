@@ -42,8 +42,8 @@ def entry.or(+file: String) -> String:
 
 # everything ez writes into a project that is not the project's: the vendored
 # packages, the test gate's shadow and its cache all live under one `.ez/`, and
-# `ez build` drops a binary in `bin/<name>.out` (`Cmd.build.named`) unless it
-# is told otherwise. A project whose first `ez check` leaves untracked output
+# `ez build` drops a binary in `bin/<name>.out` (`build.named` in
+# ez/start.bend) unless it is told otherwise. A project whose first `ez check` leaves untracked output
 # is a project whose owner has to work out for themselves which of it was
 # theirs.
 #

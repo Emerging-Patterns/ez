@@ -1,9 +1,10 @@
-# ez/ends: how the commands that are not planners end. `ez check`, `ez build`
-# and `ez run` start one bend and end on its answer; `ez test` and `ez prove`
+# ez/ends: how the commands that are not planners end. `ez check` and
+# `ez build` start one bend and end on its answer; `ez test` and `ez prove`
 # start one per file and end on the count. Each ends with a `P.Outcome`, the
 # same end a planner's plan has, and the interpreter exits with its
 # `P.status` (`Run.end`), so the status each exits with is a law (EZ-OUT-1).
-# That the answer is what bend printed is EZ-TRUST-2.
+# That the answer is what bend printed is EZ-TRUST-2. `ez run` reads no
+# answer: it exits with the program's own status (`code` in ez/start.bend).
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../lock/plan.bend as P
@@ -19,7 +20,7 @@ def lock.flags(up: Bool, +name: String) -> P.Outcome:
   Bool.pick(P.Outcome, Bool.or(up, String.is_empty(name)), P.Success{},
     P.Refused{"ez: --package needs --upgrade"})
 
-# `ez build` and `ez run`: bend exited 0
+# `ez build`: bend exited 0
 def ran(+out: String) -> P.Outcome:
   outcome.of(R.ok(out))
 

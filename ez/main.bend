@@ -14,7 +14,6 @@ import ./cmd.bend as Cmd
 import ./test.bend as Test
 import ./prove.bend as Prove
 import ../doctor/run.bend as DoctorRun
-import ../ez/env.bend as Env
 import ../tool/run.bend as ToolRun
 import ../tool/world.bend as TW
 import ../ez/say.bend as Say
@@ -23,7 +22,9 @@ import ../ez/line.bend as L
 
 # what a subcommand runs. `L.line` never runs `CHelp`, which names no
 # command; it is here so the match is whole, and it writes the help a bare
-# `ez` would.
+# `ez` would. The directories `ez check` and `ez build` write into are made
+# by those commands once they know they will start bend (`Env.dirs`), so a
+# refused one leaves the directory as it found it.
 def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
   match sub:
     case L.CInit{}:
@@ -73,19 +74,12 @@ def hint.sync(is_sync: Bool) -> IO(Unit):
         m : Maybe<&2, String> <- F.read("ez.toml")
         IO.print_err(Say.hint(Say.has.tools(F.text_of(m))))
 
-# the directories the command writes into made, then the command, with its
-# bindings
-def go.run(sub: L.Sub, +as: List<&2, String>, +matched: Shake.Matched) -> IO(Unit):
-  do IO<Unit>:
-    Env.make(Env.dirs(L.path(matched), Shake.get(matched, "out")))
-    dispatch(sub, matched, as)
-
 # what a line says: the command it names run, its help on stdout, or what
 # was wrong with it on stderr, with a hint for `ez sync`
 def go.say(how: L.Line, +as: List<&2, String>) -> IO(Unit):
   match how:
     case L.Runs{sub, +m}:
-      go.run(sub, as, m)
+      dispatch(sub, m, as)
     case L.Shows{text}:
       IO.write(text)
     case L.Misuse{text, word}:

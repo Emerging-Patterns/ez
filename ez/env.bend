@@ -40,10 +40,12 @@ def dirs.build(build: Bool, bare: Bool) -> List<&2, String>:
     case False{}:
       []
 
-# the directories a command writes into and does not make itself: `.ez` for
-# `ez check`'s JS, and `bin` for `ez build`'s default output. Every other
-# command makes what it writes into when it writes, and `ez help`, `doctor`
-# and the rest write nothing here, so they leave a directory as they found it.
+# the directories bend writes into for a command and does not make itself:
+# `.ez` for `ez check`'s JS, and `bin` for `ez build`'s default output. They
+# are made just before bend starts, so a check or build that is refused makes
+# none. Every other command makes what it writes into when it writes, and
+# `ez help`, `doctor` and the rest write nothing here, so they leave a
+# directory as they found it.
 def dirs(+cmd: String, +out: String) -> List<&2, String>:
   Bool.pick(List<&2, String>, String.eq(cmd, "check"), [".ez"],
     dirs.build(String.eq(cmd, "build"), String.is_empty(out)))

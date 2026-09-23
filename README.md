@@ -80,7 +80,11 @@ Bend runtime keeps `--help` for itself.
 already has an `ez.toml` it exits 1 and writes nothing. It is also the only
 command that makes a ledger: `ez add`, `ez remove` and `ez lock` (with or
 without `--upgrade`) in a directory with no `ez.toml` exit 1 and write
-nothing.
+nothing, and `ez check`, `ez build` and `ez run` exit 1 and start nothing.
+
+`ez run` runs the entry with bend, as `cargo run` runs a binary: the program
+reads ez's stdin and prints straight to the terminal as it goes, gets every
+word after `run`, and its status is the status of the command.
 
 A ledger, and a dependency vendored from a repo that never published:
 
