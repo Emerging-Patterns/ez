@@ -1,96 +1,232 @@
 # pub: the proofs. `bend PROOF.bend` is the gate.
+#
+# The plan is `plan.v(decide(w), w)`: `decide` walks the stages a publish
+# passes (the ledger, git status, the walk, what git tracks, the upload) and
+# stops, waits or goes on at each; on `Go` the plan is `made(w)`, and every
+# other verdict is a plan with no effect that refuses. Each stage reads what
+# it needs from the World, so a law that one stage refuses walks `decide`
+# stage by stage: every stage before it stops, waits, or goes on to the next,
+# whatever the World says there.
 import Base
-import ./pub.bend as P
+import ./world.bend as PW
+import ./plan.bend as PP
+import ../lock/plan.bend as P
+import ../pkg/pkg.bend as K
 import ../git/git.bend as G
+import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
-# LAW: one line of the search for bend's answer. A `match` may not scrutinise
-# a computed value, so the head's verdict is lifted into a parameter and
-# carried alongside as an equation; the law is then applied to the verdict the
-# code computes, which makes the two the same thing.
-law answer_is_a_name.arm:
-  for h: String
-  for t: List<&2, String>
-  for p: Bool
-  for e: {p == P.is_name(h) : Bool}
-  for ih: {P.is_name(P.answer(t)) == Laws.any_name(t) : Bool}
-  {P.is_name(P.answer.step(p, h, _u => P.answer(t)))
-    == Laws.any_name.step(p, _u => Laws.any_name(t)) : Bool}
+# ---------------------------------------------------------------------------
+# bend's answer
 
-def answer_is_a_name.arm(_h, _t, p, e, ih):
+# LAW: past a stretch with no name in it, the check answers what it had seen
+law agrees_skip:
+  for +ours: String
+  for ls: List<&2, String>
+  for +s: Bool
+  for e: {False{} == Laws.any_name(ls) : Bool}
+  {PP.agrees.go(ours, ls, s) == s : Bool}
+
+# LAW: one line of that stretch. A line that is a name contradicts the
+# premise; one that is not hands the goal on unchanged.
+law agrees_skip.arm:
+  for +ours: String
+  for +h: String
+  for t: List<&2, String>
+  for +s: Bool
+  for p: Bool
+  for e: {False{} == Laws.any_name.step(p, _u => Laws.any_name(t)) : Bool}
+  for ih: {False{} == Laws.any_name(t) : Bool} -> {PP.agrees.go(ours, t, s) == s : Bool}
+  {PP.agrees.step(p, String.eq(ours, h), s, x => PP.agrees.go(ours, t, x)) == s : Bool}
+
+def agrees_skip.arm(_ours, _h, _t, s, p, e, ih):
   match p:
     case True{}:
-      %e : {_ == True{} : Bool}
-      {==}
+      Eq.bit.absurd(&2, {PP.agrees.step(True{}, String.eq(_ours, _h), s,
+        x => PP.agrees.go(_ours, _t, x)) == s : Bool}, e)
     case False{}:
-      ih
+      ih(e)
 
-def Laws.answer_is_a_name(ls):
+def agrees_skip(ours, ls, s, e):
   match ls:
     case []:
       {==}
     case +h <> +t:
-      answer_is_a_name.arm(h, t, P.is_name(h), {==}, Laws.answer_is_a_name(t))
+      agrees_skip.arm(ours, h, t, s, PP.is_name(h), e, x => agrees_skip(ours, t, s, x))
+
+def Laws.unread_never_agrees(ours, ls, e):
+  agrees_skip(ours, ls, False{}, e)
+
+# LAW: past a stretch with no name in it, the check goes on as if it began
+# after it
+law skip_prefix:
+  for +ours: String
+  for pre: List<&2, String>
+  for +rest: List<&2, String>
+  for +s: Bool
+  for e: {False{} == Laws.any_name(pre) : Bool}
+  {PP.agrees.go(ours, List.append(&2, String, pre, rest), s) == PP.agrees.go(ours, rest, s)
+    : Bool}
+
+law skip_prefix.arm:
+  for +ours: String
+  for +h: String
+  for t: List<&2, String>
+  for +rest: List<&2, String>
+  for +s: Bool
+  for p: Bool
+  for e: {False{} == Laws.any_name.step(p, _u => Laws.any_name(t)) : Bool}
+  for ih: {False{} == Laws.any_name(t) : Bool} ->
+    {PP.agrees.go(ours, List.append(&2, String, t, rest), s) == PP.agrees.go(ours, rest, s)
+      : Bool}
+  {PP.agrees.step(p, String.eq(ours, h), s,
+    x => PP.agrees.go(ours, List.append(&2, String, t, rest), x))
+    == PP.agrees.go(ours, rest, s) : Bool}
+
+def skip_prefix.arm(ours, h, t, rest, s, p, e, ih):
+  match p:
+    case True{}:
+      Eq.bit.absurd(&2, {PP.agrees.step(True{}, String.eq(ours, h), s,
+        x => PP.agrees.go(ours, List.append(&2, String, t, rest), x))
+        == PP.agrees.go(ours, rest, s) : Bool}, e)
+    case False{}:
+      ih(e)
+
+def skip_prefix(ours, pre, rest, s, e):
+  match pre:
+    case []:
+      {==}
+    case +h <> +t:
+      skip_prefix.arm(ours, h, t, rest, s, PP.is_name(h), e,
+        x => skip_prefix(ours, t, rest, s, x))
+
+# LAW: a name that is not ours, wherever it is, sinks the check whatever it
+# had seen before
+law differs_go:
+  for +ours: String
+  for pre: List<&2, String>
+  for +h: String
+  for +post: List<&2, String>
+  for +s: Bool
+  for +e0: {True{} == PP.is_name(h) : Bool}
+  for +e1: {False{} == String.eq(ours, h) : Bool}
+  {PP.agrees.go(ours, List.append(&2, String, pre, h <> post), s) == False{} : Bool}
+
+# LAW: one line before that name. A name ands its own verdict with the
+# rest's, which is False; any other line hands the rest on.
+law differs_go.arm:
+  for p: Bool
+  for q: Bool
+  for +s: Bool
+  for f: Bool -> Bool
+  for yes: {f(True{}) == False{} : Bool}
+  for no: {f(s) == False{} : Bool}
+  {PP.agrees.step(p, q, s, f) == False{} : Bool}
+
+def differs_go.arm(p, q, _s, _f, yes, no):
+  match p:
+    case True{}:
+      match q:
+        case True{}:
+          yes
+        case False{}:
+          {==}
+    case False{}:
+      no
+
+def differs_go(ours, pre, h, post, s, e0, e1):
+  match pre:
+    case []:
+      %e0 : {PP.agrees.step(_, String.eq(ours, h), s,
+        x => PP.agrees.go(ours, post, x)) == False{} : Bool}
+      %e1 : {PP.agrees.step(True{}, _, s,
+        x => PP.agrees.go(ours, post, x)) == False{} : Bool}
+      {==}
+    case +x <> +t:
+      differs_go.arm(PP.is_name(x), String.eq(ours, x), s,
+        y => PP.agrees.go(ours, List.append(&2, String, t, h <> post), y),
+        differs_go(ours, t, h, post, True{}, e0, e1),
+        differs_go(ours, t, h, post, s, e0, e1))
+
+def Laws.differs_never_agrees(ours, pre, h, post, e0, e1):
+  differs_go(ours, pre, h, post, False{}, e0, e1)
+
+# The name that is ours, once the stretch before it is passed over, is a
+# name seen, and the stretch after it has no name to spoil it.
+law ours_at:
+  for +ours: String
+  for +h: String
+  for +post: List<&2, String>
+  for e0: {True{} == PP.is_name(h) : Bool}
+  for e1: {True{} == String.eq(ours, h) : Bool}
+  for e3: {False{} == Laws.any_name(post) : Bool}
+  {PP.agrees.go(ours, h <> post, False{}) == True{} : Bool}
+
+def ours_at(ours, h, post, e0, e1, e3):
+  %e0 : {PP.agrees.step(_, String.eq(ours, h), False{},
+    x => PP.agrees.go(ours, post, x)) == True{} : Bool}
+  %e1 : {PP.agrees.step(True{}, _, False{},
+    x => PP.agrees.go(ours, post, x)) == True{} : Bool}
+  agrees_skip(ours, post, True{}, e3)
+
+def Laws.ours_agrees(ours, pre, h, post, e0, e1, e2, e3):
+  Equal.trans(Bool,
+    PP.agrees.go(ours, List.append(&2, String, pre, h <> post), False{}),
+    PP.agrees.go(ours, h <> post, False{}), True{},
+    skip_prefix(ours, pre, h <> post, False{}, e2),
+    ours_at(ours, h, post, e0, e1, e3))
 
 # Both decoy lines are refused on their first character: `is_name` opens with
 # `String.starts_with(s, "0x")`, the literal prefix is a known constructor and
 # so is the head of each literal, so the comparison computes to False before
-# the length or the alphabet is reached and `Bool.and` never looks at its
-# second side. Nothing is left symbolic but the tail, which is never read.
+# the length or the alphabet is reached.
 def Laws.progress_is_not_an_answer(_rest):
   {==}
 
 def Laws.import_is_not_an_answer(_rest):
   {==}
 
-# The verdict is a two-step cascade and each law fixes one of the steps. An
-# unreadable answer fixes the outer one: rewriting the recogniser's False into
-# the goal leaves `judge.said(False{}, ...)`, which is `Unread{}`, which is not
-# agreement.
-def Laws.unread_never_agrees(ours, theirs, e):
-  %e : {P.agreed(P.judge.said(_, ours, theirs)) == False{} : Bool}
+# A name's prefix, length or alphabet is rewritten into `Bool.and`.
+def Laws.is_name_needs_0x(s, e):
+  %e : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), PP.name.length()),
+    G.hex.all(String.to_list(String.drop(s, 2n))))) == False{} : Bool}
   {==}
 
-# LAW: one arm of the cascade, with the recogniser's verdict lifted. A
-# recogniser that said no ends at `Unread{}` whatever the two strings are; one
-# that said yes hands the goal on to the comparison, and there the hypothesis
-# rewrites the comparison's False into place and leaves `Differs{}`.
-law differs_never_agrees.arm:
-  for +ours: String
-  for +theirs: String
-  for p: Bool
-  for e: {False{} == String.eq(ours, theirs) : Bool}
-  {P.agreed(P.judge.said(p, ours, theirs)) == False{} : Bool}
-
-def differs_never_agrees.arm(_ours, theirs, p, e):
-  match p:
-    case False{}:
-      {==}
-    case True{}:
-      %e : {P.agreed(P.judge.go(_, theirs)) == False{} : Bool}
-      {==}
-
-def Laws.differs_never_agrees(ours, theirs, e):
-  differs_never_agrees.arm(ours, theirs, P.is_name(theirs), e)
-
-# The happy path is the other arm of the same cascade: a recogniser that
-# said yes hands the goal to the comparison, and there the hypothesis
-# rewrites the comparison's True into place and leaves `Agreed{}`.
-def Laws.same_is_agreed(ours, theirs, e0, e1):
-  %e0 : {P.agreed(P.judge.said(_, ours, theirs)) == True{} : Bool}
-  %e1 : {P.agreed(P.judge.go(_, theirs)) == True{} : Bool}
+def Laws.is_name_needs_length(s, e0, e1):
+  %e0 : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), PP.name.length()),
+    G.hex.all(String.to_list(String.drop(s, 2n))))) == False{} : Bool}
+  %e1 : {Bool.and(_, G.hex.all(String.to_list(String.drop(s, 2n))))
+    == False{} : Bool}
   {==}
+
+def Laws.is_name_needs_hex(s, e0, e1, e2):
+  %e0 : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), PP.name.length()),
+    G.hex.all(String.to_list(String.drop(s, 2n))))) == False{} : Bool}
+  %e1 : {Bool.and(_, G.hex.all(String.to_list(String.drop(s, 2n))))
+    == False{} : Bool}
+  %e2 : {_ == False{} : Bool}
+  {==}
+
+def Laws.is_name_hex34(s, e0, e1, e2):
+  %e0 : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), PP.name.length()),
+    G.hex.all(String.to_list(String.drop(s, 2n))))) == True{} : Bool}
+  %e1 : {Bool.and(_, G.hex.all(String.to_list(String.drop(s, 2n))))
+    == True{} : Bool}
+  %e2 : {_ == True{} : Bool}
+  {==}
+
+# ---------------------------------------------------------------------------
+# the working tree and the package
 
 # LAW: one line of the status against both walks at once. A line that says
-# nothing hands each walk on to the rest of the status, which is the induction
-# hypothesis; a line that says something ends one walk at False and the other
-# at True, and `Bool.not` carries the one to the other.
+# nothing hands each walk on to the rest of the status; a line that says
+# something ends one walk at False and the other at True.
 law clean_is_all_blank.arm:
   for t: List<&2, String>
   for q: Bool
-  for ih: {P.blanks(t) == Bool.not(P.dirty.lines(t)) : Bool}
-  {P.blanks.step(q, _u => P.blanks(t))
-    == Bool.not(P.dirty.step(q, _u => P.dirty.lines(t))) : Bool}
+  for ih: {PP.blanks(t) == Bool.not(PP.dirty.lines(t)) : Bool}
+  {PP.blanks.step(q, _u => PP.blanks(t))
+    == Bool.not(PP.dirty.step(q, _u => PP.dirty.lines(t))) : Bool}
 
 def clean_is_all_blank.arm(_t, q, ih):
   match q:
@@ -106,43 +242,10 @@ def Laws.clean_is_all_blank(ls):
     case +h <> +t:
       clean_is_all_blank.arm(t, String.is_empty(h), Laws.clean_is_all_blank(t))
 
-# An untracked line opens with a character, so `String.is_empty` computes to
-# False on the constructor alone and the walk stops there. The path and the
-# lines after it are never read, which is the point: no status code is
-# consulted, so none can be exempt.
+# A porcelain line that names a path opens with a character, so
+# `String.is_empty` computes to False and the walk stops there. No status
+# code is consulted, so none can be exempt.
 def Laws.untracked_is_dirty(_path, _rest):
-  {==}
-
-# A name's prefix, length or alphabet is rewritten into `Bool.and`. A
-# porcelain line that names a path opens with a character, so
-# `String.is_empty` computes to False and the walk stops there.
-
-def Laws.is_name_needs_0x(s, e):
-  %e : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), P.name.length()),
-    G.hex.all(String.to_list(String.drop(s, 2n))))) == False{} : Bool}
-  {==}
-
-def Laws.is_name_needs_length(s, e0, e1):
-  %e0 : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), P.name.length()),
-    G.hex.all(String.to_list(String.drop(s, 2n))))) == False{} : Bool}
-  %e1 : {Bool.and(_, G.hex.all(String.to_list(String.drop(s, 2n))))
-    == False{} : Bool}
-  {==}
-
-def Laws.is_name_needs_hex(s, e0, e1, e2):
-  %e0 : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), P.name.length()),
-    G.hex.all(String.to_list(String.drop(s, 2n))))) == False{} : Bool}
-  %e1 : {Bool.and(_, G.hex.all(String.to_list(String.drop(s, 2n))))
-    == False{} : Bool}
-  %e2 : {_ == False{} : Bool}
-  {==}
-
-def Laws.is_name_hex34(s, e0, e1, e2):
-  %e0 : {Bool.and(_, Bool.and(Nat.is_eq(String.length(s), P.name.length()),
-    G.hex.all(String.to_list(String.drop(s, 2n))))) == True{} : Bool}
-  %e1 : {Bool.and(_, G.hex.all(String.to_list(String.drop(s, 2n))))
-    == True{} : Bool}
-  %e2 : {_ == True{} : Bool}
   {==}
 
 def Laws.modified_is_dirty(_path, _rest):
@@ -150,3 +253,301 @@ def Laws.modified_is_dirty(_path, _rest):
 
 def Laws.staged_is_dirty(_path, _rest):
   {==}
+
+# A tag other than `H` differs from `H` in its first character, so the
+# comparison computes to False on the constructors and the walk goes on.
+def Laws.assumed_is_untracked(_path, _rest):
+  {==}
+
+def Laws.skipped_is_untracked(_path, _rest):
+  {==}
+
+# ---------------------------------------------------------------------------
+# a dirty tree, or no git: the command stops at git status
+
+law dirty_led:
+  for l: PP.Led
+  for +w: PW.World
+  for +text: String
+  for e0: {PP.status(w) == PP.Said{text} : PP.Status}
+  for e1: {PP.dirty(text) == True{} : Bool}
+  {PP.stops.v(PP.decide.led(l, w)) == True{} : Bool}
+
+def dirty_led(l, w, text, e0, e1):
+  match l:
+    case PP.Led{_e}:
+      %Equal.sym(PP.Status, PP.status(w), PP.Said{text}, e0)
+        : {PP.stops.v(PP.decide.status(_, w)) == True{} : Bool}
+      %Equal.sym(Bool, PP.dirty(text), True{}, e1)
+        : {PP.stops.v(PP.decide.clean(_, text, w)) == True{} : Bool}
+      {==}
+    case PP.LedNo{_why}:
+      {==}
+
+def Laws.pub_dirty_refuses(w, text, e0, e1):
+  dirty_led(PP.led(w), w, text, e0, e1)
+
+law gitless_led:
+  for l: PP.Led
+  for +w: PW.World
+  for +why: String
+  for e: {PP.status(w) == PP.StatusNo{why} : PP.Status}
+  {PP.stops.v(PP.decide.led(l, w)) == True{} : Bool}
+
+def gitless_led(l, w, why, e):
+  match l:
+    case PP.Led{_e}:
+      %Equal.sym(PP.Status, PP.status(w), PP.StatusNo{why}, e)
+        : {PP.stops.v(PP.decide.status(_, w)) == True{} : Bool}
+      {==}
+    case PP.LedNo{_why}:
+      {==}
+
+def Laws.pub_gitless_refuses(w, why, e):
+  gitless_led(PP.led(w), w, why, e)
+
+def Laws.pub_needs_ledger(_here, _rs):
+  {==}
+
+# ---------------------------------------------------------------------------
+# a file git does not track: the command never reaches the upload
+
+law stray_walk:
+  for k: K.Walked
+  for +w: PW.World
+  for +path: String
+  for e: {PP.stray(w) == PP.Stray{path} : PP.Kept}
+  {PP.sends.v(PP.decide.walk(k, w)) == False{} : Bool}
+
+def stray_walk(k, w, path, e):
+  match k:
+    case K.Walked{_h, _root, _fs, _sums}:
+      %Equal.sym(PP.Kept, PP.stray(w), PP.Stray{path}, e)
+        : {PP.sends.v(PP.decide.kept(_, w)) == False{} : Bool}
+      {==}
+    case K.Asks{_at}:
+      {==}
+    case K.Refused{_why}:
+      {==}
+
+law stray_clean:
+  for b: Bool
+  for +text: String
+  for +w: PW.World
+  for +path: String
+  for e: {PP.stray(w) == PP.Stray{path} : PP.Kept}
+  {PP.sends.v(PP.decide.clean(b, text, w)) == False{} : Bool}
+
+def stray_clean(b, _text, w, path, e):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      stray_walk(PP.walked(w), w, path, e)
+
+law stray_status:
+  for s: PP.Status
+  for +w: PW.World
+  for +path: String
+  for e: {PP.stray(w) == PP.Stray{path} : PP.Kept}
+  {PP.sends.v(PP.decide.status(s, w)) == False{} : Bool}
+
+def stray_status(s, w, path, e):
+  match s:
+    case PP.Said{+text}:
+      stray_clean(PP.dirty(text), text, w, path, e)
+    case PP.StatusWait{}:
+      {==}
+    case PP.StatusNo{_why}:
+      {==}
+
+law stray_led:
+  for l: PP.Led
+  for +w: PW.World
+  for +path: String
+  for e: {PP.stray(w) == PP.Stray{path} : PP.Kept}
+  {PP.sends.v(PP.decide.led(l, w)) == False{} : Bool}
+
+def stray_led(l, w, path, e):
+  match l:
+    case PP.Led{_e}:
+      stray_status(PP.status(w), w, path, e)
+    case PP.LedNo{_why}:
+      {==}
+
+def Laws.pub_stray_sends_nothing(w, path, e):
+  stray_led(PP.led(w), w, path, e)
+
+# ---------------------------------------------------------------------------
+# a verdict that stops sends nothing, and one that sends nothing refuses
+
+law stop_unsent:
+  for v: PP.Verdict
+  for r: {PP.stops.v(v) == True{} : Bool}
+  {PP.sends.v(v) == False{} : Bool}
+
+def stop_unsent(v, r):
+  match v:
+    case PP.Go{}:
+      Eq.bit.absurd(&2, {PP.sends.v(PP.Go{}) == False{} : Bool}, r)
+    case PP.Wait{asks}:
+      Eq.bit.absurd(&2, {PP.sends.v(PP.Wait{asks}) == False{} : Bool}, r)
+    case PP.Stop{_why}:
+      {==}
+
+def Laws.pub_stop_sends_nothing(w, r):
+  stop_unsent(PP.decide(w), r)
+
+law unsent_fails:
+  for v: PP.Verdict
+  for +w: PW.World
+  for r: {PP.sends.v(v) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(v, w)) == False{} : Bool}
+
+def unsent_fails(v, w, r):
+  match v:
+    case PP.Go{}:
+      Eq.bit.absurd2(&2, {PP.succeeds.plan(PP.plan.v(PP.Go{}, w)) == False{} : Bool}, r)
+    case PP.Wait{_asks}:
+      {==}
+    case PP.Stop{_why}:
+      {==}
+
+def Laws.pub_unsent_refuses(w, r):
+  unsent_fails(PP.decide(w), w, r)
+
+# ---------------------------------------------------------------------------
+# an upload that does not agree: the command does not succeed
+
+law ag_upload:
+  for got: PW.Heard
+  for +w: PW.World
+  for e: {PP.agreed(w) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(PP.decide.upload(got, w), w)) == False{} : Bool}
+
+def ag_upload(got, w, e):
+  match got:
+    case PW.Open{}:
+      {==}
+    case PW.Heard{_a}:
+      %Equal.sym(Bool, PP.agreed(w), False{}, e)
+        : {PP.succeeds.plan(PP.plan.v(PP.decide.agreed(_, w), w)) == False{} : Bool}
+      {==}
+
+law ag_kept:
+  for k: PP.Kept
+  for +w: PW.World
+  for e: {PP.agreed(w) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(PP.decide.kept(k, w), w)) == False{} : Bool}
+
+def ag_kept(k, w, e):
+  match k:
+    case PP.Kept{}:
+      ag_upload(PP.uploaded(w), w, e)
+    case PP.Stray{_path}:
+      {==}
+    case PP.KeptWait{}:
+      {==}
+    case PP.KeptNo{_why}:
+      {==}
+
+law ag_walk:
+  for k: K.Walked
+  for +w: PW.World
+  for e: {PP.agreed(w) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(PP.decide.walk(k, w), w)) == False{} : Bool}
+
+def ag_walk(k, w, e):
+  match k:
+    case K.Walked{_h, _root, _fs, _sums}:
+      ag_kept(PP.stray(w), w, e)
+    case K.Asks{_at}:
+      {==}
+    case K.Refused{_why}:
+      {==}
+
+law ag_clean:
+  for b: Bool
+  for +text: String
+  for +w: PW.World
+  for e: {PP.agreed(w) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(PP.decide.clean(b, text, w), w)) == False{} : Bool}
+
+def ag_clean(b, _text, w, e):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      ag_walk(PP.walked(w), w, e)
+
+law ag_status:
+  for s: PP.Status
+  for +w: PW.World
+  for e: {PP.agreed(w) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(PP.decide.status(s, w), w)) == False{} : Bool}
+
+def ag_status(s, w, e):
+  match s:
+    case PP.Said{+text}:
+      ag_clean(PP.dirty(text), text, w, e)
+    case PP.StatusWait{}:
+      {==}
+    case PP.StatusNo{_why}:
+      {==}
+
+law ag_led:
+  for l: PP.Led
+  for +w: PW.World
+  for e: {PP.agreed(w) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(PP.decide.led(l, w), w)) == False{} : Bool}
+
+def ag_led(l, w, e):
+  match l:
+    case PP.Led{_e}:
+      ag_status(PP.status(w), w, e)
+    case PP.LedNo{_why}:
+      {==}
+
+def Laws.pub_needs_agreement(w, e):
+  ag_led(PP.led(w), w, e)
+
+# ---------------------------------------------------------------------------
+# what a publish that succeeds says, and that nothing is written
+
+law said_made:
+  for v: PP.Verdict
+  for +w: PW.World
+  for ok: {PP.succeeds.plan(PP.plan.v(v, w)) == True{} : Bool}
+  {PP.said(PP.plan.v(v, w)) == [PP.hash(w), PP.import.line(PP.hash(w), PP.at(w))]
+    : List<&2, String>}
+
+def said_made(v, w, ok):
+  match v:
+    case PP.Go{}:
+      {==}
+    case PP.Wait{asks}:
+      Eq.bit.absurd(&2, {PP.said(PP.plan.v(PP.Wait{asks}, w))
+        == [PP.hash(w), PP.import.line(PP.hash(w), PP.at(w))] : List<&2, String>}, ok)
+    case PP.Stop{why}:
+      Eq.bit.absurd(&2, {PP.said(PP.plan.v(PP.Stop{why}, w))
+        == [PP.hash(w), PP.import.line(PP.hash(w), PP.at(w))] : List<&2, String>}, ok)
+
+def Laws.pub_reports_ours(w, ok):
+  said_made(PP.decide(w), w, ok)
+
+law quiet:
+  for v: PP.Verdict
+  for +w: PW.World
+  {P.writes(PP.plan.v(v, w)) == False{} : Bool}
+
+def quiet(v, _w):
+  match v:
+    case PP.Go{}:
+      {==}
+    case PP.Wait{_asks}:
+      {==}
+    case PP.Stop{_why}:
+      {==}
+
+def Laws.pub_refusal_writes_nothing(w, _r):
+  quiet(PP.decide(w), w)

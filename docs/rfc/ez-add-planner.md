@@ -441,6 +441,15 @@ The rewritten `K.pkg_of`, and `K.of` over every tracked file, give the hash, roo
 - `ez/cap.bend`, `ez/env.bend` and `ez/args.bend` are imported as `../ez/…` from every file, as `ez/target.bend` is, since `tool/run.bend` reaches them by that path and bend gives a file one namespace per import closure.
 - `ez doctor` has no tool check, so there is nothing of it to convert here.
 
+**Update (WP11, `ez publish`).** `ez publish` is in planner form in the same shape: `pub/world.bend` (the World and the questions), `pub/plan.bend` (pure, with the decision functions of the old `pub/pub.bend`), and `pub/run.bend` (the interpreter), which `ez/cmd.bend` dispatches to. `pub/pub.bend` is deleted. Where it differs from the commands above:
+
+- The World is `{here, ledger: Maybe, replies}`. The questions reuse the tool commands' `Locate`, for `git status --porcelain --untracked-files=normal` of the project, and `Read`, for each file the package walk asks for, answered by `ToolRun.answer`. Two are publish's own: `Tracked`, `git ls-files -v` in the project, and `Upload{entry}`, `bend <entry> --publish`.
+- The upload is a question and not an effect, because its answer is what the check needs. It is the only question whose answering is not a read, so the planner asks it last, once the ledger, the status, the walk and what git tracks have all passed. Its key does not name the entry, since a command uploads once, so a law about its answer holds whatever the ledger says. The words it runs are a pure function, `PP.upload.line`, so a bend that takes `<name>@<version>` (#84) changes that function and the Upload question's fields, and no law.
+- The walk is `K.of.tree` over the files read so far, a tree that is not whole, so a file it has not been given is a question, one per round.
+- Each stage of `decide` reads what it needs from the World rather than from the stage before, so a law that one stage refuses walks the stages before it, each of which stops, waits, or goes on, whatever the World says there.
+- The plan is the lock's `Plan`: two `Say` lines and `Success` when bend's answer agrees, and no effect with `Refused` otherwise, run by `Run.exec.plan`.
+- The laws are listed in [ez-law-inventory.md](ez-law-inventory.md) under WP11. EZ-PUB-1, EZ-PUB-2 and EZ-OUT-2 are proved.
+
 ## Work packages
 
 |  |
