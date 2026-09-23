@@ -396,10 +396,11 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | hint_sync_when_tools | C | refl | Wording of the `sync` hint with tools. | none (incidental) |
 | hint_sync_without_tools | C | refl | Wording of the `sync` hint without tools. | none (incidental) |
 
-**Update:** A3 of [ez-add-planner.md](ez-add-planner.md) renders the vendor key bare, `vendor = true`, where ez wrote `vendor = "true"`; `M.flag` reads both. It adds one tagged law. EZ-LED-4 stays pending until the round trip is proved for every field.
+**Update:** A3 and A6 of [ez-add-planner.md](ez-add-planner.md) add two tagged laws, and four untagged lemmas in `manifest/PROOF.bend` (`find_last.arm`, `find_last`, `revend_again`, `readd_again`). A3 also renders the vendor key bare, `vendor = true`, where ez wrote `vendor = "true"`; `M.flag` reads both. Both rows stay pending: EZ-LED-2 until `ez add` is in planner form and `add_edits_ledger` (A2) ties the command to `R.add.keep`, when A7 flips it; EZ-LED-4 until the round trip is proved for every field.
 
 | Law | Kind | Proof | Claim | Points toward |
 | :---- | :---- | :---- | :---- | :---- |
+| add_keep_idem | Q | struct | `R.add.keep`, the edit `ez add` makes, twice equals once: the second add finds the entry the first wrote (`find_last`), so the vendor bit it keeps is that entry's (`revend_again`), and the rest is `add_idem`. | EZ-LED-2 (the model law; the plan law is A2's) |
 | vendor_reads_back | Q | struct | For either bit, a git dependency's vendor bit, rendered by `R.show` and parsed back by `M.parse`, is the bit. | EZ-LED-4 (the vendor field) |
 
 ## Coverage by RFC requirement

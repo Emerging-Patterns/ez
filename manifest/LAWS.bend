@@ -22,6 +22,16 @@ law add_idem:
   for +d: M.Dep
   {R.add(R.add(m, d), d) == R.add(m, d) : M.Manifest}
 
+# LAW: and adding it twice with the edit `ez add` makes, the one that keeps a
+# vendor bit the ledger already set, is adding it once. The second add finds
+# the entry the first one wrote, so the bit it keeps is the bit the first one
+# gave, and the dependency it adds is the one already there.
+# EZ-LED-2
+law add_keep_idem:
+  for m: M.Manifest
+  for +d: M.Dep
+  {R.add.keep(R.add.keep(m, d), d) == R.add.keep(m, d) : M.Manifest}
+
 # The rest of the ledger: the reading of a parsed document into a model, and
 # the writing of that model back out. A ledger is a file a person edits, so
 # every one of these is a claim about what ez will do with what they wrote.
