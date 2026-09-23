@@ -352,6 +352,8 @@ For a plain lock this is a corollary of `clone_reproduces` read backwards: the o
 
 Reuses `clone_reproduces`, `check/eq.bend string_eq_self`. Replaces `manifest/LAWS.bend same_rev_keeps` (toward EZ-DOC-4). Effort: small for the plain lock, medium to large for the upgrade, whose key lemma is that a dependency's verdict on its own tip is `Keep` with agreement.
 
+**Update:** WP5a has landed the plain half as `lock/LAWS.bend lock_idempotent` and `relock_lays_nothing`. Where it differs from the sketch: `after` is law vocabulary in `lock/LAWS.bend`, not `P.after`, and a refused lock leaves the World it read, so `lock_idempotent` needs no premise. The second law is about BEND_LIB rather than ez.toml, which a plain lock never writes (EZ-DOC-5): after a lock that succeeded, no tree arrives by a clone that passes, so none is laid again. `upgrade_settles` is WP5b's.
+
 ### EZ-RES-4, EZ-RES-5, EZ-RES-6, EZ-RES-8: the upgrade's decisions
 
 All four are stated over `P.ledger.next(w)`, the ledger model the plan renders, which is the old ledger when the plan refuses or writes nothing. `W.dep(w, n)` is `M.dep(M.parse(w.ledger), n)`. `P.answered(w)` is `P.wants(w) == []`.
