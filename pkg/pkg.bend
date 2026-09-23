@@ -3,9 +3,15 @@
 # them. This mirrors `pkg_files` and the hash in bend's `cli_publish`.
 # `tests/publish.sh` pins it against the real thing by running `bend --publish`
 # at a local hub, so drift fails the gate rather than the ecosystem.
+#
+# The walk is pure: `of` computes the package from a checkout's files alone,
+# which is what `ez add` in planner form will run, and `pkg_of` and `pkg_in`
+# run the same walk given nothing, answering each file it asks for from disk.
+# Bend refuses an import cycle, and this module both defines the file list the
+# walk hashes and runs it, so the walk lives here rather than in a module of
+# its own.
 import Base
 import ../io/file.bend as F
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../sha/sha.bend as Sha
 import ./path.bend as P
 
@@ -201,44 +207,6 @@ type Task is Data:
 type Found is Data:
   Found{raw: String, sum: String}
 
-# the walk so far: the files already visited, and what was found
-type State is Data:
-  State{seen: List<&2, String>, out: List<&2, Found>}
-
-# what one file of the walk answered: the walk so far, and the modules it asks
-# for next
-type Step is Data:
-  Step{st: State, kids: List<&2, Task>}
-
-# a foreign body, named the way the module importing it is named: from that
-# module's own directory. `bend --publish` writes `src/util/beep.c` for a body
-# imported by `src/util/math.bend`, so anything flatter is a different package
-# from the one bend would upload.
-def foreign.put(got: Maybe<&2, String>, raw: String) -> List<&2, Found>:
-  match got:
-    case None{}:
-      []
-    case Some{src}:
-      [Found{raw, Sha.hex(src)}]
-
-# one foreign body, or nothing when it is not on disk. bend uploads only the
-# ones that are there.
-def foreign_of(+dir: String, nd: String, +at: String) -> IO(List<&2, Found>):
-  do IO<List<&2, Found>>:
-    m : Maybe<&2, String> <- F.read(P.join(dir, at))
-    return foreign.put(m, P.join(nd, at))
-
-# every foreign body a file imports
-def foreigns(+dir: String, +nd: String, ats: List<&2, String>) -> IO(List<&2, Found>):
-  match ats:
-    case []:
-      IO.pure(List<&2, Found>, [])
-    case h <> t:
-      do IO<List<&2, Found>>:
-        rest : List<&2, Found> <- foreigns(dir, nd, t)
-        one : List<&2, Found> <- foreign_of(dir, nd, h)
-        return List.append(&2, Found, one, rest)
-
 # a module import as the file to visit next, or nothing when it names a hub
 # package
 def task_of(+dir: String, +nd: String, +spec: String) -> List<&2, Task>:
@@ -263,56 +231,6 @@ def nsdir(+ns: String) -> String:
 def raw_of(+ns: String, eb: String) -> String:
   Bool.pick(String, String.is_empty(ns), eb, ns ++ ".bend")
 
-# a file that was read: itself, its foreign bodies, and the modules it imports
-def visit.found(
-  sc: Scan,
-  sum: String,
-  +file: String,
-  +ns: String,
-  eb: String,
-  seen: List<&2, String>,
-  out: List<&2, Found>
-) -> IO(Step):
-  Scan{mods, foreign} = sc
-  +d = P.dir(file)
-  +nd = nsdir(ns)
-  do IO<Step>:
-    fs : List<&2, Found> <- foreigns(d, nd, foreign)
-    return Step{
-      State{file <> seen, Found{raw_of(ns, eb), sum} <> List.append(&2, Found, fs, out)},
-      tasks(d, nd, mods)}
-
-# a module that is imported but not on disk stops the walk, since a package
-# missing a file is not the package bend would publish
-def visit.have(
-  got: Maybe<&2, String>,
-  +file: String,
-  ns: String,
-  eb: String,
-  seen: List<&2, String>,
-  out: List<&2, Found>
-) -> IO(Step):
-  match got:
-    case None{}:
-      IO.die(Step, 1, "ez: " ++ file ++ " is imported but not there")
-    case Some{+src}:
-      visit.found(scan(src), Sha.hex(src), file, ns, eb, seen, out)
-
-# a file not visited before, read and taken apart
-def visit.read(+file: String, ns: String, eb: String, seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
-  do IO<Step>:
-    m : Maybe<&2, String> <- F.read(file)
-    visit.have(m, file, ns, eb, seen, out)
-
-# a file already visited keeps the name it was first reached through, the way
-# bend's own walk does
-def visit.go(hit: Bool, file: String, ns: String, eb: String, seen: List<&2, String>, out: List<&2, Found>) -> IO(Step):
-  match hit:
-    case True{}:
-      IO.pure(Step, Step{State{seen, out}, []})
-    case False{}:
-      visit.read(file, ns, eb, seen, out)
-
 # one step of the scan, with the head's answer in hand. `Bool.or` is an
 # ordinary function and so reduces both of its sides, which means a scan
 # written with it never stops at the name it was looking for. The rest of the
@@ -335,85 +253,6 @@ def seen.has(xs: List<&2, String>, +want: String) -> Bool:
       False{}
     case +h <> t:
       seen.has.step(String.eq(h, want), _u => seen.has(t, want))
-
-# one file of the walk: what it adds to the package, and what it asks for next
-def visit(eb: String, tk: Task, st: State) -> IO(Step):
-  Task{+file, ns} = tk
-  State{+seen, out} = st
-  visit.go(seen.has(seen, file), file, ns, eb, seen, out)
-
-# what a visit answered, with its modules put at the front of the queue, so the
-# walk goes depth first the way bend's does
-def walk.rest(step: Step, rest: List<&2, Task>, go: State -> List<&2, Task> -> IO(State)) -> IO(State):
-  Step{st, kids} = step
-  go(st, List.append(&2, Task, kids, rest))
-
-# the next file of the queue, handed on with what is left of it. An empty queue
-# is the end of the walk.
-def walk.pop(queue: List<&2, Task>, +st: State, go: State -> Task -> List<&2, Task> -> IO(State)) -> IO(State):
-  match queue:
-    case []:
-      IO.pure(State, st)
-    case h <> t:
-      go(st, h, t)
-
-# one file visited, and the walk carried on. The carrying on arrives as a
-# function, since two defs in Bend may not call each other.
-def walk.step(
-  +eb: String,
-  task: Task,
-  st: State,
-  rest: List<&2, Task>,
-  go: State -> List<&2, Task> -> IO(State)
-) -> IO(State):
-  do IO<State>:
-    r : Step <- visit(eb, task, st)
-    walk.rest(r, rest, go)
-
-# every file of the package, reached from the entry. The queue is a stack, and
-# a file is read once; a path is its own identity, since Base cannot ask the
-# file system for a real one.
-def walk(fuel: Nat, +eb: String, queue: List<&2, Task>, st: State) -> IO(State):
-  match fuel:
-    case 0n:
-      IO.pure(State, st)
-    case 1n+f:
-      walk.pop(queue, st, s => h => rest =>
-        walk.step(eb, h, s, rest, s2 => q => walk(f, eb, q, s2)))
-
-# the files a walk found
-def state.out(st: State) -> List<&2, Found>:
-  State{_seen, out} = st
-  out
-
-# how far a found file climbs out of the entry's directory
-def found.ups(hit: Found) -> Nat:
-  Found{raw, _sum} = hit
-  P.ups(raw)
-
-# the deepest climb any file of the package makes
-def climb(fs: List<&2, Found>) -> Nat:
-  match fs:
-    case []:
-      0n
-    case h <> t:
-      Nat.max(found.ups(h), climb(t))
-
-# the entry's own directory, named absolutely. Base cannot ask the file system,
-# so `realpath` is asked instead, and only when something actually climbs.
-def anc.at(+levels: Nat, dir: String) -> IO(String):
-  do IO<String>:
-    +out : String <- R.exec(["realpath", dir])
-    return P.tail(String.trim(R.text(out)), levels)
-
-# the trailing components of the entry's directory that the package re-roots
-# under: as many as its deepest climb, and none at all when nothing climbs
-def anc(levels: Nat, dir: String) -> IO(String):
-  match levels:
-    case 0n:
-      IO.pure(String, "")
-    case 1n+p:
-      anc.at(Nat.add(p, 1n), dir)
 
 # a found file, placed under whatever the package re-rooted at
 def file_of(+pre: String, hit: Found) -> File:
@@ -542,36 +381,583 @@ def manifest_of(fs: List<&2, File>) -> String:
 def hash_of(fs: List<&2, File>) -> String:
   "0x" ++ String.take(Sha.hex(manifest_of(fs)), 32n)
 
-# the verdict, with the escaping path's name already found. `hash_of` is a
-# sha256 over the whole package manifest; under a `Bool.pick` a package that
-# escapes its root paid for that hash before being refused for it.
-def pkg.judge.step(ok: Bool, bad: String, root: String, +fs: List<&2, File>) -> IO(Pkg):
+# ---------------------------------------------------------------------------
+# the walk
+
+# one file of a checkout: its path from the checkout's top, and its text
+type Source is Data:
+  Source{at: String, text: String}
+
+# the files a walk is given. A whole tree is every file of a checkout, so a
+# path it does not hold is not there. A partial one is what has been read so
+# far, with the paths that were asked for and found missing; any other path
+# is one the walk was not given, and it asks for it.
+type Tree is Data:
+  Tree{whole: Bool, files: List<&2, Source>, gone: List<&2, String>}
+
+# what a tree says of a path: here with its text, not there, or not given
+type Look is Data:
+  Here{text: String}
+  Absent{}
+  Unasked{}
+
+# a file of the package as the walk found it: the name it takes inside the
+# package, and its text
+type Hit is Data:
+  Hit{raw: String, text: String}
+
+# why the walk stopped, or that it has not: a module imported and not there,
+# an import that climbs out of the checkout, a file the walk was not given,
+# or fuel run out with files still queued
+type Stop is Data:
+  Going{}
+  Missing{at: String}
+  Climbs{at: String}
+  Asking{at: String}
+  Spent{}
+
+# the walk so far: the files already visited, what was found, whether it has
+# stopped, and the files still to visit
+type State is Data:
+  State{seen: List<&2, String>, out: List<&2, Hit>, stop: Stop, queue: List<&2, Task>}
+
+# what the walk made of a tree: the package, the file it needs next, or why
+# there is no package. A package is its hash, the directory its paths are
+# written from, the files it lays with their texts, and those files weighed,
+# in path order, which is what its manifest lists.
+type Walked is Data:
+  Walked{hash: String, root: String, files: List<&2, Source>, sums: List<&2, File>}
+  Asks{at: String}
+  Refused{why: String}
+
+# one step of a lookup, with the head's answer in hand. The rest arrives as a
+# thunk, so a hit ends the search.
+def look.step(hit: Bool, text: String, rest: Unit -> Maybe<&2, String>) -> Maybe<&2, String>:
+  match hit:
+    case True{}:
+      Some{text}
+    case False{}:
+      rest(Unit{})
+
+# a file list's text for a path, first in the list, or None when it has none
+def look(fs: List<&2, Source>, +at: String) -> Maybe<&2, String>:
+  match fs:
+    case []:
+      None{}
+    case Source{+h, text} <> t:
+      look.step(String.eq(h, at), text, _u => look(t, at))
+
+# a path that was asked for and found missing is not there; one that was not
+# asked for is not given
+def find.asked(asked: Bool) -> Look:
+  match asked:
+    case True{}:
+      Absent{}
+    case False{}:
+      Unasked{}
+
+# a path the files do not hold: not there in a whole tree, and in a partial
+# one unless it was asked for already
+def find.miss(whole: Bool, gone: List<&2, String>, +at: String) -> Look:
+  match whole:
+    case True{}:
+      Absent{}
+    case False{}:
+      find.asked(seen.has(gone, at))
+
+# a path the files hold is here
+def find.got(got: Maybe<&2, String>, whole: Bool, gone: List<&2, String>, +at: String) -> Look:
+  match got:
+    case Some{text}:
+      Here{text}
+    case None{}:
+      find.miss(whole, gone, at)
+
+# what a tree says of a path
+def find(tree: Tree, +at: String) -> Look:
+  Tree{whole, files, gone} = tree
+  find.got(look(files, at), whole, gone, at)
+
+# a checkout-relative path that climbs above the checkout's top
+def outside(+at: String) -> Bool:
+  +n = P.norm(at)
+  Bool.or(String.eq(n, ".."), String.starts_with(n, "../"))
+
+# a foreign body the tree holds, or nothing when it is not there. bend uploads
+# only the ones that are there. It is named the way the module importing it
+# is named, from that module's own directory: `bend --publish` writes
+# `src/util/beep.c` for a body imported by `src/util/math.bend`.
+def foreign.put(got: Look, +raw: String) -> List<&2, Hit>:
+  match got:
+    case Here{text}:
+      [Hit{raw, text}]
+    case Absent{}:
+      []
+    case Unasked{}:
+      []
+
+# every foreign body a file imports, named from the importing module's
+# directory
+def foreigns(+tree: Tree, +dir: String, +nd: String, ats: List<&2, String>) -> List<&2, Hit>:
+  match ats:
+    case []:
+      []
+    case +h <> t:
+      List.append(&2, Hit, foreign.put(find(tree, P.join(dir, h)), P.join(nd, h)),
+        foreigns(tree, dir, nd, t))
+
+# a foreign body inside the checkout stops the walk only when it was not given
+def foreign.asked(got: Look, +at: String, rest: Unit -> Stop) -> Stop:
+  match got:
+    case Here{_text}:
+      rest(Unit{})
+    case Absent{}:
+      rest(Unit{})
+    case Unasked{}:
+      Asking{at}
+
+# a foreign body that climbs out of the checkout stops the walk, naming it
+def foreign.judge(out: Bool, +tree: Tree, +at: String, +raw: String, rest: Unit -> Stop) -> Stop:
+  match out:
+    case True{}:
+      Climbs{raw}
+    case False{}:
+      foreign.asked(find(tree, at), at, rest)
+
+# the first foreign body of a file that stops the walk, or `Going` when none
+# does
+def foreign.check(+tree: Tree, +dir: String, +nd: String, ats: List<&2, String>) -> Stop:
+  match ats:
+    case []:
+      Going{}
+    case +h <> t:
+      +at = P.join(dir, h)
+      foreign.judge(outside(at), tree, at, P.join(nd, h),
+        _u => foreign.check(tree, dir, nd, t))
+
+# a file whose foreign bodies are all settled: itself and its foreign bodies
+# found, and the modules it imports put at the front of the queue, so the walk
+# goes depth first the way bend's does. A foreign body that stops the walk
+# leaves the file queued, so an answered question visits it again.
+def visit.put(
+  fstop: Stop,
+  +tree: Tree,
+  +sc: Scan,
+  +text: String,
+  +file: String,
+  +ns: String,
+  eb: String,
+  seen: List<&2, String>,
+  out: List<&2, Hit>,
+  rest: List<&2, Task>
+) -> State:
+  match fstop:
+    case Going{}:
+      +d = P.dir(file)
+      +nd = nsdir(ns)
+      State{file <> seen,
+        Hit{raw_of(ns, eb), text} <> List.append(&2, Hit,
+          foreigns(tree, d, nd, scan.foreign(sc)), out),
+        Going{},
+        List.append(&2, Task, tasks(d, nd, scan.mods(sc)), rest)}
+    case Missing{at}:
+      State{seen, out, Missing{at}, Task{file, ns} <> rest}
+    case Climbs{at}:
+      State{seen, out, Climbs{at}, Task{file, ns} <> rest}
+    case Asking{at}:
+      State{seen, out, Asking{at}, Task{file, ns} <> rest}
+    case Spent{}:
+      State{seen, out, Spent{}, Task{file, ns} <> rest}
+
+# a file that is in the tree, scanned, with its foreign bodies checked first
+def visit.found(
+  +tree: Tree,
+  +text: String,
+  +file: String,
+  +ns: String,
+  eb: String,
+  seen: List<&2, String>,
+  out: List<&2, Hit>,
+  rest: List<&2, Task>
+) -> State:
+  +sc = scan(text)
+  visit.put(foreign.check(tree, P.dir(file), nsdir(ns), scan.foreign(sc)),
+    tree, sc, text, file, ns, eb, seen, out, rest)
+
+# a module that is imported and not there stops the walk, since a package
+# missing a file is not the package bend would publish. One the walk was not
+# given stops it too, as a question, with the module still queued.
+def visit.have(
+  got: Look,
+  +tree: Tree,
+  +file: String,
+  +ns: String,
+  eb: String,
+  seen: List<&2, String>,
+  out: List<&2, Hit>,
+  rest: List<&2, Task>
+) -> State:
+  match got:
+    case Absent{}:
+      State{seen, out, Missing{file}, rest}
+    case Unasked{}:
+      State{seen, out, Asking{file}, Task{file, ns} <> rest}
+    case Here{text}:
+      visit.found(tree, text, file, ns, eb, seen, out, rest)
+
+# the name an import that climbs out is refused under: the path it was
+# reached through, or the entry's own path
+def climbs.name(+ns: String, +file: String) -> String:
+  Bool.pick(String, String.is_empty(ns), file, ns ++ ".bend")
+
+# a module above the checkout's top is refused rather than read: the package
+# would be named after directories of whatever machine walked it
+def visit.in(
+  out: Bool,
+  +tree: Tree,
+  +file: String,
+  +ns: String,
+  eb: String,
+  seen: List<&2, String>,
+  outs: List<&2, Hit>,
+  rest: List<&2, Task>
+) -> State:
+  match out:
+    case True{}:
+      State{seen, outs, Climbs{climbs.name(ns, file)}, rest}
+    case False{}:
+      visit.have(find(tree, file), tree, file, ns, eb, seen, outs, rest)
+
+# a file already visited keeps the name it was first reached through, the way
+# bend's own walk does
+def visit.go(
+  hit: Bool,
+  +tree: Tree,
+  +file: String,
+  ns: String,
+  eb: String,
+  seen: List<&2, String>,
+  out: List<&2, Hit>,
+  rest: List<&2, Task>
+) -> State:
+  match hit:
+    case True{}:
+      State{seen, out, Going{}, rest}
+    case False{}:
+      visit.in(outside(file), tree, file, ns, eb, seen, out, rest)
+
+# the next file of the queue visited, or the walk as it is when the queue is
+# empty
+def step.pop(
+  +tree: Tree,
+  eb: String,
+  +seen: List<&2, String>,
+  out: List<&2, Hit>,
+  stop: Stop,
+  queue: List<&2, Task>
+) -> State:
+  match queue:
+    case []:
+      State{seen, out, stop, []}
+    case Task{+file, ns} <> t:
+      visit.go(seen.has(seen, file), tree, file, ns, eb, seen, out, t)
+
+# the walk as one step that does not recurse
+def step(+tree: Tree, eb: String, st: State) -> State:
+  State{seen, out, stop, queue} = st
+  step.pop(tree, eb, seen, out, stop, queue)
+
+# whether the walk has not stopped
+def stop.going(stop: Stop) -> Bool:
+  match stop:
+    case Going{}:
+      True{}
+    case Missing{_at}:
+      False{}
+    case Climbs{_at}:
+      False{}
+    case Asking{_at}:
+      False{}
+    case Spent{}:
+      False{}
+
+# whether the walk is over: its queue is empty, or it has stopped
+def walk.done(+st: State) -> Bool:
+  State{_seen, _out, stop, queue} = st
+  Bool.or(List.is_empty(&2, Task, queue), Bool.not(stop.going(stop)))
+
+# the walk as it is when it is over, or one step further when it is not. The
+# rest of the walk arrives as a function, since a def may not call itself from
+# another def.
+def walk.more(done: Bool, st: State, go: State -> State) -> State:
+  match done:
+    case True{}:
+      st
+    case False{}:
+      go(st)
+
+# the fuel ran out: a walk that is over stays as it is, and one with files
+# still queued is spent, so it is refused rather than hashed short
+def walk.spent(done: Bool, st: State) -> State:
+  match done:
+    case True{}:
+      st
+    case False{}:
+      State{seen, out, _stop, queue} = st
+      State{seen, out, Spent{}, queue}
+
+# every file of the package reached from the entry, the step iterated under
+# fuel, until the walk is over or stops
+def walk(fuel: Nat, +tree: Tree, +eb: String, +st: State) -> State:
+  match fuel:
+    case 0n:
+      walk.spent(walk.done(st), st)
+    case 1n+f:
+      walk.more(walk.done(st), st, now => walk(f, tree, eb, step(tree, eb, now)))
+
+# the walk before its first step: the entry queued, under no name of its own
+def start(+entry: String) -> State:
+  State{[], [], Going{}, [Task{entry, ""}]}
+
+# ---------------------------------------------------------------------------
+# the package a walk found
+
+# a found file weighed: its name and the sha256 of its text
+def hit.sum(item: Hit) -> Found:
+  Hit{raw, +text} = item
+  Found{raw, Sha.hex(text)}
+
+# every found file weighed
+def hit.sums(fs: List<&2, Hit>) -> List<&2, Found>:
+  match fs:
+    case []:
+      []
+    case h <> t:
+      hit.sum(h) <> hit.sums(t)
+
+# a found file placed under whatever the package re-rooted at, with its text
+def laid.one(+pre: String, item: Hit) -> Source:
+  Hit{raw, text} = item
+  Source{P.join(pre, raw), text}
+
+# every found file placed, with its text
+def laid(+pre: String, fs: List<&2, Hit>) -> List<&2, Source>:
+  match fs:
+    case []:
+      []
+    case h <> t:
+      laid.one(pre, h) <> laid(pre, t)
+
+# a laid file weighed: its path and the sha256 of its text. This is what a
+# plan's reader would compute from the files a `Lay` writes.
+def laid.sum(src: Source) -> File:
+  Source{at, +text} = src
+  File{at, Sha.hex(text)}
+
+# every laid file weighed
+def laid.sums(fs: List<&2, Source>) -> List<&2, File>:
+  match fs:
+    case []:
+      []
+    case h <> t:
+      laid.sum(h) <> laid.sums(t)
+
+# how far a found file climbs out of the entry's directory
+def hit.ups(item: Hit) -> Nat:
+  Hit{raw, _text} = item
+  P.ups(raw)
+
+# the deepest climb any file of the package makes
+def climb(fs: List<&2, Hit>) -> Nat:
+  match fs:
+    case []:
+      0n
+    case h <> t:
+      Nat.max(hit.ups(h), climb(t))
+
+# the found files named, once no path escapes the package
+def made.judge(
+  ok: Bool,
+  +bad: String,
+  +root: String,
+  +pre: String,
+  +fs: List<&2, File>,
+  out: List<&2, Hit>
+) -> Walked:
   match ok:
     case True{}:
-      IO.pure(Pkg, Pkg{hash_of(fs), root, files_of(fs)})
+      Walked{hash_of(fs), root, laid(pre, out), fs}
     case False{}:
-      IO.die(Pkg, 1, "ez: " ++ bad ++ " escapes the package")
+      Refused{"ez: " ++ bad ++ " escapes the package"}
 
-# a file set that stays inside its package becomes one; one that does not stops
-# the command
-def pkg.judge(+bad: String, root: String, +fs: List<&2, File>) -> IO(Pkg):
-  pkg.judge.step(String.is_empty(bad), bad, root, fs)
+# the found files, placed under the components the package re-roots under
+# and weighed once
+def made.placed(+root: String, +pre: String, +out: List<&2, Hit>) -> Walked:
+  +fs = files_of(placed(pre, hit.sums(out)))
+  +bad = escaped(fs)
+  made.judge(String.is_empty(bad), bad, root, pre, fs, out)
 
-# the found files, placed under the package root and judged
-def pkg.place(root: String, pre: String, fs: List<&2, Found>) -> IO(Pkg):
-  +files = files_of(placed(pre, fs))
-  pkg.judge(escaped(files), root, files)
+# a package that climbs re-roots under as many of the entry directory's
+# trailing components as its deepest climb. The walk refuses an import that
+# climbs out of the checkout, so there are always that many; a package that
+# still climbs further is refused rather than named after nothing.
+def made.anc(far: Bool, +levels: Nat, +dir: String, +out: List<&2, Hit>) -> Walked:
+  match far:
+    case True{}:
+      Refused{"ez: the package climbs out of the checkout"}
+    case False{}:
+      made.placed(P.climb(levels, dir), P.tail(dir, levels), out)
+
+# how many components a checkout-relative directory has: none for the
+# checkout's top
+def comps(+dir: String) -> Nat:
+  +d = P.norm(dir)
+  Bool.pick(Nat, Bool.or(String.eq(d, "."), String.is_empty(d)), 0n,
+    List.length(&2, String, String.split(d, '/')))
+
+# the deepest climb decided: none leaves the package at the entry's directory
+def made.climb(+levels: Nat, +dir: String, +out: List<&2, Hit>) -> Walked:
+  match levels:
+    case 0n:
+      made.placed(P.norm(dir), "", out)
+    case 1n+p:
+      made.anc(Nat.is_gt(1n+p, comps(dir)), 1n+p, dir, out)
+
+# the walk's end judged: a walk that is over is the package, one that asks is
+# a question, and every other stop is a refusal naming what stopped it
+def made.go(stop: Stop, +entry: String, +out: List<&2, Hit>) -> Walked:
+  match stop:
+    case Going{}:
+      made.climb(climb(out), P.dir(entry), out)
+    case Missing{at}:
+      Refused{"ez: " ++ at ++ " is imported but not there"}
+    case Climbs{at}:
+      Refused{"ez: the import " ++ at ++ " climbs out of the checkout"}
+    case Asking{at}:
+      Asks{at}
+    case Spent{}:
+      Refused{"ez: the walk from " ++ entry ++ " ran out of fuel"}
+
+# the walk's end, judged
+def made(+entry: String, st: State) -> Walked:
+  State{_seen, out, stop, _queue} = st
+  made.go(stop, entry, out)
+
+# the package an entry of a tree would be published as, from the tree's
+# files alone, with this much fuel
+def of.tree(fuel: Nat, +entry: String, +tree: Tree) -> Walked:
+  made(entry, walk(fuel, tree, P.base(entry), start(entry)))
+
+# the same over a whole checkout
+def of.fuel(fuel: Nat, +entry: String, +fs: List<&2, Source>) -> Walked:
+  of.tree(fuel, entry, Tree{True{}, fs, []})
+
+# the same, with the fuel `pkg_of` walks with
+def of(+entry: String, +fs: List<&2, Source>) -> Walked:
+  of.fuel(U32.to_nat(100000), entry, fs)
+
+# ---------------------------------------------------------------------------
+# the walk answered from disk
+
+# a path read and found missing, added to what the walk was given
+def tree.gone(tree: Tree, at: String) -> Tree:
+  Tree{whole, files, gone} = tree
+  Tree{whole, files, at <> gone}
+
+# a file read, added to what the walk was given
+def tree.have(tree: Tree, src: Source) -> Tree:
+  Tree{whole, files, gone} = tree
+  Tree{whole, src <> files, gone}
+
+# what a read answered, added to what the walk was given
+def tree.add(got: Maybe<&2, String>, tree: Tree, +at: String) -> Tree:
+  match got:
+    case None{}:
+      tree.gone(tree, at)
+    case Some{text}:
+      tree.have(tree, Source{at, text})
+
+# a walk that stopped to ask, taken up again where it stopped
+def resume(st: State) -> State:
+  State{seen, out, _stop, queue} = st
+  State{seen, out, Going{}, queue}
+
+# why a walk stopped
+def state.stop(st: State) -> Stop:
+  State{_seen, _out, stop, _queue} = st
+  stop
+
+# a walk's verdict as a package, with its root taken back under the checkout
+# it was read from
+def pkg.made(+top: String, got: Walked) -> IO(Pkg):
+  match got:
+    case Walked{hash, root, _files, sums}:
+      IO.pure(Pkg, Pkg{hash, P.join(top, root), files_of(sums)})
+    case Asks{at}:
+      IO.die(Pkg, 1, "ez: the walk asked for " ++ at ++ " after it was answered")
+    case Refused{why}:
+      IO.die(Pkg, 1, why)
+
+# a question read from disk and the walk carried on, or the walk's end judged
+def pkg.next(
+  stop: Stop,
+  +top: String,
+  +entry: String,
+  +tree: Tree,
+  +st: State,
+  go: Tree -> State -> IO(Pkg)
+) -> IO(Pkg):
+  match stop:
+    case Asking{+at}:
+      do IO<Pkg>:
+        m : Maybe<&2, String> <- F.read(P.join(top, at))
+        go(tree.add(m, tree, at), resume(st))
+    case Going{}:
+      pkg.made(top, made(entry, st))
+    case Missing{_at}:
+      pkg.made(top, made(entry, st))
+    case Climbs{_at}:
+      pkg.made(top, made(entry, st))
+    case Spent{}:
+      pkg.made(top, made(entry, st))
+
+# the walk over what has been read so far, and each file it asks for read
+# and handed back, until it no longer asks
+def pkg.ask(fuel: Nat, +top: String, +entry: String, +eb: String, +tree: Tree, st: State) -> IO(Pkg):
+  match fuel:
+    case 0n:
+      IO.die(Pkg, 1, "ez: the walk from " ++ entry ++ " asked too many questions")
+    case 1n+f:
+      +now = walk(U32.to_nat(100000), tree, eb, st)
+      pkg.next(state.stop(now), top, entry, tree, now,
+        t => s => pkg.ask(f, top, entry, eb, t, s))
+
+# the package an entry would be published as, walked over its checkout: the
+# entry and every file the walk reaches are paths from `top`, read from disk
+# as the walk asks for them. An import that climbs above `top` is refused.
+def pkg.walk(+top: String, +entry: String) -> IO(Pkg):
+  pkg.ask(U32.to_nat(100000), top, entry, P.base(entry), Tree{False{}, [], []},
+    start(entry))
+
+# the package an entry of a checkout would be published as
+def pkg_in(+top: String, +entry: String) -> IO(Pkg):
+  pkg.walk(top, P.norm(entry))
+
+# an entry named from the working directory is walked over the working
+# directory, and one named from the root over the whole file system
+def pkg.from(abs: Bool, +entry: String) -> IO(Pkg):
+  match abs:
+    case True{}:
+      pkg.walk("/", String.drop(entry, 1n))
+    case False{}:
+      pkg.walk("", entry)
 
 # the package an entry file would be published as: every module it reaches,
-# every foreign body beside them, and the hash over their manifest
+# every foreign body beside them, and the hash over their manifest. A relative
+# entry's checkout is the working directory, which is the project a command
+# runs in.
 def pkg_of(+entry: String) -> IO(Pkg):
-  do IO<Pkg>:
-    st : State <- walk(U32.to_nat(100000), P.base(entry), [Task{entry, ""}],
-      State{[], []})
-    +fs : List<&2, Found> <- IO.pure(List<&2, Found>, state.out(st))
-    +n : Nat <- IO.pure(Nat, climb(fs))
-    pre : String <- anc(n, P.dir(entry))
-    pkg.place(P.climb(n, P.dir(entry)), pre, fs)
+  pkg.from(String.starts_with(entry, "/"), entry)
 
 # the hash that names a package
 def pkg.hash(package: Pkg) -> String:
