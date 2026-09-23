@@ -191,8 +191,9 @@ dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.
 adding the dependency again keeps it. The allowlist is derived from the
 ledger: after `ez add`, `ez remove` or `ez lock --upgrade`, the
 `!.ez/lib/<hash>` lines of `.gitignore` are exactly the hashes of the
-dependencies marked `vendor = true`, in the ledger's order, and every other
-line is left as it was. A missing hash is written where the first allowlist
+dependencies marked `vendor = true`, each once, in the order the ledger
+first names them, and every other line is left as it was, blank lines
+included. A missing hash is written where the first allowlist
 line was, or at the end of the file; a hash the ledger no longer vendors is
 dropped. ez counts as its own any `!` line under `.ez/lib/`, however it
 is spelled (a leading or trailing `/`, surrounding blanks), and writes the
@@ -229,8 +230,8 @@ a plain `ez lock` does. A pinned commit whose tree no longer weighs to the
 pin is a drift, and stops the upgrade. A dependency marked
 `vendor` is laid out again under `.ez/lib/<new hash>`, its old tree is
 removed, and the gitignore allowlist follows it; any other moved tree is
-left under `BEND_LIB`. An import line that names a hash that moved is
-rewritten to name the new one. The upgrade and the lock are one plan: ez.toml is
+left under `BEND_LIB`. An import line that starts `import <old>/`, at
+column 0, is rewritten to start `import <new>/`, and no other line changes. The upgrade and the lock are one plan: ez.toml is
 written once, then `.gitignore`, the rewritten sources and the lock, and an
 upgrade that stops, or a lock after it that stops, writes nothing at all. It
 does not write `.ez/origins.toml`.
