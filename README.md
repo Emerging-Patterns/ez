@@ -171,6 +171,10 @@ asking the remote. The tag or branch is recorded as `tag`, which
 `ez lock --upgrade` re-resolves. With no entry, it reads `[package] entry`
 from that revision's `ez.toml`, then `[package] bin` when `entry` is absent,
 then `main.bend`. An entry given on the command line is used as given.
+An entry the revision does not hold is refused, and so is a package whose
+imports climb out of the checkout. The package is walked from the files of
+the checkout itself, so its hash, the files laid under `BEND_LIB` and their
+manifest all come from one reading of it.
 The dependency is named the way cargo names one, never after its entry.
 `--rename NAME`, like `cargo add --rename`, records it under `NAME` ahead of
 every rule below; `NAME` must be a TOML bare key, and a source the ledger
@@ -183,12 +187,18 @@ through rather than being refused. Otherwise `owner/repo` or a URL is named
 by the repository (`[deps.repo]`, any `.git` dropped), and a path by its
 directory. A name the ledger gives to another source stops `ez add` with
 exit 1 and leaves the ledger as it was, `--rename` included; remove that
-entry, or add this one with `--rename` under another name.
+entry, or add this one with `--rename` under another name. Whatever stops
+it, `ez add` writes nothing: not the ledger, not `.gitignore`, and no tree,
+not even in `BEND_LIB`. With no ledger, one that does not parse, a target
+that names nothing, or a `--rename` refused by the ledger alone, it stops
+before asking the remote anything.
 
 A dependency with no `git` key lives on the hub. `vendor = true` commits that
 dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.
 `ez add` records a new dependency without it; you set it by hand, and
-adding the dependency again keeps it. The allowlist is derived from the
+adding the dependency again keeps it, lays the new tree under
+`.ez/lib/<hash>` rather than `BEND_LIB`, and removes the old committed tree
+when the hash moved and no other dependency names it. The allowlist is derived from the
 ledger: after `ez add`, `ez remove` or `ez lock --upgrade`, the
 `!.ez/lib/<hash>` lines of `.gitignore` are exactly the hashes of the
 dependencies marked `vendor = true`, each once, in the order the ledger
@@ -245,9 +255,9 @@ one a tracked file imports. Every package is checked against its `0x` name
 and every file against its sum, whatever it was read from; a tree already
 under `BEND_LIB` is judged as the same bytes cloned at the ledger's `rev`
 with the ledger's `narHash`. A lock whose hashes, paths or values would not
-read back (a repeated hash, or a `"`, `\` or newline in one) is refused. It does not read `.ez/origins.toml`, which
-`ez add` writes and `.gitignore` keeps out of the repo: a hash the ledger
-does not name is fetched from the hub, and when the hub does not have it the
+read back (a repeated hash, or a `"`, `\` or newline in one) is refused. It
+reads no record of origins beside the ledger, and no command writes one:
+a hash the ledger does not name is fetched from the hub, and when the hub does not have it the
 lock says the ledger does not name it and exits 1. It does not record the
 bend that ran it. `root` and `narHash` are there so that `ez lock` never has
 to consult anything a clone does not have, which is what lets someone who

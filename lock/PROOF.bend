@@ -14439,3 +14439,24 @@ def Laws.reupgrade_lays_nothing(w, u, ok, rb):
                 ups})) == [] : List<&2, String>}, u)
             case True{}:
               u.fresh(only, ledger, listing, replies, ups, ok, rb)
+
+# No ledger reads as a `Bad`, which a plain lock takes as it is and an
+# upgrade leaves as it is, and `need.why` refuses it.
+def Laws.lock_needs_ledger(up, _only, _listing, _rs, _us):
+  match up:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# The same once the read is rewritten to the `Bad` the premise gives.
+def Laws.lock_refuses_unread(up, only, _s, listing, rs, us, _why, bad):
+  match up:
+    case True{}:
+      %bad : {P.refuses.doc(P.decide(W.inputs.of(Up.next(only, _, us), listing, rs))) == True{}
+        : Bool}
+      {==}
+    case False{}:
+      %bad : {P.refuses.doc(P.decide(W.inputs.of(Up.plain(_), listing, rs))) == True{}
+        : Bool}
+      {==}

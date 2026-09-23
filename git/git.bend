@@ -1,7 +1,10 @@
-# git/git: a package that was never published, taken from the repo it lives in.
-# `hub/hub` is this job over HTTP; this is the same job over git, and both end
-# with the same `0x<hash>` over the same manifest, so a package vendored out of
-# a repo keeps its name if upstream ever publishes it.
+# git/git: what ez asks of git, and how it reads the answers. The decisions are
+# pure functions over what `git ls-remote` printed and what a checkout's
+# ez.toml says: which tag `ez add` pins (`choose`), what a named ref names
+# (`exact`), the default branch (`tip.*`), whether a ref is already a commit
+# (`is_rev`), and a package's entry and name (`entry.*`, `called.*`). The
+# planners (add/plan.bend, lock/up.bend) make them; the commands that run git
+# here are the interpreters', which clone, weigh and ask about ancestry.
 #
 # Nothing here reimplements git. Bend links no TLS and Base has no readdir, so
 # the programs that already speak the protocol are run instead, through the one
@@ -16,22 +19,9 @@ import ../pkg/path.bend as P
 import ../sha/nar.bend as Nar
 import ../ez/say.bend as Say
 
-# what a ref turned out to name: the commit that gets pinned, and the tag or
-# branch that was asked for, "" when the ref was a commit to begin with
-type Ref is Data:
-  Ref{rev: String, tag: String}
-
 # one `<sha>\t<name>` row of what `git ls-remote` printed
 type Row is Data:
   Row{rev: String, name: String}
-
-# what a vendoring amounts to, which is everything the ledger records: the
-# package's `0x` name, where it came from, the commit pinned, the ref asked
-# for, the entry the hash was computed from, and the `[package] name` the
-# checkout's own ez.toml gives it, "" when it has none
-type Got is Data:
-  Got{hash: String, url: String, rev: String, entry: String, tag: String,
-    root: String, nar: String, pkg: String}
 
 # how two versions compare. A release is greater than its prerelease, and a
 # numeric identifier is less than a word, which is the semver order.
@@ -212,49 +202,6 @@ def exact(+rs: List<&2, Row>, +ref: String) -> String:
   or_else(named(rs, "refs/tags/" ++ ref ++ "^{}"),
     or_else(named(rs, "refs/tags/" ++ ref), named(rs, "refs/heads/" ++ ref)))
 
-# a ref the remote does not have is a mistake worth naming, since the next
-# thing that would happen is a fetch of nothing
-def resolve.got(+rev: String, +url: String, +ref: String) -> IO(Ref):
-  Bool.pick(IO(Ref), String.is_empty(rev),
-    IO.die(Ref, 1, "ez: " ++ url ++ " has no ref named " ++ ref),
-    IO.pure(Ref, Ref{rev, ref}))
-
-# what the remote answered about a ref
-def resolve.said(ok: Bool, +url: String, +ref: String, +text: String) -> IO(Ref):
-  match ok:
-    case False{}:
-      IO.die(Ref, 1, "ez: git ls-remote " ++ url ++ ": " ++ text)
-    case True{}:
-      resolve.got(exact(rows(String.lines(text)), ref), url, ref)
-
-# the remote asked what a ref names: as a tag, its peeled form, and a branch,
-# all at once, because which of them exists is the question. The patterns are
-# full ref names, and `exact` still reads only the rows named exactly so.
-def resolve.ask(+url: String, +ref: String) -> IO(Ref):
-  do IO<Ref>:
-    +from : String <- anchored(url)
-    +out : String <- R.exec(["git", "ls-remote", from, "refs/tags/" ++ ref,
-      "refs/tags/" ++ ref ++ "^{}", "refs/heads/" ++ ref])
-    resolve.said(R.ok(out), url, ref, R.text(out))
-
-# a ref that is already a commit needs no remote, with that question already
-# answered. Under a `Bool.pick` the whole `git ls-remote` action was built for
-# a ref that was never going to ask anything.
-def resolve.step(pinned: Bool, url: String, ref: String) -> IO(Ref):
-  match pinned:
-    case True{}:
-      IO.pure(Ref, Ref{ref, ""})
-    case False{}:
-      resolve.ask(url, ref)
-
-# the commit a ref pins. A tag or a branch is what a person asks for and a
-# commit is what gets written down, so both are kept: the commit pins the
-# build, and the tag says what an upgrade would re-resolve. A branch is kept
-# the same way, under `tag`, so an upgrade follows the branch.
-def resolve(+url: String, +ref: String) -> IO(Ref):
-  resolve.step(is_rev(ref), url, ref)
-
-# what `git ls-remote --symref` said HEAD was: the commit, and the branch
 # that commit is the tip of
 type Tip is Data:
   Tip{rev: String, branch: String}
@@ -350,128 +297,6 @@ def weigh(+url: String, +rev: String) -> IO(String):
     _cl : String <- R.exec(["rm", "-rf", work])
     return nh
 
-# a write that did not happen is a failure, not a silence
-def wrote(ok: Bool, at: String) -> IO(Unit):
-  match ok:
-    case True{}:
-      IO.pure(Unit, Unit{})
-    case False{}:
-      IO.die(Unit, 1, "ez: " ++ at ++ " could not be written")
-
-# one file of the package copied where bend will look for it. Copied rather
-# than read and written back: the package's identity is its bytes, and a copy
-# cannot have an opinion about them.
-def place(+from: String, +dst: String, file: K.File) -> IO(Unit):
-  +at = K.file.at(file)
-  do IO<Unit>:
-    _mk : String <- R.exec(["mkdir", "-p", P.dir(dst ++ "/" ++ at)])
-    _cp : String <- R.exec(["cp", P.join(from, at), dst ++ "/" ++ at])
-    return Unit{}
-
-# every file of the package
-def places(+from: String, +dst: String, fs: List<&2, K.File>) -> IO(Unit):
-  match fs:
-    case []:
-      IO.pure(Unit, Unit{})
-    case h <> t:
-      do IO<Unit>:
-        place(from, dst, h)
-        places(from, dst, t)
-
-# the manifest beside the files, which is the text the `0x` name is the digest
-# of and the file bend checks a package against
-def manifest(+dst: String, fs: List<&2, K.File>) -> IO(Unit):
-  do IO<Unit>:
-    ok : Bool <- F.write(dst ++ "/manifest", K.manifest_of(fs))
-    wrote(ok, dst ++ "/manifest")
-
-# a package laid out the way the hub serves it, under the name the hub would
-# have served it under, so bend resolves the import with no fetch at all
-def lay(+lib: String, +hash: String, +from: String, +fs: List<&2, K.File>) -> IO(Unit):
-  +dst = lib ++ "/" ++ hash
-  do IO<Unit>:
-    _rm : String <- R.exec(["rm", "-rf", dst])
-    places(from, dst, fs)
-    manifest(dst, fs)
-
-# a ref that was already a commit leaves no tag behind, and an absent key is
-# how `lock/lock.bend` reads that
-def origin.tag(+tag: String) -> List<&2, T.Kv>:
-  Bool.pick(List<&2, T.Kv>, String.is_empty(tag), [], [T.Kv{"tag", tag}])
-
-# the keys an origin is written with. `lock/lock.bend` reads these six by name
-# and `git/LAWS.bend` holds the two halves to each other, so a key renamed on
-# one side fails the proof rather than the next lock. The tag arrives already
-# made into pairs, because whether there is one is the caller's question and
-# the law has to hold either way.
-def origin.kvs(
-  url: String,
-  rev: String,
-  entry: String,
-  root: String,
-  nar: String,
-  ts: List<&2, T.Kv>
-) -> List<&2, T.Kv>:
-  List.append(&2, T.Kv,
-    [T.Kv{"kind", "git"}, T.Kv{"url", url}, T.Kv{"rev", rev},
-      T.Kv{"entry", entry}, T.Kv{"root", root}, T.Kv{"narHash", nar}],
-    ts)
-
-# the table a package's origin is written in. The hash is quoted because a `0x`
-# name is not a bare key, and `lock/lock.bend` reads the name back through the
-# same quoting.
-def origin.name(hash: String) -> String:
-  "origins." ++ T.quote(hash)
-
-# one package's origin as a table
-def origin(hash: String, url: String, rev: String, entry: String, root: String, nar: String, tag: String) -> T.Sect:
-  T.Sect{origin.name(hash),
-    origin.kvs(url, rev, entry, root, nar, origin.tag(tag))}
-
-# a table's path, as it was written
-def sect.name(section: T.Sect) -> String:
-  T.Sect{n, _ps} = section
-  n
-
-# a table kept or dropped
-def but.put(hit: Bool, section: T.Sect, rest: List<&2, T.Sect>) -> List<&2, T.Sect>:
-  match hit:
-    case True{}:
-      rest
-    case False{}:
-      section <> rest
-
-# every table but the ones with this path, so vendoring a package again
-# replaces what was written for it rather than sitting behind it
-def but(ss: List<&2, T.Sect>, +name: String) -> List<&2, T.Sect>:
-  match ss:
-    case []:
-      []
-    case +h <> t:
-      but.put(String.eq(sect.name(h), name), h, but(t, name))
-
-# the file with this table in it and every other table left as it was. The
-# whole document is rendered from the model rather than patched, so what comes
-# out is what the parser would read back.
-def origins.text(+text: String, +section: T.Sect) -> String:
-  T.render(List.append(&2, T.Sect, but(T.sects(T.parse(text)), sect.name(section)),
-    [section]))
-
-# where the origins of vendored packages are written down, which is beside the
-# BEND_LIB they were vendored into. `ez lock` does not read it: a clone never
-# has it, and the ledger records every origin a lock needs.
-def origins.at(lib: String) -> String:
-  P.dir(lib) ++ "/origins.toml"
-
-# a package's origin written down beside the tree it was vendored into
-def note(+lib: String, +section: T.Sect) -> IO(Unit):
-  +at = origins.at(lib)
-  do IO<Unit>:
-    m : Maybe<&2, String> <- F.read(at)
-    _mk : String <- R.exec(["mkdir", "-p", P.dir(at)])
-    ok : Bool <- F.write(at, origins.text(F.text_of(m), section))
-    wrote(ok, at)
-
 # how many components a path has, which is how far down it sits
 def depth(path: String) -> Nat:
   List.length(&2, String, String.split(P.norm(path), '/'))
@@ -484,15 +309,6 @@ def depth(path: String) -> Nat:
 def root.rel(+at: String, root: String, +entry: String) -> String:
   P.climb(Nat.sub(depth(P.dir(at)), depth(root)), P.dir(entry))
 
-# the entry a package's hash is computed from has to be in the checkout, or
-# what was vendored is not the package that was asked for
-def have(ok: Bool, +entry: String, +url: String, +rev: String) -> IO(Unit):
-  match ok:
-    case True{}:
-      IO.pure(Unit, Unit{})
-    case False{}:
-      IO.die(Unit, 1, "ez: " ++ entry ++ " is not in " ++ url ++ " at " ++ rev)
-
 # the first char of a name in upper case, which is how bend writes an alias
 def title.go(cs: List<&2, Char>) -> String:
   match cs:
@@ -501,46 +317,9 @@ def title.go(cs: List<&2, Char>) -> String:
     case h <> t:
       String.from_list(Char.to_upper(h) <> t)
 
-# a name as an import alias
+# a name as an import alias, as `ez add` and `ez publish` print it
 def title(text: String) -> String:
   title.go(String.to_list(text))
-
-# the tag a ref resolved through, said out loud, because a person who asked for
-# `v1.0` is owed the commit it turned out to be
-def said.tag(+tag: String, +rev: String) -> IO(Unit):
-  Bool.pick(IO(Unit), String.is_empty(tag), IO.pure(Unit, Unit{}),
-    IO.print(tag ++ " is " ++ rev))
-
-# the import line the package is now reachable by, which is what a person does
-# next with it
-def said(+hash: String, +entry: String, tag: String, rev: String) -> IO(Unit):
-  +base = P.base(entry)
-  do IO<Unit>:
-    said.tag(tag, rev)
-    IO.print("import " ++ hash ++ "/" ++ base ++ " as " ++ title(P.unbend(base)))
-
-# the checkout weighed, walked and laid out, once it is on disk
-def vendor.tree(
-  +lib: String,
-  +work: String,
-  +url: String,
-  +rev: String,
-  +tag: String,
-  +entry: String,
-  pkg: String
-) -> IO(Got):
-  +at = P.join(work, entry)
-  do IO<Got>:
-    +nh : String <- nar(work)
-    +ck : String <- R.exec(["test", "-f", at])
-    have(R.ok(ck), entry, url, rev)
-    +p : K.Pkg <- K.pkg_in(work, entry)
-    +hash : String <- IO.pure(String, K.pkg.hash(p))
-    lay(lib, hash, K.pkg.root(p), K.pkg.files(p))
-    +rt : String <- IO.pure(String, root.rel(at, K.pkg.root(p), entry))
-    note(lib, origin(hash, url, rev, entry, rt, nh, tag))
-    said(hash, entry, tag, rev)
-    return Got{hash, url, rev, entry, tag, rt, nh, pkg}
 
 # `main.bend` when neither the entry nor the bin was named. That is the file
 # `ez init` writes when it is not told an entry.
@@ -617,13 +396,6 @@ def called.maybe(got: Maybe<&2, String>) -> String:
     case Some{text}:
       called.doc(T.parse(text))
 
-# the `[package] name` of the checkout's ez.toml, the file its entry is read
-# from, or "" when there is none
-def called.at(+work: String) -> IO(String):
-  do IO<String>:
-    m : Maybe<&2, String> <- F.read(work ++ "/ez.toml")
-    return called.maybe(m)
-
 # the entry a vendoring is taken from. One that was asked for is that one.
 def entry.for(given: Bool, +entry: String, +work: String) -> IO(String):
   match given:
@@ -631,33 +403,6 @@ def entry.for(given: Bool, +entry: String, +work: String) -> IO(String):
       IO.pure(String, entry)
     case False{}:
       entry.at(work)
-
-# the repo checked out at the pinned commit, and everything that follows from
-# it. The `.git` goes before the tree is weighed, because `fetchgit`'s hash is
-# over the working tree alone. An entry that was not asked for is read from
-# this checkout before that.
-def vendor.at(+lib: String, +url: String, ref: Ref, +entry: String) -> IO(Got):
-  Ref{+rev, tag} = ref
-  +work = lib ++ "/.work-" ++ rev
-  do IO<Got>:
-    _rm : String <- R.exec(["rm", "-rf", work])
-    _mk : String <- R.exec(["mkdir", "-p", work])
-    clone(work, url, rev)
-    +at : String <- entry.for(Bool.not(String.is_empty(entry)), entry, work)
-    pkg : String <- called.at(work)
-    _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
-    g : Got <- vendor.tree(lib, work, url, rev, tag, at, pkg)
-    _cl : String <- R.exec(["rm", "-rf", work])
-    return g
-
-# a package taken from a repo that never published: the ref resolved to a
-# commit, the tree checked out at it, the `0x` name computed the way
-# `bend <entry> --publish` would have, the files laid out under that name, and
-# the origin written down so the lock can rebuild it from the commit alone
-def vendor(+lib: String, +url: String, +ref: String, +entry: String) -> IO(Got):
-  do IO<Got>:
-    r : Ref <- resolve(url, ref)
-    vendor.at(lib, url, r, entry)
 
 # a remote with no HEAD is not a repo an upgrade can move
 def remote.got(empty: Bool, +rev: String, +branch: String, +url: String) -> IO(Tip):
@@ -1178,56 +923,3 @@ def tag.names(rs: List<&2, Row>) -> List<&2, String>:
       []
     case Con{+h, t}:
       List.append(&2, String, tag.one(h), tag.names(t))
-
-def tags.said(ok: Bool, +url: String, +text: String) -> IO(List<&2, String>):
-  match ok:
-    case False{}:
-      IO.die(List<&2, String>, 1, "ez: git ls-remote " ++ url ++ ": " ++ text)
-    case True{}:
-      IO.pure(List<&2, String>, tag.names(rows(String.lines(text))))
-
-# every tag on the remote
-def tags(+url: String) -> IO(List<&2, String>):
-  do IO<List<&2, String>>:
-    +from : String <- anchored(url)
-    +out : String <- R.exec(["git", "ls-remote", "--tags", from])
-    tags.said(R.ok(out), url, R.text(out))
-
-# a remote whose HEAD names no branch leaves `ez add` nothing to pin
-def branch.have(empty: Bool, +name: String, +url: String) -> IO(String):
-  match empty:
-    case True{}:
-      IO.die(String, 1, "ez: " ++ url ++
-        " has no semver-ish tag and its HEAD names no branch; name a ref to pin")
-    case False{}:
-      IO.pure(String, name)
-
-def heads.said(ok: Bool, +url: String, +text: String) -> IO(String):
-  match ok:
-    case False{}:
-      IO.die(String, 1, "ez: git ls-remote " ++ url ++ ": " ++ text)
-    case True{}:
-      +name = tip.branch(rows(String.lines(text)))
-      branch.have(String.is_empty(name), name, url)
-
-# the remote's default branch, as its `HEAD` symref names it
-def heads(+url: String) -> IO(String):
-  do IO<String>:
-    +from : String <- anchored(url)
-    +out : String <- R.exec(["git", "ls-remote", "--symref", from, "HEAD"])
-    heads.said(R.ok(out), url, R.text(out))
-
-def default.go(empty: Bool, +tag: String, +url: String) -> IO(String):
-  match empty:
-    case False{}:
-      IO.pure(String, tag)
-    case True{}:
-      heads(url)
-
-# the ref `ez add` pins when none was asked for: the greatest semver-ish
-# release tag, else the greatest pre-release, else the default branch
-def default.ref(+url: String) -> IO(String):
-  do IO<String>:
-    names : List<&2, String> <- tags(url)
-    +best : String <- IO.pure(String, choose(names))
-    default.go(String.is_empty(best), best, url)

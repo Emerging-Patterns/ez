@@ -1309,3 +1309,29 @@ law reupgrade_writes_only_lock:
   for ev: {Str.clear.all(I.vended(ledger.deps(P.ledger.next(w))), '\n') == True{} : Bool}
   for ne: {String.eq("ez.lock.toml", p) == False{} : Bool}
   {P.put(after(w), p) == P.Kept{} : P.Wrote}
+
+# LAW: with no ez.toml, `ez lock` refuses, plain or `--upgrade`, whatever
+# else the World holds, so with `lock_refusal_writes_nothing` it writes
+# nothing
+# EZ-LED-6
+law lock_needs_ledger:
+  for up: Bool
+  for +only: String
+  for listing: W.Listing
+  for rs: List<&2, W.Reply>
+  for us: List<&2, Up.Reply>
+  {P.refuses(W.World{W.Args{up, only}, None{}, listing, rs, us}) == True{} : Bool}
+
+# LAW: and a ledger that does not parse is refused the same way, so no lock
+# is made from a guess
+# EZ-LED-1
+law lock_refuses_unread:
+  for up: Bool
+  for +only: String
+  for +s: String
+  for listing: W.Listing
+  for rs: List<&2, W.Reply>
+  for us: List<&2, Up.Reply>
+  for why: String
+  for bad: {M.Bad{why} == M.parse(s) : M.Read}
+  {P.refuses(W.World{W.Args{up, only}, Some{s}, listing, rs, us}) == True{} : Bool}

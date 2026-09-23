@@ -8,7 +8,7 @@
 # rather than written over.
 import Base
 import ../manifest/manifest.bend as M
-import ./target.bend as Tgt
+import ../ez/target.bend as Tgt
 
 # a text walked from its end: whether a slash has been passed yet, and what
 # lies after the last one

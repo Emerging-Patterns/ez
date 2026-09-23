@@ -8,16 +8,14 @@ import ./quiet.bend as Q
 import ./drift.bend as D
 import ./gate.bend as G
 import ./clock.bend as Clock
-import ./target.bend as Tgt
+import ../ez/target.bend as Tgt
 import ./key.bend as K
 import ../manifest/manifest.bend as M
 import ../ez/pin.bend as Pin
-import ./cmd.bend as Cmd
 import ./env.bend as Env
 import ./doctor.bend as Doctor
 import ../pkg/path.bend as P
-import ./named.bend as Named
-import ../manifest/render.bend as Rend
+import ../ez/named.bend as Named
 
 # quiet: bend's chatter is not the program's output
 
@@ -334,21 +332,6 @@ law dirs_build_out:
   for eb: {True{} == String.eq(cmd, "build") : Bool}
   for eo: {False{} == String.is_empty(out) : Bool}
   {Env.dirs(cmd, out) == [] : List<&2, String>}
-
-# cmd: a command that edits the ledger needs one to be there
-
-# LAW: a missing ledger reads, for any command that edits it, as one that did
-# not parse, which renders as nothing, so no edit is ever written in its place
-# EZ-LED-6
-law ledger_missing_unwritten:
-  for +cmd: String
-  {Rend.render(Cmd.ledger.of(None{}, cmd)) == "" : String}
-
-# LAW: a ledger that is there is read as the file says
-law ledger_present_parsed:
-  for s: String
-  for cmd: String
-  {Cmd.ledger.of(Some{s}, cmd) == M.parse(s) : M.Read}
 
 # named: what `ez add` records a dependency under. Its source names it, never
 # its entry file; the ledger keeps the name it already gave that source, and

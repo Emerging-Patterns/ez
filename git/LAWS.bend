@@ -1,42 +1,16 @@
 # git: the laws. The human states them; PROOF.bend must prove them.
 #
-# Vendoring is almost all effect, and an effect proves nothing. The one pure
-# decision it makes that anything downstream depends on is the shape of an
-# origin table: this module writes it into `.ez/origins.toml`, and
-# `lock/lock.bend` reads the same keys back out of a lock's `source` tables. A
-# key spelled one way here and another way there produces a lock that
-# rebuilds a package from nowhere, and says so no louder than a missing url. That is the law worth stating, and
-# until this port it could not be stated at all, because the writer was
-# TypeScript and no Bend proof could reach it.
+# What git answers is taken as given (EZ-RES-7); what ez decides from it is
+# pure, and these are its laws: whether a ref is already a commit, the
+# directory a package is rooted at, and which tag, branch or ref `ez add`
+# pins. A tag asked of the remote as if it were a commit fetches nothing.
 #
 # `./git.bend` is spelled `../git/git.bend` here because `lock/lock.bend`
 # reaches the same file by that path, and bend gives a file one namespace per
 # import closure however many ways it is reached.
 import Base
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
-import ../lock/lock.bend as L
 import ../git/git.bend as G
 import ../pkg/path.bend as P
-
-# LAW: an origin written by this module is read back by the lock as the source
-# it was written from. Every key survives, none is shadowed by the pairs that
-# follow it, and the tag is whatever those pairs say it is — which is nothing
-# at all when the ref asked for was already a commit.
-law origin_read:
-  for url: String
-  for rev: String
-  for entry: String
-  for root: String
-  for nar: String
-  for ts: List<&2, T.Kv>
-  {L.src_of(G.origin.kvs(url, rev, entry, root, nar, ts))
-    == L.Git{url, rev, entry, root, nar, T.value(ts, "tag")} : L.Src}
-
-# The rest of a ref: whether it is already a commit, which table a
-# rewrite of origins.toml keeps, and the directory a package is rooted
-# at. A tag asked of the remote as if it were a commit fetches nothing,
-# and a rewrite that sat a second table behind the first leaves the
-# stale origin as the one the lock reads.
 
 # LAW: a ref that is not forty characters is not a commit name. A tag
 # or a branch is asked of the remote.
@@ -61,24 +35,6 @@ law is_rev_hex40:
   for e0: {True{} == Nat.is_eq(String.length(ref), 40n) : Bool}
   for e1: {True{} == G.hex.all(String.to_list(ref)) : Bool}
   {G.is_rev(ref) == True{} : Bool}
-
-# LAW: a table of this name is dropped, so vendoring a package again
-# replaces what was written for it rather than sitting behind it.
-law but_drops:
-  for +n: String
-  for ps: List<&2, T.Kv>
-  for rest: List<&2, T.Sect>
-  {G.but(T.Sect{n, ps} <> rest, n) == G.but(rest, n) : List<&2, T.Sect>}
-
-# LAW: a table of another name is kept, in the order it was written.
-law but_keeps:
-  for +n: String
-  for +m: String
-  for ps: List<&2, T.Kv>
-  for rest: List<&2, T.Sect>
-  for e: {False{} == String.eq(n, m) : Bool}
-  {G.but(T.Sect{n, ps} <> rest, m)
-    == T.Sect{n, ps} <> G.but(rest, m) : List<&2, T.Sect>}
 
 # LAW: when the entry sits at the same depth as the checkout root, the
 # recorded root is a climb of nothing off the entry's own directory.
@@ -272,3 +228,33 @@ law tip_skips_symref:
   for rest: List<&2, G.Row>
   for e: {False{} == G.is_rev(rev) : Bool}
   {G.tip.rev(G.Row{rev, "HEAD"} <> rest) == G.tip.rev(rest) : String}
+
+# The entry `ez add` walks when none is given: the checkout's `[package]
+# entry`, else its `bin`, else `main.bend` (`G.entry.pick`, over the values
+# its ez.toml gives, "" for one it does not).
+
+# LAW: an entry the package names is the one taken
+# EZ-RES-2
+law entry_pick_entry:
+  for +file: String
+  for +binary: String
+  for e: {False{} == String.is_empty(file) : Bool}
+  {G.entry.pick(file, binary) == file : String}
+
+# LAW: with no entry, its bin
+# EZ-RES-2
+law entry_pick_bin:
+  for +file: String
+  for +binary: String
+  for e0: {True{} == String.is_empty(file) : Bool}
+  for e1: {False{} == String.is_empty(binary) : Bool}
+  {G.entry.pick(file, binary) == binary : String}
+
+# LAW: with neither, `main.bend`
+# EZ-RES-2
+law entry_pick_main:
+  for +file: String
+  for +binary: String
+  for e0: {True{} == String.is_empty(file) : Bool}
+  for e1: {True{} == String.is_empty(binary) : Bool}
+  {G.entry.pick(file, binary) == "main.bend" : String}
