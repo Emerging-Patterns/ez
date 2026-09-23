@@ -31,6 +31,24 @@ def load() -> IO(M.Read):
     t : Maybe<&2, String> <- F.read(toml())
     return M.parse(F.text_of(t))
 
+# the ledger a command that edits it reads: what the file holds, parsed, or a
+# refusal when there is no file. Only `ez init` makes a ledger; `ez add`,
+# `ez remove` and `ez lock` read one, and one that is missing is not an empty
+# one to write back.
+def ledger.of(got: Maybe<&2, String>, +cmd: String) -> M.Read:
+  match got:
+    case None{}:
+      M.Bad{"no " ++ toml() ++ " here; ez " ++ cmd ++
+        " works on a project's ledger, and ez init makes one"}
+    case Some{text}:
+      M.parse(text)
+
+# the ledger on disk, for a command that edits it
+def load.edit(+cmd: String) -> IO(M.Read):
+  do IO<M.Read>:
+    t : Maybe<&2, String> <- F.read(toml())
+    return ledger.of(t, cmd)
+
 # a failed run must fail the command, or a script around it learns nothing
 def report.exit(ok: Bool) -> IO(Unit):
   match ok:
@@ -260,9 +278,19 @@ def lock.up(up: Bool, +name: String) -> IO(Unit):
         Pin.upgrade(name)
         lock.now()
 
+# a lock is of a ledger, so a missing one stops it before anything is written
+def lock.read(ledger: M.Read, up: Bool, +name: String) -> IO(Unit):
+  match ledger:
+    case M.Bad{why}:
+      refuse(M.Bad{why})
+    case M.Good{_m}:
+      lock.up(up, name)
+
 # `ez lock` and `ez lock --upgrade [--package NAME]`
 def lock(up: Bool, +name: String) -> IO(Unit):
-  lock.up(up, name)
+  do IO<Unit>:
+    r : M.Read <- load.edit("lock")
+    lock.read(r, up, name)
 
 # BEND_LIB filled from the lock, with nothing re-resolved
 def fetch() -> IO(Unit):
@@ -547,7 +575,7 @@ def add(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Un
   do IO<Unit>:
     +url : String <- add.url(place)
     +got : String <- add.ref.at(Bool.not(String.is_empty(ref)), url, ref)
-    r : M.Read <- load()
+    r : M.Read <- load.edit("add")
     +from : String <- Git.anchored(url)
     add.go(r, Named.called(place, from), url, got, entry, rename)
 
@@ -562,5 +590,5 @@ def remove.write(ledger: M.Read, name: String) -> IO(Unit):
 # `ez remove <name>`
 def remove(+name: String) -> IO(Unit):
   do IO<Unit>:
-    r : M.Read <- load()
+    r : M.Read <- load.edit("remove")
     remove.write(r, name)

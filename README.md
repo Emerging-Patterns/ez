@@ -77,7 +77,10 @@ ez doctor                        report on the toolchain and the project
 Bend runtime keeps `--help` for itself.
 
 `ez init` starts a project and never writes over one: in a directory that
-already has an `ez.toml` it exits 1 and writes nothing.
+already has an `ez.toml` it exits 1 and writes nothing. It is also the only
+command that makes a ledger: `ez add`, `ez remove` and `ez lock` (with or
+without `--upgrade`) in a directory with no `ez.toml` exit 1 and write
+nothing.
 
 A ledger, and a dependency vendored from a repo that never published:
 

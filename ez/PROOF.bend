@@ -1346,6 +1346,13 @@ def Laws.dirs_build_out(cmd, out, ec, eb, eo):
   %eo : {Bool.pick(List<&2, String>, _, ["bin"], []) == [] : List<&2, String>}
   {==}
 
+# A missing ledger is the `Bad` arm, and a `Bad` read renders as nothing.
+def Laws.ledger_missing_unwritten(_cmd):
+  {==}
+
+def Laws.ledger_present_parsed(_s, _cmd):
+  {==}
+
 # A ledger that is there picks the arm that plans nothing.
 def Laws.init_keeps_ledger(_s, _name, _at):
   {==}
