@@ -1200,3 +1200,57 @@ def Laws.add_pins_commit(w, hex, ok):
     Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)), AP.added(w),
       AP.dep.of(wh(AP.walked(w)), wr(AP.walked(w)), w), added_ok(w, ok)),
     rev_commit(w, hex))
+
+# LAW: HEAD's commit, when its symref names a branch
+law head_rev:
+  for s: Up.Said
+  for +w: A.World
+  for b: {String.is_empty(Git.tip.branch(Git.rows(String.lines(AP.said.text(s))))) == False{}
+    : Bool}
+  {AP.tip.rev(AP.tip.head(s, w)) == Git.tip.rev(Git.rows(String.lines(AP.said.text(s))))
+    : String}
+
+def head_rev(s, w, b):
+  match s:
+    case Up.Said{+text}:
+      %Equal.sym(Bool, String.is_empty(Git.tip.branch(Git.rows(String.lines(text)))), False{}, b)
+        : {AP.tip.rev(Bool.pick(AP.Tip, _,
+          AP.TipNo{"ez: " ++ A.url(w) ++
+            " has no semver-ish tag and its HEAD names no branch; name a ref to pin"},
+          AP.tip.found(Git.tip.rev(Git.rows(String.lines(text))),
+            "ez: " ++ A.url(w) ++ " has no HEAD")))
+          == Git.tip.rev(Git.rows(String.lines(text))) : String}
+      found_rev(Git.tip.rev(Git.rows(String.lines(text))), "ez: " ++ A.url(w) ++ " has no HEAD")
+    case Up.Unsaid{_why}:
+      {==}
+    case Up.Unasked{_ask}:
+      {==}
+
+law rev_head:
+  for +w: A.World
+  for none: {A.ref(w) == "" : String}
+  for +text: String
+  for t: {AP.said(w, AP.QTags{}) == Up.Said{text} : Up.Said}
+  for c: {String.is_empty(Git.choose(Git.tag.names(Git.rows(String.lines(text))))) == True{}
+    : Bool}
+  for b: {String.is_empty(Git.tip.branch(AP.rows(w, AP.QHead{}))) == False{} : Bool}
+  {AP.rev(w) == Git.tip.rev(AP.rows(w, AP.QHead{})) : String}
+
+def rev_head(w, none, text, t, c, b):
+  %Equal.sym(String, A.ref(w), "", none)
+    : {AP.tip.rev(AP.tip.of(Git.is_rev(_), String.is_empty(_), w))
+      == Git.tip.rev(AP.rows(w, AP.QHead{})) : String}
+  %Equal.sym(Up.Said, AP.said(w, AP.QTags{}), Up.Said{text}, t)
+    : {AP.tip.rev(AP.tip.tags(_, w)) == Git.tip.rev(AP.rows(w, AP.QHead{})) : String}
+  %Equal.sym(Bool, String.is_empty(Git.choose(Git.tag.names(Git.rows(String.lines(text))))),
+    True{}, c)
+    : {AP.tip.rev(AP.tip.chosen(_, Git.choose(Git.tag.names(Git.rows(String.lines(text)))),
+      Git.rows(String.lines(text)), w)) == Git.tip.rev(AP.rows(w, AP.QHead{})) : String}
+  head_rev(AP.said(w, AP.QHead{}), w, b)
+
+def Laws.add_pins_head_rev(w, none, text, t, c, b, ok):
+  Equal.trans(String, M.source.rev(M.source.dep(AP.added(w))), AP.rev(w),
+    Git.tip.rev(AP.rows(w, AP.QHead{})),
+    Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)), AP.added(w),
+      AP.dep.of(wh(AP.walked(w)), wr(AP.walked(w)), w), added_ok(w, ok)),
+    rev_head(w, none, text, t, c, b))

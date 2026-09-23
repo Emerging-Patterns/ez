@@ -1,10 +1,11 @@
-# `ez lock` from the ledger alone: what a fresh clone can do. `ez add` writes
-# two records of where a package came from, one in ez.toml and one in
-# .ez/origins.toml, and lays the package's tree under .ez/lib; .gitignore
-# keeps the second record and the tree out of the repo. So a clone has the
-# ledger and neither of the others, and the lock it writes has to be the lock
-# that was committed. This test takes the cache and the tree away and asks
-# again: the lock fetches the tree at the ledger's rev and checks it.
+# `ez lock` from the ledger alone: what a fresh clone can do. `ez add`
+# records where a package came from in ez.toml and lays the package's tree
+# under BEND_LIB, here .ez/lib, which .gitignore keeps out of the repo. (It
+# once also wrote .ez/origins.toml; the test still removes one, which older
+# checkouts may hold.) So a clone has the ledger and not the tree, and the
+# lock it writes has to be the lock that was committed. This test takes the
+# tree away and asks again: the lock fetches it at the ledger's rev and
+# checks it.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F

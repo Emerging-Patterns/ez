@@ -210,3 +210,17 @@ law add_pins_commit:
   for hex: {Git.is_rev(A.ref(w)) == True{} : Bool}
   for ok: {AP.refuses(w) == False{} : Bool}
   {M.source.rev(M.source.dep(AP.added(w))) == A.ref(w) : String}
+
+# LAW: with no ref and no semver-ish tag among the ones the remote printed,
+# the commit pinned is the one HEAD names, when its symref names a branch
+# EZ-RES-1
+law add_pins_head_rev:
+  for +w: A.World
+  for none: {A.ref(w) == "" : String}
+  for +text: String
+  for t: {AP.said(w, AP.QTags{}) == Up.Said{text} : Up.Said}
+  for c: {String.is_empty(Git.choose(Git.tag.names(Git.rows(String.lines(text))))) == True{}
+    : Bool}
+  for b: {String.is_empty(Git.tip.branch(AP.rows(w, AP.QHead{}))) == False{} : Bool}
+  for ok: {AP.refuses(w) == False{} : Bool}
+  {M.source.rev(M.source.dep(AP.added(w))) == Git.tip.rev(AP.rows(w, AP.QHead{})) : String}
