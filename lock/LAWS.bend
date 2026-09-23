@@ -128,12 +128,12 @@ def perm(ns: List<&2, Nat>, ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
       perm.ins_at(n, h, perm(ms, t))
 
 # whether a hash is none of the hashes a package list holds
-def fresh(+hash: String, ps: List<&2, L.Pack>) -> Bool:
+def hash.fresh(+hash: String, ps: List<&2, L.Pack>) -> Bool:
   match ps:
     case []:
       True{}
     case Con{+h, t}:
-      Bool.and(Bool.not(String.eq(hash, L.pack.hash(h))), fresh(hash, t))
+      Bool.and(Bool.not(String.eq(hash, L.pack.hash(h))), hash.fresh(hash, t))
 
 # whether a package list names each hash at most once. The walk's does: it
 # passes over a hash it has resolved already.
@@ -142,7 +142,7 @@ def distinct(ps: List<&2, L.Pack>) -> Bool:
     case []:
       True{}
     case Con{+h, +t}:
-      Bool.and(fresh(L.pack.hash(h), t), distinct(t))
+      Bool.and(hash.fresh(L.pack.hash(h), t), distinct(t))
 
 # LAW: the lock's text does not depend on the order the packages were found
 # in. Packages are written in hash order, so any rearrangement of a list that

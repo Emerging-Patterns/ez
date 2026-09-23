@@ -115,7 +115,7 @@ law fresh_blocks:
   for +x: String
   for +s: String
   for +ps: List<&2, L.Pack>
-  {Laws.fresh(x, ps) == KL.fresh(K.File{x, s}, L.pack.blocks(ps)) : Bool}
+  {Laws.hash.fresh(x, ps) == KL.fresh(K.File{x, s}, L.pack.blocks(ps)) : Bool}
 
 def fresh_blocks(x, s, ps):
   match ps:
@@ -123,7 +123,7 @@ def fresh_blocks(x, s, ps):
       {==}
     case L.Pack{+h, _src, _fs} <> +t:
       Equal.cong(Bool, Bool, b => Bool.and(Bool.not(String.eq(x, h)), b),
-        Laws.fresh(x, t), KL.fresh(K.File{x, s}, L.pack.blocks(t)),
+        Laws.hash.fresh(x, t), KL.fresh(K.File{x, s}, L.pack.blocks(t)),
         fresh_blocks(x, s, t))
 
 # LAW: so distinct hashes are distinct block paths
@@ -137,13 +137,13 @@ def distinct_blocks(ps):
       {==}
     case L.Pack{+h, +src, +fs} <> +t:
       Equal.trans(Bool,
-        Bool.and(Laws.fresh(h, t), Laws.distinct(t)),
+        Bool.and(Laws.hash.fresh(h, t), Laws.distinct(t)),
         Bool.and(KL.fresh(L.pack.block(L.Pack{h, src, fs}), L.pack.blocks(t)),
           Laws.distinct(t)),
         Bool.and(KL.fresh(L.pack.block(L.Pack{h, src, fs}), L.pack.blocks(t)),
           KL.distinct(L.pack.blocks(t))),
         Equal.cong(Bool, Bool, b => Bool.and(b, Laws.distinct(t)),
-          Laws.fresh(h, t),
+          Laws.hash.fresh(h, t),
           KL.fresh(L.pack.block(L.Pack{h, src, fs}), L.pack.blocks(t)),
           fresh_blocks(h, T.render(L.pack.sects.of(h, src, K.files_of(fs))), t)),
         Equal.cong(Bool, Bool,
@@ -733,14 +733,14 @@ law has_fresh:
   for +ps: List<&2, L.Pack>
   for +x: String
   for +e: {L.has(ps, x) == False{} : Bool}
-  {Laws.fresh(x, ps) == True{} : Bool}
+  {Laws.hash.fresh(x, ps) == True{} : Bool}
 
 def has_fresh(ps, x, e):
   match ps:
     case []:
       {==}
     case +p <> +t:
-      and_true(Bool.not(String.eq(x, L.pack.hash(p))), Laws.fresh(x, t),
+      and_true(Bool.not(String.eq(x, L.pack.hash(p))), Laws.hash.fresh(x, t),
         not_false(String.eq(x, L.pack.hash(p)),
           any_head(String.eq(x, L.pack.hash(p)), _u => L.has(t, x), e)),
         has_fresh(t, x,
@@ -765,7 +765,7 @@ def verdict_distinct(v, _src, hash, _rest, packs, _asks, _bad, e, n):
     case W.No{_why}:
       e
     case W.Ok{_fs, _ss}:
-      and_true(Laws.fresh(hash, packs), Laws.distinct(packs),
+      and_true(Laws.hash.fresh(hash, packs), Laws.distinct(packs),
         has_fresh(packs, hash, n), e)
 
 # LAW: and one looked up, whether it was answered or not
