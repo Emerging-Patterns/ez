@@ -32,8 +32,11 @@ let
   # lock an older ez wrote (a tool's, say) may instead hold that ez's digest:
   # each character's low eight bits, then sha256. Either is accepted, so such a
   # lock still builds; on ASCII the two are the same.
+  # Submodules are not fetched: ez weighs the checkout without them, so the
+  # narHash it records is that tree's, and fetchgit fetches them by default.
   gitSrc = hash: source: fetchgit {
     inherit (source) url rev;
+    fetchSubmodules = false;
     name = "bend-${lib.removePrefix "0x" hash}-src";
     hash = source.narHash;
   };
