@@ -11,7 +11,7 @@ import ./clock.bend as Clock
 import ./target.bend as Tgt
 import ./key.bend as K
 import ../manifest/manifest.bend as M
-import ./pin.bend as Pin
+import ../ez/pin.bend as Pin
 import ./cmd.bend as Cmd
 import ./env.bend as Env
 import ./doctor.bend as Doctor
@@ -277,14 +277,6 @@ law checkout_same:
   for +r: String
   for e: {False{} == String.is_empty(r) : Bool}
   {K.checkout(r, r) == True{} : Bool}
-
-# cmd: the files a lock starts from are the ones git tracks
-
-# LAW: a tracked path under `.ez/` is never a root of the lock. The trees
-# there are packages, read as packages, and not the project's own sources.
-law root_skips_ez:
-  for +p: String
-  {Cmd.root.keep(".ez/" ++ p) == [] : List<&2, String>}
 
 # doctor: the lock is judged against the ledger it resolves
 

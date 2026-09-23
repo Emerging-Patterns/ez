@@ -397,24 +397,3 @@ def gaps(ts: List<&2, M.Tool>) -> String:
     case h <> t:
       +here = gap(h)
       gaps.step(String.is_empty(here), here, _u => gaps(t))
-
-# a gap stops the lock before anything is written
-def need.judge(+why: String) -> IO(Unit):
-  Bool.pick(IO(Unit), String.is_empty(why), IO.pure(Unit, Unit{}),
-    IO.die(Unit, 1, why))
-
-# the ledger's pins, each complete, or the reason one is not
-def need.go(ledger: M.Read) -> IO(Unit):
-  match ledger:
-    case M.Bad{why}:
-      IO.die(Unit, 1, "ez: " ++ why)
-    case M.Good{m}:
-      M.Manifest{_n, _e, _b, _h, _ds, ts} = m
-      need.judge(gaps(ts))
-
-# `ez lock`: every `[tools.*]` pin already has a commit and a NAR hash, or the
-# lock refuses. Nothing is resolved and ez.toml is not written.
-def need() -> IO(Unit):
-  do IO<Unit>:
-    t : Maybe<&2, String> <- F.read("ez.toml")
-    need.go(M.parse(F.text_of(t)))

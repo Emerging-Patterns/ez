@@ -8,7 +8,7 @@
 import Base
 import ./drift.bend as D
 import ./gate.bend as G
-import ./pin.bend as Pin
+import ../ez/pin.bend as Pin
 import ./target.bend as Tgt
 import ./named.bend as Named
 import ./env.bend as Env
@@ -1239,13 +1239,6 @@ def Laws.checkout_differs(_was, now, e):
 def Laws.checkout_same(r, e):
   %e : {Bool.and(Bool.not(_), String.eq(r, r)) == True{} : Bool}
   Eq.string_eq_self(r)
-
-# `.ez/` is a prefix of anything appended to it, which `starts_append` holds,
-# and that picks the arm that keeps nothing.
-def Laws.root_skips_ez(p):
-  Equal.cong(Bool, List<&2, String>,
-    k => Bool.pick(List<&2, String>, k, [], [".ez/" ++ p]),
-    String.starts_with(".ez/" ++ p, ".ez/"), True{}, Eq.starts_append(".ez/", p))
 
 # doctor: the lock's verdict turns on the list first, so the no-dependency law
 # splits on it and the other two are the arm they name.

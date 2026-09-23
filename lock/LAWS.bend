@@ -4,6 +4,9 @@
 # without ever saying so.
 import Base
 import ./lock.bend as L
+import ./world.bend as W
+import ./plan.bend as P
+import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 
 # LAW: a package resolves to the origin recorded for it, whatever origins
 # follow. A second record of the same hash never shadows the first, so the
@@ -98,3 +101,122 @@ law render_keeps_packages_without_tools:
   for +hub: String
   for ps: List<&2, L.Pack>
   {L.render.pick(True{}, hub, ps, []) == L.render(hub, ps) : String}
+
+# The planner (plan.bend) over the World (world.bend). Every law below is
+# about what plain `ez lock` does, stated over the plan it returns; the
+# interpreter that executes the plan is EZ-TRUST-2.
+
+# what a plan leaves at the lock's path, from what the planner decided. Law
+# vocabulary: ez never calls it.
+def put.doc(doc: P.Doc) -> P.Wrote:
+  match doc:
+    case P.Doc{text}:
+      P.Put{text}
+    case P.Stop{_why}:
+      P.Kept{}
+
+# LAW: the lock depends on nothing in a World but its Inputs: the ledger, the
+# committed sources, and the verdict on every answer. Two Worlds that agree on
+# those write the same bytes to ez.lock.toml, or both write none, however they
+# differ otherwise.
+# EZ-DOC-3
+law lock_reproducible:
+  for w1: W.World
+  for w2: W.World
+  for e: {W.inputs(w1) == W.inputs(w2) : W.Inputs}
+  {P.put(w1, "ez.lock.toml") == P.put(w2, "ez.lock.toml") : P.Wrote}
+
+# LAW: a working checkout, whose git trees are read from BEND_LIB, writes the
+# lock a fresh clone writes, which has none there and clones and weighs each
+# one at its pinned rev, so long as git hands the clone the same bytes.
+# EZ-DOC-3
+law clone_reproduces:
+  for +w: W.World
+  {P.put(W.reclone(w), "ez.lock.toml") == P.put(w, "ez.lock.toml") : P.Wrote}
+
+# LAW: a plain lock never writes ez.toml
+# EZ-DOC-5
+law plain_lock_keeps_ledger:
+  for w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
+  {P.put(w, "ez.toml") == P.Kept{} : P.Wrote}
+
+# a package with the source the ledger records for its hash. Law vocabulary:
+# ez never calls it.
+def pinned(+orgs: List<&2, L.Origin>, pack: L.Pack) -> L.Pack:
+  L.Pack{+hash, _src, files} = pack
+  L.Pack{hash, L.origin(orgs, hash), files}
+
+# every package, so
+def pinned.all(+orgs: List<&2, L.Origin>, ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
+  match ps:
+    case []:
+      []
+    case h <> t:
+      pinned(orgs, h) <> pinned.all(orgs, t)
+
+# LAW: every package a plain lock resolves, and so every package its lock
+# renders, carries the source ez.toml records for its hash. Tools are
+# rendered from the ledger's `[tools.*]` alone, as `M.tools_of` reads them.
+# EZ-DOC-5
+law plain_lock_pins_ledger_sources:
+  for w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
+  {pinned.all(W.origins(W.ledger.of(w)), P.packs(w)) == P.packs(w)
+    : List<&2, L.Pack>}
+
+# LAW: a plain lock that refuses writes, lays and removes nothing. Its plan
+# has no effect at all; the reason is how it ends. This is EZ-OUT-2 for a
+# plain lock, and it is tagged once `--upgrade` is planned too.
+law lock_refusal_writes_nothing:
+  for +w: W.World
+  for r: {P.refuses(w) == True{} : Bool}
+  {P.writes(P.plan(w)) == False{} : Bool}
+
+# LAW: a tree read from BEND_LIB is judged exactly as the same bytes cloned
+# at the pinned rev and weighed to the ledger's narHash
+law lib_judged_as_clone:
+  for +orgs: List<&2, L.Origin>
+  for +hub: String
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  {W.accept(orgs, hub, hash, W.Got{W.Lib{}, manifest, ss})
+    == W.accept(orgs, hub, hash,
+      W.Got{W.Clone{L.src.nar(L.origin(orgs, hash))}, manifest, ss})
+    : W.Verdict}
+
+# LAW: every package the walk resolves carries the source the ledger records
+# for its hash, one step at a time
+law walk_pins_ledger_sources:
+  for +fuel: Nat
+  for +orgs: List<&2, L.Origin>
+  for +js: List<&2, W.Judged>
+  for +wk: P.Walk
+  for +e: {pinned.all(orgs, P.walk.packs(wk)) == P.walk.packs(wk)
+    : List<&2, L.Pack>}
+  {pinned.all(orgs, P.walk.packs(P.walk(fuel, orgs, js, wk)))
+    == P.walk.packs(P.walk(fuel, orgs, js, wk)) : List<&2, L.Pack>}
+
+# LAW: a tracked path under `.ez/` is never a root of the lock. The trees
+# there are packages, read as packages, and not the project's own sources.
+law root_skips_ez:
+  for +p: String
+  for text: String
+  {P.roots.one(W.Source{".ez/" ++ p, text}) == [] : List<&2, String>}
+
+# The lock document. EZ-DOC-1 is a round trip through eztoml's reader, and
+# the reader trims every line and strips the quotes off every value. These two
+# laws are its first step: a quoted value survives both, whatever it holds.
+
+# LAW: a quoted value is already trimmed. Its first and last characters are
+# quotes, so no space it holds is at an end.
+law trim_quoted:
+  for +v: String
+  {T.trim(T.quote(v)) == T.quote(v) : String}
+
+# LAW: and stripping the quotes off gives the value back, even one that holds
+# quotes of its own
+law strip_quoted:
+  for +v: String
+  {T.strip(T.quote(v), '"', '"') == v : String}

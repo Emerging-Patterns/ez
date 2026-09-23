@@ -4,6 +4,8 @@
 
 State: Accepted. Nothing here changes `ez lock` yet; the work packages below do.
 
+**Update:** WP1 has landed. Plain `ez lock` runs the planner in `lock/world.bend`, `lock/plan.bend` and `lock/run.bend`, the spike in `lock/world/` is deleted, and its laws are restated over that planner in `lock/LAWS.bend`. Where the code differs from the sketches below: an `Ask` carries the hub a hub package is served from, so the interpreter never parses the ledger; the World's ledger is `Maybe<&2, String>`, so a missing ez.toml is refused by the planner (EZ-LED-6); `Outcome`'s success is `Success{}`, since Base owns `Done`; a refused plan has no effect at all and its reason is in `Refused{why}`; and a `Lay` is built from the planner's verdict, so only a checked tree is laid, and only by a lock that succeeds. Progress is tracked in [ez-law-inventory.md](ez-law-inventory.md) under "Phase three progress".
+
 This is the design for phase three of [ez-spec.md](ez-spec.md): converting `ez lock` to a pure planner and a thin interpreter, then proving EZ-DOC-1 through EZ-DOC-5, EZ-RES-4 through EZ-RES-6 and EZ-RES-8, EZ-VEN-1 through EZ-VEN-3, and EZ-HASH-2. It was written from the code at `bec3435`. A spike in `lock/world/` checks the riskiest parts against bend 2.0.25; nothing imports it, so `ez lock` behaves exactly as before. [ez-law-inventory.md](ez-law-inventory.md) stays the progress tracker, and `SPEC.md` does not change until a requirement's law lands.
 
 ### Open questions
