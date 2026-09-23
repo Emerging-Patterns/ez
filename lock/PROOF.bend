@@ -4,6 +4,7 @@ import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
 import ./up.bend as Up
+import ../manifest/upgrade.bend as U
 import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../check/eq.bend as Eq
@@ -1532,3 +1533,1861 @@ def Laws.strip_quoted(v):
         String.to_list(v),
         back_quote(String.to_list(v))),
       Str.from_to(v)))
+
+# The upgrade's moves (EZ-RES-5, EZ-RES-8). Each law is one fact about one
+# dependency's fate (`Up.dep.one`), carried through the walk over the ledger's
+# dependencies (`Up.deps.walk`) to the ledger model the upgrade renders
+# (`Up.next.model`). A fate is proved sound once for any remote tip, since a
+# tag's and the default branch's are read the same way from there on
+# (`Up.dep.tip`).
+
+# a pin from a repository, with its fields spelled out
+def mv.git(+hn: String, +hh: String, +he: String, +url: String, +rev: String, +tag: String,
+  +root: String, +nar: String, +vend: Bool) -> M.Dep:
+  M.Dep{hn, hh, he, M.Git{url, rev, tag, root, nar, vend}}
+
+# a fate is sound against a tip when the pin it leaves is kept or moved
+# along its history, as `moved.ok` reads the remote
+def mv.ok(fate: Up.Fate, +t: Up.Tip, +rs: List<&2, Up.Reply>, +old: M.Dep) -> Bool:
+  match fate:
+    case Up.Became{d, _o, _n, _p, _m, _s, _t}:
+      Laws.moved.ok(t, rs, old, d)
+    case Up.Waits{_asks}:
+      True{}
+    case Up.Halts{_why}:
+      True{}
+
+# what every fate keeps: the name of the dependency it leaves, and at least
+# one question when it waits
+def mv.fine(fate: Up.Fate, +name: String) -> String & Bool:
+  match fate:
+    case Up.Became{d, _o, _n, _p, _m, _s, _t}:
+      (M.dep.name(d), True{})
+    case Up.Waits{asks}:
+      (name, Bool.not(List.is_empty(&2, Up.Ask, asks)))
+    case Up.Halts{_why}:
+      (name, True{})
+
+# whether a fate refuses
+def mv.halts(fate: Up.Fate) -> Bool:
+  match fate:
+    case Up.Became{_d, _o, _n, _p, _m, _s, _t}:
+      False{}
+    case Up.Waits{_asks}:
+      False{}
+    case Up.Halts{_why}:
+      True{}
+
+# the walk is sound for the dependency named `n`: it refuses, or still asks,
+# or the dependency it leaves under that name is sound against `old`
+def mv.walk(+t: Up.Tip, +rs: List<&2, Up.Reply>, dd: Up.Deps, +old: M.Dep, +n: String) -> Bool:
+  Up.Deps{ds, _ss, _es, _m, _sy, _tr, asks, bad} = dd
+  Bool.or(Bool.not(String.is_empty(bad)),
+    Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)), Laws.moved.ok(t, rs, old, M.find(ds, n))))
+
+# the walk's refusal, "" for none
+def mv.bad(dd: Up.Deps) -> String:
+  Up.Deps{_ds, _ss, _es, _m, _sy, _tr, _asks, bad} = dd
+  bad
+
+# whether an upgrade refuses
+def mv.stops(nx: Up.Next) -> Bool:
+  Bool.not(String.is_empty(Up.next.stop(nx)))
+
+# the dependency named `n` in the ledger model an upgrade renders
+def mv.dep(nx: Up.Next, +n: String) -> M.Dep:
+  M.dep(Up.next.model(nx), n)
+
+def mv.fst(p: String & Bool) -> String:
+  (a, _b) = p
+  a
+
+def mv.snd(p: String & Bool) -> Bool:
+  (_a, b) = p
+  b
+
+# LAW: an `or` whose right half answered True
+law mv.or_r:
+  for a: Bool
+  for b: Bool
+  for e: {b == True{} : Bool}
+  {Bool.or(a, b) == True{} : Bool}
+
+def mv.or_r(a, _b, e):
+  match a:
+    case True{}:
+      {==}
+    case False{}:
+      e
+
+# LAW: an `or` whose left half answered True
+law mv.or_l:
+  for a: Bool
+  for +b: Bool
+  for e: {a == True{} : Bool}
+  {Bool.or(a, b) == True{} : Bool}
+
+def mv.or_l(a, b, e):
+  Equal.cong(Bool, Bool, x => Bool.or(x, b), a, True{}, e)
+
+# LAW: a refusal's reason is never empty
+law mv.halt_ne:
+  for why: String
+  {String.is_empty(Up.halt.why(why)) == False{} : Bool}
+
+def mv.halt_ne(why):
+  match why:
+    case SNil{}:
+      {==}
+    case SCon{_h, _t}:
+      {==}
+
+# LAW: and so it reads as a refusal
+law mv.halt_not:
+  for why: String
+  {Bool.not(String.is_empty(Up.halt.why(why))) == True{} : Bool}
+
+def mv.halt_not(why):
+  match why:
+    case SNil{}:
+      {==}
+    case SCon{_h, _t}:
+      {==}
+
+# LAW: a pin kept as it was is sound against any tip
+law mv.self:
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  {Laws.moved.ok(t, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend),
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.self(t, rs, _hn, _hh, _he, url, rev, tag, _root, _nar, _vend):
+  Equal.trans(Bool,
+    Bool.and(String.eq(tag, tag),
+      Bool.or(String.eq(rev, rev), Laws.moved.to(t, rs, url, rev, rev))),
+    Bool.or(String.eq(rev, rev), Laws.moved.to(t, rs, url, rev, rev)),
+    True{},
+    Equal.cong(Bool, Bool,
+      x => Bool.and(x, Bool.or(String.eq(rev, rev), Laws.moved.to(t, rs, url, rev, rev))),
+      String.eq(tag, tag), True{}, Eq.string_eq_self(tag)),
+    Equal.cong(Bool, Bool, x => Bool.or(x, Laws.moved.to(t, rs, url, rev, rev)),
+      String.eq(rev, rev), True{}, Eq.string_eq_self(rev)))
+
+# LAW: and so is any pin from a repository
+law mv.self_dep:
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +d: M.Dep
+  for g: {M.source.is_git(M.source.dep(d)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, d, d) == True{} : Bool}
+
+def mv.self_dep(t, rs, d, g):
+  match d:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          g
+        case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
+          mv.self(t, rs, hn, hh, he, url, rev, tag, root, nar, vend)
+
+# LAW: a pin by its commit alone is from a repository
+law mv.bare_git:
+  for +d: M.Dep
+  for bare: {Laws.rev_only(d) == True{} : Bool}
+  {M.source.is_git(M.source.dep(d)) == True{} : Bool}
+
+def mv.bare_git(d, bare):
+  match d:
+    case M.Dep{_hn, _hh, _he, src}:
+      match src:
+        case M.Hub{}:
+          bare
+        case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+          {==}
+
+# LAW: and so is one through a tag
+law mv.named_git:
+  for +d: M.Dep
+  for named: {Laws.tagged(d) == True{} : Bool}
+  {M.source.is_git(M.source.dep(d)) == True{} : Bool}
+
+def mv.named_git(d, named):
+  match d:
+    case M.Dep{_hn, _hh, _he, src}:
+      match src:
+        case M.Hub{}:
+          named
+        case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+          {==}
+
+# One pin's fate is sound against the tip it was moved by. The pin is
+# checked out when the tip is its own commit, and kept only when the checkout
+# agrees; it is moved only to a tip the remote says descends from it, once
+# the tip's checkout and the hub's word are in.
+
+# LAW: a pin moved to the tip, once the hub has not objected
+law mv.ok_hub:
+  for hb: Up.Hubbed
+  for +rs: List<&2, Up.Reply>
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +hash: String
+  for +r: String
+  for +tg: String
+  for +br: String
+  for +root2: String
+  for +nar2: String
+  for +man: String
+  for srcs: List<&2, String>
+  for e: {Up.onward(rs, Up.Above{url, rev, r}) == Up.Asc{True{}} : Up.Asc}
+  {mv.ok(Up.dep.hub(hb, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), hash, r, root2,
+    nar2, man, srcs, br), Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend))
+    == True{} : Bool}
+
+def mv.ok_hub(hb, rs, _hn, _hh, _he, url, rev, tag, _root, _nar, _vend, _hash, r, _tg, _br,
+  _root2, _nar2, _man, _srcs, e):
+  match hb:
+    case Up.Clear{}:
+      Equal.trans(Bool,
+        Bool.and(String.eq(tag, tag), Bool.or(String.eq(r, rev),
+          Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))))),
+        Bool.or(String.eq(r, rev),
+          Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r})))),
+        True{},
+        Equal.cong(Bool, Bool, x => Bool.and(x, Bool.or(String.eq(r, rev),
+          Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))))),
+          String.eq(tag, tag), True{}, Eq.string_eq_self(tag)),
+        mv.or_r(String.eq(r, rev),
+          Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))),
+          Equal.trans(Bool,
+            Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))),
+            Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r})),
+            True{},
+            Equal.cong(Bool, Bool,
+              x => Bool.and(x, Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))),
+              String.eq(r, r), True{}, Eq.string_eq_self(r)),
+            Equal.cong(Up.Asc, Bool, a => Laws.onward.yes(a),
+              Up.onward(rs, Up.Above{url, rev, r}), Up.Asc{True{}}, e))))
+    case Up.Clash{}:
+      {==}
+    case Up.HubWait{_ask}:
+      {==}
+    case Up.HubNo{_why}:
+      {==}
+
+# LAW: a pin moved to the tip, once its checkout is in
+law mv.ok_adv:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  for e: {Up.onward(rs, Up.Above{url, rev, r}) == Up.Asc{True{}} : Up.Asc}
+  {mv.ok(Up.dep.advance(co, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, br),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_adv(co, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br, e):
+  match co:
+    case Up.Co{nar2, root2, +man, srcs}:
+      mv.ok_hub(Up.hubbed(rs, Up.HubHas{hub, Up.hash.of(man)}), rs, hn, hh, he, url, rev, tag,
+        root, nar, vend, Up.hash.of(man), r, tg, br, root2, nar2, man, srcs, e)
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: a tip that is another commit, once the remote said whether it
+# descends from the pin
+law mv.ok_onward:
+  for a: Up.Asc
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  for e: {Up.onward(rs, Up.Above{url, rev, r}) == a : Up.Asc}
+  {mv.ok(Up.dep.onward(a, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, tg, br),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_onward(a, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br, e):
+  match a:
+    case Up.Asc{yes}:
+      match yes:
+        case True{}:
+          mv.ok_adv(Up.checkout(rs, Up.Tree{url, r, he}), rs, hub, hn, hh, he, url, rev, tag,
+            root, nar, vend, r, tg, br, e)
+        case False{}:
+          {==}
+    case Up.AscWait{_ask}:
+      {==}
+    case Up.AscNo{_why}:
+      {==}
+
+# LAW: the pin's own commit, judged by whether its checkout agrees
+law mv.ok_agree:
+  for g: Bool
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  for +seen: String
+  {mv.ok(Up.dep.verdict(U.judge(True{}, True{}, g, r, tg), rs, hub,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, "", seen),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_agree(g, rs, _hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br, _seen):
+  match g:
+    case True{}:
+      mv.self(Up.At{r, tg, br}, rs, hn, hh, he, url, rev, tag, root, nar, vend)
+    case False{}:
+      {==}
+
+# LAW: the pin's own commit, once its checkout is in
+law mv.ok_kept:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  {mv.ok(Up.dep.kept(co, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, tg),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_kept(co, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br):
+  match co:
+    case Up.Co{nar2, root2, +man, _srcs}:
+      mv.ok_agree(U.agree(hh, Up.hash.of(man), nar, nar2, root, root2), rs, hub, hn, hh, he,
+        url, rev, tag, root, nar, vend, r, tg, br, Up.hash.of(man))
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: the tip against the pin: its own commit, or another
+law mv.ok_same:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  {mv.ok(Up.dep.same(s, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, tg, br),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_same(s, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br):
+  match s:
+    case True{}:
+      mv.ok_kept(Up.checkout(rs, Up.Tree{url, rev, he}), rs, hub, hn, hh, he, url, rev, tag,
+        root, nar, vend, r, tg, br)
+    case False{}:
+      mv.ok_onward(Up.onward(rs, Up.Above{url, rev, r}), rs, hub, hn, hh, he, url, rev, tag,
+        root, nar, vend, r, tg, br, {==})
+
+# LAW: a pin is sound against whatever tip the remote named
+law mv.ok_tip:
+  for t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  {mv.ok(Up.dep.tip(t, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)), t, rs,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_tip(t, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend):
+  match t:
+    case Up.At{+r, +tg, +br}:
+      mv.ok_same(String.eq(rev, r), rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br)
+    case Up.TipWait{_ask}:
+      {==}
+    case Up.TipNo{_why}:
+      {==}
+
+# Every fate keeps its dependency's name, and waits only with a question. The
+# walk reads the name to find a dependency again, and a question to tell a
+# walk that waits from one that is done.
+
+# LAW: a pin moved, once the hub has had its word
+law mv.fine_hub:
+  for hb: Up.Hubbed
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for src: M.Source
+  for +hash: String
+  for +r: String
+  for +root2: String
+  for +nar2: String
+  for +man: String
+  for srcs: List<&2, String>
+  for +br: String
+  {mv.fine(Up.dep.hub(hb, M.Dep{hn, hh, he, src}, hash, r, root2, nar2, man, srcs, br), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_hub(hb, _hn, _hh, _he, src, _hash, _r, _root2, _nar2, _man, _srcs, _br):
+  match hb:
+    case Up.Clear{}:
+      match src:
+        case M.Hub{}:
+          {==}
+        case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+          {==}
+    case Up.Clash{}:
+      {==}
+    case Up.HubWait{_ask}:
+      {==}
+    case Up.HubNo{_why}:
+      {==}
+
+# LAW: a pin moved, once its checkout is in
+law mv.fine_adv:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +r: String
+  for +br: String
+  {mv.fine(Up.dep.advance(co, rs, hub, M.Dep{hn, hh, he, src}, r, br), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_adv(co, rs, hub, hn, hh, he, src, r, br):
+  match co:
+    case Up.Co{nar2, root2, +man, srcs}:
+      mv.fine_hub(Up.hubbed(rs, Up.HubHas{hub, Up.hash.of(man)}), hn, hh, he, src,
+        Up.hash.of(man), r, root2, nar2, man, srcs, br)
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: any verdict
+law mv.fine_verdict:
+  for v: U.Verdict
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tip: String
+  for +br: String
+  for +seen: String
+  {mv.fine(Up.dep.verdict(v, rs, hub, M.Dep{hn, hh, he, src}, tip, br, seen), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_verdict(v, rs, hub, hn, hh, he, src, _tip, br, _seen):
+  match v:
+    case U.Keep{}:
+      {==}
+    case U.Drift{}:
+      {==}
+    case U.Off{}:
+      {==}
+    case U.Advance{+rv, _tg}:
+      mv.fine_adv(Up.checkout(rs, Up.Tree{M.source.url(src), rv, he}), rs, hub, hn, hh, he, src,
+        rv, br)
+
+# LAW: the pin's own commit, once its checkout is in
+law mv.fine_kept:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tip: String
+  for +tg: String
+  {mv.fine(Up.dep.kept(co, rs, hub, M.Dep{hn, hh, he, src}, tip, tg), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_kept(co, rs, hub, hn, hh, he, src, tip, tg):
+  match co:
+    case Up.Co{nar2, root2, +man, _srcs}:
+      mv.fine_verdict(U.judge(True{}, True{}, U.agree(hh, Up.hash.of(man), M.source.nar(src),
+        nar2, M.source.root(src), root2), tip, tg), rs, hub, hn, hh, he, src, tip, "",
+        Up.hash.of(man))
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: another commit, once ancestry is in
+law mv.fine_onward:
+  for a: Up.Asc
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tip: String
+  for +tg: String
+  for +br: String
+  {mv.fine(Up.dep.onward(a, rs, hub, M.Dep{hn, hh, he, src}, tip, tg, br), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_onward(a, rs, hub, hn, hh, he, src, tip, tg, br):
+  match a:
+    case Up.Asc{yes}:
+      mv.fine_verdict(U.judge(False{}, yes, False{}, tip, tg), rs, hub, hn, hh, he, src, tip, br, "")
+    case Up.AscWait{_ask}:
+      {==}
+    case Up.AscNo{_why}:
+      {==}
+
+# LAW: the tip against the pin
+law mv.fine_same:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tip: String
+  for +tg: String
+  for +br: String
+  {mv.fine(Up.dep.same(s, rs, hub, M.Dep{hn, hh, he, src}, tip, tg, br), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_same(s, rs, hub, hn, hh, he, src, tip, tg, br):
+  match s:
+    case True{}:
+      mv.fine_kept(Up.checkout(rs, Up.Tree{M.source.url(src), M.source.rev(src), he}), rs, hub,
+        hn, hh, he, src, tip, tg)
+    case False{}:
+      mv.fine_onward(Up.onward(rs, Up.Above{M.source.url(src), M.source.rev(src), tip}), rs, hub,
+        hn, hh, he, src, tip, tg, br)
+
+# LAW: whatever tip the remote named
+law mv.fine_tip:
+  for t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  {mv.fine(Up.dep.tip(t, rs, hub, M.Dep{hn, hh, he, src}), hn) == (hn, True{}) : String & Bool}
+
+def mv.fine_tip(t, rs, hub, hn, hh, he, src):
+  match t:
+    case Up.At{+tip, +tg, +br}:
+      mv.fine_same(String.eq(M.source.rev(src), tip), rs, hub, hn, hh, he, src, tip, tg, br)
+    case Up.TipWait{_ask}:
+      {==}
+    case Up.TipNo{_why}:
+      {==}
+
+# LAW: every dependency's fate, whatever it was asked
+law mv.fine_one:
+  for am: U.Aim
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  {mv.fine(Up.dep.one(am, rs, only, hub, h), M.dep.name(h))
+    == (M.dep.name(h), True{}) : String & Bool}
+
+def mv.fine_one(am, rs, only, hub, h):
+  match am h:
+    case U.Hold{} M.Dep{_hn, _hh, _he, _src}:
+      {==}
+    case U.Follow{+ref} M.Dep{+hn, +hh, +he, +src}:
+      mv.fine_tip(Up.follow(rs, M.source.url(src), ref), rs, hub, hn, hh, he, src)
+    case U.Forward{} M.Dep{+hn, +hh, +he, +src}:
+      mv.fine_tip(Up.forward(rs, M.source.url(src)), rs, hub, hn, hh, he, src)
+
+# One pin's fate from what it was asked. A pin by its commit alone follows the
+# default branch when it is asked about, and one through a tag its tag; one
+# that is not asked about is held.
+
+# LAW: a pin by its commit alone, asked about or not
+law mv.fwd_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  {mv.ok(Up.dep.one(U.aim(s, M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, "", root, nar, vend)), Up.forward(rs, url), rs,
+    mv.git(hn, hh, he, url, rev, "", root, nar, vend)) == True{} : Bool}
+
+def mv.fwd_sel(s, rs, _only, hub, hn, hh, he, url, rev, root, nar, vend):
+  match s:
+    case False{}:
+      mv.self(Up.forward(rs, url), rs, hn, hh, he, url, rev, "", root, nar, vend)
+    case True{}:
+      mv.ok_tip(Up.forward(rs, url), rs, hub, hn, hh, he, url, rev, "", root, nar, vend)
+
+# LAW: a pin by its commit alone moves only along the default branch
+law mv.fwd_one:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for bare: {Laws.rev_only(h) == True{} : Bool}
+  {mv.ok(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h),
+    Up.forward(rs, M.source.url(M.source.dep(h))), rs, h) == True{} : Bool}
+
+def mv.fwd_one(rs, only, hub, h, bare):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}}), Up.forward(rs, ""), rs, M.Dep{hn, hh, he, M.Hub{}})
+            == True{} : Bool}, bare)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              mv.fwd_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, root, nar, vend)
+            case SCon{+c, +ct}:
+              Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), Up.forward(rs, url), rs,
+                mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}, bare)
+
+# LAW: a pin through a tag, asked about or not
+law mv.fol_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +c: Char
+  for +ct: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  {mv.ok(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), Up.follow(rs, url, SCon{c, ct}),
+    rs, mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}
+
+def mv.fol_sel(s, rs, _only, hub, hn, hh, he, url, rev, c, ct, root, nar, vend):
+  match s:
+    case False{}:
+      mv.self(Up.follow(rs, url, SCon{c, ct}), rs, hn, hh, he, url, rev, SCon{c, ct}, root, nar,
+        vend)
+    case True{}:
+      mv.ok_tip(Up.follow(rs, url, SCon{c, ct}), rs, hub, hn, hh, he, url, rev, SCon{c, ct},
+        root, nar, vend)
+
+# LAW: a pin through a tag moves only to what the tag names, along its history
+law mv.fol_one:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for named: {Laws.tagged(h) == True{} : Bool}
+  {mv.ok(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h),
+    Up.follow(rs, M.source.url(M.source.dep(h)), M.source.tag(M.source.dep(h))), rs, h)
+    == True{} : Bool}
+
+def mv.fol_one(rs, only, hub, h, named):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}}), Up.follow(rs, "", ""), rs, M.Dep{hn, hh, he, M.Hub{}})
+            == True{} : Bool}, named)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend)), Up.follow(rs, url, ""), rs,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend)) == True{} : Bool}, named)
+            case SCon{+c, +ct}:
+              mv.fol_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root, nar,
+                vend)
+
+# The walk over the ledger's dependencies. `M.find` answers the first
+# dependency of a name, and every fate keeps its name, so the walk leaves the
+# named dependency where the ledger had it, unless it refused or still asks.
+
+# LAW: a walk over no dependencies: the blank pin `M.find` answers is never
+# sound, so neither side holds
+law mv.walk_nil:
+  for s: Bool
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for pre: {mv.ok(Up.dep.one(U.aim(s, M.Hub{}), rs, only, hub, M.Dep{"", "", "", M.Hub{}}), t, rs,
+    M.Dep{"", "", "", M.Hub{}}) == True{} : Bool}
+  {mv.walk(t, rs, Up.deps.walk(rs, only, hub, []), M.Dep{"", "", "", M.Hub{}}, n) == True{} : Bool}
+
+def mv.walk_nil(s, _t, _rs, _only, _hub, _n, pre):
+  match s:
+    case True{}:
+      pre
+    case False{}:
+      pre
+
+# LAW: the named dependency's fate in front of the rest
+law mv.join_hit:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for e: {String.eq(hn, n) == True{} : Bool}
+  for ok: {mv.ok(f, t, rs, M.Dep{hn, hh, he, src}) == True{} : Bool}
+  for fn: {mv.fine(f, hn) == (hn, True{}) : String & Bool}
+  {mv.walk(t, rs, Up.deps.join(f, rest), M.Dep{hn, hh, he, src}, n) == True{} : Bool}
+
+def mv.join_hit(f, rest, t, rs, n, hn, hh, he, src, e, ok, fn):
+  match f rest:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _o, _nw, _pv, _m, _sy, _tr} Up.Deps{+ds, _ss, _es, _any, _sy2, _tr2, +asks, +bad}:
+      Equal.trans(Bool,
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+            M.find.pick(String.eq(dn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+            M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+        True{},
+        Equal.cong(String, Bool,
+          x => Bool.or(Bool.not(String.is_empty(bad)),
+            Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+                M.find.pick(String.eq(x, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+          dn, hn, Equal.cong(String & Bool, String, p => mv.fst(p), (dn, True{}), (hn, True{}), fn)),
+        Equal.trans(Bool,
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+              M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.Dep{dn, dh, de, dsrc}))),
+          True{},
+          Equal.cong(Bool, Bool,
+            y => Bool.or(Bool.not(String.is_empty(bad)),
+              Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+                Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+                  M.find.pick(y, M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+            String.eq(hn, n), True{}, e),
+          mv.or_r(Bool.not(String.is_empty(bad)),
+            Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.Dep{dn, dh, de, dsrc})),
+            mv.or_r(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.Dep{dn, dh, de, dsrc}), ok))))
+    case Up.Waits{[]} Up.Deps{+ds, _ss, _es, _any, _sy, _tr, +asks, +bad}:
+      Eq.bit.absurd(&2, {Bool.or(Bool.not(String.is_empty(bad)),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.find(ds, n)))) == True{} : Bool},
+        Equal.cong(String & Bool, Bool, p => mv.snd(p), (hn, False{}), (hn, True{}), fn))
+    case Up.Waits{_m <> _ms} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, +bad}:
+      mv.or_r(Bool.not(String.is_empty(bad)), True{}, {==})
+    case Up.Halts{+why} Up.Deps{+ds, _ss, _es, _any, _sy, _tr, +asks, _bad}:
+      mv.or_l(Bool.not(String.is_empty(Up.halt.why(why))),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.find(ds, n))),
+        mv.halt_not(why))
+
+# LAW: another dependency's fate in front of the rest
+law mv.join_miss:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +hn: String
+  for +old: M.Dep
+  for e: {String.eq(hn, n) == False{} : Bool}
+  for fn: {mv.fine(f, hn) == (hn, True{}) : String & Bool}
+  for ih: {mv.walk(t, rs, rest, old, n) == True{} : Bool}
+  {mv.walk(t, rs, Up.deps.join(f, rest), old, n) == True{} : Bool}
+
+def mv.join_miss(f, rest, t, rs, n, hn, old, e, fn, ih):
+  match f rest:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _o, _nw, _pv, _m, _sy, _tr} Up.Deps{+ds, _ss, _es, _any, _sy2, _tr2, +asks, +bad}:
+      Equal.trans(Bool,
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, old,
+            M.find.pick(String.eq(dn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, old,
+            M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+        True{},
+        Equal.cong(String, Bool,
+          x => Bool.or(Bool.not(String.is_empty(bad)),
+            Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Laws.moved.ok(t, rs, old,
+                M.find.pick(String.eq(x, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+          dn, hn, Equal.cong(String & Bool, String, p => mv.fst(p), (dn, True{}), (hn, True{}), fn)),
+        Equal.trans(Bool,
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Laws.moved.ok(t, rs, old,
+              M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Laws.moved.ok(t, rs, old, M.find(ds, n)))),
+          True{},
+          Equal.cong(Bool, Bool,
+            y => Bool.or(Bool.not(String.is_empty(bad)),
+              Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+                Laws.moved.ok(t, rs, old, M.find.pick(y, M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+            String.eq(hn, n), False{}, e),
+          ih))
+    case Up.Waits{[]} Up.Deps{+ds, _ss, _es, _any, _sy, _tr, +asks, +bad}:
+      Eq.bit.absurd(&2, {Bool.or(Bool.not(String.is_empty(bad)),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, old, M.find(ds, n)))) == True{} : Bool},
+        Equal.cong(String & Bool, Bool, p => mv.snd(p), (hn, False{}), (hn, True{}), fn))
+    case Up.Waits{_m <> _ms} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, +bad}:
+      mv.or_r(Bool.not(String.is_empty(bad)), True{}, {==})
+    case Up.Halts{+why} Up.Deps{+ds, _ss, _es, _any, _sy, _tr, +asks, _bad}:
+      mv.or_l(Bool.not(String.is_empty(Up.halt.why(why))),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)), Laws.moved.ok(t, rs, old, M.find(ds, n))),
+        mv.halt_not(why))
+
+# LAW: one step of the walk, whether or not its head is the named dependency
+law mv.walk_step:
+  for b: Bool
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tl: List<&2, M.Dep>
+  for e: {String.eq(hn, n) == b : Bool}
+  for pre: {mv.ok(Up.dep.one(U.aim(U.chosen(only,
+    M.dep.name(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))),
+    M.source.dep(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))), rs, only, hub,
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))), t, rs,
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))) == True{} : Bool}
+  for ih: {mv.ok(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(tl, n))),
+    M.source.dep(M.find(tl, n))), rs, only, hub, M.find(tl, n)), t, rs, M.find(tl, n))
+    == True{} : Bool}
+    -> {mv.walk(t, rs, Up.deps.walk(rs, only, hub, tl), M.find(tl, n), n) == True{} : Bool}
+  {mv.walk(t, rs, Up.deps.join(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub,
+    M.Dep{hn, hh, he, src}), Up.deps.walk(rs, only, hub, tl)),
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)), n) == True{} : Bool}
+
+def mv.walk_step(b, t, rs, only, hub, n, hn, hh, he, src, tl, e, pre, ih):
+  match b:
+    case True{}:
+      mv.join_hit(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), t, rs, n, hn, hh, he, src, e, pre,
+        mv.fine_one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}))
+    case False{}:
+      mv.join_miss(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), t, rs, n, hn, M.find(tl, n), e,
+        mv.fine_one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}), ih(pre))
+
+# LAW: the walk is sound for the named dependency when its fate is
+law mv.walk_ok:
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +ds: List<&2, M.Dep>
+  for pre: {mv.ok(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(ds, n))),
+    M.source.dep(M.find(ds, n))), rs, only, hub, M.find(ds, n)), t, rs, M.find(ds, n))
+    == True{} : Bool}
+  {mv.walk(t, rs, Up.deps.walk(rs, only, hub, ds), M.find(ds, n), n) == True{} : Bool}
+
+def mv.walk_ok(t, rs, only, hub, n, ds, pre):
+  match ds:
+    case []:
+      mv.walk_nil(U.chosen(only, ""), t, rs, only, hub, n, pre)
+    case +h <> +tl:
+      match h:
+        case M.Dep{+hn, +hh, +he, +src}:
+          mv.walk_step(String.eq(hn, n), t, rs, only, hub, n, hn, hh, he, src, tl, {==}, pre,
+            p => mv.walk_ok(t, rs, only, hub, n, tl, p))
+
+# The ledger model the upgrade renders. Every way the upgrade can end leaves
+# ez.toml's model as it was, except the one where every pin was answered and
+# one moved, which leaves the dependencies the walk left.
+
+# LAW: the model, once it is known whether a pin moved
+law mv.model_moved:
+  for moved: Bool
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +dds: List<&2, M.Dep>
+  for +tts: List<&2, M.Tool>
+  for wk: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), M.dep(Up.model.next(moved,
+    M.Manifest{name, entry, bin, hub, dds, tts}, M.Manifest{name, entry, bin, hub, ds, ts}), n))
+    == True{} : Bool}
+
+def mv.model_moved(moved, _t, _rs, _n, _name, _entry, _bin, _hub, _ds, _ts, _dds, _tts, wk, self):
+  match moved:
+    case True{}:
+      wk
+    case False{}:
+      self
+
+# LAW: the model, once the sources are known
+law mv.model_srcs:
+  for srcs: Up.Srcs
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +dds: List<&2, M.Dep>
+  for +ss: List<&2, U.Swap>
+  for +es: List<&2, U.Swap>
+  for +dm: Bool
+  for +dsy: List<&2, String>
+  for +dtr: List<&2, Up.Laid>
+  for +tts: List<&2, M.Tool>
+  for +tm: Bool
+  for +tsy: List<&2, String>
+  for +ig: String
+  for wk: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+    Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), n))
+    == True{} : Bool}
+
+def mv.model_srcs(srcs, t, rs, n, name, entry, bin, hub, ds, ts, dds, _ss, _es, dm, _dsy, _dtr,
+  tts, tm, _tsy, _ig, wk, self):
+  match srcs:
+    case Up.Srcs{_fs}:
+      mv.model_moved(Bool.or(dm, tm), t, rs, n, name, entry, bin, hub, ds, ts, dds, tts, wk, self)
+    case Up.SrcsWait{_ask}:
+      self
+    case Up.SrcsNo{_why}:
+      self
+
+# LAW: the model, once `.gitignore` is known
+law mv.model_ignore:
+  for said: Up.Said
+  for +srcs: Up.Srcs
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +dds: List<&2, M.Dep>
+  for +ss: List<&2, U.Swap>
+  for +es: List<&2, U.Swap>
+  for +dm: Bool
+  for +dsy: List<&2, String>
+  for +dtr: List<&2, Up.Laid>
+  for +tts: List<&2, M.Tool>
+  for +tm: Bool
+  for +tsy: List<&2, String>
+  for wk: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.got.ignore(said, srcs,
+    M.Manifest{name, entry, bin, hub, ds, ts},
+    Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), n))
+    == True{} : Bool}
+
+def mv.model_ignore(said, srcs, t, rs, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr,
+  tts, tm, tsy, wk, self):
+  match said:
+    case Up.Said{+ig}:
+      mv.model_srcs(srcs, t, rs, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts,
+        tm, tsy, ig, wk, self)
+    case Up.Unsaid{_why}:
+      self
+    case Up.Unasked{_ask}:
+      self
+
+# LAW: the model, once the pins are answered or refused
+law mv.model_pins:
+  for dd: Up.Deps
+  for tt: Up.Tools
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wk: {mv.walk(t, rs, dd, M.find(ds, n), n) == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.pins(dd, tt, rs,
+    M.Manifest{name, entry, bin, hub, ds, ts}), n)) == True{} : Bool}
+
+def mv.model_pins(dd, tt, t, rs, n, name, entry, bin, hub, ds, ts, wk, self):
+  match dd tt:
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SCon{_c, _cs}} Up.Tools{_tts, _tm, _tsy, _tasks, _tbad}:
+      self
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SNil{}} Up.Tools{_tts, _tm, _tsy, _tasks, SCon{_c, _cs}}:
+      self
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _a <> _as, SNil{}} Up.Tools{_tts, _tm, _tsy, _tasks, SNil{}}:
+      self
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, [], SNil{}} Up.Tools{_tts, _tm, _tsy, _a <> _as, SNil{}}:
+      self
+    case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, [], SNil{}} Up.Tools{+tts, +tm, +tsy, [], SNil{}}:
+      mv.model_ignore(Up.text.said(rs, Up.Ignore{}),
+        Up.ask.srcs(List.is_empty(&2, U.Swap, es), rs), t, rs, n, name, entry,
+        bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm, tsy, wk, self)
+
+# LAW: the model, once `--package` is known to name something
+law mv.model_known:
+  for k: Bool
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wk: {mv.walk(t, rs, Up.deps.walk(rs, only, M.hub.or(hub), ds), M.find(ds, n), n)
+    == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.known(k, only, rs,
+    M.Manifest{name, entry, bin, hub, ds, ts}), n)) == True{} : Bool}
+
+def mv.model_known(k, t, rs, only, n, name, entry, bin, hub, ds, ts, wk, self):
+  match k:
+    case False{}:
+      self
+    case True{}:
+      mv.model_pins(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), t, rs,
+        n, name, entry, bin, hub, ds, ts, wk, self)
+
+# LAW: a pin by its commit alone, in any ledger an upgrade reads
+law mv.fwd_top:
+  for r: M.Read
+  for +only: String
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +bare: {Laws.rev_only(M.dep(r, n)) == True{} : Bool}
+  {Laws.moved.ok(Up.forward(rs, M.source.url(M.source.dep(M.dep(r, n)))), rs, M.dep(r, n),
+    mv.dep(Up.next(only, r, rs), n)) == True{} : Bool}
+
+def mv.fwd_top(r, only, rs, n, bare):
+  match r:
+    case M.Bad{_why}:
+      bare
+    case M.Good{m}:
+      match m:
+        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+          mv.model_known(Bool.or(U.known(only, ds), M.tool.known(only, ts)),
+            Up.forward(rs, M.source.url(M.source.dep(M.find(ds, n)))), rs, only, n, name, entry,
+            bin, hub, ds, ts,
+            mv.walk_ok(Up.forward(rs, M.source.url(M.source.dep(M.find(ds, n)))), rs, only,
+              M.hub.or(hub), n, ds, mv.fwd_one(rs, only, M.hub.or(hub), M.find(ds, n), bare)),
+            mv.self_dep(Up.forward(rs, M.source.url(M.source.dep(M.find(ds, n)))), rs,
+              M.find(ds, n), mv.bare_git(M.find(ds, n), bare)))
+
+# LAW: a pin through a tag, in any ledger an upgrade reads
+law mv.fol_top:
+  for r: M.Read
+  for +only: String
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +named: {Laws.tagged(M.dep(r, n)) == True{} : Bool}
+  {Laws.moved.ok(Up.follow(rs, M.source.url(M.source.dep(M.dep(r, n))),
+    M.source.tag(M.source.dep(M.dep(r, n)))), rs, M.dep(r, n),
+    mv.dep(Up.next(only, r, rs), n)) == True{} : Bool}
+
+def mv.fol_top(r, only, rs, n, named):
+  match r:
+    case M.Bad{_why}:
+      named
+    case M.Good{m}:
+      match m:
+        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+          mv.model_known(Bool.or(U.known(only, ds), M.tool.known(only, ts)),
+            Up.follow(rs, M.source.url(M.source.dep(M.find(ds, n))),
+              M.source.tag(M.source.dep(M.find(ds, n)))), rs, only, n, name, entry, bin, hub, ds, ts,
+            mv.walk_ok(Up.follow(rs, M.source.url(M.source.dep(M.find(ds, n))),
+              M.source.tag(M.source.dep(M.find(ds, n)))), rs, only, M.hub.or(hub), n, ds,
+              mv.fol_one(rs, only, M.hub.or(hub), M.find(ds, n), named)),
+            mv.self_dep(Up.follow(rs, M.source.url(M.source.dep(M.find(ds, n))),
+              M.source.tag(M.source.dep(M.find(ds, n)))), rs, M.find(ds, n),
+              mv.named_git(M.find(ds, n), named)))
+
+# A plain lock leaves ez.toml's model as it is; an upgrade leaves what the
+# walk decided, which is sound for the named dependency.
+def Laws.upgrade_forward_moves_onward(w, n, bare):
+  match w:
+    case W.World{args, +ledger, _listing, _replies, +ups}:
+      match args:
+        case W.Args{up, +only}:
+          match up:
+            case False{}:
+              mv.self_dep(Up.forward(ups, M.source.url(M.source.dep(M.dep(W.parsed(ledger), n)))),
+                ups, M.dep(W.parsed(ledger), n), mv.bare_git(M.dep(W.parsed(ledger), n), bare))
+            case True{}:
+              mv.fwd_top(W.parsed(ledger), only, ups, n, bare)
+
+def Laws.upgrade_tag_follows(w, n, named):
+  match w:
+    case W.World{args, +ledger, _listing, _replies, +ups}:
+      match args:
+        case W.Args{up, +only}:
+          match up:
+            case False{}:
+              mv.self_dep(Up.follow(ups, M.source.url(M.source.dep(M.dep(W.parsed(ledger), n))),
+                M.source.tag(M.source.dep(M.dep(W.parsed(ledger), n)))),
+                ups, M.dep(W.parsed(ledger), n), mv.named_git(M.dep(W.parsed(ledger), n), named))
+            case True{}:
+              mv.fol_top(W.parsed(ledger), only, ups, n, named)
+
+# The upgrade's refusals. A pin whose fate refuses makes the walk refuse,
+# since a refusal ahead of the rest wins and its reason is never empty
+# (`Up.halt.why`), and a walk that refuses stops the upgrade, which stops the
+# lock.
+
+# LAW: the dependency `M.find` answers from a repository has the name asked for
+law mv.find_pick_named:
+  for b: Bool
+  for +n: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tl: List<&2, M.Dep>
+  for e: {String.eq(hn, n) == b : Bool}
+  for g: {M.source.is_git(M.source.dep(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))))
+    == True{} : Bool}
+  for ih: {M.source.is_git(M.source.dep(M.find(tl, n))) == True{} : Bool}
+    -> {M.dep.name(M.find(tl, n)) == n : String}
+  {M.dep.name(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))) == n : String}
+
+def mv.find_pick_named(b, n, hn, _hh, _he, _src, _tl, e, g, ih):
+  match b:
+    case True{}:
+      Str.string_eq_true(hn, n, e)
+    case False{}:
+      ih(g)
+
+law mv.find_named:
+  for +ds: List<&2, M.Dep>
+  for +n: String
+  for g: {M.source.is_git(M.source.dep(M.find(ds, n))) == True{} : Bool}
+  {M.dep.name(M.find(ds, n)) == n : String}
+
+def mv.find_named(ds, n, g):
+  match ds:
+    case []:
+      Eq.bit.absurd(&2, {"" == n : String}, g)
+    case +h <> +tl:
+      match h:
+        case M.Dep{+hn, +hh, +he, +src}:
+          mv.find_pick_named(String.eq(hn, n), n, hn, hh, he, src, tl, {==}, g,
+            p => mv.find_named(tl, n, p))
+
+# LAW: and so does the one a ledger that was read answers
+law mv.dep_named:
+  for r: M.Read
+  for +n: String
+  for g: {M.source.is_git(M.source.dep(M.dep(r, n))) == True{} : Bool}
+  {M.dep.name(M.dep(r, n)) == n : String}
+
+def mv.dep_named(r, n, g):
+  match r:
+    case M.Bad{_why}:
+      Eq.bit.absurd(&2, {"" == n : String}, g)
+    case M.Good{m}:
+      match m:
+        case M.Manifest{_name, _entry, _bin, _hub, +ds, _ts}:
+          mv.find_named(ds, n, g)
+
+# LAW: a tip that is another commit, which the remote says does not descend
+# from the pin, is refused
+law mv.tip_off:
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for moved: {String.eq(rev, tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{url, rev, tip}) == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend))) == True{} : Bool}
+
+def mv.tip_off(rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, tg, br, moved, off):
+  Equal.trans(Bool,
+    mv.halts(Up.dep.same(String.eq(rev, tip), rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+    mv.halts(Up.dep.same(False{}, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+    True{},
+    Equal.cong(Bool, Bool, s => mv.halts(Up.dep.same(s, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+      String.eq(rev, tip), False{}, moved),
+    Equal.cong(Up.Asc, Bool, a => mv.halts(Up.dep.onward(a, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+      Up.onward(rs, Up.Above{url, rev, tip}), Up.Asc{False{}}, off))
+
+# LAW: the pin's own commit, whose checkout no longer agrees with the pin, is
+# refused
+law mv.tip_drift:
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for +nar2: String
+  for +root2: String
+  for +man: String
+  for +srcs: List<&2, String>
+  for same: {String.eq(rev, tip) == True{} : Bool}
+  for co: {Up.checkout(rs, Up.Tree{url, rev, he}) == Up.Co{nar2, root2, man, srcs} : Up.Co}
+  for drift: {U.agree(hh, Up.hash.of(man), nar, nar2, root, root2) == False{} : Bool}
+  {mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend))) == True{} : Bool}
+
+def mv.tip_drift(rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, tg, br, nar2, root2, man,
+  srcs, same, co, drift):
+  Equal.trans(Bool,
+    mv.halts(Up.dep.same(String.eq(rev, tip), rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+    mv.halts(Up.dep.same(True{}, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+    True{},
+    Equal.cong(Bool, Bool, s => mv.halts(Up.dep.same(s, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+      String.eq(rev, tip), True{}, same),
+    Equal.trans(Bool,
+      mv.halts(Up.dep.kept(Up.checkout(rs, Up.Tree{url, rev, he}), rs, hub,
+        mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg)),
+      mv.halts(Up.dep.kept(Up.Co{nar2, root2, man, srcs}, rs, hub,
+        mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg)),
+      True{},
+      Equal.cong(Up.Co, Bool, c => mv.halts(Up.dep.kept(c, rs, hub,
+        mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg)),
+        Up.checkout(rs, Up.Tree{url, rev, he}), Up.Co{nar2, root2, man, srcs}, co),
+      Equal.cong(Bool, Bool, g => mv.halts(Up.dep.verdict(U.judge(True{}, True{}, g, tip, tg), rs,
+        hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, "", Up.hash.of(man))),
+        U.agree(hh, Up.hash.of(man), nar, nar2, root, root2), False{}, drift)))
+
+# LAW: a pin by its commit alone that is asked about, whose default branch
+# tip is another commit not descended from it, is refused
+law mv.fwd_off_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for sel: {s == True{} : Bool}
+  for head: {Up.forward(rs, url) == Up.At{tip, tg, br} : Up.Tip}
+  for moved: {String.eq(rev, tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{url, rev, tip}) == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, "", root, nar, vend))) == True{} : Bool}
+
+def mv.fwd_off_sel(s, rs, _only, hub, hn, hh, he, url, rev, root, nar, vend, tip, tg, br, sel, head,
+  moved, off):
+  match s:
+    case False{}:
+      sel
+    case True{}:
+      Equal.trans(Bool,
+        mv.halts(Up.dep.tip(Up.forward(rs, url), rs, hub,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend))),
+        mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend))),
+        True{},
+        Equal.cong(Up.Tip, Bool, x => mv.halts(Up.dep.tip(x, rs, hub,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend))),
+          Up.forward(rs, url), Up.At{tip, tg, br}, head),
+        mv.tip_off(rs, hub, hn, hh, he, url, rev, "", root, nar, vend, tip, tg, br, moved, off))
+
+law mv.fwd_off:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for bare: {Laws.rev_only(h) == True{} : Bool}
+  for sel: {U.chosen(only, M.dep.name(h)) == True{} : Bool}
+  for head: {Up.forward(rs, M.source.url(M.source.dep(h))) == Up.At{tip, tg, br} : Up.Tip}
+  for moved: {String.eq(M.source.rev(M.source.dep(h)), tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{M.source.url(M.source.dep(h)), M.source.rev(M.source.dep(h)), tip})
+    == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h))
+    == True{} : Bool}
+
+def mv.fwd_off(rs, only, hub, h, tip, tg, br, bare, sel, head, moved, off):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}})) == True{} : Bool}, bare)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              mv.fwd_off_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, root, nar,
+                vend, tip, tg, br, sel, head, moved, off)
+            case SCon{+c, +ct}:
+              Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}, bare)
+
+# LAW: a pin through a tag that is asked about, whose tag now names another
+# commit not descended from it, is refused
+law mv.fol_off_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +c: Char
+  for +ct: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for sel: {s == True{} : Bool}
+  for refs: {Up.follow(rs, url, SCon{c, ct}) == Up.At{tip, tg, br} : Up.Tip}
+  for moved: {String.eq(rev, tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{url, rev, tip}) == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}
+
+def mv.fol_off_sel(s, rs, _only, hub, hn, hh, he, url, rev, c, ct, root, nar, vend, tip, tg, br, sel,
+  refs, moved, off):
+  match s:
+    case False{}:
+      sel
+    case True{}:
+      Equal.trans(Bool,
+        mv.halts(Up.dep.tip(Up.follow(rs, url, SCon{c, ct}), rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+        mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+        True{},
+        Equal.cong(Up.Tip, Bool, x => mv.halts(Up.dep.tip(x, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+          Up.follow(rs, url, SCon{c, ct}), Up.At{tip, tg, br}, refs),
+        mv.tip_off(rs, hub, hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend, tip, tg, br, moved,
+          off))
+
+law mv.fol_off:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for named: {Laws.tagged(h) == True{} : Bool}
+  for sel: {U.chosen(only, M.dep.name(h)) == True{} : Bool}
+  for refs: {Up.follow(rs, M.source.url(M.source.dep(h)), M.source.tag(M.source.dep(h)))
+    == Up.At{tip, tg, br} : Up.Tip}
+  for moved: {String.eq(M.source.rev(M.source.dep(h)), tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{M.source.url(M.source.dep(h)), M.source.rev(M.source.dep(h)), tip})
+    == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h))
+    == True{} : Bool}
+
+def mv.fol_off(rs, only, hub, h, tip, tg, br, named, sel, refs, moved, off):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}})) == True{} : Bool}, named)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend))) == True{} : Bool}, named)
+            case SCon{+c, +ct}:
+              mv.fol_off_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root,
+                nar, vend, tip, tg, br, sel, refs, moved, off)
+
+# LAW: a pin through a tag that is asked about, whose tag still names its
+# commit but whose checkout no longer agrees with it, is refused
+law mv.fol_drift_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +c: Char
+  for +ct: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for +nar2: String
+  for +root2: String
+  for +man: String
+  for +srcs: List<&2, String>
+  for sel: {s == True{} : Bool}
+  for refs: {Up.follow(rs, url, SCon{c, ct}) == Up.At{tip, tg, br} : Up.Tip}
+  for same: {String.eq(rev, tip) == True{} : Bool}
+  for co: {Up.checkout(rs, Up.Tree{url, rev, he}) == Up.Co{nar2, root2, man, srcs} : Up.Co}
+  for drift: {U.agree(hh, Up.hash.of(man), nar, nar2, root, root2) == False{} : Bool}
+  {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}
+
+def mv.fol_drift_sel(s, rs, _only, hub, hn, hh, he, url, rev, c, ct, root, nar, vend, tip, tg, br,
+  nar2, root2, man, srcs, sel, refs, same, co, drift):
+  match s:
+    case False{}:
+      sel
+    case True{}:
+      Equal.trans(Bool,
+        mv.halts(Up.dep.tip(Up.follow(rs, url, SCon{c, ct}), rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+        mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+        True{},
+        Equal.cong(Up.Tip, Bool, x => mv.halts(Up.dep.tip(x, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+          Up.follow(rs, url, SCon{c, ct}), Up.At{tip, tg, br}, refs),
+        mv.tip_drift(rs, hub, hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend, tip, tg, br, nar2,
+          root2, man, srcs, same, co, drift))
+
+law mv.fol_drift:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for +nar2: String
+  for +root2: String
+  for +man: String
+  for +srcs: List<&2, String>
+  for named: {Laws.tagged(h) == True{} : Bool}
+  for sel: {U.chosen(only, M.dep.name(h)) == True{} : Bool}
+  for refs: {Up.follow(rs, M.source.url(M.source.dep(h)), M.source.tag(M.source.dep(h)))
+    == Up.At{tip, tg, br} : Up.Tip}
+  for same: {String.eq(M.source.rev(M.source.dep(h)), tip) == True{} : Bool}
+  for co: {Up.checkout(rs, Up.Tree{M.source.url(M.source.dep(h)), M.source.rev(M.source.dep(h)),
+    M.dep.entry(h)}) == Up.Co{nar2, root2, man, srcs} : Up.Co}
+  for drift: {U.agree(M.dep.hash(h), Up.hash.of(man), M.source.nar(M.source.dep(h)), nar2,
+    M.source.root(M.source.dep(h)), root2) == False{} : Bool}
+  {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h))
+    == True{} : Bool}
+
+def mv.fol_drift(rs, only, hub, h, tip, tg, br, nar2, root2, man, srcs, named, sel, refs, same, co,
+  drift):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}})) == True{} : Bool}, named)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend))) == True{} : Bool}, named)
+            case SCon{+c, +ct}:
+              mv.fol_drift_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root,
+                nar, vend, tip, tg, br, nar2, root2, man, srcs, sel, refs, same, co, drift)
+
+# LAW: a walk with no dependencies has no refusal to carry, so none of them
+# refused
+law mv.halts_nil:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for hl: {mv.halts(Up.dep.one(U.aim(s, M.Hub{}), rs, only, hub, M.Dep{"", "", "", M.Hub{}}))
+    == True{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.walk(rs, only, hub, []))) == False{} : Bool}
+
+def mv.halts_nil(s, _rs, _only, _hub, hl):
+  match s:
+    case True{}:
+      Eq.bit.absurd(&2, {True{} == False{} : Bool}, hl)
+    case False{}:
+      Eq.bit.absurd(&2, {True{} == False{} : Bool}, hl)
+
+# LAW: a fate that refuses, in front of the rest, makes the walk refuse
+law mv.join_bad:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for hl: {mv.halts(f) == True{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.join(f, rest))) == False{} : Bool}
+
+def mv.join_bad(f, rest, hl):
+  match f rest:
+    case Up.Became{_d, _o, _nw, _pv, _m, _sy, _tr} Up.Deps{_ds, _ss, _es, _any, _sy2, _tr2, _asks, bad}:
+      Eq.bit.absurd(&2, {String.is_empty(bad) == False{} : Bool}, hl)
+    case Up.Waits{_more} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, bad}:
+      Eq.bit.absurd(&2, {String.is_empty(bad) == False{} : Bool}, hl)
+    case Up.Halts{why} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, _bad}:
+      mv.halt_ne(why)
+
+# LAW: and a walk that refused behind any fate still refuses
+law mv.join_keeps:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for ih: {String.is_empty(mv.bad(rest)) == False{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.join(f, rest))) == False{} : Bool}
+
+def mv.join_keeps(f, rest, ih):
+  match f rest:
+    case Up.Became{_d, _o, _nw, _pv, _m, _sy, _tr} Up.Deps{_ds, _ss, _es, _any, _sy2, _tr2, _asks, _bad}:
+      ih
+    case Up.Waits{_more} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, _bad}:
+      ih
+    case Up.Halts{why} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, _bad}:
+      mv.halt_ne(why)
+
+# LAW: one step of the walk
+law mv.halts_step:
+  for b: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tl: List<&2, M.Dep>
+  for hl: {mv.halts(Up.dep.one(U.aim(U.chosen(only,
+    M.dep.name(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))),
+    M.source.dep(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))), rs, only, hub,
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))) == True{} : Bool}
+  for ih: {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(tl, n))),
+    M.source.dep(M.find(tl, n))), rs, only, hub, M.find(tl, n))) == True{} : Bool}
+    -> {String.is_empty(mv.bad(Up.deps.walk(rs, only, hub, tl))) == False{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.join(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub,
+    M.Dep{hn, hh, he, src}), Up.deps.walk(rs, only, hub, tl)))) == False{} : Bool}
+
+def mv.halts_step(b, rs, only, hub, _n, hn, hh, he, src, tl, hl, ih):
+  match b:
+    case True{}:
+      mv.join_bad(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), hl)
+    case False{}:
+      mv.join_keeps(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), ih(hl))
+
+# LAW: the walk refuses when the named dependency's fate does
+law mv.walk_halts:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +ds: List<&2, M.Dep>
+  for hl: {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(ds, n))),
+    M.source.dep(M.find(ds, n))), rs, only, hub, M.find(ds, n))) == True{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.walk(rs, only, hub, ds))) == False{} : Bool}
+
+def mv.walk_halts(rs, only, hub, n, ds, hl):
+  match ds:
+    case []:
+      mv.halts_nil(U.chosen(only, ""), rs, only, hub, hl)
+    case +h <> +tl:
+      match h:
+        case M.Dep{+hn, +hh, +he, +src}:
+          mv.halts_step(String.eq(hn, n), rs, only, hub, n, hn, hh, he, src, tl, hl,
+            p => mv.walk_halts(rs, only, hub, n, tl, p))
+
+# LAW: a walk that refuses stops the upgrade
+law mv.pins_stop:
+  for dd: Up.Deps
+  for tt: Up.Tools
+  for +rs: List<&2, Up.Reply>
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wb: {String.is_empty(mv.bad(dd)) == False{} : Bool}
+  {mv.stops(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds, ts})) == True{} : Bool}
+
+def mv.pins_stop(dd, tt, rs, name, entry, bin, hub, ds, ts, wb):
+  match dd tt:
+    case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, +dasks, SNil{}} Up.Tools{+tts, +tm, +tsy, +tasks, +tbad}:
+      Eq.bit.absurd2(&2, {mv.stops(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, ""},
+        Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, ds, ts}))
+        == True{} : Bool}, wb)
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SCon{_c, _cs}} Up.Tools{_tts, _tm, _tsy, _tasks, _tbad}:
+      {==}
+
+# LAW: and so does a `--package` that names nothing
+law mv.known_stop:
+  for k: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wb: {String.is_empty(mv.bad(Up.deps.walk(rs, only, M.hub.or(hub), ds))) == False{} : Bool}
+  {mv.stops(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds, ts})) == True{} : Bool}
+
+def mv.known_stop(k, rs, only, name, entry, bin, hub, ds, ts, wb):
+  match k:
+    case False{}:
+      {==}
+    case True{}:
+      mv.pins_stop(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), rs, name,
+        entry, bin, hub, ds, ts, wb)
+
+# LAW: an upgrade that stops is a lock that refuses
+law mv.refuses_of:
+  for nx: Up.Next
+  for +listing: W.Listing
+  for +replies: List<&2, W.Reply>
+  for st: {mv.stops(nx) == True{} : Bool}
+  {P.refuses.doc(P.decide(W.inputs.of(nx, listing, replies))) == True{} : Bool}
+
+def mv.refuses_of(nx, listing, replies, st):
+  match nx:
+    case Up.Next{+model, +read, SNil{}, +asks, +trees, +vends, +says, +edits, +found, +drops, +swaps}:
+      Eq.bit.absurd(&2, {P.refuses.doc(P.decide(W.inputs.of(Up.Next{model, read, "", asks, trees,
+        vends, says, edits, found, drops, swaps}, listing, replies))) == True{} : Bool}, st)
+    case Up.Next{_model, _read, SCon{_c, _cs}, _asks, _trees, _vends, _says, _edits, _found, _drops, _swaps}:
+      {==}
+
+# LAW: a lock refuses when the named dependency's fate under `--upgrade` does
+law mv.refuses_top:
+  for r: M.Read
+  for +only: String
+  for +rs: List<&2, Up.Reply>
+  for +listing: W.Listing
+  for +replies: List<&2, W.Reply>
+  for +n: String
+  for g: {M.source.is_git(M.source.dep(M.dep(r, n))) == True{} : Bool}
+  for hl: {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.dep(r, n))),
+    M.source.dep(M.dep(r, n))), rs, only, M.hub_of(r), M.dep(r, n))) == True{} : Bool}
+  {P.refuses.doc(P.decide(W.inputs.of(Up.next(only, r, rs), listing, replies))) == True{} : Bool}
+
+def mv.refuses_top(r, only, rs, listing, replies, n, g, hl):
+  match r:
+    case M.Bad{+why}:
+      Eq.bit.absurd(&2, {P.refuses.doc(P.decide(W.inputs.of(Up.next(only, M.Bad{why}, rs), listing,
+        replies))) == True{} : Bool}, g)
+    case M.Good{m}:
+      match m:
+        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+          mv.refuses_of(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, ds, ts}}, rs), listing,
+            replies, mv.known_stop(Bool.or(U.known(only, ds), M.tool.known(only, ts)), rs, only,
+              name, entry, bin, hub, ds, ts, mv.walk_halts(rs, only, M.hub.or(hub), n, ds, hl)))
+
+# `--package` names the dependency, so it is the one asked about
+def Laws.upgrade_forward_refuses_off(w, n, tip, tag, branch, up, bare, sel, head, moved, off):
+  match w:
+    case W.World{args, +ledger, +listing, +replies, +ups}:
+      match args:
+        case W.Args{u, +only}:
+          match u:
+            case False{}:
+              Eq.bit.absurd(&2, {P.refuses(W.World{W.Args{False{}, only}, ledger, listing, replies,
+                ups}) == True{} : Bool}, up)
+            case True{}:
+              mv.refuses_top(W.parsed(ledger), only, ups, listing, replies, n,
+                mv.bare_git(M.dep(W.parsed(ledger), n), bare),
+                mv.fwd_off(ups, only, M.hub_of(W.parsed(ledger)), M.dep(W.parsed(ledger), n), tip,
+                  tag, branch, bare,
+                  Equal.trans(Bool, U.chosen(only, M.dep.name(M.dep(W.parsed(ledger), n))),
+                    U.chosen(only, n), True{},
+                    Equal.cong(String, Bool, x => U.chosen(only, x),
+                      M.dep.name(M.dep(W.parsed(ledger), n)), n,
+                      mv.dep_named(W.parsed(ledger), n, mv.bare_git(M.dep(W.parsed(ledger), n), bare))),
+                    sel),
+                  head, moved, off))
+
+def Laws.upgrade_tag_refuses_off(w, n, tip, tag, branch, up, named, sel, refs, moved, off):
+  match w:
+    case W.World{args, +ledger, +listing, +replies, +ups}:
+      match args:
+        case W.Args{u, +only}:
+          match u:
+            case False{}:
+              Eq.bit.absurd(&2, {P.refuses(W.World{W.Args{False{}, only}, ledger, listing, replies,
+                ups}) == True{} : Bool}, up)
+            case True{}:
+              mv.refuses_top(W.parsed(ledger), only, ups, listing, replies, n,
+                mv.named_git(M.dep(W.parsed(ledger), n), named),
+                mv.fol_off(ups, only, M.hub_of(W.parsed(ledger)), M.dep(W.parsed(ledger), n), tip,
+                  tag, branch, named,
+                  Equal.trans(Bool, U.chosen(only, M.dep.name(M.dep(W.parsed(ledger), n))),
+                    U.chosen(only, n), True{},
+                    Equal.cong(String, Bool, x => U.chosen(only, x),
+                      M.dep.name(M.dep(W.parsed(ledger), n)), n,
+                      mv.dep_named(W.parsed(ledger), n, mv.named_git(M.dep(W.parsed(ledger), n), named))),
+                    sel),
+                  refs, moved, off))
+
+def Laws.upgrade_tag_refuses_drift(w, n, tip, tag, branch, nar, root, manifest, srcs, up, named, sel,
+  refs, same, co, drift):
+  match w:
+    case W.World{args, +ledger, +listing, +replies, +ups}:
+      match args:
+        case W.Args{u, +only}:
+          match u:
+            case False{}:
+              Eq.bit.absurd(&2, {P.refuses(W.World{W.Args{False{}, only}, ledger, listing, replies,
+                ups}) == True{} : Bool}, up)
+            case True{}:
+              mv.refuses_top(W.parsed(ledger), only, ups, listing, replies, n,
+                mv.named_git(M.dep(W.parsed(ledger), n), named),
+                mv.fol_drift(ups, only, M.hub_of(W.parsed(ledger)), M.dep(W.parsed(ledger), n), tip,
+                  tag, branch, nar, root, manifest, srcs, named,
+                  Equal.trans(Bool, U.chosen(only, M.dep.name(M.dep(W.parsed(ledger), n))),
+                    U.chosen(only, n), True{},
+                    Equal.cong(String, Bool, x => U.chosen(only, x),
+                      M.dep.name(M.dep(W.parsed(ledger), n)), n,
+                      mv.dep_named(W.parsed(ledger), n, mv.named_git(M.dep(W.parsed(ledger), n), named))),
+                    sel),
+                  refs, same, co, drift))

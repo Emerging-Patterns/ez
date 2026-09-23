@@ -7,6 +7,7 @@ import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
 import ./up.bend as Up
+import ../manifest/upgrade.bend as U
 import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../pkg/pkg.bend as K
@@ -483,3 +484,176 @@ law trim_quoted:
 law strip_quoted:
   for +v: String
   {T.strip(T.quote(v), '"', '"') == v : String}
+
+# The upgrade's moves. `ez lock --upgrade` asks the remote about each selected
+# pin with a commit: one with a tag re-resolves the tag (a `Refs` answer, read
+# by `Up.follow`), and one with only a commit follows the default branch (a
+# `Head` answer, read by `Up.forward`). Either moves only to a commit the
+# remote says descends from the pin (an `Above` answer, read by `Up.onward`).
+# The laws are stated over `P.ledger.next`, the ledger model the upgrade
+# renders into ez.toml, which is ez.toml as it was when the upgrade refuses,
+# so they hold of the file's bytes relative to EZ-LED-4. That the remote's
+# answers are true of the repository is EZ-RES-7. Law vocabulary: ez never
+# calls it.
+
+# the answers to the upgrade's questions a World holds
+def ups(world: W.World) -> List<&2, Up.Reply>:
+  W.World{_args, _ledger, _listing, _replies, ups} = world
+  ups
+
+# the source ez.toml records for the dependency named `n`
+def pin(world: W.World, n: String) -> M.Source:
+  M.source.dep(W.dep(world, n))
+
+# whether a source is pinned by its commit alone, with no tag
+def rev_only.src(src: M.Source) -> Bool:
+  match src:
+    case M.Hub{}:
+      False{}
+    case M.Git{_url, _rev, tag, _root, _nar, _vend}:
+      String.is_empty(tag)
+
+# whether a dependency is pinned by its commit alone
+def rev_only(dep: M.Dep) -> Bool:
+  rev_only.src(M.source.dep(dep))
+
+# whether a source is pinned through a tag
+def tagged.src(src: M.Source) -> Bool:
+  match src:
+    case M.Hub{}:
+      False{}
+    case M.Git{_url, _rev, tag, _root, _nar, _vend}:
+      Bool.not(String.is_empty(tag))
+
+# whether a dependency is pinned through a tag
+def tagged(dep: M.Dep) -> Bool:
+  tagged.src(M.source.dep(dep))
+
+# whether the remote said a commit descends from the pin
+def onward.yes(asc: Up.Asc) -> Bool:
+  match asc:
+    case Up.Asc{yes}:
+      yes
+    case Up.AscWait{_ask}:
+      False{}
+    case Up.AscNo{_why}:
+      False{}
+
+# whether `rev` is the commit the remote named, and the remote said that
+# commit descends from `pin`
+def moved.to(tip: Up.Tip, +rs: List<&2, Up.Reply>, +url: String, +pin: String, +rev: String) -> Bool:
+  match tip:
+    case Up.At{+to, _tag, _branch}:
+      Bool.and(String.eq(rev, to), onward.yes(Up.onward(rs, Up.Above{url, pin, to})))
+    case Up.TipWait{_ask}:
+      False{}
+    case Up.TipNo{_why}:
+      False{}
+
+# whether `new` is `old` kept or moved along its history: a pin from a
+# repository still, with the tag `old` had, at `old`'s commit or at the commit
+# `tip` names when the remote said it descends from `old`'s
+def moved.ok(tip: Up.Tip, +rs: List<&2, Up.Reply>, +old: M.Dep, +new: M.Dep) -> Bool:
+  Bool.and(Bool.and(M.source.is_git(M.source.dep(new)),
+      String.eq(M.source.tag(M.source.dep(new)), M.source.tag(M.source.dep(old)))),
+    Bool.or(String.eq(M.source.rev(M.source.dep(new)), M.source.rev(M.source.dep(old))),
+      moved.to(tip, rs, M.source.url(M.source.dep(old)), M.source.rev(M.source.dep(old)),
+        M.source.rev(M.source.dep(new)))))
+
+# the pin the upgrade leaves for the dependency named `n`, against the one
+# ez.toml records and the default branch tip the remote named for it
+def forward.ok(+world: W.World, +n: String) -> Bool:
+  moved.ok(Up.forward(ups(world), M.source.url(pin(world, n))), ups(world),
+    W.dep(world, n), M.dep(P.ledger.next(world), n))
+
+# and against the commit the remote named for its tag
+def follow.ok(+world: W.World, +n: String) -> Bool:
+  moved.ok(Up.follow(ups(world), M.source.url(pin(world, n)), M.source.tag(pin(world, n))),
+    ups(world), W.dep(world, n), M.dep(P.ledger.next(world), n))
+
+# LAW: a dependency pinned by its commit alone moves, if it moves at all, to
+# the default branch tip the remote named, and only when the remote said that
+# tip descends from the pin; and it stays a commit pin, since it keeps the tag
+# it had, which is none. Whatever else the upgrade does, and whether or not it
+# refuses.
+# EZ-RES-5
+law upgrade_forward_moves_onward:
+  for +w: W.World
+  for +n: String
+  for bare: {rev_only(W.dep(w, n)) == True{} : Bool}
+  {forward.ok(w, n) == True{} : Bool}
+
+# LAW: and when `ez lock --upgrade` asks about it, and the tip the remote
+# names is another commit that the remote says does not descend from the pin,
+# the upgrade refuses, so it writes nothing and exits 1 (EZ-OUT-2)
+# EZ-RES-5
+law upgrade_forward_refuses_off:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +bare: {rev_only(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for head: {Up.forward(ups(w), M.source.url(pin(w, n))) == Up.At{tip, tag, branch} : Up.Tip}
+  for moved: {String.eq(M.source.rev(pin(w, n)), tip) == False{} : Bool}
+  for off: {Up.onward(ups(w), Up.Above{M.source.url(pin(w, n)), M.source.rev(pin(w, n)), tip})
+    == Up.Asc{False{}} : Up.Asc}
+  {P.refuses(w) == True{} : Bool}
+
+# LAW: a dependency pinned through a tag keeps its tag and moves, if it moves
+# at all, to the commit the remote names for that tag, and only when the
+# remote said that commit descends from the pin
+# EZ-RES-8
+law upgrade_tag_follows:
+  for +w: W.World
+  for +n: String
+  for named: {tagged(W.dep(w, n)) == True{} : Bool}
+  {follow.ok(w, n) == True{} : Bool}
+
+# LAW: and when `ez lock --upgrade` asks about it, and the tag now names
+# another commit that the remote says does not descend from the pin, the
+# upgrade refuses
+# EZ-RES-8
+law upgrade_tag_refuses_off:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +named: {tagged(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for refs: {Up.follow(ups(w), M.source.url(pin(w, n)), M.source.tag(pin(w, n)))
+    == Up.At{tip, tag, branch} : Up.Tip}
+  for moved: {String.eq(M.source.rev(pin(w, n)), tip) == False{} : Bool}
+  for off: {Up.onward(ups(w), Up.Above{M.source.url(pin(w, n)), M.source.rev(pin(w, n)), tip})
+    == Up.Asc{False{}} : Up.Asc}
+  {P.refuses(w) == True{} : Bool}
+
+# LAW: and when the tag still names the pinned commit, but that commit's
+# checkout no longer agrees with the pin, in its hash, its NAR hash or its
+# root, the upgrade refuses: the pin drifted
+# EZ-RES-8
+law upgrade_tag_refuses_drift:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for +nar: String
+  for +root: String
+  for +manifest: String
+  for +srcs: List<&2, String>
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +named: {tagged(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for refs: {Up.follow(ups(w), M.source.url(pin(w, n)), M.source.tag(pin(w, n)))
+    == Up.At{tip, tag, branch} : Up.Tip}
+  for same: {String.eq(M.source.rev(pin(w, n)), tip) == True{} : Bool}
+  for co: {Up.checkout(ups(w), Up.Tree{M.source.url(pin(w, n)), M.source.rev(pin(w, n)),
+    M.dep.entry(W.dep(w, n))}) == Up.Co{nar, root, manifest, srcs} : Up.Co}
+  for drift: {U.agree(M.dep.hash(W.dep(w, n)), Up.hash.of(manifest), M.source.nar(pin(w, n)),
+    nar, M.source.root(pin(w, n)), root) == False{} : Bool}
+  {P.refuses(w) == True{} : Bool}

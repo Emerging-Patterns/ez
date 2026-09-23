@@ -698,6 +698,12 @@ def swaps.put(empty: Bool, +old: String, +new: String, rest: List<&2, U.Swap>) -
     case False{}:
       U.Swap{old, new} <> rest
 
+# a refusal's reason, never empty. An empty `bad` is no refusal at all, so a
+# pin that halted with no reason would otherwise pass, and drop out of the
+# ledger the upgrade writes.
+def halt.why(+why: String) -> String:
+  Bool.pick(String, String.is_empty(why), "ez: the upgrade stopped without a reason", why)
+
 # one dependency in front of the rest. A refusal ahead of the rest wins, so
 # the first in ledger order is the one given.
 def deps.join(fate: Fate, rest: Deps) -> Deps:
@@ -712,7 +718,7 @@ def deps.join(fate: Fate, rest: Deps) -> Deps:
       Deps{ds, ss, es, any, sy, tr, List.append(&2, Ask, more, asks), bad}
     case Halts{why}:
       Deps{ds, ss, es, any, sy, tr, asks, _bad} = rest
-      Deps{ds, ss, es, any, sy, tr, asks, why}
+      Deps{ds, ss, es, any, sy, tr, asks, halt.why(why)}
 
 # every dependency, in the order the ledger wrote them
 def deps.walk(+rs: List<&2, Reply>, +only: String, +hub: String, ds: List<&2, M.Dep>) -> Deps:
@@ -963,7 +969,7 @@ def tools.join(pinned: Pinned, rest: Tools) -> Tools:
       Tools{ts, any, sy, List.append(&2, Ask, more, asks), bad}
     case PinHalt{why}:
       Tools{ts, any, sy, asks, _bad} = rest
-      Tools{ts, any, sy, asks, why}
+      Tools{ts, any, sy, asks, halt.why(why)}
 
 # every tool, in the order the ledger wrote them
 def tools.walk(+rs: List<&2, Reply>, +only: String, ts: List<&2, M.Tool>) -> Tools:
