@@ -1177,6 +1177,7 @@ law split_clear:
   for +c: Char
   {clear.all(String.split(s, c), c) == True{} : Bool}
 
+# by induction on the string, each char with its own arm
 def split_clear(s, c):
   match s:
     case SNil{}:
@@ -1193,6 +1194,7 @@ law and_true_left:
   for eu: {u == True{} : Bool}
   {Bool.and(u, v) == v : Bool}
 
+# the first half is True, so the `and` is its second
 def and_true_left(u, _v, eu):
   match u:
     case True{}:
@@ -1207,6 +1209,7 @@ law and_assoc:
   for w: Bool
   {Bool.and(u, Bool.and(v, w)) == Bool.and(Bool.and(u, v), w) : Bool}
 
+# by cases on the first bit
 def and_assoc(u, _v, _w):
   match u:
     case True{}:
@@ -1221,6 +1224,7 @@ law clear_append_eq:
   for +c: Char
   {clear(String.append(a, b), c) == Bool.and(clear(a, c), clear(b, c)) : Bool}
 
+# by induction on the first string
 def clear_append_eq(a, b, c):
   match a:
     case SNil{}:
@@ -1242,6 +1246,7 @@ law drop_clear:
   for e: {clear(s, c) == True{} : Bool}
   {clear(String.drop(s, n), c) == True{} : Bool}
 
+# by induction on the string, one char dropped at a time
 def drop_clear(s, n, c, e):
   match s n:
     case SNil{} _:

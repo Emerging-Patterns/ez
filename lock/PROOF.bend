@@ -5218,8 +5218,14 @@ def Laws.upgrade_one_asks_alone(w, n, u, e, ne):
 # model renders, or `.gitignore` with the allowlist of the hashes it commits
 # and the lines of the file it read that are not ez's. Law vocabulary: ez
 # never calls it.
-def ok.go(toml: Bool, gi: Bool, +t: String, +vs: List<&2, String>, model: M.Read,
-  +ig: String) -> Type:
+def ok.go(
+  toml: Bool,
+  gi: Bool,
+  +t: String,
+  +vs: List<&2, String>,
+  model: M.Read,
+  +ig: String
+) -> Type:
   match toml gi:
     case True{} _:
       {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}
@@ -5267,7 +5273,7 @@ law ok_done.arm:
     Up.model.next(moved, M.Manifest{pn, pe, pb, hb, ds, ts}, M.Manifest{pn, pe, pb, hb, ods, ots}),
     ig)
 
-def ok_done.arm(moved, b, pn, pe, pb, hb, ds, ts, ods, ots, ig):
+def ok_done.arm(moved, b, _pn, _pe, _pb, _hb, ds, _ts, _ods, _ots, ig):
   match moved b:
     case True{} True{}:
       ({==}, Unit{})
@@ -5501,7 +5507,7 @@ law kept_put:
   for e: {P.Kept{} == P.Put{t} : P.Wrote}
   Empty
 
-def kept_put(t, e):
+def kept_put(_t, e):
   %e : wrote.emp(_)
   Unit{}
 
@@ -5537,7 +5543,7 @@ law ok_go_empty:
   for h: ok.go(a, b, t, vs, model, ig)
   Empty
 
-def ok_go_empty(a, b, t, vs, model, ig, ea, eb, h):
+def ok_go_empty(a, b, _t, _vs, _model, _ig, ea, eb, h):
   match a b:
     case True{} _:
       Eq.bit.absurd2(&1, Empty, ea)
@@ -5619,7 +5625,7 @@ law ok_go_ign:
     ({I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
       {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>})
 
-def ok_go_ign(a, b, t, vs, model, ig, ea, eb, h):
+def ok_go_ign(a, b, t, vs, _model, ig, ea, eb, h):
   match a b:
     case True{} _:
       Eq.bit.absurd2(&1, {Str.clear.all(vs, '\n') == True{} : Bool} ->
@@ -5735,7 +5741,7 @@ law ok_go_toml:
   for h: ok.go(a, b, t, vs, model, ig)
   {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}
 
-def ok_go_toml(a, b, t, vs, model, ig, ea, h):
+def ok_go_toml(a, b, _t, vs, model, _ig, ea, h):
   match a b:
     case True{} _:
       h
@@ -6166,8 +6172,24 @@ def Laws.upgrade_rewrites_sources(w, at, text, pre, post, fs, mp, mq, bend, ok):
         at, text, pre, post, Laws.ignore.said(Up.text.said(ups, Up.Ignore{})),
         ok_world(args, ledger, ups), fs, mp, mq, bend, ok)
 
-def Laws.upgrade_rewrites_imports(w, at, text, pre, post, fs, mp, mq, bend, ok, i, old, new,
-  mv, to, hit):
+def Laws.upgrade_rewrites_imports(
+  w,
+  at,
+  text,
+  pre,
+  post,
+  fs,
+  mp,
+  mq,
+  bend,
+  ok,
+  i,
+  old,
+  new,
+  mv,
+  to,
+  hit
+):
   %Equal.sym(String, Laws.left.at(P.put(w, at), text), U.reimport.many(Laws.swaps(w), text),
     Laws.upgrade_rewrites_sources(w, at, text, pre, post, fs, mp, mq, bend, ok))
     : {String.starts_with(ML.line.at(String.lines(_), i), U.reimport.head(new)) == True{} : Bool}

@@ -2585,7 +2585,7 @@ law has_kept.cons.arm:
   for ih: {I.has(I.tag(t), r) == True{} : Bool} -> {I.has(I.tag(w), r) == True{} : Bool}
   {I.has(I.tag(h <> w), r) == True{} : Bool}
 
-def has_kept.cons.arm(b, h, t, w, r, eb, e, ih):
+def has_kept.cons.arm(b, h, _t, w, r, eb, e, ih):
   match b:
     case True{}:
       has_here(h, w, r, eb)
@@ -3819,7 +3819,7 @@ law sw_if_head:
   for e: {String.starts_with.if(t, p, s) == True{} : Bool}
   {s == True{} : Bool}
 
-def sw_if_head(t, p, s, e):
+def sw_if_head(_t, _p, s, e):
   match s:
     case True{}:
       {==}
@@ -4042,7 +4042,7 @@ law none_some:
   for e: {None{} == Some{new} : Maybe<&2, String>}
   Empty
 
-def none_some(new, e):
+def none_some(_new, e):
   %e : some.emp(_)
   Unit{}
 
@@ -4163,7 +4163,7 @@ law moved_plain.arm:
     -> {Str.clear(old, '/') == True{} : Bool}
   {Str.clear(old, '/') == True{} : Bool}
 
-def moved_plain.arm(c, o, n, t, old, new, ec, ok, to, ih):
+def moved_plain.arm(c, o, n, t, old, _new, ec, ok, to, ih):
   match c:
     case True{}:
       %Str.string_eq_true(o, old, ec) : {Str.clear(_, '/') == True{} : Bool}

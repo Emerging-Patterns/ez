@@ -349,13 +349,14 @@ def lines(ds: List<&2, M.Dep>, ls: List<&2, String>) -> List<&2, String>:
 # the last piece of a file cut at its newlines, dropped when it is empty: it
 # is what follows the newline the file ends with, and not a line a person
 # wrote
-def unend.go(t: List<&2, String>, +h: String) -> List<&2, String>:
-  match t:
+def unend.go(rest: List<&2, String>, +last: String) -> List<&2, String>:
+  match rest:
     case []:
-      Bool.pick(List<&2, String>, String.is_empty(h), [], [h])
+      Bool.pick(List<&2, String>, String.is_empty(last), [], [last])
     case +h2 <> t2:
-      h <> unend.go(t2, h2)
+      last <> unend.go(t2, h2)
 
+# the lines of a file cut at its newlines, less that last empty piece
 def unend(ps: List<&2, String>) -> List<&2, String>:
   match ps:
     case []:

@@ -480,8 +480,8 @@ law sync_idempotent:
 
 # the line at a place in a list of lines, "" past its end. Law vocabulary: ez
 # never calls it.
-def line.at(ls: List<&2, String>, n: Nat) -> String:
-  match ls n:
+def line.at(ls: List<&2, String>, at: Nat) -> String:
+  match ls at:
     case Nil{} _:
       ""
     case h <> t 0n:
@@ -490,17 +490,17 @@ def line.at(ls: List<&2, String>, n: Nat) -> String:
       line.at(t, p)
 
 # whether a hash holds neither `/` nor a newline
-def plain(+s: String) -> Bool:
-  Bool.and(Str.clear(s, '/'), Str.clear(s, '\n'))
+def plain(+hash: String) -> Bool:
+  Bool.and(Str.clear(hash, '/'), Str.clear(hash, '\n'))
 
 # whether no move of a list has a hash as its old one
-def olds.miss(ss: List<&2, U.Swap>, +h: String) -> Bool:
+def olds.miss(ss: List<&2, U.Swap>, +hash: String) -> Bool:
   match ss:
     case []:
       True{}
     case U.Swap{o, _n} <> t:
-      +rest = olds.miss(t, h)
-      Bool.and(Bool.not(String.eq(o, h)), rest)
+      +rest = olds.miss(t, hash)
+      Bool.and(Bool.not(String.eq(o, hash)), rest)
 
 # whether a list of moves is one an upgrade makes: every old hash names
 # something, every hash is plain, and no new hash is the old hash of a move
