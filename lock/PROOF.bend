@@ -910,6 +910,284 @@ def Laws.root_skips_ez(p, text):
     k => Bool.pick(List<&2, String>, k, [], L.specs(K.scan.mods(K.scan(text)))),
     String.starts_with(".ez/" ++ p, ".ez/"), True{}, Eq.starts_append(".ez/", p))
 
+# Idempotence. A clone that passed weighed to the narHash the ledger records,
+# so the same bytes read from BEND_LIB, which are judged as a clone weighed to
+# that narHash (`lib_as_clone.src`), pass the same way. Every verdict is what
+# it was, so the Inputs are, and `lock_reproducible` gives the rest.
+
+# LAW: a weighed git package that passed was weighed with no reason to refuse
+law weighed_passes:
+  for why: String
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  for e: {Laws.passed(W.git.weighed(why, hash, manifest, ss)) == True{} : Bool}
+  {why == "" : String}
+
+def weighed_passes(why, _hash, _manifest, _ss, e):
+  match why:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      Eq.bit.absurd(&2, {SCon{h, t} == "" : String}, e)
+
+# LAW: a checkout whose NAR hash the ledger agreed with has a NAR hash the
+# ledger records, so the ledger's own agrees with it too
+law nar_agrees_when_passed:
+  for +nar: String
+  for +got: String
+  for +url: String
+  for +rev: String
+  for e: {L.nar.why(nar, got, url, rev) == "" : String}
+  {L.nar.why(nar, nar, url, rev) == "" : String}
+
+def nar_agrees_when_passed(nar, got, url, rev, e):
+  match nar:
+    case SNil{}:
+      Eq.bit.absurd(&2, {L.nar.why("", "", url, rev) == "" : String},
+        Equal.cong(String, Bool, s => String.is_empty(s),
+          L.nar.why("", got, url, rev), "", e))
+    case SCon{+h, +t}:
+      Laws.nar_why_agrees(SCon{h, t}, url, rev, {==})
+
+# LAW: a clone that passed is judged as the same bytes read from BEND_LIB
+law clone_passed.src:
+  for src: L.Src
+  for +got: String
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  for e: {Laws.passed(W.accept.src(src, W.Clone{got}, hash, manifest, ss)) == True{} : Bool}
+  {W.accept.src(src, W.Lib{}, hash, manifest, ss)
+    == W.accept.src(src, W.Clone{got}, hash, manifest, ss) : W.Verdict}
+
+def clone_passed.src(src, got, hash, manifest, ss, e):
+  match src:
+    case L.Hub{}:
+      Eq.bit.absurd(&2, {W.accept.src(L.Hub{}, W.Lib{}, hash, manifest, ss)
+        == W.accept.src(L.Hub{}, W.Clone{got}, hash, manifest, ss) : W.Verdict}, e)
+    case L.Git{+url, +rev, _entry, _root, +nar, _tag}:
+      +same = weighed_passes(L.nar.why(nar, got, url, rev), hash, manifest, ss, e)
+      Equal.trans(W.Verdict,
+        W.git.weighed(L.nar.why(nar, nar, url, rev), hash, manifest, ss),
+        W.git.weighed("", hash, manifest, ss),
+        W.git.weighed(L.nar.why(nar, got, url, rev), hash, manifest, ss),
+        Equal.cong(String, W.Verdict, why => W.git.weighed(why, hash, manifest, ss),
+          L.nar.why(nar, nar, url, rev), "",
+          nar_agrees_when_passed(nar, got, url, rev, same)),
+        Equal.sym(W.Verdict,
+          W.git.weighed(L.nar.why(nar, got, url, rev), hash, manifest, ss),
+          W.git.weighed("", hash, manifest, ss),
+          Equal.cong(String, W.Verdict, why => W.git.weighed(why, hash, manifest, ss),
+            L.nar.why(nar, got, url, rev), "", same)))
+
+# LAW: a cloned tree, laid when it passed, is judged as it was
+law after.clone_judged:
+  for b: Bool
+  for +orgs: List<&2, L.Origin>
+  for +hub: String
+  for +hash: String
+  for +got: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  for e: {Laws.passed(W.accept(orgs, hub, hash, W.Got{W.Clone{got}, manifest, ss})) == b
+    : Bool}
+  {W.accept(orgs, hub, hash, Laws.after.clone(b, got, manifest, ss))
+    == W.accept(orgs, hub, hash, W.Got{W.Clone{got}, manifest, ss}) : W.Verdict}
+
+def after.clone_judged(b, orgs, _hub, hash, got, manifest, ss, e):
+  match b:
+    case True{}:
+      clone_passed.src(L.origin(orgs, hash), got, hash, manifest, ss, e)
+    case False{}:
+      {==}
+
+# LAW: one answer, as the next lock reads it, is judged as it was
+law after.one_judged:
+  for +orgs: List<&2, L.Origin>
+  for +hub: String
+  for +hash: String
+  for a: W.Answer
+  {W.accept(orgs, hub, hash, Laws.after.one(orgs, hub, hash, a))
+    == W.accept(orgs, hub, hash, a) : W.Verdict}
+
+def after.one_judged(orgs, hub, hash, a):
+  match a:
+    case W.Miss{_why}:
+      {==}
+    case W.Got{how, +manifest, +ss}:
+      match how:
+        case W.Lib{}:
+          {==}
+        case W.Clone{+got}:
+          after.clone_judged(
+            Laws.passed(W.accept(orgs, hub, hash, W.Got{W.Clone{got}, manifest, ss})),
+            orgs, hub, hash, got, manifest, ss, {==})
+        case W.Served{}:
+          {==}
+
+# LAW: every answer, as the next lock reads it, is judged as it was
+law after_judged:
+  for +orgs: List<&2, L.Origin>
+  for +hub: String
+  for rs: List<&2, W.Reply>
+  {W.judge(orgs, hub, Laws.after.all(orgs, hub, rs)) == W.judge(orgs, hub, rs)
+    : List<&2, W.Judged>}
+
+def after_judged(orgs, hub, rs):
+  match rs:
+    case []:
+      {==}
+    case W.Reply{+ask, a} <> t:
+      Equal.trans(List<&2, W.Judged>,
+        W.Judged{W.ask.hash(ask), W.accept(orgs, hub, W.ask.hash(ask),
+          Laws.after.one(orgs, hub, W.ask.hash(ask), a))}
+          <> W.judge(orgs, hub, Laws.after.all(orgs, hub, t)),
+        W.Judged{W.ask.hash(ask), W.accept(orgs, hub, W.ask.hash(ask), a)}
+          <> W.judge(orgs, hub, Laws.after.all(orgs, hub, t)),
+        W.Judged{W.ask.hash(ask), W.accept(orgs, hub, W.ask.hash(ask), a)}
+          <> W.judge(orgs, hub, t),
+        Equal.cong(W.Verdict, List<&2, W.Judged>,
+          v => W.Judged{W.ask.hash(ask), v}
+            <> W.judge(orgs, hub, Laws.after.all(orgs, hub, t)),
+          W.accept(orgs, hub, W.ask.hash(ask),
+            Laws.after.one(orgs, hub, W.ask.hash(ask), a)),
+          W.accept(orgs, hub, W.ask.hash(ask), a),
+          after.one_judged(orgs, hub, W.ask.hash(ask), a)),
+        Equal.cong(List<&2, W.Judged>, List<&2, W.Judged>,
+          js => W.Judged{W.ask.hash(ask), W.accept(orgs, hub, W.ask.hash(ask), a)} <> js,
+          W.judge(orgs, hub, Laws.after.all(orgs, hub, t)),
+          W.judge(orgs, hub, t),
+          after_judged(orgs, hub, t)))
+
+# LAW: the World a lock that succeeded leaves has the Inputs it read
+law after.laid_inputs:
+  for w: W.World
+  {W.inputs(Laws.after.laid(w)) == W.inputs(w) : W.Inputs}
+
+def after.laid_inputs(w):
+  match w:
+    case W.World{_args, +ledger, listing, replies}:
+      Equal.cong(List<&2, W.Judged>, W.Inputs,
+        js => W.Inputs{ledger, listing, js},
+        W.judge(W.origins(ledger), W.ledger.hub(ledger),
+          Laws.after.all(W.origins(ledger), W.ledger.hub(ledger), replies)),
+        W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
+        after_judged(W.origins(ledger), W.ledger.hub(ledger), replies))
+
+# LAW: whether or not the lock refused, the World it leaves writes its lock
+law after.pick_put:
+  for b: Bool
+  for +w: W.World
+  {P.put(Laws.after.pick(b, w), "ez.lock.toml") == P.put(w, "ez.lock.toml")
+    : P.Wrote}
+
+def after.pick_put(b, w):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      Laws.lock_reproducible(Laws.after.laid(w), w, after.laid_inputs(w))
+
+def Laws.lock_idempotent(w):
+  after.pick_put(P.refuses(w), w)
+
+# LAW: a cloned tree, as the next lock reads it, is not one it lays: laid, it
+# is read from BEND_LIB, and not laid, it failed
+law fresh.clone:
+  for b: Bool
+  for +orgs: List<&2, L.Origin>
+  for +hub: String
+  for +hash: String
+  for +got: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  for e: {Laws.passed(W.accept(orgs, hub, hash, W.Got{W.Clone{got}, manifest, ss})) == b
+    : Bool}
+  {Laws.fresh.one(orgs, hub, hash, Laws.after.clone(b, got, manifest, ss)) == []
+    : List<&2, String>}
+
+def fresh.clone(b, orgs, hub, hash, got, manifest, ss, e):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      Equal.cong(Bool, List<&2, String>,
+        x => Bool.pick(List<&2, String>, x, [hash], []),
+        Laws.passed(W.accept(orgs, hub, hash, W.Got{W.Clone{got}, manifest, ss})),
+        False{}, e)
+
+# LAW: no answer, as the next lock reads it, is a tree it lays
+law fresh.one_after:
+  for +orgs: List<&2, L.Origin>
+  for +hub: String
+  for +hash: String
+  for a: W.Answer
+  {Laws.fresh.one(orgs, hub, hash, Laws.after.one(orgs, hub, hash, a)) == []
+    : List<&2, String>}
+
+def fresh.one_after(orgs, hub, hash, a):
+  match a:
+    case W.Miss{_why}:
+      {==}
+    case W.Got{how, +manifest, +ss}:
+      match how:
+        case W.Lib{}:
+          {==}
+        case W.Clone{+got}:
+          fresh.clone(
+            Laws.passed(W.accept(orgs, hub, hash, W.Got{W.Clone{got}, manifest, ss})),
+            orgs, hub, hash, got, manifest, ss, {==})
+        case W.Served{}:
+          {==}
+
+# LAW: and none of them is
+law fresh.all_after:
+  for +orgs: List<&2, L.Origin>
+  for +hub: String
+  for rs: List<&2, W.Reply>
+  {Laws.fresh.all(orgs, hub, Laws.after.all(orgs, hub, rs)) == [] : List<&2, String>}
+
+def fresh.all_after(orgs, hub, rs):
+  match rs:
+    case []:
+      {==}
+    case W.Reply{+ask, a} <> t:
+      Equal.trans(List<&2, String>,
+        List.append(&2, String,
+          Laws.fresh.one(orgs, hub, W.ask.hash(ask),
+            Laws.after.one(orgs, hub, W.ask.hash(ask), a)),
+          Laws.fresh.all(orgs, hub, Laws.after.all(orgs, hub, t))),
+        Laws.fresh.all(orgs, hub, Laws.after.all(orgs, hub, t)),
+        [],
+        Equal.cong(List<&2, String>, List<&2, String>,
+          x => List.append(&2, String, x,
+            Laws.fresh.all(orgs, hub, Laws.after.all(orgs, hub, t))),
+          Laws.fresh.one(orgs, hub, W.ask.hash(ask),
+            Laws.after.one(orgs, hub, W.ask.hash(ask), a)),
+          [],
+          fresh.one_after(orgs, hub, W.ask.hash(ask), a)),
+        fresh.all_after(orgs, hub, t))
+
+# LAW: the World a lock that succeeded leaves has no tree for the next to lay
+law fresh.laid:
+  for w: W.World
+  {Laws.fresh(Laws.after.laid(w)) == [] : List<&2, String>}
+
+def fresh.laid(w):
+  match w:
+    case W.World{_args, +ledger, _listing, replies}:
+      fresh.all_after(W.origins(ledger), W.ledger.hub(ledger), replies)
+
+def Laws.relock_lays_nothing(w, ok):
+  Equal.trans(List<&2, String>,
+    Laws.fresh(Laws.after.pick(P.refuses(w), w)),
+    Laws.fresh(Laws.after.pick(False{}, w)),
+    [],
+    Equal.cong(Bool, List<&2, String>, b => Laws.fresh(Laws.after.pick(b, w)),
+      P.refuses(w), False{}, ok),
+    fresh.laid(w))
+
 # The lock document's first step. The lemmas are about lists of chars, since
 # eztoml's trim and strip walk a string as one; the list lemmas are
 # check/str.bend's.
