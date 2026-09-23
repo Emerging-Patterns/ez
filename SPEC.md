@@ -53,9 +53,9 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | :---- | :---- | :---- | :---- | :---- |
 | EZ-DOC-1 | Parsing a rendered lock yields the packages, hub and tools that were rendered. | Proved | pending | |
 | EZ-DOC-2 | Packages are written in hash order and each package's files in path order, so the lock's text does not depend on the order the walk found them in. | Proved | pending | |
-| EZ-DOC-3 | `ez lock` output is a function of the ledger and the committed tree. A fresh clone reproduces the lock byte for byte. | Proved | pending | |
+| EZ-DOC-3 | `ez lock` output is a function of the ledger and the committed tree. A fresh clone reproduces the lock byte for byte. | Proved | proved | lock/LAWS.bend lock_reproducible; lock/LAWS.bend clone_reproduces |
 | EZ-DOC-4 | `ez lock` is idempotent: run on the world it just produced, it writes the same bytes. | Proved | pending | |
-| EZ-DOC-5 | `ez lock` without `--upgrade` never writes ez.toml, and records every dependency's and tool's pin exactly as ez.toml has it. | Proved | pending | |
+| EZ-DOC-5 | `ez lock` without `--upgrade` never writes ez.toml, and records every dependency's and tool's pin exactly as ez.toml has it. | Proved | proved | lock/LAWS.bend plain_lock_keeps_ledger; lock/LAWS.bend plain_lock_pins_ledger_sources |
 
 ### Resolution (EZ-RES)
 
