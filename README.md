@@ -201,6 +201,11 @@ needs `.ez/*`, `!.ez/lib` and `.ez/lib/*`, which `ez init` writes: git
 cannot re-include a file under a directory it has excluded, so under a bare
 `.ez/` no allowlist line works, and ez replaces that line with the three.
 The file is only written when this changes it.
+`ez remove <name>` drops the dependency from the ledger and the allowlist
+with it. A vendored dependency's committed tree, `.ez/lib/<hash>`, is
+removed too, unless another dependency still names that hash. A name the
+ledger does not have stops `ez remove` with exit 1, and it writes nothing,
+as `cargo remove` does.
 Without `vendor = true`, the tree is not committed: `ez fetch` fills `BEND_LIB` from the
 lock, and `ez lock` fetches a git dependency whose tree is not under
 `BEND_LIB` at the ledger's `rev`, checks it against `narHash`, and leaves it
