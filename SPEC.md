@@ -17,6 +17,8 @@ A closed law that illustrates a pending requirement is marked `# toward EZ-X-N` 
 
 A pending requirement may already have tagged quantified laws that prove part of it. The Law column names them, and "Left to prove" below says what is missing before the status becomes proved.
 
+The Law column lists `<path> <law>` entries, the path relative to this file, joined by `; `, which is the form bolt's `trace` rule reads.
+
 Untagged quantified laws are allowed. They pass the proof gate like any law, but nothing here protects them, so a change may edit or delete them freely.
 
 ## Requirements
@@ -58,7 +60,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | :---- | :---- | :---- | :---- | :---- |
 | EZ-RES-1 | `ez add` with no ref pins the greatest semver-ish release tag on the remote; with no release, the greatest pre-release; with no semver-ish tag, the remote's default branch as its `HEAD` symref names it. A named ref resolves exactly, as `refs/tags/<ref>` and then `refs/heads/<ref>`. A 40-hex ref is used as a commit without asking the remote. | Proved | pending | |
 | EZ-RES-2 | `ez add` with no entry uses the revision's `[package] entry`, then `[package] bin`, then `main.bend`, and refuses if that file is not in the revision. | Proved | pending | |
-| EZ-RES-3 | A target containing `://` or starting `git@` is a git URL. A target starting `/`, `./`, `../` or `~/` is a path. A target of exactly two segments of letters, digits, `-`, `_` and `.`, neither of them `.` or `..`, is `https://github.com/<target>`, unless its second segment ends in `.bend`, which makes it a path. Anything else is a path, except the empty word, which is refused. | Proved | proved | ez/LAWS.bend classify_url, classify_scp, classify_abs, classify_here, classify_up, classify_home, classify_github, classify_else |
+| EZ-RES-3 | A target containing `://` or starting `git@` is a git URL. A target starting `/`, `./`, `../` or `~/` is a path. A target of exactly two segments of letters, digits, `-`, `_` and `.`, neither of them `.` or `..`, is `https://github.com/<target>`, unless its second segment ends in `.bend`, which makes it a path. Anything else is a path, except the empty word, which is refused. | Proved | proved | ez/LAWS.bend classify_url; ez/LAWS.bend classify_scp; ez/LAWS.bend classify_abs; ez/LAWS.bend classify_here; ez/LAWS.bend classify_up; ez/LAWS.bend classify_home; ez/LAWS.bend classify_github; ez/LAWS.bend classify_else |
 | EZ-RES-4 | `ez lock --upgrade` never moves a hub dependency. | Proved | pending | |
 | EZ-RES-5 | An upgraded rev-only dependency moves to the default branch tip only when its pin is an ancestor of that tip, and stays a commit pin. Otherwise the upgrade refuses with exit 1. | Proved | pending | |
 | EZ-RES-6 | `--package NAME` asks the remote to resolve only the named dependency or tool, and every other ledger entry keeps its rev, tag and hash. Resolving is asking for refs, the default branch, ancestry, or a checkout at a new rev. | Proved | pending | |
@@ -69,7 +71,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 
 | ID | Requirement | Level | Status | Law |
 | :---- | :---- | :---- | :---- | :---- |
-| EZ-VEN-1 | After `ez add`, `ez remove` or `ez lock --upgrade`, the `.gitignore` allowlist names exactly the hashes of dependencies marked `vendor = true`, and every other line of `.gitignore` is unchanged. | Proved | pending | manifest/LAWS.bend allowlist_is_the_ledger, allowlist_keeps_other_lines |
+| EZ-VEN-1 | After `ez add`, `ez remove` or `ez lock --upgrade`, the `.gitignore` allowlist names exactly the hashes of dependencies marked `vendor = true`, and every other line of `.gitignore` is unchanged. | Proved | pending | manifest/LAWS.bend allowlist_is_the_ledger; manifest/LAWS.bend allowlist_keeps_other_lines |
 | EZ-VEN-2 | When an upgrade moves a hash, every line of a `.bend` file outside `.ez` and `.git` that starts `import <old>/` names `<new>` afterwards. | Proved | pending | |
 | EZ-VEN-3 | Import rewriting leaves every other line of every file byte-identical, and does not write a file with no matching line. | Proved | pending | |
 | EZ-VEN-4 | `ez doctor` never writes to the project's source files. | Proved | pending | |
@@ -86,7 +88,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | ID | Requirement | Level | Status | Law |
 | :---- | :---- | :---- | :---- | :---- |
 | EZ-TOOL-1 | The link directory is `$EZ_TOOL_BIN`, else `$XDG_BIN_HOME`, else `$HOME/.local/bin`, an empty value counting as unset. | Proved | pending | |
-| EZ-TOOL-2 | A cached binary is reused only when the recorded commit, built file and bend version all equal the resolved ones, and never when the resolved commit is empty. A cached checkout is reused only when its recorded commit equals the resolved one. | Proved | proved | ez/LAWS.bend key_rev_differs, key_file_differs, key_bend_differs, key_no_rev, key_same_reuses, checkout_differs, checkout_same |
+| EZ-TOOL-2 | A cached binary is reused only when the recorded commit, built file and bend version all equal the resolved ones, and never when the resolved commit is empty. A cached checkout is reused only when its recorded commit equals the resolved one. | Proved | proved | ez/LAWS.bend key_rev_differs; ez/LAWS.bend key_file_differs; ez/LAWS.bend key_bend_differs; ez/LAWS.bend key_no_rev; ez/LAWS.bend key_same_reuses; ez/LAWS.bend checkout_differs; ez/LAWS.bend checkout_same |
 | EZ-TOOL-3 | A local target with uncommitted or untracked changes, or a path that is not a checkout, resolves to no commit and is rebuilt on every run. | Proved | pending | |
 | EZ-TOOL-4 | A target naming a `[tools.*]` pin in ez.toml builds the lock's rev, url, entry and bin. An `owner/repo` or URL target builds `git ls-remote <url> HEAD`. A path builds its clean `HEAD`. | Proved | pending | |
 | EZ-TOOL-5 | `ez tool run` exits with the built program's status; any failure before the program runs exits 1. | Proved | pending | |
