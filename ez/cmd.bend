@@ -16,8 +16,7 @@ import ./args.bend as Args
 import ./env.bend as Env
 import ./cap.bend as Cap
 import ./target.bend as Tgt
-import ./upgrade.bend as Up
-import ../ez/pin.bend as Pin
+import ../manifest/ignore.bend as Ig
 import ./named.bend as Named
 import ../ez/say.bend as Say
 
@@ -202,49 +201,23 @@ def publish() -> IO(Unit):
 def lockfile() -> String:
   "ez.lock.toml"
 
-# `--package` is only a filter on an upgrade. A plain lock is the planner's
-# alone (lock/plan.bend): it copies every pin as the ledger has it, refuses
-# one it would have to fill, never writes ez.toml, and writes nothing when it
-# refuses.
-def lock.plain(bare: Bool, +_name: String) -> IO(Unit):
-  match bare:
+# `ez lock`, plain or `--upgrade`, is the planner's
+# (lock/plan.bend, lock/up.bend): a plain lock copies every pin as the ledger
+# has it, refuses one it would have to fill, and never writes ez.toml; an
+# upgrade moves the selected pins, writes ez.toml once, `.gitignore`, the
+# rewritten imports and the lock in one plan. Either writes nothing when it
+# refuses, and a missing ledger is refused. `--package` is only a filter on an
+# upgrade.
+def lock.go(ok: Bool, up: Bool, +name: String) -> IO(Unit):
+  match ok:
     case True{}:
-      Run.run(W.Args{False{}, ""})
+      Run.run(W.Args{up, name})
     case False{}:
       IO.die(Unit, 1, "ez: --package needs --upgrade")
 
-# `ez lock --upgrade` re-pins git deps and tools first and then locks. The
-# lock is written by the planner, from the ledger the upgrade left. A tool pin
-# is recorded under `[tools.*]` and is not laid into BEND_LIB. A git
-# dependency whose tree is not under BEND_LIB is cloned at its ledger rev by
-# the lock itself, since its files are what the lock records; filling the rest
-# of BEND_LIB stays `ez fetch`'s. A `vendor = true` dependency is laid out by
-# the upgrade itself, because that tree is committed. A lock is of a ledger,
-# so a missing one stops the upgrade before anything is written.
-def lock.read(ledger: M.Read, +name: String) -> IO(Unit):
-  match ledger:
-    case M.Bad{why}:
-      refuse(M.Bad{why})
-    case M.Good{_m}:
-      do IO<Unit>:
-        Up.run(name)
-        Pin.upgrade(name)
-        Run.run(W.Args{True{}, name})
-
-# `ez lock`, or `ez lock --upgrade`. A plain lock reads the ledger itself, and
-# refuses a missing one there.
-def lock.up(up: Bool, +name: String) -> IO(Unit):
-  match up:
-    case False{}:
-      lock.plain(String.is_empty(name), name)
-    case True{}:
-      do IO<Unit>:
-        r : M.Read <- load.edit("lock")
-        lock.read(r, name)
-
 # `ez lock` and `ez lock --upgrade [--package NAME]`
-def lock(up: Bool, +name: String) -> IO(Unit):
-  lock.up(up, name)
+def lock(+up: Bool, +name: String) -> IO(Unit):
+  lock.go(Bool.or(up, String.is_empty(name)), up, name)
 
 # BEND_LIB filled from the lock, with nothing re-resolved
 def fetch() -> IO(Unit):
@@ -426,11 +399,46 @@ def deps.of(manifest: M.Manifest) -> List<&2, M.Dep>:
   M.Manifest{_n, _e, _b, _h, ds, _ts} = manifest
   ds
 
+# a write that did not happen is a failure
+def allowlist.wrote(ok: Bool) -> IO(Unit):
+  match ok:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      IO.die(Unit, 1, "ez: .gitignore could not be written")
+
+# the ignore file, written only when the allowlist the ledger calls for is
+# not the one it already has, so a command that changed nothing vendored
+# leaves the file as it found it, byte for byte
+def allowlist.put(same: Bool, +next: String) -> IO(Unit):
+  match same:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      do IO<Unit>:
+        ok : Bool <- F.write(".gitignore", next)
+        allowlist.wrote(ok)
+
+# the ignore file's text against the one the ledger calls for
+def allowlist.text(ds: List<&2, M.Dep>, +text: String) -> IO(Unit):
+  +next = Ig.sync(ds, text)
+  allowlist.put(String.eq(next, text), next)
+
+# the gitignore allowlist, derived from the ledger's dependencies: exactly
+# the hashes marked `vendor = true`, with every other line kept. `ez add` and
+# `ez remove` call this with the ledger they just wrote; `ez lock --upgrade`
+# plans the same `Ig.sync`. A missing file reads as empty, and stays missing
+# when the ledger vendors nothing.
+def allowlist(ds: List<&2, M.Dep>) -> IO(Unit):
+  do IO<Unit>:
+    g : Maybe<&2, String> <- F.read(".gitignore")
+    allowlist.text(ds, F.text_of(g))
+
 # an edited ledger written, then the gitignore allowlist derived from it
 def edit.write(+next: M.Manifest) -> IO(Unit):
   do IO<Unit>:
     wrote : Bool <- F.write(toml(), Rend.show(next))
-    Up.allowlist(deps.of(next))
+    allowlist(deps.of(next))
     report.exit(wrote)
 
 # a name the ledger can take, written into it with the dependency. A

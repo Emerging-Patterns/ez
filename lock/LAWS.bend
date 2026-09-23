@@ -6,10 +6,11 @@ import Base
 import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
+import ./up.bend as Up
+import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/LAWS.bend as KL
-import ../manifest/manifest.bend as M
 
 # LAW: a package resolves to the origin recorded for it, whatever origins
 # follow. A second record of the same hash never shadows the first, so the
@@ -212,7 +213,8 @@ law path_eq_named:
     == P.path.eq.why(hash, at) : String}
 
 # The planner (plan.bend) over the World (world.bend). Every law below is
-# about what plain `ez lock` does, stated over the plan it returns; the
+# about what `ez lock` does, stated over the plan it returns; one with a
+# premise that the args say no `--upgrade` is about a plain lock only. The
 # interpreter that executes the plan is EZ-TRUST-2.
 
 # what a plan leaves at the lock's path, from what the planner decided. Law
@@ -224,8 +226,9 @@ def put.doc(doc: P.Doc) -> P.Wrote:
     case P.Stop{_why}:
       P.Kept{}
 
-# LAW: the lock depends on nothing in a World but its Inputs: the ledger, the
-# committed sources, and the verdict on every answer. Two Worlds that agree on
+# LAW: the lock depends on nothing in a World but its Inputs: the ledger it is
+# made from (ez.toml, or the one an upgrade leaves), the upgrade's refusal,
+# the committed sources, and the verdict on every answer. Two Worlds that agree on
 # those write the same bytes to ez.lock.toml, or both write none, however they
 # differ otherwise.
 # EZ-DOC-3
@@ -274,13 +277,33 @@ law plain_lock_pins_ledger_sources:
   {pinned.all(W.origins(W.ledger.of(w)), P.packs(w)) == P.packs(w)
     : List<&2, L.Pack>}
 
-# LAW: a plain lock that refuses writes, lays and removes nothing. Its plan
-# has no effect at all; the reason is how it ends. This is EZ-OUT-2 for a
-# plain lock, and it is tagged once `--upgrade` is planned too.
+# LAW: `ez lock` that refuses, plain or `--upgrade`, writes, lays and removes
+# nothing: not the lock, not ez.toml, `.gitignore` or a source, and no tree.
+# Its plan has no effect at all; the reason is how it ends. An upgrade whose
+# remote answers refuse it, or whose lock then refuses, is such a World.
+# EZ-OUT-2
 law lock_refusal_writes_nothing:
   for +w: W.World
   for r: {P.refuses(w) == True{} : Bool}
   {P.writes(P.plan(w)) == False{} : Bool}
+
+# The upgrade's decisions (lock/up.bend) are stated over `P.ledger.next`, the
+# ledger model an upgrade renders into ez.toml, and over the questions it asks,
+# `P.wants.up`. A plain lock is the World whose args say no `--upgrade`, and it
+# is what these two say it is.
+
+# LAW: a plain lock asks no upgrade question, so it asks a remote nothing but
+# the tree at a rev the ledger already pins
+law plain_lock_asks_no_upgrade:
+  for w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
+  {P.wants.up(w) == [] : List<&2, Up.Ask>}
+
+# LAW: and the ledger a plain lock leaves is ez.toml as it is
+law plain_lock_ledger_next:
+  for w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
+  {P.ledger.next(w) == W.parsed(W.ledger.of(w)) : M.Read}
 
 # LAW: a tree read from BEND_LIB is judged exactly as the same bytes cloned
 # at the pinned rev and weighed to the ledger's narHash
@@ -396,11 +419,14 @@ def after.all(+orgs: List<&2, L.Origin>, +hub: String, rs: List<&2, W.Reply>) ->
       W.Reply{ask, after.one(orgs, hub, W.ask.hash(ask), answer)} <> after.all(orgs, hub, t)
 
 # the World after a lock that succeeded: the same flags, ledger and listing,
-# and every tree it laid read from BEND_LIB
+# and every tree it laid read from BEND_LIB. The trees are judged against the
+# ledger the lock was made from, which for a plain lock is ez.toml. What an
+# upgrade leaves besides, the ledger and sources it wrote, is WP5b's.
 def after.laid(world: W.World) -> W.World:
-  W.World{args, +ledger, listing, replies} = world
+  W.World{+args, +ledger, listing, replies, +ups} = world
   W.World{args, ledger, listing,
-    after.all(W.origins(ledger), W.ledger.hub(ledger), replies)}
+    after.all(W.next.origins(W.next(args, ledger, ups)),
+      W.next.hub(W.next(args, ledger, ups)), replies), ups}
 
 # a refused lock writes and lays nothing, so it leaves the World it read
 def after.pick(refused: Bool, world: W.World) -> W.World:
@@ -454,8 +480,9 @@ def fresh.all(+orgs: List<&2, L.Origin>, +hub: String, rs: List<&2, W.Reply>) ->
 # gathers, these are the trees a plain lock that succeeds lays (`P.lays` over
 # `P.cloned`). Law vocabulary: ez never calls it.
 def fresh(world: W.World) -> List<&2, String>:
-  W.World{_args, +ledger, _listing, replies} = world
-  fresh.all(W.origins(ledger), W.ledger.hub(ledger), replies)
+  W.World{+args, +ledger, _listing, replies, +ups} = world
+  fresh.all(W.next.origins(W.next(args, ledger, ups)),
+    W.next.hub(W.next(args, ledger, ups)), replies)
 
 # LAW: plain `ez lock` is idempotent. Run again on the World it leaves, it
 # writes the same bytes to ez.lock.toml, or, when it refused, refuses again

@@ -366,3 +366,64 @@ law hash_is_prefix:
   for xs: List<&2, P.File>
   {P.hash_of(xs) == "0x" ++ String.take(Sha.hex(P.manifest_of(xs)), 32n)
     : String}
+
+# The walk, which is a pure function of the files it is given. `ez add` will
+# give it every file of a checkout; `pkg_of` gives it none and answers each
+# file it asks for from disk, so both run this one walk.
+
+# LAW: an entry a checkout does not hold is refused, and named, whatever else
+# the checkout holds and however much fuel the walk has. With the checkout's
+# files as the list, this is EZ-RES-2's refusal: an entry that is not in the
+# revision is refused, never hashed as an empty package. An entry above the
+# checkout's top is refused too, by the next law.
+# EZ-RES-2
+law absent_entry_refused:
+  for f: Nat
+  for +entry: String
+  for +fs: List<&2, P.Source>
+  for inside: {False{} == P.outside(entry) : Bool}
+  for miss: {None{} == P.look(fs, entry) : Maybe<&2, String>}
+  {P.of.fuel((1n + f : Nat), entry, fs)
+    == P.Refused{"ez: " ++ entry ++ " is imported but not there"} : P.Walked}
+
+# LAW: a module or entry that climbs above the checkout's top is refused,
+# naming the import, wherever in the walk it is reached and whatever the walk
+# was given. The walk never reads it: a package that reached it would be named
+# after the directories above the checkout, which differ from machine to
+# machine.
+law escaping_import_refused:
+  for f: Nat
+  for +entry: String
+  for +tree: P.Tree
+  for +eb: String
+  for +seen: List<&2, String>
+  for +out: List<&2, P.Hit>
+  for +file: String
+  for +ns: String
+  for +rest: List<&2, P.Task>
+  for fresh: {False{} == P.seen.has(seen, file) : Bool}
+  for up: {True{} == P.outside(file) : Bool}
+  {P.made(entry, P.walk((1n + f : Nat), tree, eb,
+      P.State{seen, out, P.Going{}, P.Task{file, ns} <> rest}))
+    == P.Refused{"ez: the import " ++ P.climbs.name(ns, file)
+      ++ " climbs out of the checkout"} : P.Walked}
+
+# LAW: a walked package is named by the manifest of the very texts it lays.
+# The hash is the `0x` name of the files the walk found, each weighed by its
+# own text, so a plan that lays those files under that hash, with that
+# manifest beside them, writes a directory whose name is the digest of its
+# manifest. This is EZ-HASH-3 for the walk.
+# EZ-HASH-3
+law walked_named_by_texts:
+  for +pre: String
+  for +out: List<&2, P.Hit>
+  {P.hash_of(P.placed(pre, P.hit.sums(out)))
+    == P.hash_of(P.laid.sums(P.laid(pre, out))) : String}
+
+# LAW: and so the manifest written beside them is the manifest of those texts
+# EZ-HASH-3
+law walked_manifest_of_texts:
+  for +pre: String
+  for +out: List<&2, P.Hit>
+  {P.manifest_of(P.placed(pre, P.hit.sums(out)))
+    == P.manifest_of(P.laid.sums(P.laid(pre, out))) : String}

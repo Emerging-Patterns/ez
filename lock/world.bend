@@ -4,12 +4,15 @@
 # the planner asks by IO, and executes the plan the planner returns. The
 # design is docs/rfc/ez-lock-planner.md.
 #
-# This is the World of a plain lock: the ledger's text, the committed `.bend`
-# files, and one answer per package the planner asked about. There is no field
-# for the environment, the clock, the old lock, untracked files,
-# `.ez/origins.toml` or BEND_LIB's path, because the lock reads none of them.
+# A World is the ledger's text, the committed `.bend` files, one answer per
+# package the planner asked about, and, under `--upgrade`, one answer per
+# question the upgrade asked (lock/up.bend). There is no field for the
+# environment, the clock, the old lock, untracked files, `.ez/origins.toml` or
+# BEND_LIB's path, because the lock reads none of them.
 import Base
 import ./lock.bend as L
+import ./up.bend as Up
+import ../manifest/upgrade.bend as U
 import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../hub/hub.bend as Web
@@ -56,9 +59,11 @@ type Reply is Data:
   Reply{ask: Ask, answer: Answer}
 
 # everything `ez lock` reads. The ledger is ez.toml's text, or None when
-# there is no ez.toml.
+# there is no ez.toml. `ups` answers the upgrade's questions, and is empty for
+# a plain lock, which asks none.
 type World is Data:
-  World{args: Args, ledger: Maybe<&2, String>, listing: Listing, replies: List<&2, Reply>}
+  World{args: Args, ledger: Maybe<&2, String>, listing: Listing,
+    replies: List<&2, Reply>, ups: List<&2, Up.Reply>}
 
 # what the planner makes of one answer: the files and their texts, once every
 # check passed, or why it refused them
@@ -70,21 +75,30 @@ type Verdict is Data:
 type Judged is Data:
   Judged{hash: String, verdict: Verdict}
 
-# the part of a World the lock may depend on. A reply enters only through its
-# verdict, so how the bytes arrived does not, and bytes that failed a check
-# enter only as the refusal they caused.
+# the part of a World the lock may depend on: the ledger the lock is made
+# from, read, which under `--upgrade` is the one the upgrade leaves; why the
+# upgrade refuses, "" when it does not; the committed sources; and the verdict
+# on every package. A reply enters only through its verdict, so how the bytes
+# arrived does not, and bytes that failed a check enter only as the refusal
+# they caused.
 type Inputs is Data:
-  Inputs{ledger: Maybe<&2, String>, listing: Listing, judged: List<&2, Judged>}
+  Inputs{ledger: M.Read, stop: String, listing: Listing, judged: List<&2, Judged>}
 
 # whether the command was `ez lock --upgrade`
 def args.upgrade(world: World) -> Bool:
-  World{args, _ledger, _listing, _replies} = world
+  World{args, _ledger, _listing, _replies, _ups} = world
   Args{up, _only} = args
   up
 
+# the name `--package` gave, "" for none
+def args.only(world: World) -> String:
+  World{args, _ledger, _listing, _replies, _ups} = world
+  Args{_up, only} = args
+  only
+
 # the ledger's text
 def ledger.of(world: World) -> Maybe<&2, String>:
-  World{_args, ledger, _listing, _replies} = world
+  World{_args, ledger, _listing, _replies, _ups} = world
   ledger
 
 # the hash a question asks about
@@ -254,14 +268,104 @@ def parsed(ledger: Maybe<&2, String>) -> M.Read:
 def origins(+ledger: Maybe<&2, String>) -> List<&2, L.Origin>:
   L.ledger.read(parsed(ledger))
 
+# the dependency ez.toml names `name`, as `M.dep` finds it
+def dep(world: World, name: String) -> M.Dep:
+  World{_args, ledger, _listing, _replies, _ups} = world
+  M.dep(parsed(ledger), name)
+
 # the hub a ledger names
 def ledger.hub(+ledger: Maybe<&2, String>) -> String:
   M.hub_of(parsed(ledger))
 
+# ---------------------------------------------------------------------------
+# the ledger the lock is made from
+
+# a plain lock's is ez.toml as it is. An upgrade's is what the upgrade
+# decides on its answers: the ledger it writes, or its refusal, or the
+# questions it still has.
+def next.up(up: Bool, +only: String, +ledger: Maybe<&2, String>, ups: List<&2, Up.Reply>) -> Up.Next:
+  match up:
+    case False{}:
+      Up.plain(parsed(ledger))
+    case True{}:
+      Up.next(only, parsed(ledger), ups)
+
+# what the upgrade decides on a World, or nothing around a plain lock
+def next(args: Args, +ledger: Maybe<&2, String>, ups: List<&2, Up.Reply>) -> Up.Next:
+  Args{up, +only} = args
+  next.up(up, only, ledger, ups)
+
+# the origins the lock reads packages by
+def next.origins(+nx: Up.Next) -> List<&2, L.Origin>:
+  L.ledger.read(Up.next.read(nx))
+
+# the hub it names
+def next.hub(+nx: Up.Next) -> String:
+  M.hub_of(Up.next.read(nx))
+
+# a tree the upgrade checked out at a new rev, as the answer to the package
+# question the lock would ask about it: a clone, weighed
+def laid.reply(laid: Up.Laid, +orgs: List<&2, L.Origin>, +hub: String) -> Reply:
+  Up.Laid{+hash, nar, manifest, srcs} = laid
+  Reply{Pkg{hash, L.origin(orgs, hash), hub}, Got{Clone{nar}, manifest, srcs}}
+
+def laid.replies(ls: List<&2, Up.Laid>, +orgs: List<&2, L.Origin>, +hub: String) -> List<&2, Reply>:
+  match ls:
+    case []:
+      []
+    case h <> t:
+      laid.reply(h, orgs, hub) <> laid.replies(t, orgs, hub)
+
+# the package answers the lock reads: the trees the upgrade checked out, then
+# every answer the World holds
+def replies.of(+nx: Up.Next, replies: List<&2, Reply>) -> List<&2, Reply>:
+  List.append(&2, Reply,
+    laid.replies(Up.next.trees(nx), next.origins(nx), next.hub(nx)), replies)
+
+# every package answer judged against the ledger the lock is made from
+def judged.of(+nx: Up.Next, replies: List<&2, Reply>) -> List<&2, Judged>:
+  List.append(&2, Judged,
+    judge(next.origins(nx), next.hub(nx),
+      laid.replies(Up.next.trees(nx), next.origins(nx), next.hub(nx))),
+    judge(next.origins(nx), next.hub(nx), replies))
+
+# every committed source with each hash the upgrade moved rewritten in its
+# imports, as the upgrade writes it
+def sources.swap(+ss: List<&2, U.Swap>, fs: List<&2, Source>) -> List<&2, Source>:
+  match fs:
+    case []:
+      []
+    case Source{at, text} <> t:
+      Source{at, U.reimport.many(ss, text)} <> sources.swap(ss, t)
+
+def listing.swap(+ss: List<&2, U.Swap>, listing: Listing) -> Listing:
+  match listing:
+    case Listed{fs}:
+      Listed{sources.swap(ss, fs)}
+    case Unlisted{why}:
+      Unlisted{why}
+
+# the committed sources as the lock reads them: as the upgrade leaves them,
+# which is as they are when no hash moved, and always for a plain lock
+def listing.moved(ss: List<&2, U.Swap>, listing: Listing) -> Listing:
+  match ss:
+    case []:
+      listing
+    case h <> t:
+      listing.swap(h <> t, listing)
+
+def listing.of(+nx: Up.Next, listing: Listing) -> Listing:
+  listing.moved(Up.next.swaps(nx), listing)
+
+# what a World is, as far as the lock may tell, once the upgrade decided
+def inputs.of(+nx: Up.Next, listing: Listing, replies: List<&2, Reply>) -> Inputs:
+  Inputs{Up.next.read(nx), Up.next.stop(nx), listing.of(nx, listing),
+    judged.of(nx, replies)}
+
 # what a World is, as far as the lock may tell
 def inputs(world: World) -> Inputs:
-  World{_args, +ledger, listing, replies} = world
-  Inputs{ledger, listing, judge(origins(ledger), ledger.hub(ledger), replies)}
+  World{args, +ledger, listing, replies, ups} = world
+  inputs.of(next(args, ledger, ups), listing, replies)
 
 # ---------------------------------------------------------------------------
 # a fresh clone's World
@@ -285,7 +389,8 @@ def reclone.one(+orgs: List<&2, L.Origin>, +hash: String, answer: Answer) -> Ans
     case Got{how, manifest, ss}:
       Got{reclone.how(how, L.origin(orgs, hash)), manifest, ss}
 
-# every answer as a fresh clone would have it
+# every answer as a fresh clone would have it. A tree the upgrade checked
+# out is a clone already.
 def reclone.all(+orgs: List<&2, L.Origin>, rs: List<&2, Reply>) -> List<&2, Reply>:
   match rs:
     case []:
@@ -297,5 +402,6 @@ def reclone.all(+orgs: List<&2, L.Origin>, rs: List<&2, Reply>) -> List<&2, Repl
 # same committed sources, and every tree it would have read from BEND_LIB
 # cloned and weighed instead, since a clone has nothing there
 def reclone(world: World) -> World:
-  World{args, +ledger, listing, replies} = world
-  World{args, ledger, listing, reclone.all(origins(ledger), replies)}
+  World{+args, +ledger, listing, replies, +ups} = world
+  World{args, ledger, listing,
+    reclone.all(next.origins(next(args, ledger, ups)), replies), ups}

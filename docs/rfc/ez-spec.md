@@ -190,8 +190,8 @@ The law sketches below use these names. Where no definition exists, the sketch i
 
 | Name in a sketch | Real definition |
 | :---- | :---- |
-| `K.hash_of` | `pkg/pkg.bend:530`. The 0x name of a file list. |
-| `K.pkg_of` | `pkg/pkg.bend:556`. Walks an entry's import closure and returns the package (IO). |
+| `K.hash_of` | `pkg/pkg.bend:381`. The 0x name of a file list. |
+| `K.pkg_of` | `pkg/pkg.bend:959`. Walks an entry's import closure and returns the package (IO): the pure walk `K.of` (`pkg/pkg.bend:856`), with each file it asks for read from disk. |
 | `perm` | `pkg/LAWS.bend`. Lehmer-coded rearrangement of a file list; law vocabulary only. |
 | `Nar.path` | `sha/nar.bend:447`. The narHash of a directory (IO). No pure `Nar.of_tree` exists yet. |
 | `Lock.render.tools` | `lock/lock.bend:630`. The text of `ez.lock.toml`. |
@@ -431,7 +431,7 @@ A pending row passes with an empty Law cell. `SPEC.md`'s pending statuses and it
 
 Untagged quantified laws are allowed. ez has many of them: path lemmas, string lemmas, and the ledger reading laws that support EZ-LED. They pass the gate like any law, but the refactoring contract does not protect them, so a change may edit or delete them freely.
 
-The check belongs in bolt, as a rule in the `laws` group next to `closed`, `coverage` (which bolt v0.9.0 called `law`) and `unsafe`, run through `mkLint`. It depends only on file contents, which keeps it inside the lint gate rather than adding a new runner. `SPEC.md` stays the single requirement list, and the rule parses only its requirement and trust table rows, so the document remains prose for people and a table for the check. ez's flake checks gain `mkLint` in the first rollout phase. bolt shipped the check as `trace` (L005, bolt#106), opt-in: no group setting reaches it, and a project turns it on by naming it. ez's `bolt.bend` sets it to `error`.
+The check belongs in bolt, as a rule in the `laws` group next to `closed`, `coverage` (which bolt v0.9.0 called `law`) and `unsafe`, run through `mkLint`. It depends only on file contents, which keeps it inside the lint gate rather than adding a new runner. `SPEC.md` stays the single requirement list, and the rule parses only its requirement and trust table rows, so the document remains prose for people and a table for the check. ez's flake checks gain `mkLint` in the first rollout phase. bolt shipped the check as `trace` (L005, bolt#106, first released in bolt v1.2.0), opt-in: no group setting reaches it, and a project turns it on by naming it. ez's `bolt.bend` sets it to `error`, and `[tools.bolt]` pins bolt v1.2.1.
 
 ### Refactoring contract
 
@@ -549,7 +549,7 @@ EZ-DOC-1 is proved against the pinned eztoml v0.1.0 reader, with a file path hol
 
 The next phase converts `ez add` and `ez remove`, with `ez init`, and makes the package walk a pure function of a checkout's files. It proves EZ-LED-2, EZ-LED-3, EZ-LED-7, EZ-RES-1 and EZ-RES-2, and lands the add and remove halves of EZ-LED-1, EZ-LED-6, EZ-LED-8, EZ-VEN-1, EZ-HASH-3 and EZ-OUT-2. Its design, with its Worlds, its laws and its work packages, is in [ez-add-planner.md](ez-add-planner.md). Later phases convert `ez fetch`, `ez publish`, `ez doctor` and the tool commands in the same way, one command per phase, each ending with its requirements proved.
 
-ez stayed on bolt v0.9.0 while any `# toward` trail remained, because bolt retired `quantify` and its `# toward` exemption in favour of a strict `closed`, which the trails would fail. We deleted the last 40 trails in one change rather than one requirement at a time (see "Retiring closed laws"), and in the same change moved `[tools.bolt]` to the bolt that ships `trace`, dropped `def quantify()` from `bolt.bend`, and set `closed` and `trace` to `error`. From then on the lint gate checks `SPEC.md` against the law tags mechanically.
+ez stayed on bolt v0.9.0 while any `# toward` trail remained, because bolt retired `quantify` and its `# toward` exemption in favour of a strict `closed`, which the trails would fail. We deleted the last 40 trails in one change rather than one requirement at a time (see "Retiring closed laws"), and in the same change moved `[tools.bolt]` to the bolt that ships `trace` (a commit on bolt's main at first, since bolt v1.2.1), dropped `def quantify()` from `bolt.bend`, and set `closed` and `trace` to `error`. From then on the lint gate checks `SPEC.md` against the law tags mechanically.
 
 The refactoring contract applies from the first phase, since it depends only on law statements and the trust boundary.
 
