@@ -602,6 +602,22 @@ law upgrade_forward_refuses_off:
     == Up.Asc{False{}} : Up.Asc}
   {P.refuses(w) == True{} : Bool}
 
+# LAW: and when `ez lock --upgrade` asks about it and does not refuse, it is
+# at the default branch tip the remote named: moved there, or there already
+# EZ-RES-5
+law upgrade_forward_reaches_tip:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +bare: {rev_only(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for head: {Up.forward(ups(w), M.source.url(pin(w, n))) == Up.At{tip, tag, branch} : Up.Tip}
+  for ok: {P.refuses(w) == False{} : Bool}
+  {M.source.rev(M.source.dep(M.dep(P.ledger.next(w), n))) == tip : String}
+
 # LAW: a dependency pinned through a tag keeps its tag and moves, if it moves
 # at all, to the commit the remote names for that tag, and only when the
 # remote said that commit descends from the pin
@@ -657,3 +673,21 @@ law upgrade_tag_refuses_drift:
   for drift: {U.agree(M.dep.hash(W.dep(w, n)), Up.hash.of(manifest), M.source.nar(pin(w, n)),
     nar, M.source.root(pin(w, n)), root) == False{} : Bool}
   {P.refuses(w) == True{} : Bool}
+
+# LAW: and a pin through a tag that `ez lock --upgrade` asks about, when it
+# does not refuse, is at the commit the remote names for its tag: the tag is
+# re-resolved, not only allowed to be
+# EZ-RES-8
+law upgrade_tag_resolves:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +named: {tagged(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for refs: {Up.follow(ups(w), M.source.url(pin(w, n)), M.source.tag(pin(w, n)))
+    == Up.At{tip, tag, branch} : Up.Tip}
+  for ok: {P.refuses(w) == False{} : Bool}
+  {M.source.rev(M.source.dep(M.dep(P.ledger.next(w), n))) == tip : String}

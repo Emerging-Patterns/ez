@@ -141,10 +141,17 @@ def next.swaps(nx: Next) -> List<&2, U.Swap>:
 def plain(+read: M.Read) -> Next:
   Next{read, read, "", [], [], [], [], [], [], [], []}
 
+# a refusal's reason, never empty. An empty reason is no refusal at all, so
+# an upgrade that stopped with one would otherwise go on to lock the ledger
+# as it was, and a pin that halted with one would drop out of the ledger the
+# upgrade writes. The interpreter never answers with an empty reason.
+def halt.why(+why: String) -> String:
+  Bool.pick(String, String.is_empty(why), "ez: the upgrade stopped without a reason", why)
+
 # an upgrade that refuses, or still asks: the lock is not made, and nothing is
 # written
 def stopped(+read: M.Read, +why: String, asks: List<&2, Ask>) -> Next:
-  Next{read, read, why, asks, [], [], [], [], [], [], []}
+  Next{read, read, halt.why(why), asks, [], [], [], [], [], [], []}
 
 # ---------------------------------------------------------------------------
 # looking an answer up
@@ -697,12 +704,6 @@ def swaps.put(empty: Bool, +old: String, +new: String, rest: List<&2, U.Swap>) -
       rest
     case False{}:
       U.Swap{old, new} <> rest
-
-# a refusal's reason, never empty. An empty `bad` is no refusal at all, so a
-# pin that halted with no reason would otherwise pass, and drop out of the
-# ledger the upgrade writes.
-def halt.why(+why: String) -> String:
-  Bool.pick(String, String.is_empty(why), "ez: the upgrade stopped without a reason", why)
 
 # one dependency in front of the rest. A refusal ahead of the rest wins, so
 # the first in ledger order is the one given.
