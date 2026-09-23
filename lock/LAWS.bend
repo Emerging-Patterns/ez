@@ -611,8 +611,8 @@ def ups(world: W.World) -> List<&2, Up.Reply>:
   ups
 
 # the source ez.toml records for the dependency named `n`
-def pin(world: W.World, n: String) -> M.Source:
-  M.source.dep(W.dep(world, n))
+def pin(world: W.World, name: String) -> M.Source:
+  M.source.dep(W.dep(world, name))
 
 # whether a source is pinned by its commit alone, with no tag
 def rev_only.src(src: M.Source) -> Bool:
@@ -671,14 +671,14 @@ def moved.ok(tip: Up.Tip, +rs: List<&2, Up.Reply>, +old: M.Dep, +new: M.Dep) -> 
 
 # the pin the upgrade leaves for the dependency named `n`, against the one
 # ez.toml records and the default branch tip the remote named for it
-def forward.ok(+world: W.World, +n: String) -> Bool:
-  moved.ok(Up.forward(ups(world), M.source.url(pin(world, n))), ups(world),
-    W.dep(world, n), M.dep(P.ledger.next(world), n))
+def forward.ok(+world: W.World, +name: String) -> Bool:
+  moved.ok(Up.forward(ups(world), M.source.url(pin(world, name))), ups(world),
+    W.dep(world, name), M.dep(P.ledger.next(world), name))
 
 # and against the commit the remote named for its tag
-def follow.ok(+world: W.World, +n: String) -> Bool:
-  moved.ok(Up.follow(ups(world), M.source.url(pin(world, n)), M.source.tag(pin(world, n))),
-    ups(world), W.dep(world, n), M.dep(P.ledger.next(world), n))
+def follow.ok(+world: W.World, +name: String) -> Bool:
+  moved.ok(Up.follow(ups(world), M.source.url(pin(world, name)), M.source.tag(pin(world, name))),
+    ups(world), W.dep(world, name), M.dep(P.ledger.next(world), name))
 
 # LAW: a dependency pinned by its commit alone moves, if it moves at all, to
 # the default branch tip the remote named, and only when the remote said that

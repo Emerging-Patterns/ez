@@ -3316,8 +3316,17 @@ def Laws.upgrade_one_asks_alone(w, n, u, e, ne):
 # (`Up.dep.tip`).
 
 # a pin from a repository, with its fields spelled out
-def mv.git(+hn: String, +hh: String, +he: String, +url: String, +rev: String, +tag: String,
-  +root: String, +nar: String, +vend: Bool) -> M.Dep:
+def mv.git(
+  +hn: String,
+  +hh: String,
+  +he: String,
+  +url: String,
+  +rev: String,
+  +tag: String,
+  +root: String,
+  +nar: String,
+  +vend: Bool
+) -> M.Dep:
   M.Dep{hn, hh, he, M.Git{url, rev, tag, root, nar, vend}}
 
 # a fate is sound against a tip when the pin it leaves is kept or moved
@@ -3534,8 +3543,28 @@ law mv.ok_hub:
     nar2, man, srcs, br), Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend))
     == True{} : Bool}
 
-def mv.ok_hub(hb, rs, _hn, _hh, _he, url, rev, tag, _root, _nar, _vend, _hash, r, _tg, _br,
-  _root2, _nar2, _man, _srcs, e):
+def mv.ok_hub(
+  hb,
+  rs,
+  _hn,
+  _hh,
+  _he,
+  url,
+  rev,
+  tag,
+  _root,
+  _nar,
+  _vend,
+  _hash,
+  r,
+  _tg,
+  _br,
+  _root2,
+  _nar2,
+  _man,
+  _srcs,
+  e
+):
   match hb:
     case Up.Clear{}:
       Equal.trans(Bool,
@@ -3936,7 +3965,7 @@ law mv.fine_one:
   {mv.fine(Up.dep.one(am, rs, only, hub, h), M.dep.name(h))
     == (M.dep.name(h), True{}) : String & Bool}
 
-def mv.fine_one(am, rs, only, hub, h):
+def mv.fine_one(am, rs, _only, hub, h):
   match am h:
     case U.Hold{} M.Dep{_hn, _hh, _he, _src}:
       {==}
@@ -4103,7 +4132,7 @@ law mv.join_hit:
 
 def mv.join_hit(f, rest, t, rs, n, hn, hh, he, src, e, ok, fn):
   match f rest:
-    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _o, _nw, _pv, _m, _sy, _tr} Up.Deps{+ds, _ss, _es, _any, _sy2, _tr2, +asks, +bad}:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _, _, _, _, _, _} Up.Deps{+ds, _, _, _, _, _, +asks, +bad}:
       Equal.trans(Bool,
         Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
           Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
@@ -4165,7 +4194,7 @@ law mv.join_miss:
 
 def mv.join_miss(f, rest, t, rs, n, hn, old, e, fn, ih):
   match f rest:
-    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _o, _nw, _pv, _m, _sy, _tr} Up.Deps{+ds, _ss, _es, _any, _sy2, _tr2, +asks, +bad}:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _, _, _, _, _, _} Up.Deps{+ds, _, _, _, _, _, +asks, +bad}:
       Equal.trans(Bool,
         Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
           Laws.moved.ok(t, rs, old,
@@ -4325,8 +4354,30 @@ law mv.model_srcs:
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), n))
     == True{} : Bool}
 
-def mv.model_srcs(srcs, t, rs, n, name, entry, bin, hub, ds, ts, dds, _ss, _es, dm, _dsy, _dtr,
-  tts, tm, _tsy, _ig, wk, self):
+def mv.model_srcs(
+  srcs,
+  t,
+  rs,
+  n,
+  name,
+  entry,
+  bin,
+  hub,
+  ds,
+  ts,
+  dds,
+  _ss,
+  _es,
+  dm,
+  _dsy,
+  _dtr,
+  tts,
+  tm,
+  _tsy,
+  _ig,
+  wk,
+  self
+):
   match srcs:
     case Up.Srcs{_fs}:
       mv.model_moved(Bool.or(dm, tm), t, rs, n, name, entry, bin, hub, ds, ts, dds, tts, wk, self)
@@ -4364,8 +4415,30 @@ law mv.model_ignore:
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), n))
     == True{} : Bool}
 
-def mv.model_ignore(said, srcs, t, rs, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr,
-  tts, tm, tsy, wk, self):
+def mv.model_ignore(
+  said,
+  srcs,
+  t,
+  rs,
+  n,
+  name,
+  entry,
+  bin,
+  hub,
+  ds,
+  ts,
+  dds,
+  ss,
+  es,
+  dm,
+  dsy,
+  dtr,
+  tts,
+  tm,
+  tsy,
+  wk,
+  self
+):
   match said:
     case Up.Said{+ig}:
       mv.model_srcs(srcs, t, rs, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts,
@@ -4638,8 +4711,29 @@ law mv.tip_drift:
   {mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
     mv.git(hn, hh, he, url, rev, tag, root, nar, vend))) == True{} : Bool}
 
-def mv.tip_drift(rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, tg, br, nar2, root2, man,
-  srcs, same, co, drift):
+def mv.tip_drift(
+  rs,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  tag,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  nar2,
+  root2,
+  man,
+  srcs,
+  same,
+  co,
+  drift
+):
   Equal.trans(Bool,
     mv.halts(Up.dep.same(String.eq(rev, tip), rs, hub,
       mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
@@ -4687,8 +4781,27 @@ law mv.fwd_off_sel:
   {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
     mv.git(hn, hh, he, url, rev, "", root, nar, vend))) == True{} : Bool}
 
-def mv.fwd_off_sel(s, rs, _only, hub, hn, hh, he, url, rev, root, nar, vend, tip, tg, br, sel, head,
-  moved, off):
+def mv.fwd_off_sel(
+  s,
+  rs,
+  _only,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  sel,
+  head,
+  moved,
+  off
+):
   match s:
     case False{}:
       sel
@@ -4765,8 +4878,29 @@ law mv.fol_off_sel:
   {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
     mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}
 
-def mv.fol_off_sel(s, rs, _only, hub, hn, hh, he, url, rev, c, ct, root, nar, vend, tip, tg, br, sel,
-  refs, moved, off):
+def mv.fol_off_sel(
+  s,
+  rs,
+  _only,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  c,
+  ct,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  sel,
+  refs,
+  moved,
+  off
+):
   match s:
     case False{}:
       sel
@@ -4850,8 +4984,34 @@ law mv.fol_drift_sel:
   {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
     mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}
 
-def mv.fol_drift_sel(s, rs, _only, hub, hn, hh, he, url, rev, c, ct, root, nar, vend, tip, tg, br,
-  nar2, root2, man, srcs, sel, refs, same, co, drift):
+def mv.fol_drift_sel(
+  s,
+  rs,
+  _only,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  c,
+  ct,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  nar2,
+  root2,
+  man,
+  srcs,
+  sel,
+  refs,
+  same,
+  co,
+  drift
+):
   match s:
     case False{}:
       sel
@@ -4892,8 +5052,25 @@ law mv.fol_drift:
   {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h))
     == True{} : Bool}
 
-def mv.fol_drift(rs, only, hub, h, tip, tg, br, nar2, root2, man, srcs, named, sel, refs, same, co,
-  drift):
+def mv.fol_drift(
+  rs,
+  only,
+  hub,
+  h,
+  tip,
+  tg,
+  br,
+  nar2,
+  root2,
+  man,
+  srcs,
+  named,
+  sel,
+  refs,
+  same,
+  co,
+  drift
+):
   match h:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
@@ -4937,7 +5114,7 @@ law mv.join_bad:
 
 def mv.join_bad(f, rest, hl):
   match f rest:
-    case Up.Became{_d, _o, _nw, _pv, _m, _sy, _tr} Up.Deps{_ds, _ss, _es, _any, _sy2, _tr2, _asks, bad}:
+    case Up.Became{_d, _, _, _, _, _, _} Up.Deps{_ds, _ss, _es, _any, _sy2, _tr2, _asks, bad}:
       Eq.bit.absurd(&2, {String.is_empty(bad) == False{} : Bool}, hl)
     case Up.Waits{_more} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, bad}:
       Eq.bit.absurd(&2, {String.is_empty(bad) == False{} : Bool}, hl)
@@ -4953,7 +5130,7 @@ law mv.join_keeps:
 
 def mv.join_keeps(f, rest, ih):
   match f rest:
-    case Up.Became{_d, _o, _nw, _pv, _m, _sy, _tr} Up.Deps{_ds, _ss, _es, _any, _sy2, _tr2, _asks, _bad}:
+    case Up.Became{_d, _, _, _, _, _, _} Up.Deps{_ds, _ss, _es, _any, _sy2, _tr2, _asks, _bad}:
       ih
     case Up.Waits{_more} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, _bad}:
       ih
@@ -5143,8 +5320,24 @@ def Laws.upgrade_tag_refuses_off(w, n, tip, tag, branch, up, named, sel, refs, m
                     sel),
                   refs, moved, off))
 
-def Laws.upgrade_tag_refuses_drift(w, n, tip, tag, branch, nar, root, manifest, srcs, up, named, sel,
-  refs, same, co, drift):
+def Laws.upgrade_tag_refuses_drift(
+  w,
+  n,
+  tip,
+  tag,
+  branch,
+  nar,
+  root,
+  manifest,
+  srcs,
+  up,
+  named,
+  sel,
+  refs,
+  same,
+  co,
+  drift
+):
   match w:
     case W.World{args, +ledger, +listing, +replies, +ups}:
       match args:
@@ -5256,8 +5449,25 @@ law mv.live_hub:
   {mv.live(Up.dep.hub(hb, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), hash, tip, root2,
     nar2, man, srcs, br), tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
 
-def mv.live_hub(hb, _hn, _hh, _he, _url, _rev, _tag, _root, _nar, _vend, _hash, tip, _br, _root2,
-  _nar2, _man, _srcs):
+def mv.live_hub(
+  hb,
+  _hn,
+  _hh,
+  _he,
+  _url,
+  _rev,
+  _tag,
+  _root,
+  _nar,
+  _vend,
+  _hash,
+  tip,
+  _br,
+  _root2,
+  _nar2,
+  _man,
+  _srcs
+):
   match hb:
     case Up.Clear{}:
       Equal.cong(Bool, Bool, x => Bool.and(x, True{}), String.eq(tip, tip), True{},
@@ -5354,8 +5564,24 @@ law mv.live_agree:
     mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, "", seen),
     tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
 
-def mv.live_agree(g, _rs, _hub, _hn, _hh, _he, _url, rev, _tag, _root, _nar, _vend, tip, _tg,
-  _seen, e):
+def mv.live_agree(
+  g,
+  _rs,
+  _hub,
+  _hn,
+  _hh,
+  _he,
+  _url,
+  rev,
+  _tag,
+  _root,
+  _nar,
+  _vend,
+  tip,
+  _tg,
+  _seen,
+  e
+):
   match g:
     case True{}:
       Equal.cong(Bool, Bool, x => Bool.and(x, x), String.eq(rev, tip), True{}, e)
@@ -5547,8 +5773,27 @@ law mv.fol_live_sel:
     mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), tip,
     mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}
 
-def mv.fol_live_sel(s, rs, only, hub, hn, hh, he, url, rev, c, ct, root, nar, vend, tip, tg, br, sel,
-  refs):
+def mv.fol_live_sel(
+  s,
+  rs,
+  only,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  c,
+  ct,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  sel,
+  refs
+):
   match s:
     case False{}:
       Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(False{}, M.Git{url, rev, SCon{c, ct}, root, nar,
@@ -5637,9 +5882,9 @@ law mv.live_hit:
   for fn: {mv.fine(f, hn) == (hn, True{}) : String & Bool}
   {mv.walk_live(tip, Up.deps.join(f, rest), M.Dep{hn, hh, he, src}, n) == True{} : Bool}
 
-def mv.live_hit(f, rest, n, tip, hn, hh, he, src, e, lv, fn):
+def mv.live_hit(f, rest, n, tip, hn, _hh, _he, src, e, lv, fn):
   match f rest:
-    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _o, _nw, _pv, +m, _sy, _tr} Up.Deps{+ds, _ss, _es, +any, _sy2, _tr2, +asks, +bad}:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _, _, _, +m, _, _} Up.Deps{+ds, _, _, +any, _, _, +asks, +bad}:
       Equal.trans(Bool,
         Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
           Bool.and(String.eq(M.source.rev(M.source.dep(
@@ -5710,7 +5955,7 @@ law mv.live_miss:
 
 def mv.live_miss(f, rest, n, tip, hn, old, e, fn, ih):
   match f rest:
-    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _o, _nw, _pv, +m, _sy, _tr} Up.Deps{+ds, _ss, _es, +any, _sy2, _tr2, +asks, +bad}:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _, _, _, +m, _, _} Up.Deps{+ds, _, _, +any, _, _, +asks, +bad}:
       Equal.trans(Bool,
         Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
           Bool.and(String.eq(M.source.rev(M.source.dep(
@@ -5892,8 +6137,29 @@ law mv.reach_srcs:
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), n))), tip)
     == True{} : Bool}
 
-def mv.reach_srcs(srcs, tip, n, name, entry, bin, hub, ds, ts, dds, _ss, _es, dm, _dsy, _dtr, tts,
-  tm, _tsy, _ig, wk, se):
+def mv.reach_srcs(
+  srcs,
+  tip,
+  n,
+  name,
+  entry,
+  bin,
+  hub,
+  ds,
+  ts,
+  dds,
+  _ss,
+  _es,
+  dm,
+  _dsy,
+  _dtr,
+  tts,
+  tm,
+  _tsy,
+  _ig,
+  wk,
+  se
+):
   match srcs:
     case Up.Srcs{_fs}:
       mv.reach_moved(dm, tm, tip, n, name, entry, bin, hub, ds, ts, dds, tts, wk)
@@ -5935,8 +6201,29 @@ law mv.reach_ignore:
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), n))), tip)
     == True{} : Bool}
 
-def mv.reach_ignore(said, srcs, tip, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts,
-  tm, tsy, wk, se):
+def mv.reach_ignore(
+  said,
+  srcs,
+  tip,
+  n,
+  name,
+  entry,
+  bin,
+  hub,
+  ds,
+  ts,
+  dds,
+  ss,
+  es,
+  dm,
+  dsy,
+  dtr,
+  tts,
+  tm,
+  tsy,
+  wk,
+  se
+):
   match said:
     case Up.Said{+ig}:
       mv.reach_srcs(srcs, tip, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm,
