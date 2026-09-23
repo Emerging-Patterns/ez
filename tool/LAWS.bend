@@ -7,6 +7,7 @@
 import Base
 import ./world.bend as TW
 import ./plan.bend as TP
+import ../lock/plan.bend as P
 import ../lock/up.bend as Up
 import ../manifest/manifest.bend as M
 import ../git/git.bend as Git
@@ -272,6 +273,58 @@ law tool_link_never_runs:
   for act: {TW.act(w) == a : TW.Act}
   for l: {TP.links.act(a) == True{} : Bool}
   {TP.launches(TP.plan(w)) == False{} : Bool}
+
+# ---------------------------------------------------------------------------
+# EZ-OUT-1: the status a tool command exits with. The interpreter exits with
+# `TP.code` of the plan's end and the status of the program it started, 0
+# when it started none.
+
+# LAW: a tool command that refuses exits 1, whatever a program would have
+# exited with, since it starts none
+# EZ-OUT-1
+law tool_refusal_status_one:
+  for +w: TW.World
+  for s: U32
+  for r: {TP.refuses(w) == True{} : Bool}
+  {TP.code(TP.exit(TP.plan(w)), s) == 1 : U32}
+
+# LAW: `ez tool run` that does not refuse exits with the program's status
+# EZ-OUT-1
+law tool_run_status_is_program:
+  for +w: TW.World
+  for +args: List<&2, String>
+  for act: {TW.act(w) == TW.Run{args} : TW.Act}
+  for ok: {TP.refuses(w) == False{} : Bool}
+  for s: U32
+  {TP.code(TP.exit(TP.plan(w)), s) == s : U32}
+
+# LAW: `install` and `upgrade` that do not refuse exit 0
+# EZ-OUT-1
+law tool_link_status_zero:
+  for +w: TW.World
+  for a: TW.Act
+  for act: {TW.act(w) == a : TW.Act}
+  for l: {TP.links.act(a) == True{} : Bool}
+  for ok: {TP.refuses(w) == False{} : Bool}
+  for s: U32
+  {TP.code(TP.exit(TP.plan(w)), s) == 0 : U32}
+
+# LAW: `ez tool sync` ends with 1 exactly when it refuses, and 0 when it
+# does not. Each install it runs ends as `ez tool install` does, so one that
+# refuses ends the sync there with 1.
+# EZ-OUT-1
+law sync_exits_as_it_refuses:
+  for +ledger: Maybe<&2, String>
+  for +lock: Maybe<&2, String>
+  {P.status(TP.sync.outcome(TP.sync(ledger, lock)))
+    == P.status.of(TP.sync.refuses(TP.sync(ledger, lock))) : U32}
+
+# LAW: with no ez.toml, `ez tool sync` refuses, whatever the lock says, so
+# it installs nothing and exits 1
+# EZ-OUT-1
+law sync_needs_ledger:
+  for +lock: Maybe<&2, String>
+  {TP.sync.refuses(TP.sync(None{}, lock)) == True{} : Bool}
 
 # ---------------------------------------------------------------------------
 # EZ-TOOL-7: the file built and the link's name

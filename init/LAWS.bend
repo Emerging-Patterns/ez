@@ -14,6 +14,13 @@ law init_refusal_writes_nothing:
   for r: {IP.refuses(w) == True{} : Bool}
   {P.writes(IP.plan(w)) == False{} : Bool}
 
+# LAW: `ez init` ends with the status of its plan's outcome, which is 1
+# exactly when it refuses and 0 when it does not
+# EZ-OUT-1
+law init_exits_as_it_refuses:
+  for +w: IP.World
+  {P.code(IP.plan(w)) == P.status.of(IP.refuses(w)) : U32}
+
 # LAW: a ledger already on disk, whatever it holds, leaves `ez init` nothing
 # to write, whatever it was asked for and whatever else is there, so the
 # ledger's dependencies, tools and `bin` survive a second `ez init`

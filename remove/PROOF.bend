@@ -211,3 +211,23 @@ def Laws.remove_keeps_tools(name, s, ignore, n, e, b, h, ds, ts, good, ok):
 
 def Laws.remove_refuses_tool(name, s, ignore, n, e, b, h, ds, ts, good, _tool, no):
   Laws.remove_refuses_absent(name, s, ignore, M.Manifest{n, e, b, h, ds, ts}, good, no)
+
+# ---------------------------------------------------------------------------
+# EZ-OUT-1
+
+# LAW: a plan ends with the status of whether it refuses
+law plan_code:
+  for pl: P.Plan
+  {P.code(pl) == P.status.of(RP.refuses.plan(pl)) : U32}
+
+def plan_code(pl):
+  match pl:
+    case P.Plan{_es, o}:
+      match o:
+        case P.Success{}:
+          {==}
+        case P.Refused{_why}:
+          {==}
+
+def Laws.remove_exits_as_it_refuses(w):
+  plan_code(RP.plan(w))

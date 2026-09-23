@@ -6,8 +6,10 @@
 # to ask. Then it runs the plan: the checkout laid, the binary built or
 # reused, then the program started or the link written, and the plan's end.
 # A git question is the lock interpreter's to answer (`Run.answer.ups`), a
-# file is written by its `Run.write`, and the end is its `Run.end`. It
-# decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
+# file is written by its `Run.write`, and the command exits with the status
+# the planner gives the plan's end and the program's (`TP.code`), through
+# `Run.end.at`. It decides nothing; that it reads and executes faithfully is
+# EZ-TRUST-2.
 #
 # `sync` asks the planner which pins to install (`TP.sync`) and installs
 # each in turn as `ez tool install <name>` would.
@@ -15,6 +17,7 @@ import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ../lock/run.bend as Run
+import ../lock/plan.bend as LP
 import ../lock/up.bend as Up
 import ../fetch/run.bend as FetchRun
 import ../pkg/path.bend as P
@@ -146,22 +149,6 @@ def exec.make(making: TP.Make) -> IO(Unit):
         Say.done(s)
         Run.write(at, key)
 
-# a status that parsed. Zero is success; anything else is that status.
-def code.die(zero: Bool, status: U32) -> IO(Unit):
-  match zero:
-    case True{}:
-      IO.pure(Unit, Unit{})
-    case False{}:
-      IO.die(Unit, status, "")
-
-# the program's status, forwarded. A status that is not a number exits 1.
-def code.of(exit: Maybe<&2, U32>) -> IO(Unit):
-  match exit:
-    case None{}:
-      IO.die(Unit, 1, "")
-    case Some{+n}:
-      code.die(U32.is_eq(n, 0), n)
-
 # the lines a person is told, each on stderr
 def tell(ls: List<&2, String>) -> IO(Unit):
   match ls:
@@ -179,32 +166,36 @@ def link.after(ok: Bool, +at: String, +text: String, says: List<&2, String>) -> 
     case True{}:
       tell(says)
 
-# the program started with its words, or the link written
-def exec.finish(fin: TP.Finish) -> IO(Unit):
+# the program started with its words, or the link written, and the status
+# the program exited with, 0 when none was started
+def exec.finish(fin: TP.Finish) -> IO(U32):
   match fin:
     case TP.Idle{}:
-      IO.pure(Unit, Unit{})
+      IO.pure(U32, 0)
     case TP.Launch{bin, args}:
-      do IO<Unit>:
+      do IO<U32>:
         +out : String <- R.exec(List.append(&2, String, [bin], args))
         IO.write(R.text(out))
-        code.of(U32.read(R.code(out)))
+        return TP.program(U32.read(R.code(out)))
     case TP.Link{bin, +dir, +name, says}:
       +at = dir ++ "/" ++ name
-      do IO<Unit>:
+      do IO<U32>:
         IO.print_err(Say.linking(at))
         _mk : String <- R.exec(["mkdir", "-p", dir])
         +ln : String <- R.exec(["ln", "-sfn", bin, at])
         link.after(R.ok(ln), at, R.text(ln), says)
+        return 0
 
-# a plan, executed, and how it ends
-def exec.plan(pl: TP.Plan) -> IO(Unit):
+# a plan, executed, and how it ends: with the status the planner gives its
+# end and the program's status (`TP.code`, EZ-OUT-1)
+def exec.plan(+pl: TP.Plan) -> IO(Unit):
   TP.Plan{l, m, f, o} = pl
   do IO<Unit>:
     exec.lay(l)
     exec.make(m)
-    exec.finish(f)
-    Run.end(o)
+    s : U32 <- exec.finish(f)
+    +code : U32 <- IO.pure(U32, TP.code(TP.exit(pl), s))
+    Run.end.at(U32.is_eq(code, 0), code, LP.why(o))
 
 # ---------------------------------------------------------------------------
 # the loop
@@ -291,20 +282,19 @@ def sync.all(
         go(TW.Install{}, h, here, vars, bend, led, lock)
         sync.all(t, here, vars, bend, led, lock)
 
-# a sync's names installed in turn, or its refusal
+# a sync's names installed in turn, none when it refuses, and then its end
+# (`TP.sync.outcome`)
 def sync.go(
-  synced: TP.Sync,
+  +synced: TP.Sync,
   +here: String,
   +vars: TW.Env,
   +bend: String,
   +led: Maybe<&2, String>,
   +lock: Maybe<&2, String>
 ) -> IO(Unit):
-  match synced:
-    case TP.SyncNo{why}:
-      IO.die(Unit, 1, why)
-    case TP.Sync{ns}:
-      sync.all(ns, here, vars, bend, led, lock)
+  do IO<Unit>:
+    sync.all(TP.sync.names(synced), here, vars, bend, led, lock)
+    Run.end(TP.sync.outcome(synced))
 
 # `ez tool sync`: every pin the ledger names, installed at its lock rev
 def sync() -> IO(Unit):

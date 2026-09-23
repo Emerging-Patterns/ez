@@ -259,6 +259,13 @@ law pub_refusal_writes_nothing:
   for r: {PP.refuses(w) == True{} : Bool}
   {P.writes(PP.plan(w)) == False{} : Bool}
 
+# LAW: `ez publish` ends with the status of its plan's outcome, which is 1
+# exactly when it refuses and 0 when it does not
+# EZ-OUT-1
+law pub_exits_as_it_refuses:
+  for +w: PW.World
+  {P.code(PP.plan(w)) == P.status.of(PP.refuses(w)) : U32}
+
 # LAW: with no ez.toml, `ez publish` refuses outright, sending nothing,
 # rather than guessing an entry
 law pub_needs_ledger:

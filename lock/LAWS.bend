@@ -292,6 +292,13 @@ law lock_refusal_writes_nothing:
   for r: {P.refuses(w) == True{} : Bool}
   {P.writes(P.plan(w)) == False{} : Bool}
 
+# LAW: `ez lock`, plain or `--upgrade`, ends with the status of its plan's
+# outcome, which is 1 exactly when it refuses and 0 when it does not
+# EZ-OUT-1
+law lock_exits_as_it_refuses:
+  for +w: W.World
+  {P.code(P.plan(w)) == P.status.of(P.refuses(w)) : U32}
+
 # The upgrade's decisions (lock/up.bend) are stated over `P.ledger.next`, the
 # ledger model an upgrade renders into ez.toml, and over the questions it asks,
 # `P.wants.up`. A plain lock is the World whose args say no `--upgrade`, and it

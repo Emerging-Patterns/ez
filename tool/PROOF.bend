@@ -447,6 +447,71 @@ def Laws.tool_link_never_runs(w, a, act, l):
   never(TP.decide(w), w, a, act, l)
 
 # ---------------------------------------------------------------------------
+# EZ-OUT-1
+
+def Laws.tool_refusal_status_one(w, s, r):
+  Equal.cong(TP.Exit, U32, e => TP.code(e, s), TP.exit(TP.plan(w)), TP.Refusal{},
+    Laws.tool_refusal_exits_one(w, r))
+
+def Laws.tool_run_status_is_program(w, args, act, ok, s):
+  Equal.cong(TP.Exit, U32, e => TP.code(e, s), TP.exit(TP.plan(w)), TP.Exits{TP.out(w), args},
+    Laws.tool_run_exits_with_program(w, args, act, ok))
+
+# LAW: a linking act ends a plan that goes on without a program
+law link_ends_a:
+  for a: TW.Act
+  for +w: TW.World
+  for l: {TP.links.act(a) == True{} : Bool}
+  {TP.exit.of(TP.finish.of(a, w)) == TP.Finished{} : TP.Exit}
+
+def link_ends_a(a, w, l):
+  match a:
+    case TW.Run{args}:
+      Eq.bit.absurd(&2, {TP.exit.of(TP.finish.of(TW.Run{args}, w)) == TP.Finished{}
+        : TP.Exit}, l)
+    case TW.Install{}:
+      {==}
+    case TW.Upgrade{}:
+      {==}
+
+# LAW: so `made` for `install` or `upgrade` ends without a program
+law link_ends:
+  for a: TW.Act
+  for +w: TW.World
+  for act: {TW.act(w) == a : TW.Act}
+  for l: {TP.links.act(a) == True{} : Bool}
+  {TP.exit(TP.made(w)) == TP.Finished{} : TP.Exit}
+
+def link_ends(a, w, act, l):
+  %Equal.sym(TW.Act, TW.act(w), a, act)
+    : {TP.exit.of(TP.finish.of(_, w)) == TP.Finished{} : TP.Exit}
+  link_ends_a(a, w, l)
+
+def Laws.tool_link_status_zero(w, a, act, l, ok, s):
+  Equal.cong(TP.Exit, U32, e => TP.code(e, s), TP.exit(TP.plan(w)), TP.Finished{},
+    Equal.trans(TP.Exit, TP.exit(TP.plan(w)), TP.exit(TP.made(w)), TP.Finished{},
+      Equal.cong(TP.Plan, TP.Exit, pl => TP.exit(pl), TP.plan(w), TP.made(w), made_of(w, ok)),
+      link_ends(a, w, act, l)))
+
+# LAW: a sync ends with the status of whether it refuses
+law sync_code:
+  for s: TP.Sync
+  {P.status(TP.sync.outcome(s)) == P.status.of(TP.sync.refuses(s)) : U32}
+
+def sync_code(s):
+  match s:
+    case TP.Sync{_ns}:
+      {==}
+    case TP.SyncNo{_why}:
+      {==}
+
+def Laws.sync_exits_as_it_refuses(ledger, lock):
+  sync_code(TP.sync(ledger, lock))
+
+def Laws.sync_needs_ledger(_lock):
+  {==}
+
+# ---------------------------------------------------------------------------
 # EZ-TOOL-7
 
 def Laws.file_pin_bin(pb, pe, b, e, ne):

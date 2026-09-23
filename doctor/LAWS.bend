@@ -23,6 +23,13 @@ law doctor_writes_nothing:
   for +w: DW.World
   {P.writes(DP.plan(w)) == False{} : Bool}
 
+# LAW: `ez doctor` ends with the status of its plan's outcome, which is 1
+# exactly when it fails the command and 0 when it does not
+# EZ-OUT-1
+law doctor_exits_as_it_fails:
+  for +w: DW.World
+  {P.code(DP.plan(w)) == P.status.of(DP.refuses(w)) : U32}
+
 # LAW: every hash an import line names that the ledger's dependencies do not
 # is reported, on its own line
 # EZ-VEN-5

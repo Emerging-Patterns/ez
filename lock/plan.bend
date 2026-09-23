@@ -475,6 +475,35 @@ type Outcome is Data:
 type Plan is Data:
   Plan{effects: List<&2, Effect>, outcome: Outcome}
 
+# the status a command exits with (EZ-OUT-1): 0 when it succeeds, 1 when it
+# refuses. Every planner's plan ends with an Outcome, and the interpreter
+# exits with this status of it (`Run.end`), so this is the one place the
+# mapping lives.
+def status(outcome: Outcome) -> U32:
+  match outcome:
+    case Success{}:
+      0
+    case Refused{_why}:
+      1
+
+# the status of a command that refused, or did not
+def status.of(refused: Bool) -> U32:
+  Bool.pick(U32, refused, 1, 0)
+
+# what a command that ends is said to have ended on: nothing when it
+# succeeded, and the reason when it refused
+def why(outcome: Outcome) -> String:
+  match outcome:
+    case Success{}:
+      ""
+    case Refused{why}:
+      why
+
+# the status a plan ends with
+def code(pl: Plan) -> U32:
+  Plan{_es, o} = pl
+  status(o)
+
 # one of the upgrade's questions, as the upgrade looks its answer up (`ask`,
 # with the source the ledger records) and as git is asked it (`git`, with
 # that source anchored at the directory the lock runs in, `Up.anchor`). The

@@ -17,6 +17,23 @@ def Laws.init_refusal_writes_nothing(w, r):
           Eq.bit.absurd(&2, {P.writes(IP.plan(IP.World{n, e, None{}, ig, mn}))
             == False{} : Bool}, r)
 
+# LAW: a plan ends with the status of whether it refuses
+law plan_code:
+  for pl: P.Plan
+  {P.code(pl) == P.status.of(IP.refuses.plan(pl)) : U32}
+
+def plan_code(pl):
+  match pl:
+    case P.Plan{_es, o}:
+      match o:
+        case P.Success{}:
+          {==}
+        case P.Refused{_why}:
+          {==}
+
+def Laws.init_exits_as_it_refuses(w):
+  plan_code(IP.plan(w))
+
 # A ledger that is there picks the arm that plans nothing.
 def Laws.init_keeps_ledger(_name, _entry, _s, _ignore, _main):
   {==}

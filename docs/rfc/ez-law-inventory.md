@@ -457,7 +457,7 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | EZ-VEN-2, EZ-VEN-3 | none | imports_follow_hash | One example covering both. |
 | EZ-VEN-4 | none | none | No law. **Update:** proved by `doctor/doctor_writes_nothing` (WP12). |
 | EZ-TOOL-1 to EZ-TOOL-6 | none | none | No law. The tool laws that exist are about target classification (EZ-RES-3) and build file choice, which the RFC does not list. **Update:** EZ-TOOL-1 and EZ-TOOL-3 to EZ-TOOL-9 are proved over the tool planner (WP9); see "Tool progress". |
-| EZ-OUT-1 | none | hub_404_teaches, hub_other_miss_kept, drift_names_the_tag | Examples, and they pin the whole message, not the prefix. |
+| EZ-OUT-1 | none | hub_404_teaches, hub_other_miss_kept, drift_names_the_tag | Examples, and they pin the whole message, not the prefix. **Update:** proved in WP13, see "Exit status progress". |
 | EZ-TRUST-3 | judge_have, judge_refuse, judge_miss (by `refl`) | hash_match, hash_refuse | ez checks hub bodies against the requested hash itself, so this is not purely trusted. |
 
 ## Findings surfaced by the inventory
@@ -543,7 +543,7 @@ This section checks each requirement in the RFC draft against what the code does
 
 | ID | Verdict | Evidence |
 | :---- | :---- | :---- |
-| EZ-OUT-1 | fails | There is no `ez: <area>:` convention. Forms in use: `ez: <prose>`, `ez: <path or url>: ...`, `ez: git <subcmd>: ...`, `ez: nar hash: ...`, `ez: error: <why>` for ledger failures, Shake's unprefixed `error:` for parse errors, `warning:` on stdout, doctor's `name: problem` lines, and many failures that print a subprocess's output and exit 1 with no ez line. What is consistent is the exit status: every failure ez detects exits 1, except `ez tool run`, which forwards the program's status. |
+| EZ-OUT-1 | fails | There is no `ez: <area>:` convention. Forms in use: `ez: <prose>`, `ez: <path or url>: ...`, `ez: git <subcmd>: ...`, `ez: nar hash: ...`, `ez: error: <why>` for ledger failures, Shake's unprefixed `error:` for parse errors, `warning:` on stdout, doctor's `name: problem` lines, and many failures that print a subprocess's output and exit 1 with no ez line. What is consistent is the exit status: every failure ez detects exits 1, except `ez tool run`, which forwards the program's status. (**Update:** the exit status half is proved in WP13, see "Exit status progress".) |
 
 ## What ez lock reads
 
@@ -638,6 +638,12 @@ The design for converting `ez add` and `ez remove`, [ez-add-planner.md](ez-add-p
 | WP | State | Scope |
 | :---- | :---- | :---- |
 | WP12 | done | `ez doctor` in planner form (`doctor/world.bend`, `doctor/plan.bend`, `doctor/run.bend`), asking for versions, the library's names and the lock's listing of the tracked sources, and judging the import lines the lock judges (`P.roots`). Deleted: `ez/doctor.bend`, `ez/drift.bend`, `ez/hash_of_local`. Laws: `doctor_writes_nothing` (EZ-VEN-4); `doctor_reports_unrecorded`, `doctor_reports_unused`, `doctor_drift_fails` (EZ-VEN-5); `doctor_ignores_tools`, `manifest/tool_section_not_dep`, `tool_section_is_tool`, `tool_needs_no_hash`, `lock/lock_origins_skip_tools`, `upgrade_origins_skip_tools`, `add/add_keeps_tools`, `remove/remove_keeps_tools`, `remove_refuses_tool` (EZ-LED-5). EZ-VEN-4, EZ-VEN-5 and EZ-LED-5 proved. Behavior changes in [ez-spec.md](ez-spec.md) under "Decided behavior changes". |
+
+### Exit status progress
+
+| WP | State | Scope |
+| :---- | :---- | :---- |
+| WP13 | done | EZ-OUT-1 over every command. `P.status` (lock/plan.bend) maps a plan's outcome to the status the interpreter exits with, and `Run.end` exits with it; `TP.code` does the same for the tool commands, from the plan's end and the program's status (`TP.program`), and `tool/run.bend` exits with it; `TP.sync.outcome` ends a sync. New `ez/ends.bend` holds the outcomes of the commands that are not planners (`ran`, `checked`, `counted`, `lock.flags`), with `check.passed` and its `no main to run` walk moved there from `ez/cmd.bend`. New `ez/line.bend` holds the pure half of the dispatcher, moved from `ez/main.bend` (`Sub`, `spec`, `command`), and `line` and `status`, which decide how a line ends before any command runs; `ez/main.bend` prints and exits as they say. Laws: `init_exits_as_it_refuses`, `add_exits_as_it_refuses`, `remove_exits_as_it_refuses`, `lock_exits_as_it_refuses`, `fetch_exits_as_it_refuses`, `pub_exits_as_it_refuses`, `doctor_exits_as_it_fails`; `tool/tool_refusal_status_one`, `tool_run_status_is_program`, `tool_link_status_zero`, `sync_exits_as_it_refuses`, `sync_needs_ledger`; `ez/ran_exits_as_bend`, `check_exits_as_it_passes`, `gate_exits_as_it_counts`, `package_needs_upgrade`, `help_exits_zero`, `help_unknown_exits_one`, `usage_error_exits_one`, `bare_exits_zero`, `group_exits_one`, `command_runs`, `command_ends_its_own` (all EZ-OUT-1). EZ-OUT-1 proved; the interpreter's faithfulness stays EZ-TRUST-2. Behavior changes in [ez-spec.md](ez-spec.md) under "Decided behavior changes": `ez tool sync` with no ez.toml, a bare `ez tool`, and `ez help` of an unknown word each exit 1 where they exited 0. Found and not changed: the native runtime takes `--help`, `--threads` and `--gpu` anywhere on the line before ez sees it, so `ez add --help` prints the runtime's usage and exits 0; and `ez -h` is an unknown flag, since Shake binds no short help. |
 
 ## Missing behavior
 

@@ -1266,3 +1266,23 @@ def Laws.add_pins_head_rev(w, none, text, t, c, b, ok):
 # they are, so the ledger `add_edits_ledger` names is this one.
 def Laws.add_keeps_tools(w, n, e, b, h, ds, ts, good, ok):
   Laws.add_edits_ledger(w, M.Manifest{n, e, b, h, ds, ts}, good, ok)
+
+# ---------------------------------------------------------------------------
+# EZ-OUT-1
+
+# LAW: a plan ends with the status of whether it refuses
+law plan_code:
+  for pl: P.Plan
+  {P.code(pl) == P.status.of(AP.refuses.plan(pl)) : U32}
+
+def plan_code(pl):
+  match pl:
+    case P.Plan{_es, o}:
+      match o:
+        case P.Success{}:
+          {==}
+        case P.Refused{_why}:
+          {==}
+
+def Laws.add_exits_as_it_refuses(w):
+  plan_code(AP.plan(w))

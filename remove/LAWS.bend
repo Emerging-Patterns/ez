@@ -19,6 +19,13 @@ law remove_refusal_writes_nothing:
   for r: {RP.refuses(w) == True{} : Bool}
   {P.writes(RP.plan(w)) == False{} : Bool}
 
+# LAW: `ez remove` ends with the status of its plan's outcome, which is 1
+# exactly when it refuses and 0 when it does not
+# EZ-OUT-1
+law remove_exits_as_it_refuses:
+  for +w: RP.World
+  {P.code(RP.plan(w)) == P.status.of(RP.refuses(w)) : U32}
+
 # LAW: with no ez.toml, `ez remove` refuses, whatever it was asked to remove
 # and whatever `.gitignore` holds, so it writes nothing
 # EZ-LED-6

@@ -586,13 +586,20 @@ def exec.all(+lib: String, es: List<&2, Plan.Effect>) -> IO(Unit):
         exec(lib, h)
         exec.all(lib, t)
 
-# how the command ends
-def end(outcome: Plan.Outcome) -> IO(Unit):
-  match outcome:
-    case Plan.Success{}:
+# a status that is 0 ends nothing, so the program runs out and exits 0; any
+# other exits with that status and the reason
+def end.at(zero: Bool, +code: U32, +why: String) -> IO(Unit):
+  match zero:
+    case True{}:
       IO.pure(Unit, Unit{})
-    case Plan.Refused{why}:
-      IO.die(Unit, 1, why)
+    case False{}:
+      IO.die(Unit, code, why)
+
+# how the command ends: with the status the planner gave its outcome
+# (`Plan.status`, EZ-OUT-1), and the reason when it refused
+def end(+outcome: Plan.Outcome) -> IO(Unit):
+  +code = Plan.status(outcome)
+  end.at(U32.is_eq(code, 0), code, Plan.why(outcome))
 
 # a plan, executed
 def exec.plan(+lib: String, pl: Plan.Plan) -> IO(Unit):

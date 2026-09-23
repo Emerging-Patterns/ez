@@ -1018,10 +1018,26 @@ def sync.read(led: M.Read, got: Maybe<&2, String>) -> Sync:
     case M.Good{m}:
       sync.lock(got, tools.of(m))
 
-# `ez tool sync` over the project's ledger and lock. A project with no
-# ledger pins nothing, and syncs nothing.
+# `ez tool sync` over the project's ledger and lock. With no ledger there is
+# no project to sync, and it is refused, as `ez lock` and `ez fetch` refuse
+# one.
 def sync(ledger: Maybe<&2, String>, lock: Maybe<&2, String>) -> Sync:
-  sync.read(TW.project.of(ledger), lock)
+  match ledger:
+    case None{}:
+      SyncNo{"ez: no ez.toml here; ez tool sync installs the tools a project's " ++
+        "ledger pins, and ez init makes one"}
+    case Some{text}:
+      sync.read(M.parse(text), lock)
+
+# how a sync ends once every install it runs has ended: 1 with the reason
+# when it refused, and 0 when it did not (EZ-OUT-1). An install that refuses
+# ends the sync there, with its own status.
+def sync.outcome(synced: Sync) -> P.Outcome:
+  match synced:
+    case Sync{_ns}:
+      P.Success{}
+    case SyncNo{why}:
+      P.Refused{why}
 
 # whether a sync refuses
 def sync.refuses(synced: Sync) -> Bool:
@@ -1138,3 +1154,25 @@ def exit(pl: Plan) -> Exit:
       exit.of(f)
     case P.Refused{_why}:
       Refusal{}
+
+# the program's status as the runtime reported it. One that is not a number
+# is 1, since something ended the program that was not its own exit.
+def program(got: Maybe<&2, U32>) -> U32:
+  match got:
+    case None{}:
+      1
+    case Some{n}:
+      n
+
+# the status a tool command exits with, given the status the program it
+# started exited with (EZ-OUT-1): 1 for a refusal, 0 for a command that
+# ends without starting one, and the program's own status for `ez tool run`.
+# A command that starts nothing is handed 0 for it.
+def code(ended: Exit, program: U32) -> U32:
+  match ended:
+    case Refusal{}:
+      1
+    case Finished{}:
+      0
+    case Exits{_b, _as}:
+      program
