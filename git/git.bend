@@ -143,11 +143,10 @@ def row.rev(line: Row) -> String:
   Row{rev, _name} = line
   rev
 
-# a row `git ls-remote` wrote for the peeled `^{}` form of a ref, which is the
-# commit an annotated tag points at rather than the tag object itself
-def row.peeled(line: Row) -> Bool:
+# a row's ref name
+def row.name(line: Row) -> String:
   Row{_rev, name} = line
-  String.ends_with(name, "^{}")
+  name
 
 # one row taken apart. ls-remote separates the two fields with a tab.
 def row_of(+text: String) -> Row:
@@ -167,39 +166,38 @@ def rows(ls: List<&2, String>) -> List<&2, Row>:
 
 # one step of the search, with the head's answer in hand. A recursive call in
 # an arm of a `Bool.pick` is not an arm at all: it is built whatever the
-# condition says, so the first peeled row still cost a walk of every row after
-# it.
-def peeled.step(here: Bool, rev: String, rest: Unit -> String) -> String:
+# condition says, so the first row that answered still cost a walk of every
+# row after it.
+def named.step(here: Bool, rev: String, rest: Unit -> String) -> String:
   match here:
     case True{}:
       rev
     case False{}:
       rest(Unit{})
 
-# the first peeled row's commit, or "" when no row is peeled
-def peeled(rs: List<&2, Row>) -> String:
+# the commit of the first row whose ref name is exactly `want`, or "" when no
+# row is. The whole name is compared: `git ls-remote` matches its patterns
+# against the tail of a ref, so it answers `refs/heads/main` with
+# `refs/heads/feature/main` as well, and only this comparison tells them apart.
+def named(rs: List<&2, Row>, +want: String) -> String:
   match rs:
     case []:
       ""
     case +h <> t:
-      peeled.step(row.peeled(h), row.rev(h), _u => peeled(t))
-
-# the first row's commit, or "" when there are none
-def unpeeled(rs: List<&2, Row>) -> String:
-  match rs:
-    case []:
-      ""
-    case h <> _t:
-      row.rev(h)
+      named.step(String.eq(row.name(h), want), row.rev(h), _u => named(t, want))
 
 # the first of two answers that says anything
 def or_else(+primary: String, fallback: String) -> String:
   Bool.pick(String, String.is_empty(primary), fallback, primary)
 
-# the commit a ref names: an annotated tag resolves through its peeled row,
-# and everything else through the row ls-remote wrote for the ref itself
-def pick(+rs: List<&2, Row>) -> String:
-  or_else(peeled(rs), unpeeled(rs))
+# the commit a ref names, from the rows the remote answered with. A tag comes
+# first, through its peeled `^{}` row when it is annotated, since that row is
+# the commit and the other is the tag object; then a branch of that name. No
+# other row is ever picked, so a tag and a branch that share a name resolve to
+# the tag, and `main` never resolves to `feature/main`.
+def exact(+rs: List<&2, Row>, +ref: String) -> String:
+  or_else(named(rs, "refs/tags/" ++ ref ++ "^{}"),
+    or_else(named(rs, "refs/tags/" ++ ref), named(rs, "refs/heads/" ++ ref)))
 
 # a ref the remote does not have is a mistake worth naming, since the next
 # thing that would happen is a fetch of nothing
@@ -214,14 +212,15 @@ def resolve.said(ok: Bool, +url: String, +ref: String, +text: String) -> IO(Ref)
     case False{}:
       IO.die(Ref, 1, "ez: git ls-remote " ++ url ++ ": " ++ text)
     case True{}:
-      resolve.got(pick(rows(String.lines(text))), url, ref)
+      resolve.got(exact(rows(String.lines(text)), ref), url, ref)
 
-# the remote asked what a ref names. Both the ref and its peeled tag form are
-# asked for at once, because which of the two exists is the question.
+# the remote asked what a ref names: as a tag, its peeled form, and a branch,
+# all at once, because which of them exists is the question. The patterns are
+# full ref names, and `exact` still reads only the rows named exactly so.
 def resolve.ask(+url: String, +ref: String) -> IO(Ref):
   do IO<Ref>:
-    +out : String <- R.exec(["git", "ls-remote", url, ref,
-      "refs/tags/" ++ ref ++ "^{}"])
+    +out : String <- R.exec(["git", "ls-remote", url, "refs/tags/" ++ ref,
+      "refs/tags/" ++ ref ++ "^{}", "refs/heads/" ++ ref])
     resolve.said(R.ok(out), url, ref, R.text(out))
 
 # a ref that is already a commit needs no remote, with that question already
@@ -236,7 +235,8 @@ def resolve.step(pinned: Bool, url: String, ref: String) -> IO(Ref):
 
 # the commit a ref pins. A tag or a branch is what a person asks for and a
 # commit is what gets written down, so both are kept: the commit pins the
-# build, and the tag says what an upgrade would re-resolve.
+# build, and the tag says what an upgrade would re-resolve. A branch is kept
+# the same way, under `tag`, so an upgrade follows the branch.
 def resolve(+url: String, +ref: String) -> IO(Ref):
   resolve.step(is_rev(ref), url, ref)
 
@@ -1037,6 +1037,67 @@ def latest(names: List<&2, String>) -> String:
     case Con{+h, t}:
       latest.step(ver.of(h), h, latest(t))
 
+# a version with no pre-release, which is a release
+def release.ver(version: Ver) -> Bool:
+  match version:
+    case No{}:
+      False{}
+    case Yes{_ns, ps}:
+      List.is_empty(&2, Id, ps)
+
+# a semver-ish tag that is a release: `v1.9.0`, not `v2.0.0-rc1`
+def release(+name: String) -> Bool:
+  release.ver(ver.of(name))
+
+# a name that is a release, weighed against the greatest release after it the
+# way `latest` weighs any two versions; a name that is not is passed over
+def latest.rel.step(keep: Bool, +name: String, +rest: String) -> String:
+  match keep:
+    case False{}:
+      rest
+    case True{}:
+      latest.have(String.is_empty(rest), name, rest, ver.of(name))
+
+# the greatest release, or "" when no name is one
+def latest.rel(names: List<&2, String>) -> String:
+  match names:
+    case Nil{}:
+      ""
+    case Con{+h, t}:
+      latest.rel.step(release(h), h, latest.rel(t))
+
+# one name found to be a release, or the rest still to be asked about
+def has.release.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
+# whether any name is a release
+def has.release(names: List<&2, String>) -> Bool:
+  match names:
+    case Nil{}:
+      False{}
+    case Con{+h, t}:
+      has.release.step(release(h), _u => has.release(t))
+
+# the greatest release when there is one, and otherwise the greatest of what
+# is left, every one of which is a pre-release
+def choose.go(none: Bool, +rel: String, +any: String) -> String:
+  match none:
+    case True{}:
+      any
+    case False{}:
+      rel
+
+# the tag `ez add` pins when no ref was asked for: a release beats every
+# pre-release, however much greater the pre-release's numbers are, and
+# within each class the greatest wins by `ord.ver`, the later of two equal
+# ones winning as `latest` has it. "" when no name is semver-ish.
+def choose(+names: List<&2, String>) -> String:
+  choose.go(String.is_empty(latest.rel(names)), latest.rel(names), latest(names))
+
 
 # one row's tag name, or nothing when the row is peeled or not a tag
 def tag.put(hit: Bool, +name: String) -> List<&2, String>:
@@ -1065,46 +1126,6 @@ def tag.names(rs: List<&2, Row>) -> List<&2, String>:
     case Con{+h, t}:
       List.append(&2, String, tag.one(h), tag.names(t))
 
-# a row's ref name
-def row.name(line: Row) -> String:
-  Row{_rev, name} = line
-  name
-
-def head.step(here: Bool, rest: Unit -> Bool) -> Bool:
-  match here:
-    case True{}:
-      True{}
-    case False{}:
-      rest(Unit{})
-
-# whether the remote advertised this exact ref
-def head.has(+want: String, rs: List<&2, Row>) -> Bool:
-  match rs:
-    case Nil{}:
-      False{}
-    case Con{+h, t}:
-      head.step(String.eq(row.name(h), want), _u => head.has(want, t))
-
-# `master` when it was advertised, and nothing when it was not
-def branch.master(has: Bool) -> String:
-  match has:
-    case True{}:
-      "master"
-    case False{}:
-      ""
-
-# `main` when it was advertised, otherwise `master`
-def branch.main(has: Bool, rs: List<&2, Row>) -> String:
-  match has:
-    case True{}:
-      "main"
-    case False{}:
-      branch.master(head.has("refs/heads/master", rs))
-
-# the branch a default pin uses: `main`, or `master` when `main` is absent
-def branch.pick(+rs: List<&2, Row>) -> String:
-  branch.main(head.has("refs/heads/main", rs), rs)
-
 def tags.said(ok: Bool, +url: String, +text: String) -> IO(List<&2, String>):
   match ok:
     case False{}:
@@ -1118,10 +1139,12 @@ def tags(+url: String) -> IO(List<&2, String>):
     +out : String <- R.exec(["git", "ls-remote", "--tags", url])
     tags.said(R.ok(out), url, R.text(out))
 
+# a remote whose HEAD names no branch leaves `ez add` nothing to pin
 def branch.have(empty: Bool, +name: String, +url: String) -> IO(String):
   match empty:
     case True{}:
-      IO.die(String, 1, "ez: " ++ url ++ " has no main or master")
+      IO.die(String, 1, "ez: " ++ url ++
+        " has no semver-ish tag and its HEAD names no branch; name a ref to pin")
     case False{}:
       IO.pure(String, name)
 
@@ -1130,14 +1153,13 @@ def heads.said(ok: Bool, +url: String, +text: String) -> IO(String):
     case False{}:
       IO.die(String, 1, "ez: git ls-remote " ++ url ++ ": " ++ text)
     case True{}:
-      +name = branch.pick(rows(String.lines(text)))
+      +name = tip.branch(rows(String.lines(text)))
       branch.have(String.is_empty(name), name, url)
 
-# `main` if the remote has it, otherwise `master`
+# the remote's default branch, as its `HEAD` symref names it
 def heads(+url: String) -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(["git", "ls-remote", url, "refs/heads/main",
-      "refs/heads/master"])
+    +out : String <- R.exec(["git", "ls-remote", "--symref", url, "HEAD"])
     heads.said(R.ok(out), url, R.text(out))
 
 def default.go(empty: Bool, +tag: String, +url: String) -> IO(String):
@@ -1147,10 +1169,10 @@ def default.go(empty: Bool, +tag: String, +url: String) -> IO(String):
     case True{}:
       heads(url)
 
-# the ref `ez add` pins when none was asked for: the latest semver-ish tag,
-# or `main`, or `master` when `main` is not there
+# the ref `ez add` pins when none was asked for: the greatest semver-ish
+# release tag, else the greatest pre-release, else the default branch
 def default.ref(+url: String) -> IO(String):
   do IO<String>:
     names : List<&2, String> <- tags(url)
-    +best : String <- IO.pure(String, latest(names))
+    +best : String <- IO.pure(String, choose(names))
     default.go(String.is_empty(best), best, url)

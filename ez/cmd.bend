@@ -465,7 +465,8 @@ def add.url(place: Tgt.Place) -> IO(String):
     case Tgt.Remote{url, _slug}:
       IO.pure(String, url)
 
-# a ref that was asked for, or the latest tag, or `main`, or `master`
+# a ref that was asked for, or the one `Git.default.ref` chooses: the greatest
+# release tag, else the greatest pre-release, else the default branch
 def add.ref.at(given: Bool, +url: String, +ref: String) -> IO(String):
   match given:
     case True{}:

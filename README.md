@@ -107,11 +107,16 @@ entry = "bolt/main.bend"
 ```
 
 `bin` is the file `ez tool run`, `ez tool install`, `ez tool upgrade`, and
-`ezx` build. With no `bin`, that is the entry. `owner/repo` is
-`https://github.com/owner/repo`. A git URL is kept. Any other target is a
-path (`/…`, `./…`, `../…`, `~/…`, or a word that is not `owner/repo`). The
-checkout and the binary are cached under `$XDG_CACHE_HOME/ez/tool/<slug>`
-(`~/.cache/ez/tool/<slug>` when that is unset).
+`ezx` build. With no `bin`, that is the entry. A target with `://` in it,
+or starting `git@`, is a git URL and is kept. A target starting `/`, `./`,
+`../` or `~/` is a path. `owner/repo` (exactly two segments of letters,
+digits, `-`, `_` and `.`, neither of them `.` or `..`) is
+`https://github.com/owner/repo` unless the second segment ends in `.bend`, so
+`vercel/next.js` is GitHub and `src/main.bend` is a path. Anything else is a
+path. The checkout and the binary are cached under
+`$XDG_CACHE_HOME/ez/tool/<slug>` (`~/.cache/ez/tool/<slug>` when that is
+unset); the slug of a URL or of
+`owner/repo` drops a trailing `.git`.
 
 A remote resolves to `git ls-remote <url> HEAD`. A path resolves to a clean
 `HEAD`. A name that matches a `[tools.*]` pin resolves to the rev in
@@ -133,11 +138,17 @@ command runs the binary. `ez tool run` does, and the built program's status
 is the status of the command. A target, ledger, fetch, build or link that
 fails exits 1.
 
-`ez add` takes the same kind of target. With no ref, it pins the latest
-semver-ish tag on the remote. With no such tag, it pins `main`, or `master`
-when `main` is absent. With no entry, it reads `[package] entry` from that
-revision's `ez.toml`, then `[package] bin` when `entry` is absent, then
-`main.bend`. A ref and an entry given on the command line are used as given.
+`ez add` takes the same kind of target. With no ref, it pins the greatest
+semver-ish release tag on the remote (`v1.9.0` beats `v2.0.0-rc1`); with no
+release, the greatest pre-release; with no semver-ish tag at all, the
+remote's default branch, as its `HEAD` names it. A remote whose `HEAD` names
+no branch is refused. A named ref resolves exactly: `refs/tags/<ref>` first,
+then `refs/heads/<ref>`, so a tag beats a branch of the same name and `main`
+never resolves to `feature/main`. A 40-hex ref is used as the commit without
+asking the remote. The tag or branch is recorded as `tag`, which
+`ez lock --upgrade` re-resolves. With no entry, it reads `[package] entry`
+from that revision's `ez.toml`, then `[package] bin` when `entry` is absent,
+then `main.bend`. An entry given on the command line is used as given.
 
 A dependency with no `git` key lives on the hub. `vendor = true` commits that
 dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.
