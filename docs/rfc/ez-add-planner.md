@@ -397,6 +397,15 @@ What the spike does not tell us: it has no planner around the walk, no interpret
 
 The rewritten `K.pkg_of`, and `K.of` over every tracked file, give the hash, root and manifest of the walk they replace on every `.bend` file of this repository and of the pinned checkouts of eztoml, ezhttp, sha256, snap, shake and bolt, 251 entries.
 
+**Update (A1, A4).** `ez remove` and `ez init` are in planner form, in `remove/plan.bend` and `init/plan.bend`, each with a thin interpreter beside it (`remove/run.bend`, `init/run.bend`) that `ez/cmd.bend` dispatches to. Where the code differs from the design above:
+
+- A0's other half is deferred. Moving `Effect`, `Plan`, `Outcome` and `Wrote` to `plan/plan.bend`, and creating `git/ask.bend`, would churn `lock/` while several work packages are open there, so it was decided, with the maintainer away, to wait. The two planners import the types from `lock/plan.bend` directly (`import ../lock/plan.bend as P`), and both interpreters run their plans with the lock interpreter's `Run.exec.plan`, which already executes `Write`, `Lay`, `Drop` and `Say` and ends with the outcome. When A0 moves the types, these imports change and nothing else does.
+- The remove World's `.gitignore` is a `String`, `""` when the file is missing, as `I.sync` takes it; a missing file stays missing when the ledger vendors nothing. The init World also carries the name and entry asked for, beside the three texts as `Maybe`.
+- A dependency's committed tree is dropped only when its hash starts with `0x` and has no `/` or `\`. `M.parse` does not check a hash's shape, and `rm -rf .ez/lib/<hash>` over a hand-edited hash could reach outside `.ez/lib`. cargo and uv never remove a path taken from the manifest unchecked, so neither does ez.
+- An absent name is refused with `ez: ez.toml has no dependency named <name>`, where `cargo remove` says the dependency could not be found. The text is incidental; the exit status and that nothing is written are not.
+- `ez init` does not write the stub entry over ez.toml or `.gitignore` when the entry asked for is one of them, which the old command avoided by reading the entry after writing both.
+- The laws: `remove_refusal_writes_nothing` and `init_refusal_writes_nothing` (EZ-OUT-2); `remove_needs_ledger`, and `init_keeps_ledger` now over the plan (EZ-LED-6); `remove_refuses_unread` (EZ-LED-1), with `read_refuses_a_problem` and `render_of_unread_is_blank` tagged EZ-LED-1; `remove_edits_ledger`, stated as the bytes the plan leaves at ez.toml, `Rend.show(Rend.remove(m, name))`, with `remove_idem` tagged EZ-LED-3; `remove_syncs_allowlist` (EZ-VEN-1), that the plan leaves `.gitignore` holding exactly `I.sync` over the dependencies left, written or kept; and the untagged `remove_refuses_absent`. The remove laws are stated over a World built from its fields, `RP.World{name, Some{s}, ignore}`, with the parse as a premise, rather than over `RP.read(w)`. EZ-LED-3 is proved: the requirement is about the model edit, and `remove_edits_ledger` ties `ez remove` to it. EZ-LED-1, EZ-LED-6, EZ-VEN-1 and EZ-OUT-2 stay pending until `ez add` (A2) and the lock's halves land.
+
 ## Work packages
 
 |  |

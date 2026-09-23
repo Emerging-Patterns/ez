@@ -1295,10 +1295,6 @@ def Laws.ledger_missing_unwritten(_cmd):
 def Laws.ledger_present_parsed(_s, _cmd):
   {==}
 
-# A ledger that is there picks the arm that plans nothing.
-def Laws.init_keeps_ledger(_s, _name, _at):
-  {==}
-
 # named: a walk from the end of a text has passed a slash once it has passed
 # the one in front of `n`, and nothing to its left changes that. The name laws
 # rewrite the one `String.eq` each branch turns on.
