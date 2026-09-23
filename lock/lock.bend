@@ -344,7 +344,7 @@ def lock.sect(hub: String) -> T.Sect:
 
 # the lock as a document: what resolved it, then every package it resolved,
 # in hash order. `render` writes its text a block at a time; that the two
-# agree is checked by `ez lock` on this repository and not yet by a law.
+# agree is lock/LAWS.bend's `render_is_doc`.
 def doc(hub: String, ps: List<&2, Pack>) -> List<&2, T.Sect>:
   List.append(&2, T.Sect, [lock.sect(hub)], pack.all(pack.sort(ps)))
 

@@ -667,3 +667,473 @@ law split_join:
 def split_join(p, ps, c, e):
   split_join.go(ps, p, c, Eq.and.left(clear(p, c), clear.all(ps, c), e),
     Eq.and.right(clear(p, c), clear.all(ps, c), e))
+
+# Orders, lists of any data, and more string facts. The lock's round trip
+# (lock/PROOF.bend, through check/toml.bend) needs them; none is about the
+# lock.
+
+# the type that is empty exactly where a comparison answered LT
+def cmp.lt_emp(ans: Cmp) -> Type:
+  match ans:
+    case LT{}:
+      Empty
+    case EQ{}:
+      Unit
+    case GT{}:
+      Unit
+
+def cmp.eq_lt(eq: {EQ{} == LT{} : Cmp}) -> Empty:
+  %eq : cmp.lt_emp(_)
+  Unit{}
+
+def cmp.gt_lt(eq: {GT{} == LT{} : Cmp}) -> Empty:
+  %eq : cmp.lt_emp(_)
+  Unit{}
+
+# LAW: a word at or below a second, which is below a third, is below the
+# third
+law word_le_lt:
+  for +n: Nat
+  for x: Word(n)
+  for a: Word(n)
+  for b: Word(n)
+  for exa: {Cmp.is_gt(Word.cmp(n, x, a)) == False{} : Bool}
+  for eab: {Word.cmp(n, a, b) == LT{} : Cmp}
+  {Word.cmp(n, x, b) == LT{} : Cmp}
+
+# the step, with the tails' two answers given, so the arms they rule out
+# can be closed
+law wlt_step:
+  for +p: Nat
+  for +xb: Bool
+  for +ab: Bool
+  for +bb: Bool
+  for +xt: Word(p)
+  for +at: Word(p)
+  for +bt: Word(p)
+  for r1: Cmp
+  for e1: {Word.cmp(p, xt, at) == r1 : Cmp}
+  for r2: Cmp
+  for e2: {Word.cmp(p, at, bt) == r2 : Cmp}
+  for exa: {Cmp.is_gt(Word.cmp.fin(xb, ab, r1)) == False{} : Bool}
+  for eab: {Word.cmp.fin(ab, bb, r2) == LT{} : Cmp}
+  for ih: {Cmp.is_gt(Word.cmp(p, xt, at)) == False{} : Bool}
+    -> {Word.cmp(p, at, bt) == LT{} : Cmp} -> {Word.cmp(p, xt, bt) == LT{} : Cmp}
+  {Word.cmp.fin(xb, bb, Word.cmp(p, xt, bt)) == LT{} : Cmp}
+
+# the heads, when the tails are one word: the second head is below the third,
+# so it is False and the third True, and the first is not above False
+law bits_le_lt:
+  for xb: Bool
+  for ab: Bool
+  for bb: Bool
+  for exa: {Cmp.is_gt(Bool.cmp(xb, ab)) == False{} : Bool}
+  for eab: {Bool.cmp(ab, bb) == LT{} : Cmp}
+  {Bool.cmp(xb, bb) == LT{} : Cmp}
+
+# the four ways two bits compare, each closed by the premises
+def bits_le_lt(xb, ab, bb, exa, eab):
+  match xb ab bb:
+    case False{} False{} True{}:
+      {==}
+    case True{} False{} True{}:
+      Eq.bit.absurd2(&2, {EQ{} == LT{} : Cmp}, exa)
+    case _ False{} False{}:
+      Eq.bit.gone(&2, {Bool.cmp(xb, False{}) == LT{} : Cmp}, cmp.eq_lt(eab))
+    case _ True{} False{}:
+      Eq.bit.gone(&2, {Bool.cmp(xb, False{}) == LT{} : Cmp}, cmp.gt_lt(eab))
+    case _ True{} True{}:
+      Eq.bit.gone(&2, {Bool.cmp(xb, True{}) == LT{} : Cmp}, cmp.eq_lt(eab))
+
+# the tails' answers decide it, and when they are EQ the heads do
+def wlt_step(p, xb, ab, bb, xt, at, bt, r1, e1, r2, e2, exa, eab, ih):
+  match r1 r2:
+    case LT{} LT{}:
+      Equal.cong(Cmp, Cmp, c => Word.cmp.fin(xb, bb, c),
+        Word.cmp(p, xt, bt), LT{},
+        ih(
+          Equal.cong(Cmp, Bool, c => Cmp.is_gt(c), Word.cmp(p, xt, at), LT{}, e1),
+          e2))
+    case EQ{} LT{}:
+      Equal.cong(Cmp, Cmp, c => Word.cmp.fin(xb, bb, c),
+        Word.cmp(p, xt, bt), LT{},
+        Equal.trans(Cmp, Word.cmp(p, xt, bt), Word.cmp(p, at, bt), LT{},
+          Equal.cong(Word(p), Cmp, w => Word.cmp(p, w, bt), xt, at,
+            word_eq(p, xt, at, e1)),
+          e2))
+    case LT{} EQ{}:
+      Equal.cong(Cmp, Cmp, c => Word.cmp.fin(xb, bb, c),
+        Word.cmp(p, xt, bt), LT{},
+        Equal.trans(Cmp, Word.cmp(p, xt, bt), Word.cmp(p, xt, at), LT{},
+          Equal.cong(Word(p), Cmp, w => Word.cmp(p, xt, w), bt, at,
+            Equal.sym(Word(p), at, bt, word_eq(p, at, bt, e2))),
+          e1))
+    case EQ{} EQ{}:
+      Equal.trans(Cmp,
+        Word.cmp.fin(xb, bb, Word.cmp(p, xt, bt)),
+        Word.cmp.fin(xb, bb, EQ{}),
+        LT{},
+        Equal.cong(Cmp, Cmp, c => Word.cmp.fin(xb, bb, c),
+          Word.cmp(p, xt, bt), EQ{},
+          Equal.trans(Cmp, Word.cmp(p, xt, bt), Word.cmp(p, at, bt), EQ{},
+            Equal.cong(Word(p), Cmp, w => Word.cmp(p, w, bt), xt, at,
+              word_eq(p, xt, at, e1)),
+            e2)),
+        bits_le_lt(xb, ab, bb, exa, eab))
+    case GT{} _:
+      Eq.bit.absurd2(&2, {Word.cmp.fin(xb, bb, Word.cmp(p, xt, bt)) == LT{} : Cmp}, exa)
+    case _ GT{}:
+      Eq.bit.gone(&2, {Word.cmp.fin(xb, bb, Word.cmp(p, xt, bt)) == LT{} : Cmp},
+        cmp.gt_lt(eab))
+
+# by induction on the width, with the tails' law handed to the step
+def word_le_lt(n, x, a, b, exa, eab):
+  match n:
+    case 0n:
+      match x a b:
+        case WNil{} WNil{} WNil{}:
+          Eq.bit.gone(&2, {EQ{} == LT{} : Cmp}, cmp.eq_lt(eab))
+    case 1n+p:
+      match x a b:
+        case WCon{+xb, +xt} WCon{+ab, +at} WCon{+bb, +bt}:
+          wlt_step(p, xb, ab, bb, xt, at, bt,
+            Word.cmp(p, xt, at), {==}, Word.cmp(p, at, bt), {==}, exa, eab,
+            h1 => h2 => word_le_lt(p, xt, at, bt, h1, h2))
+
+# LAW: an `and` whose right half is False is False
+law and_false:
+  for a: Bool
+  {Bool.and(a, False{}) == False{} : Bool}
+
+# both values of the left half
+def and_false(a):
+  match a:
+    case False{}:
+      {==}
+    case True{}:
+      {==}
+
+# LAW: an `and` of two halves that answered True
+law and_true:
+  for u: Bool
+  for v: Bool
+  for eu: {u == True{} : Bool}
+  for ev: {v == True{} : Bool}
+  {Bool.and(u, v) == True{} : Bool}
+
+# the left half is True, so the right is the answer
+def and_true(u, _v, eu, ev):
+  match u:
+    case True{}:
+      ev
+    case False{}:
+      eu
+
+# LAW: a comparison that is at most EQ is not GT
+law le_not_gt:
+  for c: Cmp
+  for e: {Cmp.is_le(c) == True{} : Bool}
+  {Cmp.is_gt(c) == False{} : Bool}
+
+# each answer of the comparison
+def le_not_gt(c, e):
+  match c:
+    case LT{}:
+      {==}
+    case EQ{}:
+      {==}
+    case GT{}:
+      Eq.bit.absurd(&2, {True{} == False{} : Bool}, e)
+
+# LAW: a code point at or below a second, which is below a third, is below
+# the third
+law u32_le_lt:
+  for x: U32
+  for a: U32
+  for k: U32
+  for e: {U32.is_le(x, a) == True{} : Bool}
+  for ek: {U32.cmp(a, k) == LT{} : Cmp}
+  {U32.cmp(x, k) == LT{} : Cmp}
+
+# a code point is a word of thirty-two bits
+def u32_le_lt(x, a, k, e, ek):
+  match x a k:
+    case U32{+xw} U32{+aw} U32{kw}:
+      word_le_lt(32n, xw, aw, kw, le_not_gt(Word.cmp(32n, xw, aw), e), ek)
+
+# LAW: the negation of a bit that answered False
+law not_false:
+  for u: Bool
+  for e: {u == False{} : Bool}
+  {Bool.not(u) == True{} : Bool}
+
+# the bit is False, or the premise is a contradiction
+def not_false(u, e):
+  match u:
+    case False{}:
+      {==}
+    case True{}:
+      Eq.bit.absurd2(&2, {False{} == True{} : Bool}, e)
+
+# ---------------------------------------------------------------------------
+# strings with no copy of a char
+
+# LAW: two strings with no copy of a char, one after the other, have none
+law clear_append:
+  for +a: String
+  for +b: String
+  for +c: Char
+  for +ea: {clear(a, c) == True{} : Bool}
+  for eb: {clear(b, c) == True{} : Bool}
+  {clear(String.append(a, b), c) == True{} : Bool}
+
+# by induction on the first string
+def clear_append(a, b, c, ea, eb):
+  match a:
+    case SNil{}:
+      eb
+    case SCon{+h, +t}:
+      and_true(Bool.not(Char.is_eq(h, c)), clear(String.append(t, b), c),
+        Eq.and.left(Bool.not(Char.is_eq(h, c)), clear(t, c), ea),
+        clear_append(t, b, c,
+          Eq.and.right(Bool.not(Char.is_eq(h, c)), clear(t, c), ea), eb))
+
+# LAW: the reverse of a string with a last char starts with it
+law rev_last:
+  for +a: String
+  for +c: Char
+  for +acc: String
+  {String.reverse.go(String.append(a, SCon{c, SNil{}}), acc)
+    == SCon{c, String.reverse.go(a, acc)} : String}
+
+# by induction on the string, the accumulator growing
+def rev_last(a, c, acc):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      rev_last(t, c, SCon{h, acc})
+
+# LAW: a string holds what the text after it holds
+law contains_after:
+  for +a: String
+  for +b: String
+  for +p: String
+  for e: {String.contains(b, p) == True{} : Bool}
+  {String.contains(String.append(a, b), p) == True{} : Bool}
+
+# one char, with whether the text from it on starts with the pattern given
+law contains_after.go:
+  for +t: String
+  for +b: String
+  for +p: String
+  for x: Bool
+  for ih: {String.contains(String.append(t, b), p) == True{} : Bool}
+  {String.contains.if(String.append(t, b), p, x) == True{} : Bool}
+
+def contains_after.go(_t, _b, _p, x, ih):
+  match x:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+# by induction on the text in front, each char with its own arm
+def contains_after(a, b, p, e):
+  match a:
+    case SNil{}:
+      e
+    case SCon{+h, +t}:
+      contains_after.go(t, b, p, String.starts_with(SCon{h, String.append(t, b)}, p),
+        contains_after(t, b, p, e))
+
+# ---------------------------------------------------------------------------
+# lists of any data
+
+# LAW: a list with nothing after it is the list
+law list_append_nil:
+  for -A: Data
+  for +xs: List<&2, A>
+  {List.append(&2, A, xs, []) == xs : List<&2, A>}
+
+# by induction on the list
+def list_append_nil(A, xs):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.cong(List<&2, A>, List<&2, A>, r => h <> r,
+        List.append(&2, A, t, []), t, list_append_nil(A, t))
+
+# LAW: appending is associative
+law list_append_assoc:
+  for -A: Data
+  for +xs: List<&2, A>
+  for +ys: List<&2, A>
+  for +zs: List<&2, A>
+  {List.append(&2, A, List.append(&2, A, xs, ys), zs)
+    == List.append(&2, A, xs, List.append(&2, A, ys, zs)) : List<&2, A>}
+
+# by induction on the first list
+def list_append_assoc(A, xs, ys, zs):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.cong(List<&2, A>, List<&2, A>, r => h <> r,
+        List.append(&2, A, List.append(&2, A, t, ys), zs),
+        List.append(&2, A, t, List.append(&2, A, ys, zs)),
+        list_append_assoc(A, t, ys, zs))
+
+# LAW: reversing onto an accumulator is reversing, then the accumulator
+law list_rev_acc:
+  for -A: Data
+  for +xs: List<&2, A>
+  for +acc: List<&2, A>
+  {List.reverse.go(&2, A, xs, acc)
+    == List.append(&2, A, List.reverse.go(&2, A, xs, []), acc) : List<&2, A>}
+
+# by induction on the list, the accumulator moved to the end
+def list_rev_acc(A, xs, acc):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      h1 = list_rev_acc(A, t, h <> acc)
+      h2 = Equal.sym(List<&2, A>, List.reverse.go(&2, A, t, [h]),
+        List.append(&2, A, List.reverse.go(&2, A, t, []), [h]), list_rev_acc(A, t, [h]))
+      h3 = Equal.sym(List<&2, A>,
+        List.append(&2, A, List.append(&2, A, List.reverse.go(&2, A, t, []), [h]), acc),
+        List.append(&2, A, List.reverse.go(&2, A, t, []), h <> acc),
+        list_append_assoc(A, List.reverse.go(&2, A, t, []), [h], acc))
+      %h2 : {List.reverse.go(&2, A, t, h <> acc) == List.append(&2, A, _, acc) : List<&2, A>}
+      %h3 : {List.reverse.go(&2, A, t, h <> acc) == _ : List<&2, A>}
+      h1
+
+# LAW: reversing twice gives the list back
+law list_rev_rev:
+  for -A: Data
+  for +xs: List<&2, A>
+  for +ys: List<&2, A>
+  for +zs: List<&2, A>
+  {List.reverse.go(&2, A, List.reverse.go(&2, A, xs, ys), zs)
+    == List.reverse.go(&2, A, ys, List.append(&2, A, xs, zs)) : List<&2, A>}
+
+# by induction on the first list: each element goes over and back
+def list_rev_rev(A, xs, ys, zs):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      list_rev_rev(A, t, h <> ys, zs)
+
+# LAW: two lists of strings with no copy of a char, one after the other, have
+# none
+law clear_all_append:
+  for +xs: List<&2, String>
+  for +ys: List<&2, String>
+  for +c: Char
+  for +ex: {clear.all(xs, c) == True{} : Bool}
+  for ey: {clear.all(ys, c) == True{} : Bool}
+  {clear.all(List.append(&2, String, xs, ys), c) == True{} : Bool}
+
+# by induction on the first list
+def clear_all_append(xs, ys, c, ex, ey):
+  match xs:
+    case []:
+      ey
+    case +h <> +t:
+      and_true(clear(h, c), clear.all(List.append(&2, String, t, ys), c),
+        Eq.and.left(clear(h, c), clear.all(t, c), ex),
+        clear_all_append(t, ys, c, Eq.and.right(clear(h, c), clear.all(t, c), ex), ey))
+
+# LAW: a join from a first piece with text in front has the text in front
+law join_go_append:
+  for +zs: List<&2, String>
+  for +x: String
+  for +y: String
+  for +sep: String
+  {String.join.go(zs, String.append(x, y), sep)
+    == String.append(x, String.join.go(zs, y, sep)) : String}
+
+# a join with pieces after the first appends the text in front
+def join_go_append(zs, x, y, sep):
+  match zs:
+    case []:
+      {==}
+    case +z <> +zt:
+      Eq.append_assoc(x, y, String.append(sep, String.join.go(zt, z, sep)))
+
+# LAW: a join from a first piece is the piece, then the join from nothing
+law join_fold:
+  for +zs: List<&2, String>
+  for +x: String
+  {String.join.go(zs, x, "\n") == String.append(x, String.join.go(zs, "", "\n")) : String}
+
+# the piece is the piece with nothing after it
+def join_fold(zs, x):
+  a = Eq.append_nil(x)
+  %a : {String.join.go(zs, _, "\n") == String.append(x, String.join.go(zs, "", "\n")) : String}
+  join_go_append(zs, x, "", "\n")
+
+# LAW: reversing a list with one more at its end puts it first
+law list_rev_last:
+  for -A: Data
+  for +xs: List<&2, A>
+  for +x: A
+  for +acc: List<&2, A>
+  {List.reverse.go(&2, A, List.append(&2, A, xs, [x]), acc)
+    == x <> List.reverse.go(&2, A, xs, acc) : List<&2, A>}
+
+# by induction on the list, the accumulator growing
+def list_rev_last(A, xs, x, acc):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      list_rev_last(A, t, x, h <> acc)
+
+# LAW: dropping nothing from a string leaves it
+law drop_zero:
+  for +s: String
+  {String.drop(s, 0n) == s : String}
+
+# both shapes of the string
+def drop_zero(s):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{h, t}:
+      {==}
+
+# LAW: two strings that do not compare equal do not either way round
+law eq_flip:
+  for +a: String
+  for +b: String
+  for e: {String.eq(a, b) == False{} : Bool}
+  {String.eq(b, a) == False{} : Bool}
+
+# the other way round's answer, given as a parameter
+law eq_flip.go:
+  for +a: String
+  for +b: String
+  for c: Bool
+  for ec: {String.eq(b, a) == c : Bool}
+  for e: {String.eq(a, b) == False{} : Bool}
+  {c == False{} : Bool}
+
+def eq_flip.go(a, b, c, ec, e):
+  match c:
+    case False{}:
+      {==}
+    case True{}:
+      Eq.bit.absurd(&2, {True{} == False{} : Bool},
+        Equal.trans(Bool, False{}, String.eq(a, b), True{},
+          Equal.sym(Bool, String.eq(a, b), False{}, e),
+          Equal.trans(Bool, String.eq(a, b), String.eq(a, a), True{},
+            Equal.cong(String, Bool, x => String.eq(a, x), b, a, string_eq_true(b, a, ec)),
+            Eq.string_eq_self(a))))
+
+# the other way round, asked once
+def eq_flip(a, b, e):
+  eq_flip.go(a, b, String.eq(b, a), {==}, e)

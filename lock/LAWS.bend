@@ -178,6 +178,40 @@ law render_keeps_packages_without_tools:
   for ps: List<&2, L.Pack>
   {L.render.pick(True{}, hub, ps, []) == L.render(hub, ps) : String}
 
+# What the lock may hold. The pinned eztoml reader cuts a pair line at its
+# first `=`, even inside a quoted key
+# (https://github.com/Emerging-Patterns/eztoml/issues/24), so a file path
+# holding one would read back as another path. The planner refuses such a
+# lock rather than write one that does not read back.
+
+# LAW: a package list with a file whose path holds `=` is not lockable,
+# whatever else it holds
+law path_eq_unlockable:
+  for +hash: String
+  for +src: L.Src
+  for +at: String
+  for +sum: String
+  for +fs: List<&2, K.File>
+  for +rest: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for e: {False{} == P.path.eqless(at) : Bool}
+  {P.lockable(L.Pack{hash, src, K.File{at, sum} <> fs} <> rest, ts, hub) == False{}
+    : Bool}
+
+# LAW: and the refusal names the package and the path, so the author knows
+# which file to rename
+law path_eq_named:
+  for +hash: String
+  for +src: L.Src
+  for +at: String
+  for +sum: String
+  for +fs: List<&2, K.File>
+  for +rest: List<&2, L.Pack>
+  for +e: {False{} == P.path.eqless(at) : Bool}
+  {P.lockable.why(L.Pack{hash, src, K.File{at, sum} <> fs} <> rest)
+    == P.path.eq.why(hash, at) : String}
+
 # The planner (plan.bend) over the World (world.bend). Every law below is
 # about what `ez lock` does, stated over the plan it returns; one with a
 # premise that the args say no `--upgrade` is about a plain lock only. The
@@ -577,9 +611,11 @@ law relock_lays_nothing:
   for ok: {P.refuses(w) == False{} : Bool}
   {fresh(after(w)) == [] : List<&2, String>}
 
-# The lock document. EZ-DOC-1 is a round trip through eztoml's reader, and
-# the reader trims every line and strips the quotes off every value. These two
-# laws are its first step: a quoted value survives both, whatever it holds.
+# The lock document reads back. EZ-DOC-1 is a round trip through the pinned
+# eztoml reader: the text `ez lock` writes, parsed, gives back the packages,
+# the hub and the tool pins it was written from. The reader trims every line
+# and strips the quotes off every value; these two laws are the first step: a
+# quoted value survives both, whatever it holds.
 
 # LAW: a quoted value is already trimmed. Its first and last characters are
 # quotes, so no space it holds is at an end.
@@ -592,3 +628,112 @@ law trim_quoted:
 law strip_quoted:
   for +v: String
   {T.strip(T.quote(v), '"', '"') == v : String}
+
+# The rest is proved in two steps, as the design laid out. The first is about
+# tables: the lock's text is eztoml's text for a document of tables
+# (`render_is_doc`), and parsing it gives the tables back
+# (`lock_sections_read_back`), which check/toml.bend proves for any document
+# whose names and keys the reader can take back. `lockable` is what makes the
+# lock's document one of those, and the planner refuses a lock that is not
+# lockable, so the premise holds of every lock ez writes. The second is about
+# what ez reads out of the tables: `L.packs`, `L.lock.hub` and `M.tools` find
+# what was written. What they give back is not always the list given: the
+# packages come back in hash order with their files in path order and each
+# once, which is `canon`, and the lock does not write a tool's `vendor`,
+# which is `tools.canon`. Law vocabulary: ez never calls these.
+
+# the document a lock renders: the `[lock]` table, every package's two tables
+# in hash order, then every tool's table. Law vocabulary.
+def lock.doc(ts: List<&2, M.Tool>, hub: String, ps: List<&2, L.Pack>) -> List<&2, T.Sect>:
+  List.append(&2, T.Sect, L.doc(hub, ps), L.tool.sects(ts))
+
+# a tool's source as the lock gives it back: the lock does not write
+# `vendor`, and eztoml reads a git source with no root as rooted at `.` and
+# one with no url as the hub. Law vocabulary.
+def source.canon(source: M.Source) -> M.Source:
+  match source:
+    case M.Hub{}:
+      M.Hub{}
+    case M.Git{url, rev, tag, root, nar, _vend}:
+      +u = url
+      M.source.go(String.is_empty(u), u, rev, tag, M.root.or(root), nar, False{})
+
+# a tool pin as the lock gives it back
+def tool.canon(pin: M.Tool) -> M.Tool:
+  M.Tool{n, e, b, s} = pin
+  M.Tool{n, e, b, source.canon(s)}
+
+# every tool pin, so
+def tools.canon(ts: List<&2, M.Tool>) -> List<&2, M.Tool>:
+  match ts:
+    case []:
+      []
+    case h <> t:
+      tool.canon(h) <> tools.canon(t)
+
+# a package as a lock gives it back: its files in path order, each once. Law
+# vocabulary.
+def canon.one(pack: L.Pack) -> L.Pack:
+  L.Pack{h, s, f} = pack
+  L.Pack{h, s, K.files_of(f)}
+
+# every package, so
+def canon.all(ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
+  match ps:
+    case []:
+      []
+    case h <> t:
+      canon.one(h) <> canon.all(t)
+
+# the packages a lock gives back: in hash order, each with its files in path
+# order and each once
+def canon(ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
+  canon.all(L.pack.sort(ps))
+
+# LAW: the lock's text is eztoml's text for its document. The lock writes
+# each package as a block of text and sorts the blocks; that is the text of
+# the packages sorted, one table after another.
+law render_is_doc:
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ps: List<&2, L.Pack>
+  {L.render.tools(ts, hub, ps) == T.render(lock.doc(ts, hub, ps)) : String}
+
+# LAW: parsing the lock `ez lock` renders gives back the tables it rendered:
+# the `[lock]` table, every package's two tables in hash order, and every
+# tool's table
+law lock_sections_read_back:
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {T.sects(T.parse(L.render.tools(ts, hub, ps))) == lock.doc(ts, hub, ps)
+    : List<&2, T.Sect>}
+
+# LAW: parsing the lock `ez lock` renders gives back its packages, in hash
+# order with their files in path order, whatever order they were given in
+# EZ-DOC-1
+law lock_reads_back:
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {L.packs(T.sects(T.parse(L.render.tools(ts, hub, ps)))) == canon(ps) : List<&2, L.Pack>}
+
+# LAW: and the hub it was resolved against
+# EZ-DOC-1
+law lock_hub_reads_back:
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {L.lock.hub(T.sects(T.parse(L.render.tools(ts, hub, ps)))) == hub : String}
+
+# LAW: and its tool pins, as the lock gives them back
+# EZ-DOC-1
+law lock_tools_read_back:
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {M.tools(T.sects(T.parse(L.render.tools(ts, hub, ps)))) == tools.canon(ts) : List<&2, M.Tool>}

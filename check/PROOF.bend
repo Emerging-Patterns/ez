@@ -5,3 +5,4 @@
 import Base
 import ./eq.bend as Eq
 import ./str.bend as Str
+import ./toml.bend as Toml
