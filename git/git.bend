@@ -534,7 +534,7 @@ def vendor.tree(
     +nh : String <- nar(work)
     +ck : String <- R.exec(["test", "-f", at])
     have(R.ok(ck), entry, url, rev)
-    +p : K.Pkg <- K.pkg_of(at)
+    +p : K.Pkg <- K.pkg_in(work, entry)
     +hash : String <- IO.pure(String, K.pkg.hash(p))
     lay(lib, hash, K.pkg.root(p), K.pkg.files(p))
     +rt : String <- IO.pure(String, root.rel(at, K.pkg.root(p), entry))
