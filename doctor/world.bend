@@ -6,9 +6,13 @@
 # clock or the rest of the environment, because the planner reads neither.
 #
 # A question is a program asked for its version, the names of the packages
-# under BEND_LIB, or the project's sources: every `.bend` file git tracks,
-# with its text, which is the lock's own listing (`W.Listing`), read the way
-# `ez lock` reads it. So doctor judges the import lines `ez lock` judges.
+# under BEND_LIB, the project's sources, or a package's tree under BEND_LIB.
+# The sources are every `.bend` file git tracks, with its text, which is the
+# lock's own listing (`W.Listing`), read the way `ez lock` reads it. So doctor
+# judges the import lines `ez lock` judges. A tree is asked about with the
+# lock's own question (`W.Ask`) and answered only from BEND_LIB: the manifest
+# there and the text of each file it names, or that there is none. Doctor
+# never asks the network, so this is all it can know of a package.
 import Base
 import ../lock/world.bend as W
 import ../manifest/manifest.bend as M
@@ -18,12 +22,16 @@ type Ask is Data:
   Probe{name: String}   # the program asked for its version
   Lib{dir: String}      # the names under the library directory, as `ls` prints them
   Sources{}             # every `.bend` file git tracks, with its text
+  Tree{ask: W.Ask}      # the lock's question about a package, put to BEND_LIB
 
 # the answer to one: what a program printed, and whether it ran; or the
-# sources as the lock lists them
+# sources as the lock lists them; or a package's tree as BEND_LIB holds it,
+# or that BEND_LIB holds none
 type Answer is Data:
-  Printed{ok: Bool, text: String}   # Probe, Lib
-  Listed{listing: W.Listing}        # Sources
+  Printed{ok: Bool, text: String}                  # Probe, Lib
+  Listed{listing: W.Listing}                       # Sources
+  Laid{manifest: String, srcs: List<&2, String>}   # Tree, there
+  Away{}                                           # Tree, not there
 
 # one question, answered
 type Reply is Data:
@@ -90,6 +98,8 @@ def key(ask: Ask) -> String:
       "lib\n" ++ dir
     case Sources{}:
       "sources"
+    case Tree{ask}:
+      "tree\n" ++ W.ask.hash(ask)
 
 # an answer looked up, or none yet
 type Heard is Data:

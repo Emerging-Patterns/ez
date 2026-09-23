@@ -559,6 +559,14 @@ type Walked is Data:
   Asks{at: String}
   Refused{why: String}
 
+# a path of the project, as it is written inside a package rooted at `root`:
+# the path itself under the project's own root, and the path with the root's
+# directories taken off otherwise. The hub serves a package's files at these
+# paths, so `ez add` and `ez publish` both name the entry by it.
+def inside(+root: String, +path: String) -> String:
+  Bool.pick(String, String.eq(root, "."), path,
+    String.drop(path, (String.length(root) + 1n : Nat)))
+
 # one step of a lookup, with the head's answer in hand. The rest arrives as a
 # thunk, so a hit ends the search.
 def look.step(hit: Bool, text: String, rest: Unit -> Maybe<&2, String>) -> Maybe<&2, String>:
