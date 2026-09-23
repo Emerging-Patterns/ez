@@ -4240,6 +4240,23 @@ def set_name(tool, _rev, _tag, _nar):
         case M.Git{url, r, old, root, nr, vend}:
           {==}
 
+law tpin_name:
+  for short: Bool
+  for +tool: M.Tool
+  for +rev: String
+  for +tag: String
+  for +nar: String
+  for says: List<&2, String>
+  {pinned.name(Up.tool.pin(short, tool, rev, tag, nar, says), M.tool.name(tool))
+    == M.tool.name(tool) : String}
+
+def tpin_name(short, tool, rev, tag, nar, _says):
+  match short:
+    case True{}:
+      {==}
+    case False{}:
+      set_name(tool, rev, tag, nar)
+
 law weighed_name:
   for wd: Up.Wd
   for +tool: M.Tool
@@ -4249,10 +4266,10 @@ law weighed_name:
   {pinned.name(Up.tool.weighed(wd, tool, rev, tag, says), M.tool.name(tool))
     == M.tool.name(tool) : String}
 
-def weighed_name(wd, tool, rev, tag, _says):
+def weighed_name(wd, tool, rev, tag, says):
   match wd:
-    case Up.Wd{nar}:
-      set_name(tool, rev, tag, nar)
+    case Up.Wd{+nar}:
+      tpin_name(Bool.or(String.is_empty(rev), String.is_empty(nar)), tool, rev, tag, nar, says)
     case Up.WdWait{_ask}:
       {==}
     case Up.WdNo{_why}:
@@ -4262,12 +4279,13 @@ law resolved_name:
   for tip: Up.Tip
   for +rs: List<&2, Up.Reply>
   for +tool: M.Tool
-  {pinned.name(Up.tool.resolved(tip, rs, tool), M.tool.name(tool)) == M.tool.name(tool) : String}
+  for +ref: String
+  {pinned.name(Up.tool.resolved(tip, rs, tool, ref), M.tool.name(tool)) == M.tool.name(tool) : String}
 
-def resolved_name(tip, rs, tool):
+def resolved_name(tip, rs, tool, ref):
   match tip:
-    case Up.At{+rev, tag, _branch}:
-      weighed_name(Up.weighed(rs, Up.Weigh{M.source.url(M.tool.source(tool)), rev}), tool, rev, tag, [])
+    case Up.At{+rev, _tag, _branch}:
+      weighed_name(Up.weighed(rs, Up.Weigh{M.source.url(M.tool.source(tool)), rev}), tool, rev, ref, [])
     case Up.TipWait{_ask}:
       {==}
     case Up.TipNo{_why}:
@@ -4282,28 +4300,12 @@ law named_name:
 
 def named_name(named, rs, tool, url):
   match named:
-    case Up.Named{ref}:
-      resolved_name(Up.follow(rs, url, ref), rs, tool)
+    case Up.Named{+ref}:
+      resolved_name(Up.follow(rs, url, ref), rs, tool, ref)
     case Up.NamedWait{_ask}:
       {==}
     case Up.NamedNo{_why}:
       {==}
-
-law fill_name:
-  for no_rev: Bool
-  for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
-  {pinned.name(Up.tool.fill(no_rev, rs, tool), M.tool.name(tool)) == M.tool.name(tool) : String}
-
-def fill_name(no_rev, rs, tool):
-  match no_rev:
-    case True{}:
-      named_name(Up.tool.ref(String.is_empty(M.source.tag(M.tool.source(tool))), rs,
-        M.source.url(M.tool.source(tool)), M.source.tag(M.tool.source(tool))), rs, tool,
-        M.source.url(M.tool.source(tool)))
-    case False{}:
-      weighed_name(Up.weighed(rs, Up.Weigh{M.source.url(M.tool.source(tool)),
-        M.source.rev(M.tool.source(tool))}), tool, M.source.rev(M.tool.source(tool)), "", [])
 
 law tverdict_name:
   for verdict: U.Verdict
@@ -4322,9 +4324,27 @@ def tverdict_name(verdict, rs, tool, _tip, branch):
       {==}
     case U.Off{}:
       {==}
-    case U.Advance{+rev, tag}:
-      weighed_name(Up.weighed(rs, Up.Weigh{M.source.url(M.tool.source(tool)), rev}), tool, rev, tag,
+    case U.Advance{+rev, _tag}:
+      weighed_name(Up.weighed(rs, Up.Weigh{M.source.url(M.tool.source(tool)), rev}), tool, rev, "",
         [Up.say.move(M.tool.name(tool), M.source.rev(M.tool.source(tool)), rev, branch)])
+
+law tkept_nar_name:
+  for fill: Bool
+  for +rs: List<&2, Up.Reply>
+  for +tool: M.Tool
+  for +tip: String
+  for +tag: String
+  for +nar: String
+  {pinned.name(Up.tool.kept.nar(fill, rs, tool, tip, tag, nar), M.tool.name(tool))
+    == M.tool.name(tool) : String}
+
+def tkept_nar_name(fill, rs, tool, tip, tag, nar):
+  match fill:
+    case True{}:
+      tpin_name(Bool.or(String.is_empty(tip), String.is_empty(nar)), tool, tip, "", nar, [])
+    case False{}:
+      tverdict_name(U.judge(True{}, True{}, String.eq(M.source.nar(M.tool.source(tool)), nar), tip, tag),
+        rs, tool, tip, "")
 
 law tkept_name:
   for wd: Up.Wd
@@ -4337,8 +4357,7 @@ law tkept_name:
 def tkept_name(wd, rs, tool, tip, tag):
   match wd:
     case Up.Wd{+nar}:
-      tverdict_name(U.judge(True{}, True{}, String.eq(M.source.nar(M.tool.source(tool)), nar), tip, tag),
-        rs, tool, tip, "")
+      tkept_nar_name(String.is_empty(M.source.nar(M.tool.source(tool))), rs, tool, tip, tag, nar)
     case Up.WdWait{_ask}:
       {==}
     case Up.WdNo{_why}:
@@ -4411,6 +4430,21 @@ def taim_name(aim, rs, tool):
       ttip_name(Up.follow(rs, M.source.url(M.tool.source(tool)), ref), rs, tool)
     case U.Forward{}:
       ttip_name(Up.forward(rs, M.source.url(M.tool.source(tool))), rs, tool)
+
+law fill_name:
+  for no_rev: Bool
+  for +rs: List<&2, Up.Reply>
+  for +tool: M.Tool
+  {pinned.name(Up.tool.fill(no_rev, rs, tool), M.tool.name(tool)) == M.tool.name(tool) : String}
+
+def fill_name(no_rev, rs, tool):
+  match no_rev:
+    case True{}:
+      named_name(Up.tool.ref(String.is_empty(M.source.tag(M.tool.source(tool))), rs,
+        M.source.url(M.tool.source(tool)), M.source.tag(M.tool.source(tool))), rs, tool,
+        M.source.url(M.tool.source(tool)))
+    case False{}:
+      taim_name(U.aim(True{}, M.tool.source(tool)), rs, tool)
 
 law short_name:
   for short: Bool
