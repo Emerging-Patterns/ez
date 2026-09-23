@@ -1155,15 +1155,6 @@ def exit(pl: Plan) -> Exit:
     case P.Refused{_why}:
       Refusal{}
 
-# the program's status as the runtime reported it. One that is not a number
-# is 1, since something ended the program that was not its own exit.
-def program(got: Maybe<&2, U32>) -> U32:
-  match got:
-    case None{}:
-      1
-    case Some{n}:
-      n
-
 # the status a tool command exits with, given the status the program it
 # started exited with (EZ-OUT-1): 1 for a refusal, 0 for a command that
 # ends without starting one, and the program's own status for `ez tool run`.

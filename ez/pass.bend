@@ -2,8 +2,9 @@
 # runs one. Every other program ez starts goes through snap's `exec`, which
 # hands the child /dev/null for stdin, holds what it prints until it exits,
 # and answers both at once; that is what a command that reads the answer
-# wants. `ez run` reads nothing back: the program talks to the person, and
-# ez only waits for it and exits with its status (`S.code`, EZ-OUT-1).
+# wants. `ez run` and `ez tool run` read nothing back: the program talks to
+# the person, and ez only waits for it and exits with its status (`S.code`
+# and `TP.code`, EZ-OUT-1).
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 
