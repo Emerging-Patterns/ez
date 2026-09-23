@@ -86,44 +86,11 @@ def Laws.hash_of_local(s, e):
     D.head(String.split(String.drop(s, 7n), '/')), "") == "" : String}
   {==}
 
-def Laws.hash_of_import():
-  {==}
-
-def Laws.hash_of_relative():
-  {==}
-
-def Laws.imported_dedups():
-  {==}
-
-def Laws.report_agrees():
-  {==}
-
-def Laws.report_both_ways():
-  {==}
-
-def Laws.report_unused():
-  {==}
-
 # The clock's pure half: a non-empty deadline is rewritten into the
 # pick that keeps it.
 
 def Laws.by_effect_keeps(d, e):
   %e : {Bool.pick(String, _, "0", d) == d : String}
-  {==}
-
-# The command line as parse sees it. Each side is a known list, so the
-# proof is the computation itself.
-
-def Laws.argv_of_run():
-  {==}
-
-def Laws.argv_of_tool():
-  {==}
-
-def Laws.tool_rest_dashes():
-  {==}
-
-def Laws.tool_rest_plain():
   {==}
 
 # target: each law's word is built from literal chars around the parts that
@@ -1144,9 +1111,6 @@ def Laws.classify_else(text, ne, eu, eg, e1, e2, e3, e4, no):
   %eg : {Tgt.classify.scp(_, text) == Tgt.Local{text} : Tgt.Place}
   {==}
 
-def Laws.target_escapes():
-  {==}
-
 # `~/` is not `~`, which computes, and is a prefix of what it was put on,
 # which `starts_nil` holds for the open rest
 def Laws.expand_home(home, rest):
@@ -1178,21 +1142,6 @@ def Laws.anchor_relative(here, path, eu, ea, eg):
   %ea : {P.anchor.path(Bool.or(_, String.starts_with(path, "git@")), here,
     path) == P.join(here, path) : String}
   %eg : {P.anchor.path(_, here, path) == P.join(here, path) : String}
-  {==}
-
-def Laws.file_bin():
-  {==}
-
-def Laws.file_entry():
-  {==}
-
-def Laws.file_default():
-  {==}
-
-def Laws.out_name_empty():
-  {==}
-
-def Laws.out_name():
   {==}
 
 # key: the hypothesis rewrites one comparison to False, and what is left is an
