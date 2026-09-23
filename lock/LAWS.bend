@@ -205,6 +205,148 @@ law root_skips_ez:
   for text: String
   {P.roots.one(W.Source{".ez/" ++ p, text}) == [] : List<&2, String>}
 
+# Idempotence. A plain lock that succeeds writes ez.lock.toml and lays under
+# BEND_LIB every tree a clone answered and the planner passed. It writes no
+# ledger and no source, and neither file it writes is a tracked `.bend` file,
+# so the next lock reads the same ledger and the same committed sources. What
+# changes is how the laid trees arrive: from BEND_LIB now, with the bytes that
+# were laid. The remotes are taken not to change between the two runs, so
+# every other answer is what it was. That a laid tree reads back as the
+# manifest and texts it was laid from is the interpreter's side (EZ-TRUST-2):
+# a clone's answer carries the manifest its files render to, which is the
+# manifest a lay writes.
+
+# whether a verdict passed every check
+def passed(verdict: W.Verdict) -> Bool:
+  match verdict:
+    case W.Ok{_fs, _ss}:
+      True{}
+    case W.No{_why}:
+      False{}
+
+# a cloned tree as the next lock reads it: from BEND_LIB when it was laid,
+# cloned again when it was not
+def after.clone(laid: Bool, +got: String, +manifest: String, +ss: List<&2, String>) -> W.Answer:
+  match laid:
+    case True{}:
+      W.Got{W.Lib{}, manifest, ss}
+    case False{}:
+      W.Got{W.Clone{got}, manifest, ss}
+
+# one answer by how it arrived. Only a clone that passed is laid.
+def after.how(
+  how: W.How,
+  +orgs: List<&2, L.Origin>,
+  +hub: String,
+  +hash: String,
+  +manifest: String,
+  +ss: List<&2, String>
+) -> W.Answer:
+  match how:
+    case W.Lib{}:
+      W.Got{W.Lib{}, manifest, ss}
+    case W.Clone{+got}:
+      after.clone(passed(W.accept(orgs, hub, hash, W.Got{W.Clone{got}, manifest, ss})),
+        got, manifest, ss)
+    case W.Served{}:
+      W.Got{W.Served{}, manifest, ss}
+
+# one answer as the next lock reads it
+def after.one(+orgs: List<&2, L.Origin>, +hub: String, +hash: String, answer: W.Answer) -> W.Answer:
+  match answer:
+    case W.Miss{why}:
+      W.Miss{why}
+    case W.Got{how, manifest, ss}:
+      after.how(how, orgs, hub, hash, manifest, ss)
+
+# every answer, so
+def after.all(+orgs: List<&2, L.Origin>, +hub: String, rs: List<&2, W.Reply>) -> List<&2, W.Reply>:
+  match rs:
+    case []:
+      []
+    case W.Reply{+ask, answer} <> t:
+      W.Reply{ask, after.one(orgs, hub, W.ask.hash(ask), answer)} <> after.all(orgs, hub, t)
+
+# the World after a lock that succeeded: the same flags, ledger and listing,
+# and every tree it laid read from BEND_LIB
+def after.laid(world: W.World) -> W.World:
+  W.World{args, +ledger, listing, replies} = world
+  W.World{args, ledger, listing,
+    after.all(W.origins(ledger), W.ledger.hub(ledger), replies)}
+
+# a refused lock writes and lays nothing, so it leaves the World it read
+def after.pick(refused: Bool, world: W.World) -> W.World:
+  match refused:
+    case True{}:
+      world
+    case False{}:
+      after.laid(world)
+
+# the World a plain lock leaves, for the next lock to read. Law vocabulary: ez
+# never calls it.
+def after(+world: W.World) -> W.World:
+  after.pick(P.refuses(world), world)
+
+# the hash of an answer a clone gave that passed every check: a tree the next
+# plan would lay
+def fresh.how(
+  how: W.How,
+  +orgs: List<&2, L.Origin>,
+  +hub: String,
+  +hash: String,
+  +manifest: String,
+  +ss: List<&2, String>
+) -> List<&2, String>:
+  match how:
+    case W.Lib{}:
+      []
+    case W.Clone{+got}:
+      Bool.pick(List<&2, String>,
+        passed(W.accept(orgs, hub, hash, W.Got{W.Clone{got}, manifest, ss})), [hash], [])
+    case W.Served{}:
+      []
+
+def fresh.one(+orgs: List<&2, L.Origin>, +hub: String, +hash: String, answer: W.Answer) -> List<&2, String>:
+  match answer:
+    case W.Miss{_why}:
+      []
+    case W.Got{how, manifest, ss}:
+      fresh.how(how, orgs, hub, hash, manifest, ss)
+
+def fresh.all(+orgs: List<&2, L.Origin>, +hub: String, rs: List<&2, W.Reply>) -> List<&2, String>:
+  match rs:
+    case []:
+      []
+    case W.Reply{ask, answer} <> t:
+      +hash = W.ask.hash(ask)
+      List.append(&2, String, fresh.one(orgs, hub, hash, answer), fresh.all(orgs, hub, t))
+
+# every tree a World's clones answered that passed every check. In a World
+# that asks about each hash once, which is every World the interpreter
+# gathers, these are the trees a plain lock that succeeds lays (`P.lays` over
+# `P.cloned`). Law vocabulary: ez never calls it.
+def fresh(world: W.World) -> List<&2, String>:
+  W.World{_args, +ledger, _listing, replies} = world
+  fresh.all(W.origins(ledger), W.ledger.hub(ledger), replies)
+
+# LAW: plain `ez lock` is idempotent. Run again on the World it leaves, it
+# writes the same bytes to ez.lock.toml, or, when it refused, refuses again
+# and writes none. A laid tree read from BEND_LIB is judged as the clone that
+# passed was, which is `clone_reproduces` read backwards.
+# EZ-DOC-4
+law lock_idempotent:
+  for +w: W.World
+  {P.put(after(w), "ez.lock.toml") == P.put(w, "ez.lock.toml") : P.Wrote}
+
+# LAW: and it lays nothing new. On the World a lock that succeeded leaves, no
+# tree arrives by a clone that passes, so every tree the next lock reads that
+# passes was read from BEND_LIB or served by the hub, and none is laid again.
+# EZ-DOC-4
+law relock_lays_nothing:
+  for +w: W.World
+  for ok: {P.refuses(w) == False{} : Bool}
+  {fresh(after(w)) == [] : List<&2, String>}
+
 # The lock document. EZ-DOC-1 is a round trip through eztoml's reader, and
 # the reader trims every line and strips the quotes off every value. These two
 # laws are its first step: a quoted value survives both, whatever it holds.
