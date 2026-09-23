@@ -4,14 +4,14 @@
 
 State: Draft
 
-The first draft was written from the README, the PR history, and the Bend LAWS/PROOF conventions, without the source. This revision replaces those assumptions with what the code at `b28ca2c` does, and records the decisions a maintainer made on every point where the code and the intent differed. The evidence is in [ez-law-inventory.md](ez-law-inventory.md), which lists every existing law and the findings from reading each command.
+The first draft was written from the README, the PR history, and the Bend LAWS/PROOF conventions, without the source. This revision replaces those assumptions with what the code at `b28ca2c` does, and records the decisions a maintainer made on every point where the code and the intent differed. The evidence came from a companion inventory that listed every law ez had, what each one pointed toward, and what we found reading each command. The inventory then tracked every work package until the specification was met, and it has since been folded into this document: the map from requirement to laws is `SPEC.md`'s Law column, the planner as it was built is under "The planner as built", what is still open is under "Known gaps", and the history is under "How we got here".
 
-Every review item below is resolved. Several decisions change ez's behavior; they are collected under "Decided behavior changes" and land as their own PRs.
+Every review item below is resolved. Several decisions change ez's behavior; they are collected under "Decided behavior changes" and have landed as their own PRs. Every Proved requirement is proved except EZ-LED-4.
 
 Items for review:
 
 - [x] <!-- REVIEW (resolved): Function names in the law sketches were placeholders. They now name real definitions, or say that none exists yet; see "Names used in this document". -->
-- [x] <!-- REVIEW (resolved): The requirement list was derived from the README. Each requirement has been checked against the code; the verdicts are in the inventory, and requirements were corrected, added or removed to match. -->
+- [x] <!-- REVIEW (resolved): The requirement list was derived from the README. Each requirement has been checked against the code, and requirements were corrected, added or removed to match. The notes under each requirement group below record what the check found. -->
 - [x] <!-- REVIEW (resolved): bolt is the home for the traceability check, as a rule in its `laws` group beside `closed`, `law` and `unsafe`. -->
 - [x] <!-- REVIEW (resolved): EZ-DOC-3 stays the headline guarantee. `ez lock` may read the ledger, the committed `.bend` files, the vendored trees, and hub content verified by hash, and nothing else. The changes that make that true are listed under "Decided behavior changes". -->
 - [x] <!-- REVIEW (resolved, then reversed): `Sha.hex` first kept its low-byte fold, on the belief that EZ-HASH-4 needed it to match `bend --publish`. The publish check refuted it: `bend --publish` hashes with `crypto.createHash("sha256").update(text)` (bend2/main.ts `cli_publish`), which is the text's UTF-8 bytes, and the hub checks bodies with `TextEncoder` (bend2/bend.ts `hub_get`). A non-ASCII file published as a different hash from the one ez computed; snap, shake and ezhttp all hold one. `Sha.hex` now hashes the UTF-8 bytes, `Sha.raw` keeps the byte-level digest for NAR serials, and `tests/publish.bend` publishes a non-ASCII file so the gate catches a regression. -->
@@ -31,13 +31,15 @@ Items for review:
 - [x] <!-- REVIEW (resolved): Closed laws are deleted, not kept as examples. -->
 - [x] <!-- REVIEW (resolved): The phase-three design, [ez-lock-planner.md](ez-lock-planner.md), is accepted with every recommendation it made. It rewords EZ-DOC-5 and EZ-RES-6, adds EZ-OUT-2, adds five behavior changes to "Decided behavior changes", and proves the phase-three upgrade laws relative to EZ-LED-4. -->
 - [x] <!-- REVIEW (resolved): The design for converting `ez add` and `ez remove`, [ez-add-planner.md](ez-add-planner.md), is accepted with every recommendation it made. It rewords EZ-LED-8 for a `~/` target, and adds seven behavior changes to "Decided behavior changes". -->
-- [x] <!-- REVIEW (resolved): None of the accidental behavior in the inventory becomes a requirement. The fixes worth making are listed under "Decided behavior changes". The doctor drift report and argument forwarding, which had only closed laws, become EZ-VEN-5 and EZ-TOOL-9 instead of losing their only record. -->
+- [x] <!-- REVIEW (resolved): None of the accidental behavior found while reading the code becomes a requirement. The fixes worth making are listed under "Decided behavior changes". The doctor drift report and argument forwarding, which had only closed laws, become EZ-VEN-5 and EZ-TOOL-9 instead of losing their only record. -->
 
 ---
 
 ## Abstract
 
 ez has 269 laws across ten LAWS.bend files. 122 of them are closed equalities, most moved over from `#|` tests, so they pin exact outputs for specific inputs rather than stating what ez guarantees. This RFC defines a behavioral specification for ez in which every requirement is either **Proved** by a quantified law or explicitly **Trusted** as an assumption about the environment, with nothing in between. It adds a model of the state each command reads and writes, so that IO behavior can be stated as laws, and a refactoring contract that says exactly which statements a change must preserve.
+
+That was ez when we wrote the first revision. Since then every command has been split into a pure planner and a thin interpreter, every Proved requirement but EZ-LED-4 has a tagged quantified law, and no closed law remains.
 
 ## Glossary
 
@@ -65,15 +67,15 @@ ez has 269 laws across ten LAWS.bend files. 122 of them are closed equalities, m
 
 ez is a project manager for Bend 2. Bend already hashes a file and its local imports into a 0x name and serves it from a hub. ez sits on top of that and manages a whole project: it scaffolds projects, vendors git dependencies, resolves the import graph into a lock, fills `BEND_LIB`, builds and runs entries, pins and installs tools, and publishes. It is written entirely in Bend, and it computes the 0x hash a repo would get even when that repo never published, so the import line it writes is the one a published package would have produced.
 
-### How ez proves things today
+### How ez proved things when we started
 
 Bend's verification model splits claims from proofs. LAWS.bend holds the statements, PROOF.bend holds a definition that proves each one, and `bend PROOF.bend` fails until every law is discharged. Proofs are terms built from pattern matching, recursion as induction, and equality rewrites. There are no tactics and no proof search.
 
-A passing exit status is not enough. `bend` exits 0 and prints `All terms check, but N defs rely on unsafe or foreign code:` when a proof leans on an unchecked def, and a def that never returns proves anything. The gate ez actually runs reads the first line of output and accepts only the bare `All terms check.` (`ez/test.bend:545-558`). That stricter reading is what we mean by the proof gate throughout.
+A passing exit status is not enough. `bend` exits 0 and prints `All terms check, but N defs rely on unsafe or foreign code:` when a proof leans on an unchecked def, and a def that never returns proves anything. The gate ez runs reads the first line of output and accepts only the bare `All terms check.` That stricter reading is what we mean by the proof gate throughout.
 
-Today the gate runs inside `ez test`. `ez test` finds every PROOF.bend, runs `bend` on each alongside its test lanes, and reports a proof as passed only on that exact line. `flake.nix` runs `ez test --js-only --unit-only` through `mkProofs`, and that is the only place CI checks the laws. `ez test` caches a passed proof in `.ez/cache`, keyed on the bend version, `$CC`, and the hash of the proof's import closure; `mkProofs` builds from a clean copy of the source, so in CI the cache is always empty.
+When we started, the gate ran inside `ez test`, and it has since moved to its own command (see "The proof gate"). `ez test` found every PROOF.bend, ran `bend` on each alongside its test lanes, and reported a proof as passed only on that exact line. `flake.nix` ran `ez test --js-only --unit-only` through `mkProofs`, and that was the only place CI checked the laws. `ez test` cached a passed proof in `.ez/cache`, keyed on the bend version, `$CC`, and the hash of the proof's import closure; `mkProofs` builds from a clean copy of the source, so in CI the cache was always empty.
 
-ez adopted this model through a series of PRs that moved "law-shaped" equalities out of `#|` test trailers and into LAWS/PROOF across the sha, pkg, lock, git, net, pub, manifest and ez areas. The result is uneven. The inventory counts 147 quantified laws and 122 closed ones. The quantified laws include one real guarantee (the 0x hash does not depend on the order files were found in), a strong model of the ledger, the HTTP client's framing, the decision functions of `ez publish`, a path algebra, and thirteen laws that hold a faster rewrite equal to the definition it replaced. Every law about upgrade decisions, lock rendering, import rewriting, the gitignore allowlist, target classification, NAR hashing and SHA-256 is closed. Of the 94 laws in `ez/LAWS.bend`, 42 are about the `ez test` runner itself and 19 pin progress or error wording.
+ez adopted this model through a series of PRs that moved "law-shaped" equalities out of `#|` test trailers and into LAWS/PROOF across the sha, pkg, lock, git, net, pub, manifest and ez areas. The result is uneven. A law-by-law inventory at `f009e42` counted 147 quantified laws and 122 closed ones. The quantified laws include one real guarantee (the 0x hash does not depend on the order files were found in), a strong model of the ledger, the HTTP client's framing, the decision functions of `ez publish`, a path algebra, and thirteen laws that hold a faster rewrite equal to the definition it replaced. Every law about upgrade decisions, lock rendering, import rewriting, the gitignore allowlist, target classification, NAR hashing and SHA-256 is closed. Of the 94 laws in `ez/LAWS.bend`, 42 are about the `ez test` runner itself and 19 pin progress or error wording.
 
 ### Why this leaves us unsure what is proved
 
@@ -135,7 +137,7 @@ The specification depends on one mechanical check: for every PROOF.bend in the t
 
 Laws can only quantify over values, and most of ez's behavior is IO. We close that gap by modeling what a command can see as a value and splitting each command into a pure planner and a thin interpreter.
 
-The fields below are what `ez lock` actually observes today, taken from tracing the command (see "What ez lock reads" in the inventory). None of these types exists in the code yet.
+The fields below are what `ez lock` actually observed when we wrote this revision, taken from tracing the command (see "What ez lock may read"). This is the sketch we started from; none of these types existed in the code then. What we built differs in shape, and is summarized under "The planner as built".
 
 ```
 # New types. Field names are proposals. Every field is something a command
@@ -178,11 +180,25 @@ We do not need to convert every command before the spec is useful. The spec is w
 
 ### How far ez lock is from planner form
 
-Much of the pure half already exists. `origin` and `origins.all` choose where a package comes from (`lock/lock.bend:137-195`). `U.aim`, `U.judge`, `U.retarget`, `U.reallow.many` and `U.reimport.many` decide upgrades and compute the rewritten ledger, gitignore and sources (`manifest/upgrade.bend`). `Lock.render.tools` turns packages and tools into the lock's text. `K.hash_of` and `K.manifest_of` are pure.
+This is how the code stood at `b28ca2c`, before any conversion. Much of the pure half already existed. `origin` and `origins.all` choose where a package comes from (`lock/lock.bend:137-195`). `U.aim`, `U.judge`, `U.retarget`, `U.reallow.many` and `U.reimport.many` decide upgrades and compute the rewritten ledger, gitignore and sources (`manifest/upgrade.bend`). `Lock.render.tools` turns packages and tools into the lock's text. `K.hash_of` and `K.manifest_of` are pure.
 
 What is not pure is the control flow between them, spread across roughly forty IO functions. Three places matter most. The package set grows from IO results: `resolve` reads or fetches a package, scans its text for imports, and queues what it finds, dying on the first bad package in walk order. A decision is made inside IO: `read.git` turns a missing manifest into an empty file list (`lock/lock.bend:287-293`), which is the bug that breaks EZ-DOC-3. And `--upgrade` runs three phases (`Up.run`, `Pin.upgrade`, `lock.now`) that communicate by writing ez.toml and `.ez/lib` and reading them back, so the final lock depends on the order of writes, and a failure in a later phase leaves earlier writes in place.
 
 Converting `ez lock` means turning `roots` and `resolve` into a pure fold over `World.tree`, `World.lib` and `World.hub`, making the three upgrade phases one planner that threads the ledger through as a value, and moving the "missing tree" case out of `read.git` into an explicit outcome.
+
+### The planner as built
+
+Every command that reads or writes project state is now a planner and an interpreter: `ez lock` (plain and `--upgrade`), `ez add`, `ez remove`, `ez init`, `ez fetch`, `ez publish`, `ez doctor`, and `ez tool run`, `install`, `upgrade` and `sync`. Each lives in its own directory as `world.bend`, `plan.bend` and `run.bend` (`init/` and `remove/` need no World file of their own), beside the `LAWS.bend` and `PROOF.bend` that state and prove its requirements. The designs are [ez-lock-planner.md](ez-lock-planner.md) for the lock and [ez-add-planner.md](ez-add-planner.md) for the rest, which follow the lock's pattern.
+
+The World is not the whole system as a value, as the sketch above has it. It is the few things a command reads up front (such as the ledger's text, the committed `.bend` files as `git ls-files` lists them, the arguments and the directory the command runs in) plus one answer for each question the planner has asked so far. A World has no field for anything the command may not depend on: `lock/world.bend` has none for the environment, the clock, the old lock, untracked files or `.ez/origins.toml`, so EZ-DOC-3 can be stated as a frame property over `W.inputs` and a regression that reads something new stops the proof.
+
+The planner is pure and does one of two things with a World. Either it names the questions it still needs answered, or it returns a Plan. The lock asks for a package's manifest and files, from the hub, from `BEND_LIB` or from a clone at a rev; an upgrade, `ez add` and the tool commands also ask a remote for its refs, tags, default branch, ancestry or a checkout; `ez publish` asks what git tracks and, last, for the upload. A Plan is a list of effects and an outcome. The interpreter loops, answering each question by one IO action and adding the answer to the World, until nothing is left to ask. Laziness costs no purity this way, since the planner only ever sees answers, and every source a question names is anchored by the planner, so the interpreter never decides where to look.
+
+The lock's effects are `Write{path, text}`, `Lay{place, hash, files}` (a tree under `.ez/lib`, committed, or under `BEND_LIB`, a cache), `Drop{hash}` and `Say{text}`, and its outcome is `Success{}` or `Refused{why}`. A refused plan has no write, lay or drop in it, which is what EZ-OUT-2 says. `P.status` maps an outcome to the exit status, which is what EZ-OUT-1 is stated over. Every command but the tool commands runs its plan through the lock's effect runner, `Run.exec.plan` in `lock/run.bend`, which executes the effects in order and then exits through `Run.end` with that status. The tool commands have a plan of their own shape (the checkout laid, the binary made or reused, and then either the program started or the link written), and `TP.code` gives their status from the plan's end and the program's status; their writes still run through the lock's interpreter. The commands that are not planners (`ez check`, `ez build`, `ez run`, `ez test`, `ez prove`) end with an outcome `ez/ends.bend` computes from what bend answered, and `ez/line.bend` decides how a command line ends before any command runs.
+
+The interpreters decide nothing, and that they read and execute faithfully is EZ-TRUST-2. Each one says in its header comment what it asks of the system, so the trusted surface can be read file by file.
+
+The price of the loop is small. Measured on this repository's own lock when WP1 landed, with every tree already under `BEND_LIB`, a plain lock took 0.53 s against 0.21 s before, because every round re-scans the committed sources for imports; with every tree to clone, 7.4 s against 7.3 s, since the clones dominate. When WP2 folded the upgrade in, `ez lock --upgrade` against a real remote took 17.1 s against 20.7 s before.
 
 ### Names used in this document
 
@@ -206,18 +222,20 @@ The law sketches below use these names. Where no definition exists, the sketch i
 
 ### Requirements
 
-The requirements below are the first version of `SPEC.md`. Each one is stated as behavior, not implementation, and was checked against the code. The Status column is `proved` when a tagged quantified law already exists and `pending` otherwise. Where the code does not yet behave as a requirement says, the inventory records the finding and the requirement carries a REVIEW marker in Draft Status.
+The requirements below were the first version of `SPEC.md`, and the tables now carry `SPEC.md`'s current wording and status. Each one is stated as behavior, not implementation, and was checked against the code. The Status column is `proved` when a tagged quantified law exists and `pending` otherwise; today only EZ-LED-4 is pending. The notes under each table record what the code did when we wrote the requirement, what we decided, and how the row was proved.
+
+We do not repeat the map from requirement to laws here. `SPEC.md`'s Law column is the canonical list of the tagged laws behind each row, bolt's `trace` rule checks it against the tags in every LAWS.bend, and `SPEC.md`'s "Left to prove" section says, for each row that took more than one command, how it was closed and what its laws rest on. A law named in the notes below is there to explain a decision, and the Law column is what to read for the complete set.
 
 #### Hashing (EZ-HASH)
 
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
 | EZ-HASH-1 | The 0x hash of a file list with distinct paths depends only on its (path, sum) pairs, not on the order they were found in. | Proved | proved |
-| EZ-HASH-2 | The NAR serialization of a directory does not depend on the order its entries are listed in. | Proved | pending |
-| EZ-HASH-3 | When ez writes a package under `<lib>/<h>`, `h` is the 0x hash of the file list whose manifest it writes beside the files. | Proved | pending |
+| EZ-HASH-2 | The NAR serialization of a directory does not depend on the order its entries are listed in. | Proved | proved |
+| EZ-HASH-3 | When ez writes a package under `<lib>/<h>`, `h` is the 0x hash of the file list whose manifest it writes beside the files. | Proved | proved |
 | EZ-HASH-4 | ez's 0x hash for an entry equals the hash `bend --publish` assigns to it. | Trusted | |
 | EZ-HASH-5 | ez's narHash equals `nix hash path --type sha256 --sri` of the same tree. | Trusted | |
-| EZ-HASH-6 | `Sha.hex(s)` is the SHA-256 of the UTF-8 bytes of `s`. For a file's text that is SHA-256 of the file's bytes. | Trusted | |
+| EZ-HASH-6 | `Sha.hex(s)` is the SHA-256 of the UTF-8 bytes of `s`. For a file's text that is SHA-256 of the file's bytes, which is what `bend --publish` and the hub compute. | Trusted | |
 
 EZ-HASH-1 is already true and already proved. The law is `pkg/hash_perm`, over the file list the import walk produces rather than a directory tree, with distinct paths as a precondition:
 
@@ -232,13 +250,13 @@ law hash_perm:
 
 The precondition is part of the guarantee. `dedup` keeps the last of a run of equal paths, so two entries with the same path and different sums hash differently depending on order. The walk visits each file once, so distinct paths is what it produces, but the law does not cover the walk itself.
 
-EZ-HASH-2 is true by construction: `sha/nar.bend` lists a directory with `find` and sorts the names with an insertion sort on `String.is_le` before serializing. It is not stated because the serializer reads the filesystem as it goes. Stating it needs a pure `Nar.of_tree(t: Tree) -> String` that `Nar.path` calls after reading, and then a law like the one above over permutations of each directory's entries.
+EZ-HASH-2 is true by construction: `sha/nar.bend` lists a directory with `find` and sorts the names with an insertion sort on `String.is_le` before serializing. It is not stated because the serializer reads the filesystem as it goes. Stating it needs a pure `Nar.of_tree(t: Tree) -> String` that `Nar.path` calls after reading, and then a law like the one above over permutations of each directory's entries. That is what we built in WP8 of the lock design: `sha/nar.bend` loads a directory's children in whatever order `find` lists them, `Nar.dir` sorts them with `K.file.sort` before serializing, and `sha/nar_dir_order_free` proves the result independent of the listing order for distinct names. The narHash of every package and tool in ez.lock.toml was recomputed with the new code and matched.
 
-EZ-HASH-3 holds when a tree is written, because `Git.lay` names the directory and writes the manifest from the same file list. Nothing re-checks it afterwards, which is why it is stated about the write and not about the directory at rest.
+EZ-HASH-3 held when a tree was written, because `Git.lay` named the directory and wrote the manifest from the same file list. Nothing re-checked it afterwards, which is why it is stated about the write and not about the directory at rest. It is now proved for every command that lays a tree, `ez add`, `ez fetch` and `ez lock`, each of which checks that the files it lays hash to the name it lays them under.
 
-The split in this group shows how the two levels work together. We cannot prove that ez agrees with nix or with Bend's publisher, because those are other programs, so EZ-HASH-4 and EZ-HASH-5 are Trusted. The inventory lists the ways EZ-HASH-5 can diverge today (exec bit from `test -x`, trimmed names and symlink targets, names with newlines, submodules). EZ-HASH-6 is restated from "computes FIPS 180-4 SHA-256" to say what is hashed: the UTF-8 bytes of the text. `Sha.hex` used to cut each character to its low eight bits, which is SHA-256 of the file only for ASCII. That fold was believed to be Bend's own, but a publish of a file with a non-ASCII character refuted it: `bend --publish` hashes `createHash("sha256").update(text)`, the UTF-8 bytes (bend2/main.ts `cli_publish`), so the fold broke EZ-HASH-4 for every package holding such a file. `Sha.hex` now encodes to UTF-8 before hashing, the same encoding `sha/nar.bend` always used, because both nix and Bend hash bytes.
+The split in this group shows how the two levels work together. We cannot prove that ez agrees with nix or with Bend's publisher, because those are other programs, so EZ-HASH-4 and EZ-HASH-5 are Trusted. We know of ways EZ-HASH-5 can diverge, listed under "Known gaps". EZ-HASH-6 is restated from "computes FIPS 180-4 SHA-256" to say what is hashed: the UTF-8 bytes of the text. `Sha.hex` used to cut each character to its low eight bits, which is SHA-256 of the file only for ASCII. That fold was believed to be Bend's own, but a publish of a file with a non-ASCII character refuted it: `bend --publish` hashes `createHash("sha256").update(text)`, the UTF-8 bytes (bend2/main.ts `cli_publish`), so the fold broke EZ-HASH-4 for every package holding such a file. `Sha.hex` now encodes to UTF-8 before hashing, the same encoding `sha/nar.bend` always used, because both nix and Bend hash bytes.
 
-The closed laws for the FIPS `abc` vector, the empty string and the empty NAR directory back these requirements only as examples. They are removed in the first rollout phase.
+The closed laws for the FIPS `abc` vector, the empty string and the empty NAR directory backed these requirements only as examples. They were removed in the first rollout phase.
 
 #### Ledger (EZ-LED)
 
@@ -246,34 +264,34 @@ These requirements are new in this revision. The ledger code already has the str
 
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
-| EZ-LED-1 | A ledger that does not parse is never read into a model, and renders as nothing, so no command writes a guess over it. | Proved | pending |
-| EZ-LED-2 | Adding a dependency to a ledger model twice is adding it once. | Proved | pending |
-| EZ-LED-3 | Removing a dependency from a ledger model twice is removing it once. | Proved | pending |
+| EZ-LED-1 | A ledger that does not parse is never read into a model, and renders as nothing, so no command writes a guess over it. | Proved | proved |
+| EZ-LED-2 | Adding a dependency to a ledger model twice is adding it once. | Proved | proved |
+| EZ-LED-3 | Removing a dependency from a ledger model twice is removing it once. | Proved | proved |
 | EZ-LED-4 | A ledger ez rendered parses back to the model it was rendered from. | Proved | pending |
-| EZ-LED-5 | A `[tools.*]` section is a tool, never a dependency, and needs no `hash`. | Proved | pending |
-| EZ-LED-6 | `ez init` writes nothing when a ledger exists, and `ez add`, `ez remove`, `ez fetch` and `ez lock`, with or without `--upgrade`, refuse and write nothing when there is none. | Proved | pending |
-| EZ-LED-7 | A dependency's ledger name is `--rename` when given, which must be a TOML bare key; otherwise the name the ledger already records for that source; otherwise the target's `[package] name` when it is a TOML bare key; otherwise the repository's name; otherwise the directory's name. A name the ledger gives a different source is refused, and so is a `--rename` of a source the ledger records under another name. | Proved | pending |
-| EZ-LED-8 | A path target is recorded in the ledger as it was given, with a leading `~/` expanded, and a relative path resolves against the project root wherever git reads it: `ez add`, `ez lock`, `ez fetch` and `ez lock --upgrade`. | Proved | pending |
+| EZ-LED-5 | A `[tools.*]` section is a tool, never a dependency, and needs no `hash`. | Proved | proved |
+| EZ-LED-6 | `ez init` writes nothing when a ledger exists, and `ez add`, `ez remove`, `ez fetch` and `ez lock`, with or without `--upgrade`, refuse and write nothing when there is none. | Proved | proved |
+| EZ-LED-7 | A dependency's ledger name is `--rename` when given, which must be a TOML bare key; otherwise the name the ledger already records for that source; otherwise the target's `[package] name` when it is a TOML bare key; otherwise the repository's name; otherwise the directory's name. A name the ledger gives a different source is refused, and so is a `--rename` of a source the ledger records under another name. | Proved | proved |
+| EZ-LED-8 | A path target is recorded in the ledger as it was given, with a leading `~/` expanded, and a relative path resolves against the project root wherever git reads it: `ez add`, `ez lock`, `ez fetch` and `ez lock --upgrade`. | Proved | proved |
 
 **Update (WP12):** EZ-LED-5 is proved over the ledger reader, which files a `[tools.*]` section among the tools, never among the dependencies, and never refuses it for lacking a `hash` (`tool_section_not_dep`, `tool_section_is_tool`, `tool_needs_no_hash`), and over every command that reads a ledger's dependencies: `ez lock`, plain or `--upgrade` (`lock_origins_skip_tools`, `upgrade_origins_skip_tools`), `ez add` (`add_keeps_tools`), `ez remove` (`remove_keeps_tools`, `remove_refuses_tool`) and `ez doctor` (`doctor_ignores_tools`).
 
-EZ-LED-1 to EZ-LED-3 have quantified laws today (`read_refuses_a_problem`, `render_of_unread_is_blank`, `add_idem`, `remove_idem`), and are pending only because the laws are untagged and state the model edit, not the command. `ez add` does not call `R.add` on the parsed ledger as it stands: it forces `vendor = false` and re-renders the whole file, so re-adding a dependency drops `vendor = true`. The requirement is over the model edit; the command's use of it is part of converting `ez add` to planner form. EZ-LED-4 has one closed example (`render_parse_roundtrip`).
+EZ-LED-1 to EZ-LED-3 had quantified laws when we wrote them (`read_refuses_a_problem`, `render_of_unread_is_blank`, `add_idem`, `remove_idem`), and were pending only because the laws were untagged and stated the model edit, not the command. `ez add` did not call `R.add` on the parsed ledger: it forced `vendor = false` and re-rendered the whole file, so re-adding a dependency dropped `vendor = true`. Converting `ez add` and `ez remove` to planner form tied each command to its model edit (`add_edits_ledger`, `remove_edits_ledger`), and all three rows are proved. EZ-LED-4 had one closed example (`render_parse_roundtrip`), deleted with the other trails, and it is the one row still pending; see "Known gaps".
 
-EZ-LED-6 to EZ-LED-8 come from the decided behavior changes below. Their decisions are pure functions with quantified laws: for EZ-LED-6, `init_keeps_ledger` and `ledger_missing_unwritten`; for EZ-LED-7, `rename_wins`, `rename_dotted`, `rename_moved`, `rename_clash`, `name_keeps`, `own_package`, `own_invalid`, `leaf_is_last`, `clash_same`, `clash_other` and `clash_hub`; for EZ-LED-8, `anchor_url`, `anchor_absolute` and `anchor_relative`. We keep the three requirements pending until `ez add` and `ez remove` are in planner form, because the laws state what the decision functions return and not that the commands act on it. **Update (A2):** with `ez add` in planner form, EZ-LED-6 and EZ-LED-7 are proved by plan laws over each command (`add_needs_ledger`, `lock_needs_ledger`, `remove_needs_ledger`, `init_keeps_ledger`; `add_records_named`, `add_refuses_named`), and `ledger_missing_unwritten`, which was about the add half of `ez/cmd.bend`, is deleted with it. EZ-LED-8 has its `ez add` half (`add_records_as_given`, `add_path_as_given`, `add_asks_anchored`) and waits on the lock's questions and `ez fetch`. **Update (WP8):** `ez fetch` has its half too (`fetch_asks_anchored`, `fetch_keeps_records`), so EZ-LED-8 waits only on the lock's questions. EZ-LED-6 now names `ez fetch` beside `ez add`, `ez remove` and `ez lock` (`fetch_needs_ledger`, `fetch_needs_ledger_asks_nothing`). EZ-LED-8 is what keeps EZ-DOC-3 true for path dependencies: the ledger and the lock record the path as the user gave it, so a clone that keeps the project and the path's repository side by side locks to the same bytes. The one exception is a leading `~/`, which `ez add` expands when it records the path: a `~/` left in the ledger would make every later lock read `HOME`, which EZ-DOC-3 does not allow.
+EZ-LED-6 to EZ-LED-8 come from the decided behavior changes below. Their decisions are pure functions with quantified laws: for EZ-LED-6, `init_keeps_ledger` and `ledger_missing_unwritten`; for EZ-LED-7, `rename_wins`, `rename_dotted`, `rename_moved`, `rename_clash`, `name_keeps`, `own_package`, `own_invalid`, `leaf_is_last`, `clash_same`, `clash_other` and `clash_hub`; for EZ-LED-8, `anchor_url`, `anchor_absolute` and `anchor_relative`. We kept the three requirements pending until `ez add` and `ez remove` were in planner form, because the laws state what the decision functions return and not that the commands act on it. **Update (A2):** with `ez add` in planner form, EZ-LED-6 and EZ-LED-7 are proved by plan laws over each command (`add_needs_ledger`, `lock_needs_ledger`, `remove_needs_ledger`, `init_keeps_ledger`; `add_records_named`, `add_refuses_named`), and `ledger_missing_unwritten`, which was about the add half of `ez/cmd.bend`, is deleted with it. EZ-LED-8 has its `ez add` half (`add_records_as_given`, `add_path_as_given`, `add_asks_anchored`) and waits on the lock's questions and `ez fetch`. **Update (WP8):** `ez fetch` has its half too (`fetch_asks_anchored`, `fetch_keeps_records`), so EZ-LED-8 waited only on the lock's questions, which WP10 anchored, and the row is proved. EZ-LED-6 now names `ez fetch` beside `ez add`, `ez remove` and `ez lock` (`fetch_needs_ledger`, `fetch_needs_ledger_asks_nothing`). EZ-LED-8 is what keeps EZ-DOC-3 true for path dependencies: the ledger and the lock record the path as the user gave it, so a clone that keeps the project and the path's repository side by side locks to the same bytes. The one exception is a leading `~/`, which `ez add` expands when it records the path: a `~/` left in the ledger would make every later lock read `HOME`, which EZ-DOC-3 does not allow.
 
 #### Lock document (EZ-DOC)
 
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
-| EZ-DOC-1 | Parsing a rendered lock yields the packages, hub and tools that were rendered. | Proved | pending |
-| EZ-DOC-2 | Packages are written in hash order and each package's files in path order, so the lock's text does not depend on the order the walk found them in. | Proved | pending |
-| EZ-DOC-3 | `ez lock` output is a function of the ledger and the committed tree. A fresh clone reproduces the lock byte for byte. | Proved | pending |
-| EZ-DOC-4 | `ez lock` is idempotent: run on the world it just produced, it writes the same bytes. | Proved | pending |
-| EZ-DOC-5 | `ez lock` without `--upgrade` never writes ez.toml, and records every dependency's and tool's pin exactly as ez.toml has it. | Proved | pending |
+| EZ-DOC-1 | Parsing a rendered lock yields the packages, hub and tools that were rendered. | Proved | proved |
+| EZ-DOC-2 | Packages are written in hash order and each package's files in path order, so the lock's text does not depend on the order the walk found them in. | Proved | proved |
+| EZ-DOC-3 | `ez lock` output is a function of the ledger and the committed tree. A fresh clone reproduces the lock byte for byte. | Proved | proved |
+| EZ-DOC-4 | `ez lock` is idempotent: run on the world it just produced, it writes the same bytes. | Proved | proved |
+| EZ-DOC-5 | `ez lock` without `--upgrade` never writes ez.toml, and records every dependency's and tool's pin exactly as ez.toml has it. | Proved | proved |
 
-EZ-DOC-2 replaces the draft's "rendering a parsed lock reproduces the original bytes". No code path re-renders a parsed lock, and the TOML renderer does no escaping, so that statement was about a function ez does not have. What the lock does guarantee is canonical order: `pack.sort` and `K.files_of` sort before rendering, and `pack_ins_le` already states one step of it.
+EZ-DOC-2 replaces the draft's "rendering a parsed lock reproduces the original bytes". No code path re-renders a parsed lock, and the TOML renderer does no escaping, so that statement was about a function ez does not have. What the lock does guarantee is canonical order: `pack.sort` and `K.files_of` sorted before rendering, and `pack_ins_le` stated one step of it. WP3 proved the whole of it: the lock renders each package as one block filed under its hash and sorts the blocks with the same `K.file.sort` that EZ-HASH-1 rests on, so `lock_order_free` and `pack_order_free` follow from pkg's `sort_perm`. WP4 proved EZ-DOC-1 against the pinned eztoml v0.1.0 reader, with a file path holding `=` refused (see "Decided behavior changes").
 
-EZ-DOC-3 is the headline guarantee of the whole tool, and it does not hold today; the changes that make it hold are decided (see "What ez lock may read"). The README says `root` and `narHash` exist so that `ez lock` never has to consult anything a clone does not have, and that part is true: plain lock copies them from the ledger and never recomputes them. But plain lock also reads the untracked trees under `$BEND_LIB`, and when a non-vendored git dependency's tree is missing it writes an empty `files` table and exits 0. On a fresh clone of this repository that happens to shake, eztoml and snap. As a law, EZ-DOC-3 is a frame property, and stating it forces us to define exactly what the lock may read:
+EZ-DOC-3 is the headline guarantee of the whole tool, and it did not hold when we wrote it; the changes that make it hold were decided (see "What ez lock may read"), landed, and WP1 proved the row with `lock_reproducible` and `clone_reproduces`. The README says `root` and `narHash` exist so that `ez lock` never has to consult anything a clone does not have, and that part was true: plain lock copied them from the ledger and never recomputed them. But plain lock also read the untracked trees under `$BEND_LIB`, and when a non-vendored git dependency's tree was missing it wrote an empty `files` table and exited 0. On a fresh clone of this repository that happened to shake, eztoml and snap. As a law, EZ-DOC-3 is a frame property, and stating it forces us to define exactly what the lock may read:
 
 ```
 # EZ-DOC-3
@@ -291,9 +309,9 @@ law lock_reproducible:
 
 `inputs` is the ledger text, the committed `.bend` files as `git ls-files '*.bend'` lists them, the vendored trees under `.ez/lib`, and the files at each non-vendored git dependency's ledger rev. Hub content is not an input: it is addressed by hash and checked on arrival, so "the hub serves what was published" is a trust assumption (EZ-TRUST-3), and two worlds whose hubs both serve a hash serve the same bytes.
 
-Tracing the command showed what plain `ez lock` reads today, and each read outside that set is decided:
+Tracing the command at `b28ca2c` showed what plain `ez lock` read, and each read outside that set was decided:
 
-| Input today | Decision |
+| Input at `b28ca2c` | Decision |
 | :---- | :---- |
 | untracked trees under `$BEND_LIB` for non-vendored git dependencies, with a missing tree written as `files = []` and exit 0 | Fetch the tree at the ledger's rev and check it against `narHash`. Refuse with exit 1 if either fails. Never write an empty `files` table for a git dependency. |
 | `.ez/origins.toml` | Not read by `ez lock`. `ez add` already records every git dependency in the ledger. |
@@ -302,22 +320,22 @@ Tracing the command showed what plain `ez lock` reads today, and each read outsi
 | `bend version` for `[lock] bend` | Drop `[lock] bend` from the lock. The flake pins bend. |
 | `git` and the network through `Pin.fill` when a tool pin lacks `rev` or `narHash`, writing ez.toml | Only under `--upgrade`. A plain lock with an incomplete tool pin refuses with exit 1. |
 
-The inventory's table lists every input with its source line.
+Every decision in this table has landed. Plain `ez lock` now reads the ledger, the files `git ls-files '*.bend'` lists, and one answer per package it asks about, and nothing else: the World in `lock/world.bend` has no field for the environment, the old lock, `.ez/origins.toml` or untracked files. Under `--upgrade` it also reads the remote's answers, `.gitignore` and the committed sources it may rewrite, all as questions the planner asks.
 
 #### Resolution (EZ-RES)
 
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
-| EZ-RES-1 | `ez add` with no ref pins the greatest semver-ish release tag on the remote; with no release, the greatest pre-release; with no semver-ish tag, the remote's default branch as its `HEAD` symref names it. A named ref resolves exactly, as `refs/tags/<ref>` and then `refs/heads/<ref>`. A 40-hex ref is used as a commit without asking the remote. | Proved | pending |
-| EZ-RES-2 | `ez add` with no entry uses the revision's `[package] entry`, then `[package] bin`, then `main.bend`, and refuses if that file is not in the revision. | Proved | pending |
-| EZ-RES-3 | A target containing `://` or starting `git@` is a git URL. A target starting `/`, `./`, `../` or `~/` is a path. A target of exactly two segments of letters, digits, `-`, `_` and `.`, neither of them `.` or `..`, is `https://github.com/<target>`, unless its second segment ends in `.bend`, which makes it a path. Anything else is a path, except the empty word, which is refused. | Proved | pending |
-| EZ-RES-4 | `ez lock --upgrade` never moves a hub dependency. | Proved | pending |
-| EZ-RES-5 | An upgraded rev-only dependency moves to the default branch tip only when its pin is an ancestor of that tip, and stays a commit pin. Otherwise the upgrade refuses with exit 1. | Proved | pending |
-| EZ-RES-6 | `--package NAME` asks the remote to resolve only the named dependency or tool, and every other ledger entry keeps its rev, tag and hash. Resolving is asking for refs, the default branch, ancestry, or a checkout at a new rev. | Proved | pending |
+| EZ-RES-1 | `ez add` with no ref pins the greatest semver-ish release tag on the remote; with no release, the greatest pre-release; with no semver-ish tag, the remote's default branch as its `HEAD` symref names it. A named ref resolves exactly, as `refs/tags/<ref>` and then `refs/heads/<ref>`. A 40-hex ref is used as a commit without asking the remote. | Proved | proved |
+| EZ-RES-2 | `ez add` with no entry uses the revision's `[package] entry`, then `[package] bin`, then `main.bend`, and refuses if that file is not in the revision. | Proved | proved |
+| EZ-RES-3 | A target containing `://` or starting `git@` is a git URL. A target starting `/`, `./`, `../` or `~/` is a path. A target of exactly two segments of letters, digits, `-`, `_` and `.`, neither of them `.` or `..`, is `https://github.com/<target>`, unless its second segment ends in `.bend`, which makes it a path. Anything else is a path, except the empty word, which is refused. | Proved | proved |
+| EZ-RES-4 | `ez lock --upgrade` never moves a hub dependency. | Proved | proved |
+| EZ-RES-5 | An upgraded rev-only dependency moves to the default branch tip only when its pin is an ancestor of that tip, and stays a commit pin. Otherwise the upgrade refuses with exit 1. | Proved | proved |
+| EZ-RES-6 | `--package NAME` asks the remote to resolve only the named dependency or tool, and every other ledger entry keeps its rev, tag and hash. Resolving is asking for refs, the default branch, ancestry, or a checkout at a new rev. | Proved | proved |
 | EZ-RES-7 | Tags, refs, and ancestry reported by git are accurate. | Trusted | |
-| EZ-RES-8 | An upgraded tagged dependency re-resolves its tag. A tag that now names a commit the pin does not descend to, or a pinned commit whose tree no longer hashes to the pin, stops the upgrade with exit 1. | Proved | pending |
+| EZ-RES-8 | An upgraded tagged dependency re-resolves its tag. A tag that now names a commit the pin does not descend to, or a pinned commit whose tree no longer hashes to the pin, stops the upgrade with exit 1. | Proved | proved |
 
-"Semver-ish" in EZ-RES-1 is what `git/git.bend` accepts: an optional `v` or `V`, one or more dot-separated numeric parts, an optional pre-release after `-`, and anything after `+` ignored. The comparator pads missing parts with zero. Three parts of EZ-RES-1 are decided changes: today a pre-release can beat an older release (`v2.0.0-rc1` over `v1.9.0`), the default branch is guessed as `main` then `master`, and names resolve with a tail-matching `ls-remote`, so `main` can resolve to `refs/heads/feature/main`. EZ-RES-1 and EZ-RES-2 are precedence rules, and each becomes a law over every list of tags or every manifest. Today they have no law at all, and `Git.latest` and `Git.default.ref` mix the choice with the `ls-remote` calls.
+"Semver-ish" in EZ-RES-1 is what `git/git.bend` accepts: an optional `v` or `V`, one or more dot-separated numeric parts, an optional pre-release after `-`, and anything after `+` ignored. The comparator pads missing parts with zero. Three parts of EZ-RES-1 are decided changes: today a pre-release can beat an older release (`v2.0.0-rc1` over `v1.9.0`), the default branch is guessed as `main` then `master`, and names resolve with a tail-matching `ls-remote`, so `main` can resolve to `refs/heads/feature/main`. EZ-RES-1 and EZ-RES-2 are precedence rules, and each becomes a law over every list of tags or every manifest. When we wrote them they had no law at all, and `Git.latest` and `Git.default.ref` mixed the choice with the `ls-remote` calls. The choice is now a pure function of what `git ls-remote` printed, proved over any list of tags (`latest_greatest` rests on `ord.ver` being a total preorder), and `ez add` asks for that output through its planner, which proved both rows.
 
 EZ-RES-6 is narrowed from the draft's "every other lock entry is unchanged", and says "resolve" because the lock that follows an upgrade still fetches every non-vendored git tree missing from BEND_LIB at its ledger rev, which asks the remote for a tree but resolves nothing. The final step of an upgrade recomputes the whole lock from the current world, so other entries are unchanged only when nothing else changed, which is EZ-DOC-3's job. What `--package` itself guarantees is about the ledger:
 
@@ -333,7 +351,7 @@ law upgrade_one_frames_others:
 
 The law that landed is `lock/LAWS.bend upgrade_one_frames_deps`, with `upgrade_one_frames_tools` for the tools and `upgrade_one_asks_alone` for "asks the remote to resolve only the named dependency or tool": the questions an upgrade with `--package NAME` asks are exactly those it asks of a ledger holding nothing but the entries named `NAME`. [ez-lock-planner.md](ez-lock-planner.md) says where they differ from this sketch.
 
-EZ-RES-8 is new. The code refuses on a moved tag and on drift, and closed laws (`tag_moved_off`, `same_rev_drifts`) showed the verdicts until the trails were deleted. In the dependency path the drift decision is made after the new tree has been laid, by `confirmed` in `ez/upgrade.bend`, and `U.judge` is called with its agreement bit fixed to true, so its `Drift` arm cannot fire there.
+EZ-RES-8 is new. The code refuses on a moved tag and on drift, and closed laws (`tag_moved_off`, `same_rev_drifts`) showed the verdicts until the trails were deleted. In the dependency path the drift decision was made after the new tree had been laid, by `confirmed` in `ez/upgrade.bend`, and `U.judge` was called with its agreement bit fixed to true, so its `Drift` arm could not fire there. WP2 put the upgrade in the lock's planner, where a drifted pin is `U.judge`'s `Drift` and is refused before anything is laid, and WP6 proved the row.
 
 EZ-RES-5 and EZ-RES-8 are proved relative to EZ-RES-7. The law says ez moves a pin only when the model's ancestry relation says so; whether that relation matches the real repository is git's responsibility.
 
@@ -341,41 +359,41 @@ EZ-RES-5 and EZ-RES-8 are proved relative to EZ-RES-7. The law says ez moves a p
 
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
-| EZ-VEN-1 | After `ez add`, `ez remove` or `ez lock --upgrade`, the `.gitignore` allowlist names exactly the hashes of dependencies marked `vendor = true`, and every other line of `.gitignore` is unchanged. | Proved | pending |
+| EZ-VEN-1 | After `ez add`, `ez remove` or `ez lock --upgrade`, the `.gitignore` allowlist names exactly the hashes of dependencies marked `vendor = true`, and every other line of `.gitignore` is unchanged. | Proved | proved |
 | EZ-VEN-2 | When an upgrade moves a hash, every line of a `.bend` file outside `.ez` and `.git` that starts `import <old>/` names `<new>` afterwards. | Proved | proved |
 | EZ-VEN-3 | Import rewriting leaves every other line of every file byte-identical, and does not write a file with no matching line. | Proved | proved |
-| EZ-VEN-4 | `ez doctor` never writes to the project's source files. | Proved | pending |
-| EZ-VEN-5 | `ez doctor` reports every hash an import line names that the ledger does not, and every ledger dependency no import line names, and exits 1 when it reports any. | Proved | pending |
+| EZ-VEN-4 | `ez doctor` never writes to the project's source files. | Proved | proved |
+| EZ-VEN-5 | `ez doctor` reports every hash an import line names that the ledger does not, and every ledger dependency no import line names, and exits 1 when it reports any. | Proved | proved |
 
-EZ-VEN-1 is not true today: only `ez lock --upgrade` writes the allowlist, `ez add` never writes it, `ez remove` never removes a line, and `ez init` writes `.ez/`, under which git ignores every allowlist line. The decided change derives the allowlist from the ledger with one pure function, which the three commands call, and changes `ez init` to write `.ez/*`, `!.ez/lib` and `.ez/lib/*`. The law is then stated over that function.
+EZ-VEN-1 was not true when we wrote it: only `ez lock --upgrade` wrote the allowlist, `ez add` never wrote it, `ez remove` never removed a line, and `ez init` wrote `.ez/`, under which git ignores every allowlist line. The decided change derives the allowlist from the ledger with one pure function, `I.sync` in `manifest/ignore.bend`, which the three commands call, and changes `ez init` to write `.ez/*`, `!.ez/lib` and `.ez/lib/*`. The laws are stated over that function and over each command's plan, and the row is proved.
 
-EZ-VEN-2 and EZ-VEN-3 together specify rewriting completely: the first says what changes, the second says nothing else does. The match is exact at column 0, so an indented import (which the package walk accepts) is not rewritten; the requirement states the column-0 rule so that a change to it is a behavior change. Swaps apply one after another, so the law should quantify over swap lists with distinct old and new hashes. A single closed example, `imports_follow_hash`, covered both requirements on one file until the trails were deleted.
+EZ-VEN-2 and EZ-VEN-3 together specify rewriting completely: the first says what changes, the second says nothing else does. The match is exact at column 0, so an indented import (which the package walk accepts) is not rewritten; the requirement states the column-0 rule so that a change to it is a behavior change. Swaps apply one after another, so the law quantifies over swap lists in which no move's new hash is a later move's old one (`moves.ok`; `SPEC.md` spells out the premise). A single closed example, `imports_follow_hash`, covered both requirements on one file until the trails were deleted; WP7 proved both rows over the text and over the upgrade's plan.
 
-EZ-VEN-4 holds today (`ez/doctor.bend` has no file write) and is only provable because of the planner split, where it becomes a claim that the plan `doctor_plan` returns contains no effect under the project root. Every command used to run `Env.make()` first, which created `.ez`, `bin` and the library directory; that was recorded as accidental in the inventory and is fixed, so `ez doctor` creates nothing (`Env.dirs`, law `dirs_other`). EZ-VEN-5 is new; the drift report had six closed laws in `ez/LAWS.bend` (`report_both_ways` and the rest), deleted with the other trails, and no requirement until now. **Update (WP12):** `ez doctor` is in planner form (`doctor/world.bend`, `doctor/plan.bend`, `doctor/run.bend`), and EZ-VEN-4 and EZ-VEN-5 are proved over its plan; see "Update (WP12, `ez doctor`)" in [ez-add-planner.md](ez-add-planner.md). The plan is lines said and how the command ends, so doctor writes nothing at all (`doctor_writes_nothing`), which is stronger than the row asks. An import line is one the lock reads as one, so doctor and `ez lock` never disagree about what the source imports.
+EZ-VEN-4 held when we wrote it (`ez/doctor.bend` had no file write) and was only provable because of the planner split, where it becomes a claim that the plan `doctor_plan` returns contains no effect under the project root. Every command used to run `Env.make()` first, which created `.ez`, `bin` and the library directory; we recorded that as accidental when we read the code, and it is fixed, so `ez doctor` creates nothing (`Env.dirs`, law `dirs_other`). EZ-VEN-5 is new; the drift report had six closed laws in `ez/LAWS.bend` (`report_both_ways` and the rest), deleted with the other trails, and no requirement until now. **Update (WP12):** `ez doctor` is in planner form (`doctor/world.bend`, `doctor/plan.bend`, `doctor/run.bend`), and EZ-VEN-4 and EZ-VEN-5 are proved over its plan; see "Update (WP12, `ez doctor`)" in [ez-add-planner.md](ez-add-planner.md). The plan is lines said and how the command ends, so doctor writes nothing at all (`doctor_writes_nothing`), which is stronger than the row asks. An import line is one the lock reads as one, so doctor and `ez lock` never disagree about what the source imports.
 
 #### Fetch (EZ-FETCH)
 
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
-| EZ-FETCH-1 | `ez fetch` writes a package file under `BEND_LIB` only when its digest matches the lock: a hub body's digest starts with the lock's sum, a git file's digest equals it. | Proved | pending |
+| EZ-FETCH-1 | `ez fetch` writes a package file under `BEND_LIB` only when its digest matches the lock: a hub body's digest starts with the lock's sum, a git file's digest equals it. | Proved | proved |
 
-This takes most of the weight off the draft's EZ-TRUST-3 ("the hub serves the tree whose hash was requested"). ez does not trust the hub's content: `Hub.judge` refuses a body that does not hash to what was asked for, and the three quantified `hub/judge_*` laws state the verdicts. What remains trusted is SHA-256 itself and the hub's availability. `ez fetch` does not check `narHash`, and it trusts a cached tree whose manifest text matches without re-reading its files; both are recorded in the inventory. **Update (WP8):** `ez fetch` is in planner form (`fetch/plan.bend`), and EZ-FETCH-1 is proved by `fetch_lays_the_lock`, which asks of every file laid, hub or git, that its digest equal the lock's sum. A tree already under BEND_LIB is now read and checked like a fetched one before it is kept. `narHash` is still not checked: every file laid is checked against its own sum, and the package against its name, so the tree laid is the lock's whatever the checkout around it held.
+This takes most of the weight off the draft's EZ-TRUST-3 ("the hub serves the tree whose hash was requested"). ez does not trust the hub's content: `Hub.judge` refuses a body that does not hash to what was asked for, and the three quantified `hub/judge_*` laws state the verdicts. What remains trusted is SHA-256 itself and the hub's availability. When we wrote the row, `ez fetch` did not check `narHash`, and it trusted a cached tree whose manifest text matched without re-reading its files. **Update (WP8):** `ez fetch` is in planner form (`fetch/plan.bend`), and EZ-FETCH-1 is proved by `fetch_lays_the_lock`, which asks of every file laid, hub or git, that its digest equal the lock's sum. A tree already under BEND_LIB is now read and checked like a fetched one before it is kept. `narHash` is still not checked: every file laid is checked against its own sum, and the package against its name, so the tree laid is the lock's whatever the checkout around it held.
 
 #### Tools (EZ-TOOL)
 
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
-| EZ-TOOL-1 | The link directory is `$EZ_TOOL_BIN`, else `$XDG_BIN_HOME`, else `$HOME/.local/bin`, an empty value counting as unset. | Proved | pending |
-| EZ-TOOL-2 | A cached binary is reused only when the recorded commit, built file and bend version all equal the resolved ones, and never when the resolved commit is empty. A cached checkout is reused only when its recorded commit equals the resolved one. | Proved | pending |
-| EZ-TOOL-3 | A local target with uncommitted or untracked changes, or a path that is not a checkout, resolves to no commit and is rebuilt on every run. | Proved | pending |
-| EZ-TOOL-4 | A target naming a `[tools.*]` pin in ez.toml builds the lock's rev, url, entry and bin. An `owner/repo` or URL target builds `git ls-remote <url> HEAD`. A path builds its clean `HEAD`. | Proved | pending |
-| EZ-TOOL-5 | `ez tool run` exits with the built program's status; any failure before the program runs exits 1. | Proved | pending |
-| EZ-TOOL-6 | `ez tool install` and `ez tool upgrade` never run the built binary. | Proved | pending |
-| EZ-TOOL-7 | The built file is the pin's `bin`, then the pin's `entry`, then the checkout's `bin`, then its `entry`, then `main.bend`. The link is named after the checkout's package name, or `app`. | Proved | pending |
-| EZ-TOOL-8 | A remote target whose cache slug is empty, absolute, or climbs with `..` is refused. | Proved | pending |
-| EZ-TOOL-9 | `ez tool run <target>` passes every word after the target to the program, dropping one leading `--`. `ez run` passes every word after `run` to the entry. | Proved | pending |
+| EZ-TOOL-1 | The link directory is `$EZ_TOOL_BIN`, else `$XDG_BIN_HOME`, else `$HOME/.local/bin`, an empty value counting as unset. `ez tool install` and `ez tool upgrade` link there, and refuse before anything is built when all three are empty. | Proved | proved |
+| EZ-TOOL-2 | A cached binary is reused only when the recorded commit, built file and bend version all equal the resolved ones, and never when the resolved commit is empty. A cached checkout is reused only when its recorded commit equals the resolved one. | Proved | proved |
+| EZ-TOOL-3 | A local target with uncommitted or untracked changes, whatever the repository's own settings hide, or a path that is not the top of a checkout, resolves to no commit and is rebuilt on every run. | Proved | proved |
+| EZ-TOOL-4 | A target naming a `[tools.*]` pin in ez.toml builds the lock's rev, url, entry and bin. An `owner/repo` or URL target builds the commit `git ls-remote <url> HEAD` names. A path builds its clean `HEAD`. | Proved | proved |
+| EZ-TOOL-5 | `ez tool run` exits with the built program's status; any failure before the program runs exits 1. | Proved | proved |
+| EZ-TOOL-6 | `ez tool install` and `ez tool upgrade` never run the built binary. | Proved | proved |
+| EZ-TOOL-7 | The built file is the pin's `bin`, then the pin's `entry`, then the checkout's `bin`, then its `entry`, then `main.bend`. The link is named after the checkout's package name, or `app`, and a package name that is not a TOML bare key is refused. | Proved | proved |
+| EZ-TOOL-8 | A remote target whose cache slug is empty, absolute, or climbs with `..` is refused. | Proved | proved |
+| EZ-TOOL-9 | `ez tool run <target>` passes every word after the target to the program, dropping one leading `--`. `ez run` passes every word after `run` to the entry. | Proved | proved |
 
-EZ-TOOL-2 is a decided change. Today one file records only the commit, for both the checkout and the binary, so a pinned tool with an `entry` override and a free run of the same repo at the same rev can share a binary. EZ-TOOL-7, EZ-TOOL-8 and EZ-TOOL-9 are new; the closed laws for them in `ez/LAWS.bend` (`file_*`, `out_name*`, `target_escapes`, `argv_of_*`, `tool_rest_*`) were deleted with the other trails.
+EZ-TOOL-2 is a decided change. One file recorded only the commit, for both the checkout and the binary, so a pinned tool with an `entry` override and a free run of the same repo at the same rev could share a binary. The cache key now records the built file and the bend version, and the row is proved over that key (`key_*`, `checkout_*` in `ez/LAWS.bend`) and over the tool plan's reuse. EZ-TOOL-7, EZ-TOOL-8 and EZ-TOOL-9 are new; the closed laws for them in `ez/LAWS.bend` (`file_*`, `out_name*`, `target_escapes`, `argv_of_*`, `tool_rest_*`) were deleted with the other trails.
 
 EZ-TOOL-5 is stated over the planner's outcome, not over a real process. The planner returns a run effect as its final effect after a successful build and exit 1 on every earlier failure; the interpreter passing the child's status through unchanged is covered by the interpreter trust assumption. The program runs with stdin at `/dev/null` and its output buffered until it exits; that is interpreter behavior and not part of the requirement.
 
@@ -392,7 +410,7 @@ Both are new, and both are proved over the plan `ez publish` runs (`pub/plan.ben
 
 ### Outcomes and incidental output
 
-Much of the brittleness in today's closed laws comes from pinning whole outputs. The spec separates output into two kinds.
+Much of the brittleness in the closed laws ez had came from pinning whole outputs. The spec separates output into two kinds.
 
 **Contractual output** is anything a user or a script can reasonably depend on: exit statuses, the bytes of files ez writes (lock, ledger, gitignore, rewritten imports), link paths, and effect plans. Requirements talk only about contractual output.
 
@@ -400,20 +418,22 @@ Much of the brittleness in today's closed laws comes from pinning whole outputs.
 
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
-| EZ-OUT-1 | Every command exits 0 on success and 1 on any failure ez detects, except `ez tool run`, which exits with the program's status. | Proved | pending |
-| EZ-OUT-2 | A command that refuses writes nothing: every file it would otherwise write or remove is left as it found it. | Proved | pending |
+| EZ-OUT-1 | Every command exits 0 on success and 1 on any failure ez detects, except `ez tool run`, which exits with the program's status. | Proved | proved |
+| EZ-OUT-2 | A command that refuses writes nothing: every file it would otherwise write or remove is left as it found it. | Proved | proved |
 
-EZ-OUT-2 is new, decided with the phase-three design. In planner form a command computes its whole plan before any effect runs, so a refusal is a plan with no write, lay or remove effect in it. Today it does not hold: `ez lock --upgrade` writes ez.toml, `.gitignore`, sources and trees in stages, and a failure in a later stage leaves the earlier writes in place. A write the interpreter attempts and the system rejects is not a refusal; that failure is EZ-OUT-1's, and what it leaves behind is covered by EZ-TRUST-2. Each command meets EZ-OUT-2 when it is converted to planner form.
+EZ-OUT-2 is new, decided with the phase-three design. In planner form a command computes its whole plan before any effect runs, so a refusal is a plan with no write, lay or remove effect in it. It did not hold when we decided it: `ez lock --upgrade` wrote ez.toml, `.gitignore`, sources and trees in stages, and a failure in a later stage left the earlier writes in place. A write the interpreter attempts and the system rejects is not a refusal; that failure is EZ-OUT-1's, and what it leaves behind is covered by EZ-TRUST-2. Each command met EZ-OUT-2 when it was converted to planner form, and with `ez publish` (WP11) the row is proved for every command.
 
-This replaces the draft's `ez: <area>:` prefix requirement, which the code does not implement. The 19 closed laws that pin progress and error wording (`hub_404_teaches`, `drift_names_the_tag`, `installed_names_the_link` and the rest) point toward no requirement and are deleted in the first rollout phase.
+EZ-OUT-1 is proved over a pure function per command that gives its exit status (`P.status` of a plan's outcome, `TP.code` for the tool commands, the outcomes in `ez/ends.bend` for the commands that are not planners, and `ez/line.bend` for a line before any command runs); the interpreters only exit with it. `ez run` exits 1 when the program fails rather than with the program's status; see "Known gaps".
+
+EZ-OUT-1 replaces the draft's `ez: <area>:` prefix requirement, which the code does not implement. The 19 closed laws that pinned progress and error wording (`hub_404_teaches`, `drift_names_the_tag`, `installed_names_the_link` and the rest) pointed toward no requirement and were deleted in the first rollout phase.
 
 ### Retiring closed laws
 
 Closed laws have no standing in this specification. They are not a level, they cannot carry a requirement tag, and nothing in the refactoring contract protects them. We retire them in two steps.
 
-In the first rollout phase, every existing closed law is sorted against the requirement list, using the inventory's "Points toward" column. A closed law that illustrates a requirement is kept temporarily and marked with the ID it points toward, so the pending requirement has a visible trail. A closed law that fits no requirement is deleted, since it pins behavior nobody has decided to guarantee. By the inventory, 78 of the 122 closed laws are deleted in this step: the ones about the `ez test` runner, the CLI parser, progress and error wording, the spinner's terminal choice, and the SHA-256 and NAR vectors, whose requirements are Trusted. 43 point toward a Proved requirement and are kept, tagged, until its law lands. The remaining one, `dflt_https`, moves to ezhttp with the rest of `net/`. The thirteen refactor-equivalence laws are deleted in the same step, with the `old.*` definitions they compare against: the rewrites they checked have landed, and keeping the old definitions would maintain a second specification nobody reads.
+In the first rollout phase, every existing closed law is sorted against the requirement list, using the "points toward" column of the law-by-law inventory we kept while writing this revision. A closed law that illustrates a requirement is kept temporarily and marked with the ID it points toward, so the pending requirement has a visible trail. A closed law that fits no requirement is deleted, since it pins behavior nobody has decided to guarantee. By that inventory, 78 of the 122 closed laws are deleted in this step: the ones about the `ez test` runner, the CLI parser, progress and error wording, the spinner's terminal choice, and the SHA-256 and NAR vectors, whose requirements are Trusted. 43 point toward a Proved requirement and are kept, tagged, until its law lands. The remaining one, `dflt_https`, moves to ezhttp with the rest of `net/`. The thirteen refactor-equivalence laws are deleted in the same step, with the `old.*` definitions they compare against: the rewrites they checked have landed, and keeping the old definitions would maintain a second specification nobody reads.
 
-The plan was to delete the closed laws pointing at a requirement in the same PR that lands its quantified law, which strictly subsumes them. We took the second step sooner. With 40 trails left and every pending row's real law already stated in an accepted design document (this RFC's requirement sections, and [ez-lock-planner.md](ez-lock-planner.md) for the lock), the trails were no longer telling anyone what to prove, and they held ez on an old bolt. We deleted all of them in one change ([ez-law-inventory.md](ez-law-inventory.md) lists them), with their proofs and the sample values only they used. No closed law remains in ez.
+The plan was to delete the closed laws pointing at a requirement in the same PR that lands its quantified law, which strictly subsumes them. We took the second step sooner. With 40 trails left and every pending row's real law already stated in an accepted design document (this RFC's requirement sections, and [ez-lock-planner.md](ez-lock-planner.md) for the lock), the trails were no longer telling anyone what to prove, and they held ez on an old bolt. We deleted all of them in one change, with their proofs and the sample values only they used. No closed law remains in ez.
 
 bolt enforces the end state. Its `closed` rule flagged every law with no binder up to v0.4.0, but from v0.5.0 (bolt#10) it accepted a closed equality as a stated claim. At ez's request bolt v0.9.0 added `quantify` (L004), an opt-in rule that flagged every law with no binder unless the comment line right above it started with `# toward `, and ez ran it at `error` while the trails remained. bolt has since made `closed` (L002) strict itself: it flags every law in a LAWS.bend with no `for` or `exs` binder, equality or not, and nothing exempts one. L004 is retired. ez runs `closed` at `error`, so a new closed law cannot land.
 
@@ -463,11 +483,11 @@ These assumptions sit outside the proofs. They are the complete list of Trusted 
 | EZ-TRUST-2 | The interpreter reads the World and executes plans faithfully. | It makes no decisions and is kept small enough to review line by line. |
 | EZ-TRUST-3 | The hub serves, for a hash, what was published under it. | ez checks every hub body against the hash it asked for (EZ-FETCH-1), so this reduces to availability and EZ-HASH-6. |
 | EZ-TRUST-4 | `ez prove` runs `bend` on every PROOF.bend in the tree and passes only on an exact `All terms check.` first line. | It is ez code run by `mkProofs`, not a law. CI builds from a clean tree, so nothing is cached. |
-| EZ-TRUST-5 | HTTP framing and URL parsing are correct. | Proved in ezhttp (v0.4.0, the rev ez.toml pins); ez's gate does not re-check it. |
+| EZ-TRUST-5 | HTTP framing and URL parsing are correct. | Proved in ezhttp v0.4.0, the rev ez.toml pins; ez's gate does not re-check it. |
 | EZ-RES-7 | git reports refs, tags, and ancestry accurately. | The World model takes git's answers as given. |
 | EZ-HASH-4 | ez's 0x hash matches `bend --publish`. | The publisher is a separate program. |
 | EZ-HASH-5 | ez's narHash matches nix. | nix is a separate program. |
-| EZ-HASH-6 | `Sha.hex` computes the SHA-256 digest of its text's UTF-8 bytes. | Proved in Giulio2002/bend-sha256 against an executable FIPS 180-4 specification, at the hash ez vendors; ez's gate does not re-check it. Collision resistance is also assumed. |
+| EZ-HASH-6 | `Sha.raw` computes the SHA-256 digest of its bytes, and `Sha.hex` of its text's UTF-8. | Proved in Giulio2002/bend-sha256 against an executable FIPS 180-4 specification, at the hash ez vendors; ez's gate does not re-check it. Collision resistance is also assumed. |
 
 EZ-TRUST-3 is narrowed from the first draft: ez verifies hub content itself (EZ-FETCH-1), so what remains is that the hub serves the hash at all, which is what lets EZ-DOC-3 leave hub content out of `inputs`.
 
@@ -511,11 +531,37 @@ Converting `ez doctor` to planner form (WP12) adds five more, each shown on the 
 
 Proving EZ-OUT-1 (WP13) adds three, each shown on the binary first against local git upstreams, with a stand-in `bend` for publish, and each decided as cargo would. With no ez.toml, `ez tool sync` refuses and exits 1, where it synced nothing and exited 0, as `ez lock` and `ez fetch` refuse a directory with no ledger and cargo refuses one with no Cargo.toml. A bare `ez tool` prints the help of `ez tool` on stderr and exits 1, where it printed the help of `ez` on stdout and exited 0: a bare `ez` is help, as a bare `cargo` is, but a group that was not told which of its commands to run is a line that did not say what it wanted, as `cargo report` with no command is. And `ez help` of a word that names no command, `ez help bogus`, fails with the error `ez bogus` gets and exits 1, where it printed the help of `ez` and exited 0, as `cargo help bogus` fails. Every other command already exited 0 on success and 1 on a failure ez detects, and `ez tool run` with the program's status, so nothing else changed on the binary; what changed is where the status comes from. Each command's status is now computed by a pure function the laws are about (`P.status` of a plan's outcome, `TP.code` for the tool commands, the outcomes in `ez/ends.bend` for the commands that are not planners, and `L.status` for the line before any command runs), and the interpreters only exit with it. We kept `ez run` exiting 1 when the program fails, rather than with the program's status as `cargo run` does, since EZ-OUT-1 names `ez tool run` as its only exception.
 
-The inventory also lists behavior that looks accidental and is not a requirement. The fixes worth making, besides the ledger changes above: every command, `ez help` included, creates `.ez` and `bin` in the current directory; and `ez doctor` fails a project with no dependencies.
+Reading the code also turned up behavior that looked accidental and is not a requirement. Besides the ledger changes above, two such fixes were worth making, and both have landed. Every command, `ez help` included, created `.ez` and `bin` in the current directory, because `Env.make()` ran before the line was parsed; `Env.dirs` now names only the directories a command writes into, and nothing for most commands (`dirs_other`, `dirs_check`, `dirs_build`, `dirs_build_out`). And `ez doctor` failed a project with no dependencies, because it counted a lock that names no package as a problem even when the ledger needed none. The rest of what looked accidental was either covered by a decided change above or left alone as incidental, and what remains open is under "Known gaps".
+
+### Known gaps
+
+These are the things we know ez does not yet do, or does in a way we have not decided to guarantee. None of them is a requirement, and none weakens a proved row; each is here so that a reader does not have to rediscover it.
+
+EZ-LED-4 is the one Proved requirement still pending. The ledger renderer and eztoml's reader have no proved round trip, and ez waits on eztoml 0.2.x, a real TOML lexer, to state one. When ez moves to it, EZ-DOC-1's text layer rests on eztoml's own proved round trip as a Trusted row pointing at eztoml's requirement, the lock's refusal of a file path holding `=` lifts, and `bootstrap.sh`'s awk, which also cuts a pair at its first `=`, is fixed in the same change. Until then, the upgrade laws for EZ-RES-4 to EZ-RES-6, EZ-RES-8, EZ-DOC-4's `--upgrade` half and the `ez add` and upgrade halves of EZ-VEN-1 and EZ-LED-8 hold of ez.toml's bytes only relative to EZ-LED-4, as `SPEC.md` records under "Left to prove".
+
+`ez add` prints an import line naming the entry alone, `import <hash>/<entry> as ...`, even for a package that climbs out of its entry's directory (`says` in `add/plan.bend`). The hub serves that package's entry at its path inside the package, which is the line `ez publish` prints since WP11 and the line bend prints. The ledger and lock `ez add` writes are right; only the hint it prints is wrong for such a package.
+
+The import scan that `ez lock` and `ez doctor` share, `P.roots` in `lock/plan.bend`, splits a line on spaces only, so `import<TAB>0x…` is not seen as an import. Bend accepts it, so such a dependency is missing from the lock and reported unused by doctor. Both commands read the same lines, so they never disagree with each other, only with bend.
+
+`ez doctor` does not detect a stale lock. It compares the import lines with the ledger, and checks that the lock parses and that the packages it records are under `BEND_LIB`, but it does not ask whether `ez lock` would write the same lock today.
+
+The Bend native runtime takes `--help`, `--threads` and `--gpu` anywhere on the command line before ez sees them, so `ez add --help` prints the runtime's usage and exits 0. `ez -h` is an unknown flag, since Shake binds no short help. Neither is ez's to fix from inside ez.
+
+`ez run` exits 1 when the program fails, rather than with the program's status as `cargo run` does. We kept it in WP13 because EZ-OUT-1 names `ez tool run` as its only exception; making `ez run` pass the status through would be a change to EZ-OUT-1.
+
+`refuse` in `ez/cmd.bend` is dead code: nothing calls it, since the commands that read a ledger refuse through their plans. It can be deleted in any change that touches the file.
+
+EZ-HASH-5 can diverge from nix in ways we know of: the NAR walk takes the exec bit from `test -x`, an access check rather than the mode bit; it trims `find`'s output and each symlink target, so leading or trailing whitespace in a name or target is lost; a name holding a newline splits in two; and ez does not fetch submodules, while nixpkgs `fetchgit` may. `ez fetch` does not check `narHash` either: it checks every file against its sum and the package against its name, which pins the bytes it lays but not the checkout around them.
+
+Bend 2.0.26 adds named hub imports, and issue #84 tracks what ez does about them. `ez publish` builds the words it uploads with by a pure function (`PP.upload.line`), so a bend that publishes `<name>@<version>` changes that function and the Upload question's fields and no law, but the package walk, the import scan and the lock have not been looked at for named imports.
+
+When WP9 landed, bolt v1.2.1's own lock recorded `snap/par.c` under the sum the old `Sha.hex` gave, before it hashed UTF-8 bytes, so `ez tool sync` of this repository stopped at the fetch with exit 1. That is the tool's lock to refresh, not ez's to change.
 
 ### How we will know it worked
 
 The spec has done its job when the traceability check passes with no pending requirements in the EZ-DOC and EZ-RES groups, every remaining closed law has been deleted, and a rewrite of `ez lock` internals can be merged on the strength of the proof gate alone, without anyone re-deriving what an old example meant or running a test suite to feel safe.
+
+The first two are met. bolt's `trace` rule runs at `error` against `SPEC.md`, every EZ-DOC and EZ-RES row is proved, and no closed law remains. The third is what the refactoring contract promises, and with every command in planner form it is now a matter of practice rather than of missing laws.
 
 ## Abandoned Ideas
 
@@ -559,7 +605,7 @@ The rollout proceeds in phases, each of which leaves the repo consistent. The de
 
 A preliminary phase makes ez lint clean under bolt v0.8.1: it fixes every style, correctness and suspicious finding (short parameter names, wrapping, doc comments, shadowing), none of which changes behavior, so that `mkLint` can join the flake checks with every group at `error` except the two law rules.
 
-The first phase writes `SPEC.md` from this RFC, with the proved and pending status of each requirement, and sorts the existing closed laws using the inventory: 43 that illustrate a Proved requirement are tagged with its ID, and 78 are deleted, along with the thirteen refactor-equivalence laws and their `old.*` definitions. It tags `pkg/hash_perm` with EZ-HASH-1. With the preliminary phase, it adds `mkLint` to ez's flake checks and moves `[tools.bolt]` to v0.8.1, with `closed` and `law` at `warn` and everything else at `error` in `bolt.bend`. This phase changes no behavior and immediately shows how far ez is from its own spec.
+The first phase writes `SPEC.md` from this RFC, with the proved and pending status of each requirement, and sorts the existing closed laws using the law-by-law inventory: 43 that illustrate a Proved requirement are tagged with its ID, and 78 are deleted, along with the thirteen refactor-equivalence laws and their `old.*` definitions. It tags `pkg/hash_perm` with EZ-HASH-1. With the preliminary phase, it adds `mkLint` to ez's flake checks and moves `[tools.bolt]` to v0.8.1, with `closed` and `law` at `warn` and everything else at `error` in `bolt.bend`. This phase changes no behavior and immediately shows how far ez is from its own spec.
 
 The second phase enables the traceability check in bolt, reading `SPEC.md`. Pending requirements do not fail it, so it can go on at once. `closed` is on at `error`, which keeps the closed laws from coming back; `coverage` (bolt v0.9.0's `law`) returns to `error` when the commands it grades are in planner form.
 
@@ -573,6 +619,32 @@ ez stayed on bolt v0.9.0 while any `# toward` trail remained, because bolt retir
 
 The refactoring contract applies from the first phase, since it depends only on law statements and the trust boundary.
 
+## How we got here
+
+The rollout above ran as planned, with the command conversions split into work packages. The lock's are numbered WP0 to WP8 in [ez-lock-planner.md](ez-lock-planner.md), and those for `ez add`, `ez remove` and `ez init` are A0 to A7 in [ez-add-planner.md](ez-add-planner.md). The later commands took the next numbers, WP8 to WP13, and followed the add design's pattern, each recorded as an "Update" note there. Two packages share the number WP8: the lock design's NAR work and the conversion of `ez fetch`. Every package that changed behavior showed the change on the binary first, and "Decided behavior changes" records each one; the table below says only what each package proved.
+
+| Step | What it did | Rows proved |
+| :---- | :---- | :---- |
+| Preliminary and first phase | Made ez lint clean under bolt, wrote `SPEC.md`, tagged `pkg/hash_perm`, deleted 78 closed laws and the thirteen refactor-equivalence laws, and kept 43 as `# toward` trails. | EZ-HASH-1 |
+| Decided behavior changes | Landed the lock input changes, the tag, target and cache-key changes, `ez prove`, and the ledger fixes, each with quantified laws over its decision. | EZ-RES-3, EZ-TOOL-2 |
+| Trails | Deleted the last 40 trails and moved to the bolt with a strict `closed` rule and `trace`, both at `error`. | |
+| WP0, WP1 | String lemmas, then plain `ez lock` as a planner. | EZ-DOC-3, EZ-DOC-5 |
+| WP2 | `ez lock --upgrade` in the same planner, as one plan. | |
+| WP3, WP4 | Lock order, then lock read-back against eztoml v0.1.0. | EZ-DOC-2, EZ-DOC-1 |
+| WP5a, WP5b | Idempotence of a plain lock, then of an upgrade. | EZ-DOC-4 |
+| WP6 | The upgrade's moves. | EZ-RES-4, EZ-RES-5, EZ-RES-6, EZ-RES-8 |
+| WP7 | Import rewriting and the allowlist's text layer. | EZ-VEN-2, EZ-VEN-3 |
+| WP8 (lock design) | A pure NAR directory serializer. | EZ-HASH-2 |
+| A0 to A7 | A pure package walk, then `ez remove`, `ez add` and `ez init` as planners. | EZ-LED-1, EZ-LED-2, EZ-LED-3, EZ-LED-6, EZ-LED-7, EZ-RES-1, EZ-RES-2 |
+| WP8 (`ez fetch`) | `ez fetch` as a planner. | EZ-FETCH-1 |
+| WP9 | The tool commands as planners. | EZ-TOOL-1, EZ-TOOL-3 to EZ-TOOL-9 |
+| WP10 | The `ez lock` halves of three rows the add and fetch work had started. | EZ-LED-8, EZ-HASH-3, EZ-VEN-1 |
+| WP11 | `ez publish` as a planner. | EZ-PUB-1, EZ-PUB-2, EZ-OUT-2 |
+| WP12 | `ez doctor` as a planner. | EZ-VEN-4, EZ-VEN-5, EZ-LED-5 |
+| WP13 | Exit statuses as pure functions of each command's end. | EZ-OUT-1 |
+
+Proving also found bugs that reading the code had missed, and each was fixed where it was found: WP6 found that WP2's upgrade read an empty refusal reason as no refusal (a case the interpreter never built, so the binary did not change), WP5b found that a tool pin with a rev and no narHash moved on the next upgrade, WP7 found the allowlist written twice for a shared tree, and WP10 found a lock that accepted a manifest `ez fetch` would then refuse. The proofs are long, as the risks below expected: `lock/PROOF.bend` grew by about 4,800 lines in WP5b alone, most of them one lemma per step of the upgrade.
+
 ## Risks
 
 ### Proof effort in Bend
@@ -585,11 +657,11 @@ A law about the World model is only as good as the model. If the model says git 
 
 ### The spec encodes accidents
 
-Writing requirements from current behavior risks promoting bugs into guarantees. This revision checked every requirement against the code, and a maintainer decided each disagreement between the code and the README, either correcting the requirement or deciding a behavior change. Behavior the inventory lists as accidental is kept out of the requirements.
+Writing requirements from current behavior risks promoting bugs into guarantees. This revision checked every requirement against the code, and a maintainer decided each disagreement between the code and the README, either correcting the requirement or deciding a behavior change. Behavior we found to be accidental is kept out of the requirements, and what is still open is listed under "Known gaps" rather than promoted.
 
 ### Headline guarantee requires a behavior change
 
-EZ-DOC-3 does not hold today, and no refactor can make it hold, because `ez lock` reads inputs a clone does not have. The inputs it may read are decided, and the changes that enforce them are behavior changes with their own risk: fetching non-vendored dependencies makes plain `ez lock` need the network where it silently did without before, and dropping `[lock] bend` changes every existing lock file once. Until those land, EZ-DOC-3 stays pending, and the spec says so plainly rather than implying reproducibility the tool does not have.
+EZ-DOC-3 did not hold when we wrote it, and no refactor could make it hold, because `ez lock` read inputs a clone does not have. The inputs it may read were decided, and the changes that enforce them are behavior changes with their own risk: fetching non-vendored dependencies makes plain `ez lock` need the network where it silently did without before, and dropping `[lock] bend` changed every existing lock file once. Until those landed, EZ-DOC-3 stayed pending, and the spec said so plainly rather than implying reproducibility the tool did not have. They have landed, and WP1 proved the row.
 
 ### Pressure to reintroduce tests
 

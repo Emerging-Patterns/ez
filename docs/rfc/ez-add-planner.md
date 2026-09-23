@@ -4,7 +4,7 @@
 
 State: Accepted. Nothing here changes `ez add` or `ez remove` yet; the work packages below do.
 
-This is the design for the phase after [ez-lock-planner.md](ez-lock-planner.md): converting `ez add` and `ez remove` to pure planners and thin interpreters, then proving the pending rows they touch. It follows the lock design's pattern (a World, a planner that asks or plans, an interpreter that answers and executes) and does not repeat it; read that design's "Summary", "Laziness without losing purity" and "The Plan and the outcome" first. It was written from the code at `0f8f179`, where WP1 of the lock design has landed, and it builds on the shapes WP1 built (see that design's "Update" note) rather than on its sketches. A spike in `pkg/tree/` makes the package walk pure; nothing imports it, so `ez add` behaves exactly as before. [ez-law-inventory.md](ez-law-inventory.md) stays the progress tracker, and `SPEC.md` does not change until a requirement's law lands.
+This is the design for the phase after [ez-lock-planner.md](ez-lock-planner.md): converting `ez add` and `ez remove` to pure planners and thin interpreters, then proving the pending rows they touch. It follows the lock design's pattern (a World, a planner that asks or plans, an interpreter that answers and executes) and does not repeat it; read that design's "Summary", "Laziness without losing purity" and "The Plan and the outcome" first. It was written from the code at `0f8f179`, where WP1 of the lock design has landed, and it builds on the shapes WP1 built (see that design's "Update" note) rather than on its sketches. A spike in `pkg/tree/` makes the package walk pure; nothing imports it, so `ez add` behaves exactly as before. `SPEC.md` does not change until a requirement's law lands; how the work went is summarized in [ez-spec.md](ez-spec.md) under "How we got here".
 
 ### Open questions
 
@@ -448,7 +448,7 @@ The rewritten `K.pkg_of`, and `K.of` over every tracked file, give the hash, roo
 - The walk is `K.of.tree` over the files read so far, a tree that is not whole, so a file it has not been given is a question, one per round.
 - Each stage of `decide` reads what it needs from the World rather than from the stage before, so a law that one stage refuses walks the stages before it, each of which stops, waits, or goes on, whatever the World says there.
 - The plan is the lock's `Plan`: two `Say` lines and `Success` when bend's answer agrees, and no effect with `Refused` otherwise, run by `Run.exec.plan`.
-- The laws are listed in [ez-law-inventory.md](ez-law-inventory.md) under WP11. EZ-PUB-1, EZ-PUB-2 and EZ-OUT-2 are proved.
+- The laws are listed in the Law column of [SPEC.md](../../SPEC.md). EZ-PUB-1, EZ-PUB-2 and EZ-OUT-2 are proved.
 
 **Update (WP12, `ez doctor`).** `ez doctor` is in planner form in the same shape: `doctor/world.bend` (the World and the questions), `doctor/plan.bend` (pure), and `doctor/run.bend` (the interpreter), which `ez/main.bend` dispatches to. `ez/doctor.bend` and `ez/drift.bend` are deleted, with the untagged `hash_of_local`; `lock_needless`, `lock_needed` and `lock_names` move to `doctor/LAWS.bend`. Where it differs from the commands above:
 
@@ -475,7 +475,7 @@ The rewritten `K.pkg_of`, and `K.of` over every tracked file, give the hash, roo
 | A4 | `ez init` in planner form: World of the ledger, `.gitignore` and entry texts as `Maybe`; `init_keeps_ledger` becomes a plan law. | A0 | small |
 | A5 | EZ-RES-1's missing law: the release `Git.choose` returns is the greatest. | nothing | medium |
 | A6 | EZ-LED-2's model law `add_keep_idem`. | nothing | medium |
-| A7 | Flip the rows whose halves have all landed, update `SPEC.md` and the inventory: EZ-LED-2, EZ-LED-3, EZ-LED-7, EZ-RES-1, EZ-RES-2 after A1, A2, A5, A6; EZ-LED-1, EZ-LED-6, EZ-VEN-1 once WP2 and A4 are in too. EZ-LED-8, EZ-HASH-3 and EZ-OUT-2 stay pending until `ez fetch` is converted, and say so under "Left to prove". | the rest | small |
+| A7 | Flip the rows whose halves have all landed, update `SPEC.md`: EZ-LED-2, EZ-LED-3, EZ-LED-7, EZ-RES-1, EZ-RES-2 after A1, A2, A5, A6; EZ-LED-1, EZ-LED-6, EZ-VEN-1 once WP2 and A4 are in too. EZ-LED-8, EZ-HASH-3 and EZ-OUT-2 stay pending until `ez fetch` is converted, and say so under "Left to prove". | the rest | small |
 
 A0 is the only package that touches modules WP1 and WP2 own (`lock/plan.bend`'s types, and `git/ask.bend` if WP2 got there first); it moves them and changes no statement, so it is a refactor under the contract. A1 and A2 are the only packages that change behavior, and each lists its changes in its PR description. A2 can run alongside WP2 once A0 lands, since the two share only `git/ask.bend`.
 
