@@ -231,13 +231,15 @@ def known(ds: List<&2, Origin>, +wanted: String) -> Bool:
     case x <> t:
       any.step(String.eq(origin.hash(x), wanted), _u => known(t, wanted))
 
-# whether a package is already resolved
+# whether a package is already resolved. The wanted hash is compared first,
+# the way pkg's `fresh` compares a path, so a walk that passes over a hash it
+# has is a walk whose hashes are distinct without a symmetry lemma.
 def has(ds: List<&2, Pack>, +wanted: String) -> Bool:
   match ds:
     case []:
       False{}
     case x <> t:
-      any.step(String.eq(pack.hash(x), wanted), _u => has(t, wanted))
+      any.step(String.eq(wanted, pack.hash(x)), _u => has(t, wanted))
 
 # whether a name is already among the ones a walk has seen. Base's
 # `List.contains` applies an erased equality, which Bend's termination check
@@ -278,12 +280,17 @@ def file.pairs(fs: List<&2, K.File>) -> List<&2, T.Kv>:
     case h <> t:
       file.pair(h) <> file.pairs(t)
 
+# the two tables a package is written as, from its files already in path
+# order and each one once
+def pack.sects.of(hash: String, src: Src, fs: List<&2, K.File>) -> List<&2, T.Sect>:
+  +at = "packages." ++ T.quote(hash)
+  [T.Sect{at ++ ".source", src.pairs(src)},
+   T.Sect{at ++ ".files", file.pairs(fs)}]
+
 # the two tables a package is written as
 def pack.sects(package: Pack) -> List<&2, T.Sect>:
   Pack{hash, src, files} = package
-  +at = "packages." ++ T.quote(hash)
-  [T.Sect{at ++ ".source", src.pairs(src)},
-   T.Sect{at ++ ".files", file.pairs(K.files_of(files))}]
+  pack.sects.of(hash, src, K.files_of(files))
 
 # every package, in hash order
 def pack.all(ps: List<&2, Pack>) -> List<&2, T.Sect>:
@@ -328,18 +335,56 @@ def pack.sort(ps: List<&2, Pack>) -> List<&2, Pack>:
     case Con{+h, t}:
       pack.ins(pack.sort(t), h)
 
-# the lock as a document: what resolved it, then every package it resolved.
-# The bend that ran the lock is not recorded: it is not something a clone
-# has, and the flake pins the bend a build uses. A lock written before this
-# that records one still reads, since nothing reads the key.
-def doc(hub: String, ps: List<&2, Pack>) -> List<&2, T.Sect>:
-  List.append(&2, T.Sect,
-    [T.Sect{"lock", [T.Kv{"version", "2"}, T.Kv{"hub", hub}]}],
-    pack.all(pack.sort(ps)))
+# the `[lock]` table: what resolved the lock. The bend that ran the lock is
+# not recorded: it is not something a clone has, and the flake pins the bend
+# a build uses. A lock written before this that records one still reads,
+# since nothing reads the key.
+def lock.sect(hub: String) -> T.Sect:
+  T.Sect{"lock", [T.Kv{"version", "2"}, T.Kv{"hub", hub}]}
 
-# the lock as the text written to ez.lock.toml
+# the lock as a document: what resolved it, then every package it resolved,
+# in hash order. `render` writes its text a block at a time; that the two
+# agree is checked by `ez lock` on this repository and not yet by a law.
+def doc(hub: String, ps: List<&2, Pack>) -> List<&2, T.Sect>:
+  List.append(&2, T.Sect, [lock.sect(hub)], pack.all(pack.sort(ps)))
+
+# a package's two tables as one block of text, filed under its hash. The lock
+# puts packages in hash order by sorting these blocks with `K.file.sort`,
+# whose order-independence pkg proves; a second sort over packages would need
+# that proof again, and Bend's function values are linear, so one sort by a
+# key function applied at every comparison cannot be written. A block's path
+# is its package's hash, so distinct hashes are distinct paths.
+def pack.block(package: Pack) -> K.File:
+  Pack{+hash, src, files} = package
+  K.File{hash, T.render(pack.sects.of(hash, src, K.files_of(files)))}
+
+# every package, as its block
+def pack.blocks(ps: List<&2, Pack>) -> List<&2, K.File>:
+  match ps:
+    case []:
+      []
+    case h <> t:
+      pack.block(h) <> pack.blocks(t)
+
+# the text of every block, in the order given
+def block.texts(bs: List<&2, K.File>) -> List<&2, String>:
+  match bs:
+    case []:
+      []
+    case K.File{_hash, text} <> t:
+      text <> block.texts(t)
+
+# the lock's text: the `[lock]` table, each block in the order given, then the
+# rest, one blank line between tables. A block is its two tables with the
+# same blank line between them, so this is the text eztoml renders for the
+# document.
+def text.of(hub: String, bs: List<&2, K.File>, rest: List<&2, String>) -> String:
+  String.join(T.render.sect(lock.sect(hub)) <>
+    List.append(&2, String, block.texts(bs), rest), "\n")
+
+# the lock as the text written to ez.lock.toml, its packages in hash order
 def render(hub: String, ps: List<&2, Pack>) -> String:
-  T.render(doc(hub, ps))
+  text.of(hub, K.file.sort(pack.blocks(ps)), [])
 
 # the keys a pinned CLI contributes. The same names a `[tools.*]` section
 # uses in ez.toml, and not the `[packages.*]` source table.
@@ -365,22 +410,18 @@ def tool.sects(ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
     case h <> t:
       tool.sect(h) <> tool.sects(t)
 
-# the lock with its tools after the packages. An empty tool list is the
-# lock `render` writes, so a ledger with no tools is unchanged.
+# the lock with its tools after the packages. An empty tool list adds no
+# table, so a ledger with no tools writes the lock `render` writes.
+def render.tools(ts: List<&2, M.Tool>, hub: String, ps: List<&2, Pack>) -> String:
+  text.of(hub, K.file.sort(pack.blocks(ps)), T.render.all(tool.sects(ts)))
+
+# the same, told whether the tool list is empty
 def render.pick(empty: Bool, hub: String, ps: List<&2, Pack>, ts: List<&2, M.Tool>) -> String:
   match empty:
     case True{}:
       render(hub, ps)
     case False{}:
-      T.render(List.append(&2, T.Sect, doc(hub, ps), tool.sects(ts)))
-
-# the same choice, made by matching the list so it is read once
-def render.tools(ts: List<&2, M.Tool>, hub: String, ps: List<&2, Pack>) -> String:
-  match ts:
-    case []:
-      render(hub, ps)
-    case h <> t:
-      render.pick(False{}, hub, ps, h <> t)
+      render.tools(ts, hub, ps)
 
 # the `[lock]` table of a lock that was read
 def lock.pairs(ss: List<&2, T.Sect>) -> List<&2, T.Kv>:

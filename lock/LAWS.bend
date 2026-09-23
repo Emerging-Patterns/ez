@@ -7,6 +7,9 @@ import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../pkg/pkg.bend as K
+import ../pkg/LAWS.bend as KL
+import ../manifest/manifest.bend as M
 
 # LAW: a package resolves to the origin recorded for it, whatever origins
 # follow. A second record of the same hash never shadows the first, so the
@@ -94,6 +97,78 @@ law lock_names_hub:
   for +hub: String
   for ps: List<&2, L.Pack>
   {L.lock.hub(L.doc(hub, ps)) == hub : String}
+
+# The order a lock is written in. pkg says what a rearranged file list is,
+# with `perm` and `distinct`; these say the same of a package list, in the
+# same shape, so that a package list rearranged is its blocks rearranged.
+# Law vocabulary: ez never calls them.
+
+# a package put at a chosen place in a list, as pkg's `perm.ins_at` puts a
+# file
+def perm.ins_at(place: Nat, pack: L.Pack, ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
+  match place ps:
+    case 0n _:
+      pack <> ps
+    case 1n+p Nil{}:
+      [pack]
+    case 1n+p Con{h, t}:
+      h <> perm.ins_at(p, pack, t)
+
+# a package list rearranged, as pkg's `perm` rearranges a file list: the
+# numbers reach every order the walk could have found the packages in
+def perm(ns: List<&2, Nat>, ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
+  match ns ps:
+    case Nil{} Nil{}:
+      []
+    case Nil{} Con{h, t}:
+      h <> t
+    case Con{n, ms} Nil{}:
+      []
+    case Con{n, ms} Con{h, t}:
+      perm.ins_at(n, h, perm(ms, t))
+
+# whether a hash is none of the hashes a package list holds
+def hash.fresh(+hash: String, ps: List<&2, L.Pack>) -> Bool:
+  match ps:
+    case []:
+      True{}
+    case Con{+h, t}:
+      Bool.and(Bool.not(String.eq(hash, L.pack.hash(h))), hash.fresh(hash, t))
+
+# whether a package list names each hash at most once. The walk's does: it
+# passes over a hash it has resolved already.
+def distinct(ps: List<&2, L.Pack>) -> Bool:
+  match ps:
+    case []:
+      True{}
+    case Con{+h, +t}:
+      Bool.and(hash.fresh(L.pack.hash(h), t), distinct(t))
+
+# LAW: the lock's text does not depend on the order the packages were found
+# in. Packages are written in hash order, so any rearrangement of a list that
+# names each hash once writes the same bytes, tools and hub alike.
+# EZ-DOC-2
+law lock_order_free:
+  for +ns: List<&2, Nat>
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for dis: {distinct(ps) == True{} : Bool}
+  {L.render.tools(ts, hub, perm(ns, ps)) == L.render.tools(ts, hub, ps) : String}
+
+# LAW: and a package's block, the text the lock holds for it, does not depend
+# on the order its files were found in. Files are written in path order, so
+# any rearrangement of a file list that names each path once writes the same
+# block. This is pkg's `sort_perm` under `pack.block`.
+# EZ-DOC-2
+law pack_order_free:
+  for +ns: List<&2, Nat>
+  for +hash: String
+  for +src: L.Src
+  for +fs: List<&2, K.File>
+  for dis: {KL.distinct(fs) == True{} : Bool}
+  {L.pack.block(L.Pack{hash, src, KL.perm(ns, fs)})
+    == L.pack.block(L.Pack{hash, src, fs}) : K.File}
 
 # LAW: a lock with no tools is the lock `render` writes. Packages do not
 # move because a tool list was empty.
@@ -197,6 +272,25 @@ law walk_pins_ledger_sources:
     : List<&2, L.Pack>}
   {pinned.all(orgs, P.walk.packs(P.walk(fuel, orgs, js, wk)))
     == P.walk.packs(P.walk(fuel, orgs, js, wk)) : List<&2, L.Pack>}
+
+# LAW: the walk resolves each hash at most once, one step at a time: a step
+# passes over a hash it has already resolved
+law walk_keeps_hashes_distinct:
+  for +fuel: Nat
+  for +orgs: List<&2, L.Origin>
+  for +js: List<&2, W.Judged>
+  for +wk: P.Walk
+  for +e: {distinct(P.walk.packs(wk)) == True{} : Bool}
+  {distinct(P.walk.packs(P.walk(fuel, orgs, js, wk))) == True{} : Bool}
+
+# LAW: so every package list plain `ez lock` resolves, which is the list its
+# lock renders, names each hash once. That is `lock_order_free`'s premise,
+# so the lock ez writes does not depend on the order the walk found its
+# packages in.
+# EZ-DOC-2
+law plain_lock_hashes_distinct:
+  for w: W.World
+  {distinct(P.packs(w)) == True{} : Bool}
 
 # LAW: a tracked path under `.ez/` is never a root of the lock. The trees
 # there are packages, read as packages, and not the project's own sources.
