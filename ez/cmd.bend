@@ -179,7 +179,7 @@ def publish() -> IO(Unit):
 def lock.go(ok: Bool, up: Bool, +name: String) -> IO(Unit):
   match ok:
     case True{}:
-      Run.run(W.Args{up, name})
+      Run.run(up, name)
     case False{}:
       IO.die(Unit, 1, "ez: --package needs --upgrade")
 

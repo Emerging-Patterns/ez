@@ -46,7 +46,6 @@ import ../pkg/path.bend as Path
 import ../git/git.bend as Git
 import ../ez/named.bend as Named
 import ../ez/target.bend as Tgt
-import ../sha/sha.bend as Sha
 
 # ---------------------------------------------------------------------------
 # the questions
@@ -695,77 +694,6 @@ def asks.from(as: List<&2, Up.Ask>, +from: String) -> Bool:
     case h <> t:
       +rest = asks.from(t, from)
       Bool.and(String.eq(ask.url(h), from), rest)
-
-# every file of a tree but the last, which a `Lay` writes as the manifest
-def front(fs: List<&2, W.Source>) -> List<&2, W.Source>:
-  match fs:
-    case []:
-      []
-    case h <> t:
-      match t:
-        case []:
-          []
-        case h2 <> t2:
-          h <> front(h2 <> t2)
-
-# a file's text
-def text.of(src: W.Source) -> String:
-  W.Source{_at, text} = src
-  text
-
-# the last file's text, "" for no file
-def last(fs: List<&2, W.Source>) -> String:
-  match fs:
-    case []:
-      ""
-    case h <> t:
-      match t:
-        case []:
-          text.of(h)
-        case h2 <> t2:
-          last(h2 <> t2)
-
-# a laid file weighed by its own text
-def weigh(src: W.Source) -> K.File:
-  W.Source{at, +text} = src
-  K.File{at, Sha.hex(text)}
-
-# every laid file weighed by its own text
-def weighs(fs: List<&2, W.Source>) -> List<&2, K.File>:
-  match fs:
-    case []:
-      []
-    case h <> t:
-      weigh(h) <> weighs(t)
-
-# whether a laid tree is named by the manifest of the texts it lays: its
-# last file is the manifest of the others, each weighed by its own text,
-# and its hash is the `0x` name of that manifest
-def lay.named(+hash: String, +fs: List<&2, W.Source>) -> Bool:
-  +sums = K.files_of(weighs(front(fs)))
-  Bool.and(String.eq(hash, K.hash_of(sums)), String.eq(last(fs), K.manifest_of(sums)))
-
-# whether an effect that lays a tree lays a named one
-def lays.one(effect: P.Effect) -> Bool:
-  match effect:
-    case P.Lay{_place, hash, fs}:
-      lay.named(hash, fs)
-    case _:
-      True{}
-
-# whether every tree a list of effects lays is named by its manifest
-def lays.named(es: List<&2, P.Effect>) -> Bool:
-  match es:
-    case []:
-      True{}
-    case h <> t:
-      +rest = lays.named(t)
-      Bool.and(lays.one(h), rest)
-
-# the effects of a plan
-def effects(pl: P.Plan) -> List<&2, P.Effect>:
-  P.Plan{es, _outcome} = pl
-  es
 
 # what a path holds once a plan has run, when it held `was` before
 def after(wrote: P.Wrote, +was: String) -> String:

@@ -877,7 +877,7 @@ def fixed_walked(w):
 law front_snoc:
   for xs: List<&2, W.Source>
   for x: W.Source
-  {AP.front(List.append(&2, W.Source, xs, [x])) == xs : List<&2, W.Source>}
+  {P.front(List.append(&2, W.Source, xs, [x])) == xs : List<&2, W.Source>}
 
 def front_snoc(xs, x):
   match xs:
@@ -889,7 +889,7 @@ def front_snoc(xs, x):
           {==}
         case h2 <> t2:
           Equal.cong(List<&2, W.Source>, List<&2, W.Source>, ys => h <> ys,
-            AP.front(List.append(&2, W.Source, h2 <> t2, [x])), h2 <> t2,
+            P.front(List.append(&2, W.Source, h2 <> t2, [x])), h2 <> t2,
             front_snoc(h2 <> t2, x))
 
 # LAW: and the last one's text is its text
@@ -897,7 +897,7 @@ law last_snoc:
   for xs: List<&2, W.Source>
   for at: String
   for text: String
-  {AP.last(List.append(&2, W.Source, xs, [W.Source{at, text}])) == text : String}
+  {P.last(List.append(&2, W.Source, xs, [W.Source{at, text}])) == text : String}
 
 def last_snoc(xs, at, text):
   match xs:
@@ -913,7 +913,7 @@ def last_snoc(xs, at, text):
 # LAW: the found files as laid, weighed, are the walk's laid files weighed
 law weigh_srcs:
   for fs: List<&2, K.Source>
-  {AP.weighs(AP.srcs(fs)) == K.laid.sums(fs) : List<&2, K.File>}
+  {W.weighs(AP.srcs(fs)) == K.laid.sums(fs) : List<&2, K.File>}
 
 def weigh_srcs(fs):
   match fs:
@@ -921,7 +921,7 @@ def weigh_srcs(fs):
       {==}
     case K.Source{at, text} <> t:
       Equal.cong(List<&2, K.File>, List<&2, K.File>, ys => K.File{at, Sha.hex(text)} <> ys,
-        AP.weighs(AP.srcs(t)), K.laid.sums(t), weigh_srcs(t))
+        W.weighs(AP.srcs(t)), K.laid.sums(t), weigh_srcs(t))
 
 # a package's file list, weighed from its texts, and the files a `Lay`
 # writes for it
@@ -938,18 +938,18 @@ def lay.files(+fs: List<&2, K.Source>) -> List<&2, W.Source>:
 # by its hash, is named
 law lay_canon:
   for +fs: List<&2, K.Source>
-  {AP.lay.named(lh(fs), lay.files(fs)) == True{} : Bool}
+  {P.lay.named(lh(fs), lay.files(fs)) == True{} : Bool}
 
 def lay_canon(fs):
-  %Equal.sym(List<&2, W.Source>, AP.front(lay.files(fs)), AP.srcs(fs),
+  %Equal.sym(List<&2, W.Source>, P.front(lay.files(fs)), AP.srcs(fs),
     front_snoc(AP.srcs(fs), W.Source{"manifest", K.manifest_of(lsum(fs))}))
-    : {Bool.and(String.eq(lh(fs), K.hash_of(K.files_of(AP.weighs(_)))),
-      String.eq(AP.last(lay.files(fs)), K.manifest_of(K.files_of(AP.weighs(_))))) == True{}
+    : {Bool.and(String.eq(lh(fs), K.hash_of(K.files_of(W.weighs(_)))),
+      String.eq(P.last(lay.files(fs)), K.manifest_of(K.files_of(W.weighs(_))))) == True{}
       : Bool}
-  %Equal.sym(List<&2, K.File>, AP.weighs(AP.srcs(fs)), K.laid.sums(fs), weigh_srcs(fs))
+  %Equal.sym(List<&2, K.File>, W.weighs(AP.srcs(fs)), K.laid.sums(fs), weigh_srcs(fs))
     : {Bool.and(String.eq(lh(fs), K.hash_of(K.files_of(_))),
-      String.eq(AP.last(lay.files(fs)), K.manifest_of(K.files_of(_)))) == True{} : Bool}
-  %Equal.sym(String, AP.last(lay.files(fs)), K.manifest_of(lsum(fs)),
+      String.eq(P.last(lay.files(fs)), K.manifest_of(K.files_of(_)))) == True{} : Bool}
+  %Equal.sym(String, P.last(lay.files(fs)), K.manifest_of(lsum(fs)),
     last_snoc(AP.srcs(fs), "manifest", K.manifest_of(lsum(fs))))
     : {Bool.and(String.eq(lh(fs), lh(fs)), String.eq(_, K.manifest_of(lsum(fs)))) == True{}
       : Bool}
@@ -963,7 +963,7 @@ law says_lays:
   for c: Bool
   for +a: String
   for +b: String
-  {AP.lays.named(Bool.pick(List<&2, P.Effect>, c, [P.Say{a}], [P.Say{b}, P.Say{a}]))
+  {P.lays.named(Bool.pick(List<&2, P.Effect>, c, [P.Say{a}], [P.Say{b}, P.Say{a}]))
     == True{} : Bool}
 
 def says_lays(c, _a, _b):
@@ -976,8 +976,8 @@ def says_lays(c, _a, _b):
 law drops_lays:
   for gs: List<&2, String>
   for rest: List<&2, P.Effect>
-  for e: {AP.lays.named(rest) == True{} : Bool}
-  {AP.lays.named(P.drops.of(gs, rest)) == True{} : Bool}
+  for e: {P.lays.named(rest) == True{} : Bool}
+  {P.lays.named(P.drops.of(gs, rest)) == True{} : Bool}
 
 def drops_lays(gs, rest, e):
   match gs:
@@ -992,7 +992,7 @@ law ignore_lays:
   for gs: List<&2, String>
   for +h: String
   for +w: A.World
-  {AP.lays.named(AP.ignore.put(b, next, P.drops.of(gs, AP.says(h, w)))) == True{} : Bool}
+  {P.lays.named(AP.ignore.put(b, next, P.drops.of(gs, AP.says(h, w)))) == True{} : Bool}
 
 def ignore_lays(b, _next, gs, h, w):
   match b:
@@ -1021,11 +1021,11 @@ law lays_of:
   for +fs: List<&2, K.Source>
   for +m: M.Manifest
   for +w: A.World
-  {AP.lays.named(AP.effects.of(d, lh(fs), fs, lsum(fs), m, w)) == True{} : Bool}
+  {P.lays.named(AP.effects.of(d, lh(fs), fs, lsum(fs), m, w)) == True{} : Bool}
 
 def lays_of(d, fs, m, w):
-  both(AP.lay.named(lh(fs), lay.files(fs)),
-    AP.lays.named(AP.ignore.put(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w),
+  both(P.lay.named(lh(fs), lay.files(fs)),
+    P.lays.named(AP.ignore.put(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w),
       P.drops.of(gss(d, lh(fs), m), AP.says(lh(fs), w)))),
     lay_canon(fs),
     ignore_lays(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w), gss(d, lh(fs), m),
@@ -1034,7 +1034,7 @@ def lays_of(d, fs, m, w):
 law lays_fixed:
   for k: K.Walked
   for +w: A.World
-  {AP.lays.named(AP.effects.k(fix(k), w)) == True{} : Bool}
+  {P.lays.named(AP.effects.k(fix(k), w)) == True{} : Bool}
 
 def lays_fixed(k, w):
   match k:
@@ -1047,17 +1047,17 @@ def lays_fixed(k, w):
 
 law lays_walked:
   for +w: A.World
-  {AP.lays.named(AP.effects.k(AP.walked(w), w)) == True{} : Bool}
+  {P.lays.named(AP.effects.k(AP.walked(w), w)) == True{} : Bool}
 
 def lays_walked(w):
-  %fixed_walked(w) : {AP.lays.named(AP.effects.k(_, w)) == True{} : Bool}
+  %fixed_walked(w) : {P.lays.named(AP.effects.k(_, w)) == True{} : Bool}
   lays_fixed(AP.walked(w), w)
 
 law lays_seal:
   for es: List<&2, P.Effect>
   for o: P.Outcome
-  for e: {AP.lays.named(es) == True{} : Bool}
-  {AP.lays.named(AP.effects(AP.seal(es, o))) == True{} : Bool}
+  for e: {P.lays.named(es) == True{} : Bool}
+  {P.lays.named(P.effects(AP.seal(es, o))) == True{} : Bool}
 
 def lays_seal(_es, o, e):
   match o:
@@ -1069,7 +1069,7 @@ def lays_seal(_es, o, e):
 law lays_v:
   for v: AP.Verdict
   for +w: A.World
-  {AP.lays.named(AP.effects(AP.plan.v(v, w))) == True{} : Bool}
+  {P.lays.named(P.effects(AP.plan.v(v, w))) == True{} : Bool}
 
 def lays_v(v, w):
   match v:

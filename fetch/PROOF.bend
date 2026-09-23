@@ -17,7 +17,6 @@ import ./plan.bend as FP
 import ../lock/plan.bend as P
 import ../lock/world.bend as W
 import ../lock/lock.bend as L
-import ../add/plan.bend as AP
 import ../add/PROOF.bend as AddP
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
@@ -225,7 +224,7 @@ def Laws.fetch_lays_the_lock(w):
 # LAW: the planner weighs a file the way the law vocabulary does
 law weighs_same:
   for ls: List<&2, W.Source>
-  {FP.weighs(ls) == AP.weighs(ls) : List<&2, K.File>}
+  {FP.weighs(ls) == W.weighs(ls) : List<&2, K.File>}
 
 def weighs_same(ls):
   match ls:
@@ -233,13 +232,13 @@ def weighs_same(ls):
       {==}
     case W.Source{at, text} <> t:
       Equal.cong(List<&2, K.File>, List<&2, K.File>, ys => K.File{at, Sha.hex(text)} <> ys,
-        FP.weighs(t), AP.weighs(t), weighs_same(t))
+        FP.weighs(t), W.weighs(t), weighs_same(t))
 
 law named_seal:
   for es: List<&2, P.Effect>
   for o: P.Outcome
-  for e: {AP.lays.named(es) == True{} : Bool}
-  {AP.lays.named(FP.effects(FP.seal(es, o))) == True{} : Bool}
+  for e: {P.lays.named(es) == True{} : Bool}
+  {P.lays.named(FP.effects(FP.seal(es, o))) == True{} : Bool}
 
 def named_seal(_es, o, e):
   match o:
@@ -257,8 +256,8 @@ law named_got:
   for +ls: List<&2, W.Source>
   for rest: List<&2, P.Effect>
   for g: {FP.good(fs, h, ls) == b : Bool}
-  for e: {AP.lays.named(rest) == True{} : Bool}
-  {AP.lays.named(FP.effect.v(FP.judge.got(b, fs, h, ls), rest)) == True{} : Bool}
+  for e: {P.lays.named(rest) == True{} : Bool}
+  {P.lays.named(FP.effect.v(FP.judge.got(b, fs, h, ls), rest)) == True{} : Bool}
 
 def named_got(b, fs, h, ls, rest, g, e):
   match b:
@@ -266,32 +265,32 @@ def named_got(b, fs, h, ls, rest, g, e):
       e
     case True{}:
       %Equal.sym(List<&2, W.Source>,
-        AP.front(List.append(&2, W.Source, ls, [W.Source{"manifest", FP.manifest(ls)}])),
+        P.front(List.append(&2, W.Source, ls, [W.Source{"manifest", FP.manifest(ls)}])),
         ls, AddP.front_snoc(ls, W.Source{"manifest", FP.manifest(ls)}))
-        : {Bool.and(Bool.and(String.eq(h, K.hash_of(K.files_of(AP.weighs(_)))),
-          String.eq(AP.last(List.append(&2, W.Source, ls,
+        : {Bool.and(Bool.and(String.eq(h, K.hash_of(K.files_of(W.weighs(_)))),
+          String.eq(P.last(List.append(&2, W.Source, ls,
             [W.Source{"manifest", FP.manifest(ls)}])),
-            K.manifest_of(K.files_of(AP.weighs(_))))), AP.lays.named(rest)) == True{}
+            K.manifest_of(K.files_of(W.weighs(_))))), P.lays.named(rest)) == True{}
           : Bool}
       %weighs_same(ls)
         : {Bool.and(Bool.and(String.eq(h, K.hash_of(K.files_of(_))),
-          String.eq(AP.last(List.append(&2, W.Source, ls,
+          String.eq(P.last(List.append(&2, W.Source, ls,
             [W.Source{"manifest", FP.manifest(ls)}])),
-            K.manifest_of(K.files_of(_)))), AP.lays.named(rest)) == True{} : Bool}
+            K.manifest_of(K.files_of(_)))), P.lays.named(rest)) == True{} : Bool}
       %Equal.sym(String,
-        AP.last(List.append(&2, W.Source, ls, [W.Source{"manifest", FP.manifest(ls)}])),
+        P.last(List.append(&2, W.Source, ls, [W.Source{"manifest", FP.manifest(ls)}])),
         FP.manifest(ls), AddP.last_snoc(ls, "manifest", FP.manifest(ls)))
         : {Bool.and(Bool.and(String.eq(h, FP.named(ls)), String.eq(_, FP.manifest(ls))),
-          AP.lays.named(rest)) == True{} : Bool}
+          P.lays.named(rest)) == True{} : Bool}
       %Equal.sym(Bool, String.eq(FP.manifest(ls), FP.manifest(ls)), True{},
         Eq.string_eq_self(FP.manifest(ls)))
-        : {Bool.and(Bool.and(String.eq(h, FP.named(ls)), _), AP.lays.named(rest)) == True{}
+        : {Bool.and(Bool.and(String.eq(h, FP.named(ls)), _), P.lays.named(rest)) == True{}
           : Bool}
       %Equal.sym(Bool, String.eq(h, FP.named(ls)), True{},
         Eq.and.right(FP.paths.safe(ls), String.eq(h, FP.named(ls)),
           Eq.and.right(FP.fits(fs, ls),
             Bool.and(FP.paths.safe(ls), String.eq(h, FP.named(ls))), g)))
-        : {Bool.and(Bool.and(_, True{}), AP.lays.named(rest)) == True{} : Bool}
+        : {Bool.and(Bool.and(_, True{}), P.lays.named(rest)) == True{} : Bool}
       e
 
 law named_one:
@@ -299,8 +298,8 @@ law named_one:
   for +h: String
   for p: FP.Part
   for rest: List<&2, P.Effect>
-  for e: {AP.lays.named(rest) == True{} : Bool}
-  {AP.lays.named(FP.effect.v(FP.judge(fs, h, p), rest)) == True{} : Bool}
+  for e: {P.lays.named(rest) == True{} : Bool}
+  {P.lays.named(FP.effect.v(FP.judge(fs, h, p), rest)) == True{} : Bool}
 
 def named_one(fs, h, p, rest, e):
   match p:
@@ -317,7 +316,7 @@ def named_one(fs, h, p, rest, e):
 
 law named_all:
   for ps: List<&2, FP.Pt>
-  {AP.lays.named(FP.effects.of(FP.judged(ps))) == True{} : Bool}
+  {P.lays.named(FP.effects.of(FP.judged(ps))) == True{} : Bool}
 
 def named_all(ps):
   match ps:
@@ -330,7 +329,7 @@ law named_led:
   for b: Bool
   for g: Maybe<&2, String>
   for +w: F.World
-  {AP.lays.named(FP.effects(FP.plan.led(b, g, w))) == True{} : Bool}
+  {P.lays.named(FP.effects(FP.plan.led(b, g, w))) == True{} : Bool}
 
 def named_led(b, g, w):
   match b:

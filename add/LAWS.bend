@@ -177,7 +177,7 @@ law add_walk_refused:
 # EZ-HASH-3
 law add_lays_named:
   for +w: A.World
-  {AP.lays.named(AP.effects(AP.plan(w))) == True{} : Bool}
+  {P.lays.named(P.effects(AP.plan(w))) == True{} : Bool}
 
 # LAW: with no ref, when a tag is semver-ish, the commit pinned is the one
 # the remote's tags name for the tag `Git.choose` takes, through its peeled

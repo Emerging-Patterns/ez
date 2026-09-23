@@ -27,6 +27,7 @@ import ../manifest/upgrade.bend as U
 import ../manifest/ignore.bend as I
 import ../git/git.bend as Git
 import ../pkg/pkg.bend as K
+import ../pkg/path.bend as Path
 import ../hub/hub.bend as Web
 import ../sha/sha.bend as Sha
 import ../ez/say.bend as Say
@@ -36,8 +37,11 @@ import ../ez/say.bend as Say
 
 # a question the upgrade asks, answered by one IO action. `ez add`
 # (add/plan.bend) asks four of them too: `Tags`, `Head` and `Refs` to resolve
-# a ref, and `Clone` for the checkout it walks, with `url` the source as git
-# is to read it, which that planner anchors itself.
+# a ref, and `Clone` for the checkout it walks. The upgrade asks each with
+# the source its ledger records, and looks the answer up by that; git is asked
+# the same question with that source anchored at the project (`anchor`),
+# which the planner computes (lock/plan.bend, `P.Query`). `ez add` and
+# `ez fetch` ask with the source anchored already.
 type Ask is Data:
   Refs{url: String, ref: String}                 # `git ls-remote url refs/tags/<ref> ... refs/heads/<ref>`
   Head{url: String}                              # `git ls-remote --symref url HEAD`
@@ -49,6 +53,58 @@ type Ask is Data:
   Ignore{}                                       # `.gitignore`, "" when missing
   Sources{}                                      # every `.bend` file outside `.ez` and `.git`
   Clone{url: String, rev: String}                # a checkout at rev: narHash and every file's text, for `ez add`
+
+# the source a question names, "" for one that names none
+def ask.url(ask: Ask) -> String:
+  match ask:
+    case Refs{url, _ref}:
+      url
+    case Head{url}:
+      url
+    case Tags{url}:
+      url
+    case Above{url, _pin, _tip}:
+      url
+    case Tree{url, _rev, _entry}:
+      url
+    case Weigh{url, _rev}:
+      url
+    case HubHas{_hub, _hash}:
+      ""
+    case Ignore{}:
+      ""
+    case Sources{}:
+      ""
+    case Clone{url, _rev}:
+      url
+
+# a question as git is to be asked it: the source it names anchored at the
+# directory `here` (`Path.anchor`), so a relative path, which the ledger keeps
+# relative to the project, is read from the project wherever git runs. A URL
+# and an absolute path are as they are, and a question that names no source
+# is as it is.
+def anchor(+here: String, ask: Ask) -> Ask:
+  match ask:
+    case Refs{url, ref}:
+      Refs{Path.anchor(here, url), ref}
+    case Head{url}:
+      Head{Path.anchor(here, url)}
+    case Tags{url}:
+      Tags{Path.anchor(here, url)}
+    case Above{url, pin, tip}:
+      Above{Path.anchor(here, url), pin, tip}
+    case Tree{url, rev, entry}:
+      Tree{Path.anchor(here, url), rev, entry}
+    case Weigh{url, rev}:
+      Weigh{Path.anchor(here, url), rev}
+    case HubHas{hub, hash}:
+      HubHas{hub, hash}
+    case Ignore{}:
+      Ignore{}
+    case Sources{}:
+      Sources{}
+    case Clone{url, rev}:
+      Clone{Path.anchor(here, url), rev}
 
 # one source file of the project, with its text
 type Found is Data:
