@@ -604,6 +604,23 @@ def says.of(ss: List<&2, String>, rest: List<&2, Effect>) -> List<&2, Effect>:
     case h <> t:
       Say{h} <> says.of(t, rest)
 
+# the lines a list of effects says, in order
+def said.in(es: List<&2, Effect>) -> List<&2, String>:
+  match es:
+    case []:
+      []
+    case e <> t:
+      match e:
+        case Say{text}:
+          text <> said.in(t)
+        case _:
+          said.in(t)
+
+# the lines a plan says, in order, which is what a person is told
+def said(pl: Plan) -> List<&2, String>:
+  Plan{es, _outcome} = pl
+  said.in(es)
+
 # the files the upgrade writes, in order, ahead of what follows
 def edits.of(es: List<&2, Up.Edit>, rest: List<&2, Effect>) -> List<&2, Effect>:
   match es:
