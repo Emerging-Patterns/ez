@@ -305,6 +305,115 @@ law plain_lock_ledger_next:
   for e: {W.args.upgrade(w) == False{} : Bool}
   {P.ledger.next(w) == W.parsed(W.ledger.of(w)) : M.Read}
 
+# What `ez lock --upgrade` keeps and what it asks about. These laws are stated
+# over `P.ledger.next`, the ledger model the upgrade renders into ez.toml, so
+# they hold of the file's bytes relative to EZ-LED-4. Whatever the remote
+# answered, and on every round of questions, the model keeps the entries these
+# name. `W.dep(w, n)` is the dependency ez.toml records under `n`, as `M.dep`
+# finds it, the first of that name.
+
+# the tool a ledger pins under a name, as `M.tool.find` finds it. Law
+# vocabulary: ez never calls it.
+def tool.at(ledger: M.Read, name: String) -> M.Tool:
+  M.tool.find(M.tools_of(ledger), name)
+
+# the upgrade's answers a World holds
+def ups.of(world: W.World) -> List<&2, Up.Reply>:
+  W.World{_args, _ledger, _listing, _replies, ups} = world
+  ups
+
+# a dependency kept in front of the rest when it is named, else the rest
+def deps.put(hit: Bool, dep: M.Dep, rest: List<&2, M.Dep>) -> List<&2, M.Dep>:
+  match hit:
+    case True{}:
+      dep <> rest
+    case False{}:
+      rest
+
+# every dependency a ledger names `name`, in its order
+def deps.named(ds: List<&2, M.Dep>, +name: String) -> List<&2, M.Dep>:
+  match ds:
+    case []:
+      []
+    case +h <> t:
+      deps.put(String.eq(M.dep.name(h), name), h, deps.named(t, name))
+
+# a tool kept in front of the rest when it is named, else the rest
+def tools.put(hit: Bool, pin: M.Tool, rest: List<&2, M.Tool>) -> List<&2, M.Tool>:
+  match hit:
+    case True{}:
+      pin <> rest
+    case False{}:
+      rest
+
+# every tool a ledger names `name`, in its order
+def tools.named(ts: List<&2, M.Tool>, +name: String) -> List<&2, M.Tool>:
+  match ts:
+    case []:
+      []
+    case +h <> t:
+      tools.put(String.eq(M.tool.name(h), name), h, tools.named(t, name))
+
+# the ledger with nothing but what `--package name` names: the package's own
+# fields, and every dependency and tool of that name. Law vocabulary: ez never
+# calls it.
+def alone(ledger: M.Read, +name: String) -> M.Read:
+  match ledger:
+    case M.Bad{why}:
+      M.Bad{why}
+    case M.Good{m}:
+      M.Manifest{pn, pe, pb, hub, ds, ts} = m
+      M.Good{M.Manifest{pn, pe, pb, hub, deps.named(ds, name), tools.named(ts, name)}}
+
+# LAW: `ez lock --upgrade` never moves a hub dependency. The entry ez.toml
+# records under a name, when its source is the hub, is the entry the ledger
+# the upgrade leaves records under that name, whatever `--package` named and
+# whatever the remote said. A hub package's hash is its pin.
+# EZ-RES-4
+law upgrade_holds_hub:
+  for +w: W.World
+  for +n: String
+  for hub: {M.source.is_git(M.source.dep(W.dep(w, n))) == False{} : Bool}
+  {M.dep(P.ledger.next(w), n) == W.dep(w, n) : M.Dep}
+
+# LAW: `--package n` leaves every dependency of another name as ez.toml has
+# it: its rev, tag, hash, and every other field
+# EZ-RES-6
+law upgrade_one_frames_deps:
+  for +w: W.World
+  for +n: String
+  for +m: String
+  for e: {W.args.only(w) == n : String}
+  for ne: {String.is_empty(n) == False{} : Bool}
+  for d: {String.eq(n, m) == False{} : Bool}
+  {M.dep(P.ledger.next(w), m) == W.dep(w, m) : M.Dep}
+
+# LAW: and every tool of another name
+# EZ-RES-6
+law upgrade_one_frames_tools:
+  for +w: W.World
+  for +n: String
+  for +m: String
+  for e: {W.args.only(w) == n : String}
+  for ne: {String.is_empty(n) == False{} : Bool}
+  for d: {String.eq(n, m) == False{} : Bool}
+  {tool.at(P.ledger.next(w), m) == tool.at(W.parsed(W.ledger.of(w)), m) : M.Tool}
+
+# LAW: and `ez lock --upgrade --package n` asks the remote exactly what it
+# asks of a ledger holding nothing but the entries named `n`, on every round
+# of questions. Refs, the default branch, tags, ancestry and checkouts are
+# asked of those entries alone; no other dependency or tool reaches the
+# remote, or changes a question that is asked.
+# EZ-RES-6
+law upgrade_one_asks_alone:
+  for +w: W.World
+  for +n: String
+  for u: {W.args.upgrade(w) == True{} : Bool}
+  for e: {W.args.only(w) == n : String}
+  for ne: {String.is_empty(n) == False{} : Bool}
+  {P.wants.up(w) == Up.next.asks(Up.next(n, alone(W.parsed(W.ledger.of(w)), n), ups.of(w)))
+    : List<&2, Up.Ask>}
+
 # LAW: a tree read from BEND_LIB is judged exactly as the same bytes cloned
 # at the pinned rev and weighed to the ledger's narHash
 law lib_judged_as_clone:

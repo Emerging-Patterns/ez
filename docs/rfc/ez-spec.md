@@ -329,6 +329,8 @@ law upgrade_one_frames_others:
   {M.dep(upgrade_plan.ledger(w, n), m) == M.dep(M.parse(w.ledger), m) : M.Dep}
 ```
 
+The law that landed is `lock/LAWS.bend upgrade_one_frames_deps`, with `upgrade_one_frames_tools` for the tools and `upgrade_one_asks_alone` for "asks the remote to resolve only the named dependency or tool": the questions an upgrade with `--package NAME` asks are exactly those it asks of a ledger holding nothing but the entries named `NAME`. [ez-lock-planner.md](ez-lock-planner.md) says where they differ from this sketch.
+
 EZ-RES-8 is new. The code refuses on a moved tag and on drift, and closed laws (`tag_moved_off`, `same_rev_drifts`) showed the verdicts until the trails were deleted. In the dependency path the drift decision is made after the new tree has been laid, by `confirmed` in `ez/upgrade.bend`, and `U.judge` is called with its agreement bit fixed to true, so its `Drift` arm cannot fire there.
 
 EZ-RES-5 and EZ-RES-8 are proved relative to EZ-RES-7. The law says ez moves a pin only when the model's ancestry relation says so; whether that relation matches the real repository is git's responsibility.
