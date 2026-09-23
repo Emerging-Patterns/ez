@@ -491,6 +491,8 @@ Under `--upgrade`, `ez lock` also reads `.gitignore`, a second `find` (`-not -pa
 
 What the README's reproducibility sentence ("`ez lock` never has to consult anything a clone does not have") gets right is narrower: dependency `root` and `narHash` are copied from the ledger and never recomputed by plain lock.
 
+**Update:** the decided input changes have landed. At `bec3435` plain `ez lock` reads the ledger, `git ls-files '*.bend'` and those files, trees under `$BEND_LIB` or clones at the ledger rev checked against `narHash`, and hub content, plus any untracked local file a tracked file imports. The planner design for phase three, [ez-lock-planner.md](ez-lock-planner.md), re-traces the inputs and proposes the World that models them.
+
 ## Missing behavior
 
 ### Behavior the code guarantees that the RFC does not mention
