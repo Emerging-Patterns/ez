@@ -12,6 +12,7 @@ import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
 import ./lock.bend as L
 import ../ez/say.bend as Say
+import ./run.bend as Run
 
 # a write that did not happen is a failure, not a silence
 def wrote(ok: Bool, at: String) -> IO(Unit):
@@ -29,11 +30,19 @@ def put(+lib: String, +hash: String, at: String, text: String) -> IO(Unit):
     ok : Bool <- F.write(dst, text)
     wrote(ok, dst)
 
+# what a fetch answered, or the reason it did not
+def body_of(got: Web.Got) -> IO(String):
+  match got:
+    case Web.Miss{why}:
+      IO.die(String, 1, "ez: " ++ why)
+    case Web.Have{body}:
+      IO.pure(String, body)
+
 # one file of a hub package, fetched and checked against the lock
 def hub.one(+hub: String, +lib: String, +hash: String, +file: K.File) -> IO(Unit):
   do IO<Unit>:
     g : Web.Got <- Web.fetch(L.url_of(hub, hash, K.file.at(file)), K.file.sum(file))
-    text : String <- L.body_of(g)
+    text : String <- body_of(g)
     put(lib, hash, K.file.at(file), text)
 
 # every file of a hub package
@@ -167,6 +176,6 @@ def restore.at(+ss: List<&2, T.Sect>, lib: String) -> IO(Unit):
 # BEND_LIB filled from a lock file
 def restore(at: String) -> IO(Unit):
   do IO<Unit>:
-    lib : String <- L.lib()
+    lib : String <- Run.bend.lib()
     m : Maybe<&2, String> <- F.read(at)
     restore.at(T.sects(T.parse(F.text_of(m))), lib)

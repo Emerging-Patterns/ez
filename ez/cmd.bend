@@ -6,7 +6,8 @@ import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ../manifest/render.bend as Rend
-import ../lock/lock.bend as Lock
+import ../lock/run.bend as Run
+import ../lock/world.bend as W
 import ../lock/restore.bend as Restore
 import ../git/git.bend as Git
 import ../pub/pub.bend as Pub
@@ -16,8 +17,7 @@ import ./env.bend as Env
 import ./cap.bend as Cap
 import ./target.bend as Tgt
 import ./upgrade.bend as Up
-import ./pin.bend as Pin
-import ./sorted.bend as Sorted
+import ../ez/pin.bend as Pin
 import ./named.bend as Named
 import ../ez/say.bend as Say
 
@@ -198,99 +198,53 @@ def publish() -> IO(Unit):
     lib : String <- Env.lib()
     Pub.publish(lib, at)
 
-# a listed path the lock starts from: any but the committed trees under
-# `.ez/`, which are packages and not the project's own sources
-def root.keep(+at: String) -> List<&2, String>:
-  Bool.pick(List<&2, String>, String.starts_with(at, ".ez/"), [], [at])
-
-# every listed path the lock starts from
-def roots.of(ls: List<&2, String>) -> List<&2, String>:
-  match ls:
-    case []:
-      []
-    case h <> t:
-      List.append(&2, String, root.keep(h), roots.of(t))
-
-# the lock's roots, from what `git ls-files` printed: blank lines dropped,
-# `.ez/` dropped, and the rest in order, so the walk starts from the same
-# list on every machine
-def tracked(ls: List<&2, String>) -> List<&2, String>:
-  Sorted.sort(roots.of(Args.nonempty(ls)))
-
-# a listing that failed is not an empty project. Outside a git repository
-# there is no committed tree to lock, and a lock of whatever happened to be
-# on disk is one a clone could not reproduce.
-def sources.got(ok: Bool, +text: String) -> IO(List<&2, String>):
-  match ok:
-    case True{}:
-      IO.pure(List<&2, String>, tracked(String.lines(text)))
-    case False{}:
-      IO.die(List<&2, String>, 1,
-        "ez: ez lock reads the .bend files git tracks, and git could not list them: " ++
-          String.trim(text))
-
-# every .bend file git tracks under the current directory, for the lock's
-# roots. Untracked files are not a clone's, so they are not the lock's.
-def sources() -> IO(List<&2, String>):
-  do IO<List<&2, String>>:
-    +out : String <- R.exec(["git", "-c", "core.quotepath=off", "ls-files",
-      "--", "*.bend"])
-    sources.got(R.ok(out), R.text(out))
-
 # the lock's path, which is fixed
 def lockfile() -> String:
   "ez.lock.toml"
 
-# the lock, rewritten from every root in the tree
-def lock.now() -> IO(Unit):
-  do IO<Unit>:
-    IO.print_err(Say.resolving())
-    srcs : List<&2, String> <- sources()
-    text : String <- Lock.lock(srcs)
-    wrote : Bool <- F.write(lockfile(), text)
-    report.exit(wrote)
-
-# `--package` is only a filter on an upgrade. A plain lock copies every pin
-# as the ledger has it, and refuses one it would have to fill.
+# `--package` is only a filter on an upgrade. A plain lock is the planner's
+# alone (lock/plan.bend): it copies every pin as the ledger has it, refuses
+# one it would have to fill, never writes ez.toml, and writes nothing when it
+# refuses.
 def lock.plain(bare: Bool, +_name: String) -> IO(Unit):
   match bare:
     case True{}:
-      do IO<Unit>:
-        Pin.need()
-        lock.now()
+      Run.run(W.Args{False{}, ""})
     case False{}:
       IO.die(Unit, 1, "ez: --package needs --upgrade")
 
-# `ez lock`, or `ez lock --upgrade` which re-pins git deps and tools first
-# and then resolves. The lock is written from the ledger either way. A tool
-# pin is recorded under `[tools.*]` and is not laid into BEND_LIB. A git
-# dependency whose tree is not under BEND_LIB is fetched at its ledger rev by
+# `ez lock --upgrade` re-pins git deps and tools first and then locks. The
+# lock is written by the planner, from the ledger the upgrade left. A tool pin
+# is recorded under `[tools.*]` and is not laid into BEND_LIB. A git
+# dependency whose tree is not under BEND_LIB is cloned at its ledger rev by
 # the lock itself, since its files are what the lock records; filling the rest
 # of BEND_LIB stays `ez fetch`'s. A `vendor = true` dependency is laid out by
-# the upgrade itself, because that tree is committed.
+# the upgrade itself, because that tree is committed. A lock is of a ledger,
+# so a missing one stops the upgrade before anything is written.
+def lock.read(ledger: M.Read, +name: String) -> IO(Unit):
+  match ledger:
+    case M.Bad{why}:
+      refuse(M.Bad{why})
+    case M.Good{_m}:
+      do IO<Unit>:
+        Up.run(name)
+        Pin.upgrade(name)
+        Run.run(W.Args{True{}, name})
+
+# `ez lock`, or `ez lock --upgrade`. A plain lock reads the ledger itself, and
+# refuses a missing one there.
 def lock.up(up: Bool, +name: String) -> IO(Unit):
   match up:
     case False{}:
       lock.plain(String.is_empty(name), name)
     case True{}:
       do IO<Unit>:
-        Up.run(name)
-        Pin.upgrade(name)
-        lock.now()
-
-# a lock is of a ledger, so a missing one stops it before anything is written
-def lock.read(ledger: M.Read, up: Bool, +name: String) -> IO(Unit):
-  match ledger:
-    case M.Bad{why}:
-      refuse(M.Bad{why})
-    case M.Good{_m}:
-      lock.up(up, name)
+        r : M.Read <- load.edit("lock")
+        lock.read(r, name)
 
 # `ez lock` and `ez lock --upgrade [--package NAME]`
 def lock(up: Bool, +name: String) -> IO(Unit):
-  do IO<Unit>:
-    r : M.Read <- load.edit("lock")
-    lock.read(r, up, name)
+  lock.up(up, name)
 
 # BEND_LIB filled from the lock, with nothing re-resolved
 def fetch() -> IO(Unit):
