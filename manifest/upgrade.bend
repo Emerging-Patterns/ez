@@ -3,8 +3,9 @@
 # floating name a person wrote down, so that is what gets re-resolved. A pin
 # with no tag fast-forwards to the default branch tip when the commit is an
 # ancestor of it, and stays a commit pin. A hub package is the hash itself.
-# `vend` says the tree under `.ez/lib/<hash>` is committed, so a move rewrites
-# the gitignore allowlist that names it. The same move rewrites an
+# `vend` says the tree under `.ez/lib/<hash>` is committed, so a move lays the
+# new tree there; the allowlist that names it is `manifest/ignore.bend`'s,
+# derived from the ledger the move writes. A move also rewrites an
 # `import 0x<hash>` line that names the old hash.
 import Base
 import ./manifest.bend as M
@@ -22,8 +23,8 @@ type Verdict is Data:
   Off{}
   Advance{rev: String, tag: String}
 
-# one committed hash the allowlist must stop naming, and the hash that
-# replaces it
+# one hash that moved, and the hash that replaces it: an import line to
+# rewrite, or a committed tree to remove
 type Swap is Data:
   Swap{old: String, new: String}
 
@@ -165,62 +166,6 @@ def retarget.go(
 def retarget(dep: M.Dep, +rev: String, +hash: String, +root: String, +nar: String) -> M.Dep:
   M.Dep{n, _h, e, s} = dep
   retarget.go(n, e, s, rev, hash, root, nar)
-
-# the gitignore line that keeps one committed tree
-def allow(+hash: String) -> String:
-  "!.ez/lib/" ++ hash
-
-# one line, with the old hash's exception rewritten when it is that line
-def reallow.line(+line: String, +old: String, +new: String) -> String:
-  Bool.pick(String, String.eq(String.trim(line), allow(old)), allow(new), line)
-
-# every line, in order
-def reallow.lines(ls: List<&2, String>, +old: String, +new: String) -> List<&2, String>:
-  match ls:
-    case []:
-      []
-    case +h <> t:
-      reallow.line(h, old, new) <> reallow.lines(t, old, new)
-
-# the rest of the scan only when this line was not the exception
-def listed.step(hit: Bool, rest: Unit -> Bool) -> Bool:
-  match hit:
-    case True{}:
-      True{}
-    case False{}:
-      rest(Unit{})
-
-# whether the allowlist already names this hash
-def listed(ls: List<&2, String>, +hash: String) -> Bool:
-  match ls:
-    case []:
-      False{}
-    case +h <> t:
-      listed.step(String.eq(String.trim(h), allow(hash)), _u => listed(t, hash))
-
-# the exception appended when the old hash was not in the file at all.
-# `String.lines` keeps the empty line a trailing newline is, so joining
-# those lines puts that newline back and a second one must not be added.
-def reallow.fin(present: Bool, +text: String, +hash: String) -> String:
-  match present:
-    case True{}:
-      text
-    case False{}:
-      text ++ allow(hash) ++ "\n"
-
-# the ignore file with one committed hash replaced by another
-def reallow(+text: String, +old: String, +new: String) -> String:
-  +ls = reallow.lines(String.lines(text), old, new)
-  reallow.fin(listed(ls, new), String.join(ls, "\n"), new)
-
-# every replacement, in order. The list is the first argument so the walk is
-# the thing that shrinks; the text is rebuilt as it goes.
-def reallow.many(ss: List<&2, Swap>, +text: String) -> String:
-  match ss:
-    case []:
-      text
-    case Swap{+old, +new} <> t:
-      reallow.many(t, reallow(text, old, new))
 
 # the first of a list of strings, or ""
 def reimport.head(ps: List<&2, String>) -> String:

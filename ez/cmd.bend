@@ -280,8 +280,14 @@ def ignore() -> String:
 # `ez build` drops a binary in `bin/<name>.out` unless it is told otherwise. A
 # project whose first `ez check` leaves untracked output is a project whose
 # owner has to work out for themselves which of it was theirs.
+#
+# `.ez/` is ignored as its contents rather than as a directory, and
+# `.ez/lib` is let back in only to have its contents ignored again. That is
+# what lets a `!.ez/lib/<hash>` line keep a vendored tree: git cannot
+# re-include a file under a directory it has excluded, so under a bare
+# `.ez/` every such line would be inert.
 def init.rules(+name: String) -> List<&2, String>:
-  [".ez/", build.named(name)]
+  [".ez/*", "!.ez/lib", ".ez/lib/*", build.named(name)]
 
 # one step of a scan that is looking for one hit, with the head's answer in
 # hand. `Bool.or` is an ordinary function and reduces both of its sides, so a
@@ -412,15 +418,26 @@ def add.dep(got: Git.Got) -> M.Dep:
   Git.Got{h, u, v, e, t, r, n} = got
   add.dep.go(h, u, v, e, t, r, n)
 
-# the ledger with this dependency written into it
+# the dependencies of a ledger that was read
+def deps.of(manifest: M.Manifest) -> List<&2, M.Dep>:
+  M.Manifest{_n, _e, _b, _h, ds, _ts} = manifest
+  ds
+
+# an edited ledger written, then the gitignore allowlist derived from it
+def edit.write(+next: M.Manifest) -> IO(Unit):
+  do IO<Unit>:
+    wrote : Bool <- F.write(toml(), Rend.show(next))
+    Up.allowlist(deps.of(next))
+    report.exit(wrote)
+
+# the ledger with this dependency written into it. A dependency added again
+# keeps the `vendor = true` its entry already had.
 def add.write(ledger: M.Read, dep: M.Dep) -> IO(Unit):
   match ledger:
     case M.Bad{why}:
       refuse(M.Bad{why})
     case M.Good{m}:
-      do IO<Unit>:
-        wrote : Bool <- F.write(toml(), Rend.show(Rend.add(m, dep)))
-        report.exit(wrote)
+      edit.write(Rend.add.keep(m, dep))
 
 # a git dependency vendored, and then recorded in the ledger under its own
 # name. The vendoring comes first: a ledger naming a package that is not on
@@ -465,15 +482,13 @@ def add(+target: String, +ref: String, +entry: String) -> IO(Unit):
     +got : String <- add.ref.at(Bool.not(String.is_empty(ref)), url, ref)
     add.go(url, got, entry)
 
-# the ledger with a dependency dropped
+# the ledger with a dependency dropped, and its allowlist line with it
 def remove.write(ledger: M.Read, name: String) -> IO(Unit):
   match ledger:
     case M.Bad{why}:
       refuse(M.Bad{why})
     case M.Good{m}:
-      do IO<Unit>:
-        wrote : Bool <- F.write(toml(), Rend.show(Rend.remove(m, name)))
-        report.exit(wrote)
+      edit.write(Rend.remove(m, name))
 
 # `ez remove <name>`
 def remove(+name: String) -> IO(Unit):

@@ -28,7 +28,7 @@ def fresh(+repo: String, +app: String) -> IO(Unit):
     g : Maybe<&2, String> <- F.read(app ++ "/.gitignore")
     Check.eq_str("and the ignore rules for what ez will generate",
       Q.chomp(F.text_of(g)),
-      "# written by ez\n.ez/\nbin/app.out")
+      "# written by ez\n.ez/*\n!.ez/lib\n.ez/lib/*\nbin/app.out")
     e : Maybe<&2, String> <- F.read(app ++ "/main.bend")
     Check.eq_str("and an entry that checks and runs",
       Q.chomp(F.text_of(e)), stub())
@@ -47,7 +47,7 @@ def kept(+repo: String, +app: String) -> IO(Unit):
     g : Maybe<&2, String> <- F.read(app ++ "/.gitignore")
     Check.eq_str("and does not rewrite the ignore file",
       Q.chomp(F.text_of(g)),
-      "# written by ez\n.ez/\nbin/app.out")
+      "# written by ez\n.ez/*\n!.ez/lib\n.ez/lib/*\nbin/app.out")
 
 # an entry under a directory that is not there yet
 def nested(+repo: String, +app: String) -> IO(Unit):
