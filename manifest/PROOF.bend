@@ -5,6 +5,7 @@ import ./manifest.bend as M
 import ./render.bend as R
 import ./ignore.bend as I
 import ../check/eq.bend as Eq
+import ./upgrade.bend as U
 import ../check/str.bend as Str
 import ./LAWS.bend as Laws
 
@@ -3424,3 +3425,790 @@ def Laws.sync_idempotent(ds, text, ev):
   sync_idem.arm(ds, text,
     String.eq(I.file.text(I.lines(ds, I.file.lines(text))),
       I.file.text(I.file.lines(text))), {==}, ev)
+
+# Import rewriting. The text is cut at its newlines and joined back, and no
+# rewritten line holds a newline, so the lines afterwards are the lines
+# before, each rewritten. A line that names no moved hash is left as it is.
+# A line that names one is rewritten by the first move of it, and no move
+# after that one names the new hash, since a hash holds no `/`: a line that
+# starts `import <a>/` and `import <b>/` has `a` and `b` the same.
+
+# LAW: the empty line names nothing, so a move leaves it
+law line_empty:
+  for +o: String
+  for +n: String
+  {U.reimport.line("", o, n) == "" : String}
+
+def line_empty(o, _n):
+  match o:
+    case SNil{}:
+      {==}
+    case SCon{c, r}:
+      {==}
+
+# LAW: and so does every move
+law many_empty:
+  for ss: List<&2, U.Swap>
+  {U.reimport.many.line(ss, "") == "" : String}
+
+def many_empty(ss):
+  match ss:
+    case []:
+      {==}
+    case U.Swap{+o, +n} <> +t:
+      Equal.trans(String,
+        U.reimport.many.line(t, U.reimport.line("", o, n)),
+        U.reimport.many.line(t, ""),
+        "",
+        Equal.cong(String, String, x => U.reimport.many.line(t, x),
+          U.reimport.line("", o, n), "", line_empty(o, n)),
+        many_empty(t))
+
+# LAW: the line at a place, after every line was rewritten, is the line that
+# was there, rewritten
+law at_many:
+  for +ss: List<&2, U.Swap>
+  for ls: List<&2, String>
+  for i: Nat
+  {Laws.line.at(U.reimport.many.lines(ss, ls), i)
+    == U.reimport.many.line(ss, Laws.line.at(ls, i)) : String}
+
+def at_many(ss, ls, i):
+  match ls i:
+    case Nil{} _:
+      Equal.sym(String, U.reimport.many.line(ss, ""), "", many_empty(ss))
+    case h <> t 0n:
+      {==}
+    case h <> t 1n+p:
+      at_many(ss, t, p)
+
+# LAW: a line a move names starts with the text the move writes in front
+law head_clear:
+  for +n: String
+  for +en: {Str.clear(n, '\n') == True{} : Bool}
+  {Str.clear(U.reimport.head(n), '\n') == True{} : Bool}
+
+def head_clear(n, en):
+  Equal.trans(Bool,
+    Str.clear(String.append(n, "/"), '\n'),
+    Bool.and(Str.clear(n, '\n'), Str.clear("/", '\n')),
+    True{},
+    Str.clear_append(n, "/", '\n'),
+    and_tt(Str.clear(n, '\n'), Str.clear("/", '\n'), en, {==}))
+
+# LAW: one line, with whether the move names it given as a parameter: what the
+# move writes holds no newline when the line and the new hash hold none
+law line_clear.arm:
+  for b: Bool
+  for +l: String
+  for +o: String
+  for +n: String
+  for +el: {Str.clear(l, '\n') == True{} : Bool}
+  for +en: {Str.clear(n, '\n') == True{} : Bool}
+  {Str.clear(U.reimport.line.go(b, l, o, n), '\n') == True{} : Bool}
+
+def line_clear.arm(b, l, o, n, el, en):
+  match b:
+    case True{}:
+      Equal.trans(Bool,
+        Str.clear(String.append(U.reimport.head(n),
+          String.drop(l, String.length(U.reimport.head(o)))), '\n'),
+        Bool.and(Str.clear(U.reimport.head(n), '\n'),
+          Str.clear(String.drop(l, String.length(U.reimport.head(o))), '\n')),
+        True{},
+        Str.clear_append(U.reimport.head(n),
+          String.drop(l, String.length(U.reimport.head(o))), '\n'),
+        and_tt(Str.clear(U.reimport.head(n), '\n'),
+          Str.clear(String.drop(l, String.length(U.reimport.head(o))), '\n'),
+          head_clear(n, en),
+          Str.drop_clear(l, String.length(U.reimport.head(o)), '\n', el)))
+    case False{}:
+      el
+
+# LAW: the old hash of the first move names something
+law ok_old_full:
+  for +o: String
+  for +n: String
+  for +t: List<&2, U.Swap>
+  for +ok: {Laws.moves.ok(U.Swap{o, n} <> t) == True{} : Bool}
+  {String.is_empty(o) == False{} : Bool}
+
+def ok_old_full(o, n, t, ok):
+  Eq.not.true(String.is_empty(o),
+    Eq.and.left(Bool.not(String.is_empty(o)), Laws.plain(o),
+      Eq.and.left(Bool.and(Bool.not(String.is_empty(o)), Laws.plain(o)),
+        Bool.and(Laws.plain(n), Laws.olds.miss(t, n)),
+        Eq.and.left(Bool.and(Bool.and(Bool.not(String.is_empty(o)), Laws.plain(o)),
+          Bool.and(Laws.plain(n), Laws.olds.miss(t, n))), Laws.moves.ok(t), ok))))
+
+# LAW: and is plain
+law ok_old_plain:
+  for +o: String
+  for +n: String
+  for +t: List<&2, U.Swap>
+  for +ok: {Laws.moves.ok(U.Swap{o, n} <> t) == True{} : Bool}
+  {Laws.plain(o) == True{} : Bool}
+
+def ok_old_plain(o, n, t, ok):
+  Eq.and.right(Bool.not(String.is_empty(o)), Laws.plain(o),
+    Eq.and.left(Bool.and(Bool.not(String.is_empty(o)), Laws.plain(o)),
+      Bool.and(Laws.plain(n), Laws.olds.miss(t, n)),
+      Eq.and.left(Bool.and(Bool.and(Bool.not(String.is_empty(o)), Laws.plain(o)),
+        Bool.and(Laws.plain(n), Laws.olds.miss(t, n))), Laws.moves.ok(t), ok)))
+
+# LAW: the new hash is plain
+law ok_new_plain:
+  for +o: String
+  for +n: String
+  for +t: List<&2, U.Swap>
+  for +ok: {Laws.moves.ok(U.Swap{o, n} <> t) == True{} : Bool}
+  {Laws.plain(n) == True{} : Bool}
+
+def ok_new_plain(o, n, t, ok):
+  Eq.and.left(Laws.plain(n), Laws.olds.miss(t, n),
+    Eq.and.right(Bool.and(Bool.not(String.is_empty(o)), Laws.plain(o)),
+      Bool.and(Laws.plain(n), Laws.olds.miss(t, n)),
+      Eq.and.left(Bool.and(Bool.and(Bool.not(String.is_empty(o)), Laws.plain(o)),
+        Bool.and(Laws.plain(n), Laws.olds.miss(t, n))), Laws.moves.ok(t), ok)))
+
+# LAW: and is no old hash of a move after it
+law ok_new_miss:
+  for +o: String
+  for +n: String
+  for +t: List<&2, U.Swap>
+  for +ok: {Laws.moves.ok(U.Swap{o, n} <> t) == True{} : Bool}
+  {Laws.olds.miss(t, n) == True{} : Bool}
+
+def ok_new_miss(o, n, t, ok):
+  Eq.and.right(Laws.plain(n), Laws.olds.miss(t, n),
+    Eq.and.right(Bool.and(Bool.not(String.is_empty(o)), Laws.plain(o)),
+      Bool.and(Laws.plain(n), Laws.olds.miss(t, n)),
+      Eq.and.left(Bool.and(Bool.and(Bool.not(String.is_empty(o)), Laws.plain(o)),
+        Bool.and(Laws.plain(n), Laws.olds.miss(t, n))), Laws.moves.ok(t), ok)))
+
+# LAW: and the moves after the first are an upgrade's moves too
+law ok_rest:
+  for +o: String
+  for +n: String
+  for +t: List<&2, U.Swap>
+  for +ok: {Laws.moves.ok(U.Swap{o, n} <> t) == True{} : Bool}
+  {Laws.moves.ok(t) == True{} : Bool}
+
+def ok_rest(o, n, t, ok):
+  Eq.and.right(Bool.and(Bool.and(Bool.not(String.is_empty(o)), Laws.plain(o)),
+    Bool.and(Laws.plain(n), Laws.olds.miss(t, n))), Laws.moves.ok(t), ok)
+
+# LAW: a plain hash holds no `/`
+law plain_slash:
+  for +s: String
+  for e: {Laws.plain(s) == True{} : Bool}
+  {Str.clear(s, '/') == True{} : Bool}
+
+def plain_slash(s, e):
+  Eq.and.left(Str.clear(s, '/'), Str.clear(s, '\n'), e)
+
+# LAW: and no newline
+law plain_nl:
+  for +s: String
+  for e: {Laws.plain(s) == True{} : Bool}
+  {Str.clear(s, '\n') == True{} : Bool}
+
+def plain_nl(s, e):
+  Eq.and.right(Str.clear(s, '/'), Str.clear(s, '\n'), e)
+
+# LAW: a line put through every move holds no newline when it held none
+law many_line_clear:
+  for +ss: List<&2, U.Swap>
+  for +l: String
+  for +ok: {Laws.moves.ok(ss) == True{} : Bool}
+  for +el: {Str.clear(l, '\n') == True{} : Bool}
+  {Str.clear(U.reimport.many.line(ss, l), '\n') == True{} : Bool}
+
+def many_line_clear(ss, l, ok, el):
+  match ss:
+    case []:
+      el
+    case U.Swap{+o, +n} <> +t:
+      many_line_clear(t, U.reimport.line(l, o, n), ok_rest(o, n, t, ok),
+        line_clear.arm(U.reimport.hit(String.is_empty(o), l, o), l, o, n, el,
+          plain_nl(n, ok_new_plain(o, n, t, ok))))
+
+# LAW: and so does every line
+law many_lines_clear:
+  for +ss: List<&2, U.Swap>
+  for ls: List<&2, String>
+  for +ok: {Laws.moves.ok(ss) == True{} : Bool}
+  for +el: {Str.clear.all(ls, '\n') == True{} : Bool}
+  {Str.clear.all(U.reimport.many.lines(ss, ls), '\n') == True{} : Bool}
+
+def many_lines_clear(ss, ls, ok, el):
+  match ls:
+    case []:
+      {==}
+    case +h <> +t:
+      and_tt(Str.clear(U.reimport.many.line(ss, h), '\n'),
+        Str.clear.all(U.reimport.many.lines(ss, t), '\n'),
+        many_line_clear(ss, h, ok, Eq.and.left(Str.clear(h, '\n'), Str.clear.all(t, '\n'), el)),
+        many_lines_clear(ss, t, ok, Eq.and.right(Str.clear(h, '\n'), Str.clear.all(t, '\n'), el)))
+
+# LAW: the pieces of a text, rewritten and joined back, cut back into those
+# rewritten pieces
+law by_line.arm:
+  for +ss: List<&2, U.Swap>
+  for +ps: List<&2, String>
+  for +ok: {Laws.moves.ok(ss) == True{} : Bool}
+  for +ec: {Str.clear.all(ps, '\n') == True{} : Bool}
+  for ne: {List.is_empty(&2, String, ps) == False{} : Bool}
+  {String.split(String.join(U.reimport.many.lines(ss, ps), "\n"), '\n')
+    == U.reimport.many.lines(ss, ps) : List<&2, String>}
+
+def by_line.arm(ss, ps, ok, ec, ne):
+  match ps:
+    case []:
+      Eq.bit.absurd2(&2, {String.split(String.join(U.reimport.many.lines(ss, []), "\n"), '\n')
+        == U.reimport.many.lines(ss, []) : List<&2, String>}, ne)
+    case +p <> +r:
+      Str.split_join(U.reimport.many.line(ss, p), U.reimport.many.lines(ss, r), '\n',
+        many_lines_clear(ss, p <> r, ok, ec))
+
+def Laws.rewrite_by_line(ss, text, ok):
+  by_line.arm(ss, String.split(text, '\n'), ok, Str.split_clear(text, '\n'),
+    Str.split_cons(text, '\n'))
+
+# LAW: one move, with whether it can name anything given as a parameter,
+# leaves a line that does not start with its `import <old>/`
+law line_keeps.arm:
+  for b: Bool
+  for +l: String
+  for +o: String
+  for +n: String
+  for e: {String.starts_with(l, U.reimport.head(o)) == False{} : Bool}
+  {U.reimport.line.go(U.reimport.hit(b, l, o), l, o, n) == l : String}
+
+def line_keeps.arm(b, l, o, n, e):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      %Equal.sym(Bool, String.starts_with(l, U.reimport.head(o)), False{}, e)
+        : {U.reimport.line.go(_, l, o, n) == l : String}
+      {==}
+
+# LAW: a line a move does not name is left as it is
+law line_keeps:
+  for +l: String
+  for +o: String
+  for +n: String
+  for e: {String.starts_with(l, U.reimport.head(o)) == False{} : Bool}
+  {U.reimport.line(l, o, n) == l : String}
+
+def line_keeps(l, o, n, e):
+  line_keeps.arm(String.is_empty(o), l, o, n, e)
+
+# LAW: and a line no move names is left by all of them
+law many_keeps:
+  for ss: List<&2, U.Swap>
+  for +l: String
+  for +none: {Laws.names.none(ss, l) == True{} : Bool}
+  {U.reimport.many.line(ss, l) == l : String}
+
+def many_keeps(ss, l, none):
+  match ss:
+    case []:
+      {==}
+    case U.Swap{+o, +n} <> +t:
+      Equal.trans(String,
+        U.reimport.many.line(t, U.reimport.line(l, o, n)),
+        U.reimport.many.line(t, l),
+        l,
+        Equal.cong(String, String, x => U.reimport.many.line(t, x),
+          U.reimport.line(l, o, n), l,
+          line_keeps(l, o, n, Eq.not.true(String.starts_with(l, U.reimport.head(o)),
+            Eq.and.left(Bool.not(String.starts_with(l, U.reimport.head(o))),
+              Laws.names.none(t, l), none)))),
+        many_keeps(t, l, Eq.and.right(Bool.not(String.starts_with(l, U.reimport.head(o))),
+          Laws.names.none(t, l), none)))
+
+def Laws.rewrite_keeps_other_lines(ss, text, i, ok, miss):
+  Equal.trans(String,
+    Laws.line.at(String.lines(U.reimport.many(ss, text)), i),
+    Laws.line.at(U.reimport.many.lines(ss, String.lines(text)), i),
+    Laws.line.at(String.lines(text), i),
+    Equal.cong(List<&2, String>, String, ls => Laws.line.at(ls, i),
+      String.lines(U.reimport.many(ss, text)),
+      U.reimport.many.lines(ss, String.lines(text)),
+      Laws.rewrite_by_line(ss, text, ok)),
+    Equal.trans(String,
+      Laws.line.at(U.reimport.many.lines(ss, String.lines(text)), i),
+      U.reimport.many.line(ss, Laws.line.at(String.lines(text), i)),
+      Laws.line.at(String.lines(text), i),
+      at_many(ss, String.lines(text), i),
+      many_keeps(ss, Laws.line.at(String.lines(text), i), miss)))
+
+# LAW: rewriting every line keeps their number
+law many_length:
+  for +ss: List<&2, U.Swap>
+  for ls: List<&2, String>
+  {List.length(&2, String, U.reimport.many.lines(ss, ls))
+    == List.length(&2, String, ls) : Nat}
+
+def many_length(ss, ls):
+  match ls:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.cong(Nat, Nat, x => 1n+x,
+        List.length(&2, String, U.reimport.many.lines(ss, t)),
+        List.length(&2, String, t), many_length(ss, t))
+
+def Laws.rewrite_keeps_line_count(ss, text, ok):
+  Equal.trans(Nat,
+    List.length(&2, String, String.lines(U.reimport.many(ss, text))),
+    List.length(&2, String, U.reimport.many.lines(ss, String.lines(text))),
+    List.length(&2, String, String.lines(text)),
+    Equal.cong(List<&2, String>, Nat, ls => List.length(&2, String, ls),
+      String.lines(U.reimport.many(ss, text)),
+      U.reimport.many.lines(ss, String.lines(text)),
+      Laws.rewrite_by_line(ss, text, ok)),
+    many_length(ss, String.lines(text)))
+
+# LAW: lines none of which a move names are left as they are
+law many_lines_keep:
+  for +ss: List<&2, U.Swap>
+  for ls: List<&2, String>
+  for +none: {Laws.names.none.all(ss, ls) == True{} : Bool}
+  {U.reimport.many.lines(ss, ls) == ls : List<&2, String>}
+
+def many_lines_keep(ss, ls, none):
+  match ls:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.trans(List<&2, String>,
+        U.reimport.many.line(ss, h) <> U.reimport.many.lines(ss, t),
+        h <> U.reimport.many.lines(ss, t),
+        h <> t,
+        Equal.cong(String, List<&2, String>, x => x <> U.reimport.many.lines(ss, t),
+          U.reimport.many.line(ss, h), h,
+          many_keeps(ss, h, Eq.and.left(Laws.names.none(ss, h), Laws.names.none.all(ss, t),
+            none))),
+        Equal.cong(List<&2, String>, List<&2, String>, y => h <> y,
+          U.reimport.many.lines(ss, t), t,
+          many_lines_keep(ss, t, Eq.and.right(Laws.names.none(ss, h),
+            Laws.names.none.all(ss, t), none))))
+
+def Laws.rewrite_nothing_named(ss, text, none):
+  Equal.trans(String,
+    String.join(U.reimport.many.lines(ss, String.split(text, '\n')), "\n"),
+    String.join(String.split(text, '\n'), "\n"),
+    text,
+    Equal.cong(List<&2, String>, String, ls => String.join(ls, "\n"),
+      U.reimport.many.lines(ss, String.split(text, '\n')), String.split(text, '\n'),
+      many_lines_keep(ss, String.split(text, '\n'), none)),
+    Str.join_split(text, '\n'))
+
+# A line names one hash at most. `import <a>/` and `import <b>/` both at the
+# front of a line, with neither hash holding `/`, have `a` and `b` the same:
+# the first `/` after `import ` ends both.
+
+# LAW: a prefix check that held had heads that compared equal
+law sw_if_head:
+  for t: String
+  for p: String
+  for s: Bool
+  for e: {String.starts_with.if(t, p, s) == True{} : Bool}
+  {s == True{} : Bool}
+
+def sw_if_head(t, p, s, e):
+  match s:
+    case True{}:
+      {==}
+    case False{}:
+      e
+
+# LAW: and tails that held
+law sw_if_tail:
+  for t: String
+  for p: String
+  for s: Bool
+  for e: {String.starts_with.if(t, p, s) == True{} : Bool}
+  {String.starts_with(t, p) == True{} : Bool}
+
+def sw_if_tail(t, p, s, e):
+  match s:
+    case True{}:
+      e
+    case False{}:
+      Eq.bit.absurd(&2, {String.starts_with(t, p) == True{} : Bool}, e)
+
+# LAW: a string that starts with two joined starts, past the first, with the
+# second
+law sw_drop:
+  for p: String
+  for +x: String
+  for +q: String
+  for e: {String.starts_with(x, String.append(p, q)) == True{} : Bool}
+  {String.starts_with(String.drop(x, String.length(p)), q) == True{} : Bool}
+
+def sw_drop(p, x, q, e):
+  match p x:
+    case SNil{} SNil{}:
+      e
+    case SNil{} SCon{y, r}:
+      e
+    case SCon{c, p2} SNil{}:
+      Eq.bit.absurd(&2, {String.starts_with(String.drop(SNil{}, String.length(SCon{c, p2})), q)
+        == True{} : Bool}, e)
+    case SCon{+c, +p2} SCon{+y, +r}:
+      sw_drop(p2, r, q, sw_if_tail(r, String.append(p2, q), Char.is_eq(y, c), e))
+
+# LAW: `/` held by a string that holds none is a contradiction
+law slash_clash:
+  for +c: Char
+  for +y: Char
+  for +b: String
+  for ey: {Char.is_eq(y, '/') == True{} : Bool}
+  for ec: {Char.is_eq(y, c) == True{} : Bool}
+  for eb: {Str.clear(SCon{c, b}, '/') == True{} : Bool}
+  Empty
+
+def slash_clash(c, y, b, ey, ec, eb):
+  Eq.bit.clash2(Equal.trans(Bool, True{}, Char.is_eq(c, '/'), False{},
+    Equal.trans(Bool, True{}, Char.is_eq(y, '/'), Char.is_eq(c, '/'),
+      Equal.sym(Bool, Char.is_eq(y, '/'), True{}, ey),
+      Equal.cong(Char, Bool, x => Char.is_eq(x, '/'), y, c, Str.char_eq_true(y, c, ec))),
+    Eq.not.true(Char.is_eq(c, '/'),
+      Eq.and.left(Bool.not(Char.is_eq(c, '/')), Str.clear(b, '/'), eb))))
+
+# LAW: two strings that hold no `/`, each followed by `/` at the front of one
+# text, are one string
+law sl_same:
+  for +a: String
+  for +b: String
+  for +z: String
+  for +ea: {Str.clear(a, '/') == True{} : Bool}
+  for +eb: {Str.clear(b, '/') == True{} : Bool}
+  for +ha: {String.starts_with(z, String.append(a, "/")) == True{} : Bool}
+  for +hb: {String.starts_with(z, String.append(b, "/")) == True{} : Bool}
+  {a == b : String}
+
+def sl_same(a, b, z, ea, eb, ha, hb):
+  match a b:
+    case SNil{} SNil{}:
+      {==}
+    case SNil{} SCon{+d, +b2}:
+      match z:
+        case SNil{}:
+          Eq.bit.absurd(&2, {SNil{} == SCon{d, b2} : String}, ha)
+        case SCon{+y, +r}:
+          Empty.absurd({SNil{} == SCon{d, b2} : String},
+            slash_clash(d, y, b2,
+              sw_if_head(r, "", Char.is_eq(y, '/'), ha),
+              sw_if_head(r, String.append(b2, "/"), Char.is_eq(y, d), hb), eb))
+    case SCon{+c, +a2} SNil{}:
+      match z:
+        case SNil{}:
+          Eq.bit.absurd(&2, {SCon{c, a2} == SNil{} : String}, ha)
+        case SCon{+y, +r}:
+          Empty.absurd({SCon{c, a2} == SNil{} : String},
+            slash_clash(c, y, a2,
+              sw_if_head(r, "", Char.is_eq(y, '/'), hb),
+              sw_if_head(r, String.append(a2, "/"), Char.is_eq(y, c), ha), ea))
+    case SCon{+c, +a2} SCon{+d, +b2}:
+      match z:
+        case SNil{}:
+          Eq.bit.absurd(&2, {SCon{c, a2} == SCon{d, b2} : String}, ha)
+        case SCon{+y, +r}:
+          Equal.trans(String, SCon{c, a2}, SCon{d, a2}, SCon{d, b2},
+            Equal.cong(Char, String, x => SCon{x, a2}, c, d,
+              Equal.trans(Char, c, y, d,
+                Equal.sym(Char, y, c, Str.char_eq_true(y, c,
+                  sw_if_head(r, String.append(a2, "/"), Char.is_eq(y, c), ha))),
+                Str.char_eq_true(y, d,
+                  sw_if_head(r, String.append(b2, "/"), Char.is_eq(y, d), hb)))),
+            Equal.cong(String, String, x => SCon{d, x}, a2, b2,
+              sl_same(a2, b2, r,
+                Eq.and.right(Bool.not(Char.is_eq(c, '/')), Str.clear(a2, '/'), ea),
+                Eq.and.right(Bool.not(Char.is_eq(d, '/')), Str.clear(b2, '/'), eb),
+                sw_if_tail(r, String.append(a2, "/"), Char.is_eq(y, c), ha),
+                sw_if_tail(r, String.append(b2, "/"), Char.is_eq(y, d), hb))))
+
+# LAW: a line that names two hashes that hold no `/` names one hash twice
+law prefix_same:
+  for +x: String
+  for +a: String
+  for +b: String
+  for +ea: {Str.clear(a, '/') == True{} : Bool}
+  for +eb: {Str.clear(b, '/') == True{} : Bool}
+  for ha: {String.starts_with(x, U.reimport.head(a)) == True{} : Bool}
+  for hb: {String.starts_with(x, U.reimport.head(b)) == True{} : Bool}
+  {a == b : String}
+
+def prefix_same(x, a, b, ea, eb, ha, hb):
+  sl_same(a, b, String.drop(x, 7n), ea, eb,
+    sw_drop("import ", x, String.append(a, "/"), ha),
+    sw_drop("import ", x, String.append(b, "/"), hb))
+
+# LAW: a line that names a plain hash names no plain hash the hash is not
+law prefix_other:
+  for +x: String
+  for +a: String
+  for +b: String
+  for +ea: {Str.clear(a, '/') == True{} : Bool}
+  for +eb: {Str.clear(b, '/') == True{} : Bool}
+  for ha: {String.starts_with(x, U.reimport.head(a)) == True{} : Bool}
+  for ne: {String.eq(b, a) == False{} : Bool}
+  {String.starts_with(x, U.reimport.head(b)) == False{} : Bool}
+
+# LAW: the same, with how the line compares to the second given as a
+# parameter
+law prefix_other.arm:
+  for +x: String
+  for +a: String
+  for +b: String
+  for s: Bool
+  for es: {String.starts_with(x, U.reimport.head(b)) == s : Bool}
+  for +ea: {Str.clear(a, '/') == True{} : Bool}
+  for +eb: {Str.clear(b, '/') == True{} : Bool}
+  for ha: {String.starts_with(x, U.reimport.head(a)) == True{} : Bool}
+  for ne: {String.eq(b, a) == False{} : Bool}
+  {String.starts_with(x, U.reimport.head(b)) == False{} : Bool}
+
+def prefix_other.arm(x, a, b, s, es, ea, eb, ha, ne):
+  match s:
+    case False{}:
+      es
+    case True{}:
+      Eq.bit.absurd2(&2, {String.starts_with(x, U.reimport.head(b)) == False{} : Bool},
+        Equal.trans(Bool, True{}, String.eq(b, a), False{},
+          Equal.trans(Bool, True{}, String.eq(b, b), String.eq(b, a),
+            Equal.sym(Bool, String.eq(b, b), True{}, Eq.string_eq_self(b)),
+            Equal.cong(String, Bool, q => String.eq(b, q), b, a,
+              prefix_same(x, b, a, eb, ea, es, ha))),
+          ne))
+
+def prefix_other(x, a, b, ea, eb, ha, ne):
+  prefix_other.arm(x, a, b, String.starts_with(x, U.reimport.head(b)), {==}, ea, eb, ha, ne)
+
+# LAW: a line a move rewrote names none of the moves after it, whose old
+# hashes are plain and none of which is the new hash
+law names_none_new:
+  for +t: List<&2, U.Swap>
+  for +n: String
+  for +rest: String
+  for +pn: {Str.clear(n, '/') == True{} : Bool}
+  for +miss: {Laws.olds.miss(t, n) == True{} : Bool}
+  for +ok: {Laws.moves.ok(t) == True{} : Bool}
+  {Laws.names.none(t, String.append(U.reimport.head(n), rest)) == True{} : Bool}
+
+def names_none_new(t, n, rest, pn, miss, ok):
+  match t:
+    case []:
+      {==}
+    case U.Swap{+o, +n2} <> +t2:
+      and_tt(Bool.not(String.starts_with(String.append(U.reimport.head(n), rest),
+          U.reimport.head(o))),
+        Laws.names.none(t2, String.append(U.reimport.head(n), rest)),
+        not_of_false(String.starts_with(String.append(U.reimport.head(n), rest),
+            U.reimport.head(o)),
+          prefix_other(String.append(U.reimport.head(n), rest), n, o, pn,
+            plain_slash(o, ok_old_plain(o, n2, t2, ok)),
+            Eq.starts_append(U.reimport.head(n), rest),
+            Eq.not.true(String.eq(o, n),
+              Eq.and.left(Bool.not(String.eq(o, n)), Laws.olds.miss(t2, n), miss)))),
+        names_none_new(t2, n, rest, pn,
+          Eq.and.right(Bool.not(String.eq(o, n)), Laws.olds.miss(t2, n), miss),
+          ok_rest(o, n2, t2, ok)))
+
+# the hash a move sends to, or "" for none. Law vocabulary: ez never calls it.
+def some.of(m: Maybe<&2, String>) -> String:
+  match m:
+    case None{}:
+      ""
+    case Some{x}:
+      x
+
+# the type that is empty where a move was found
+def some.emp(m: Maybe<&2, String>) -> Type:
+  match m:
+    case None{}:
+      Unit
+    case Some{x}:
+      Empty
+
+# LAW: no move is found in no moves
+law none_some:
+  for +new: String
+  for e: {None{} == Some{new} : Maybe<&2, String>}
+  Empty
+
+def none_some(new, e):
+  %e : some.emp(_)
+  Unit{}
+
+# LAW: a line a move names, when the move's old hash names something, is
+# rewritten to start with the new hash
+law line_hits:
+  for +l: String
+  for +o: String
+  for +n: String
+  for eo: {String.is_empty(o) == False{} : Bool}
+  for eh: {String.starts_with(l, U.reimport.head(o)) == True{} : Bool}
+  {U.reimport.line(l, o, n)
+    == String.append(U.reimport.head(n), String.drop(l, String.length(U.reimport.head(o))))
+    : String}
+
+def line_hits(l, o, n, eo, eh):
+  %Equal.sym(Bool, String.is_empty(o), False{}, eo)
+    : {U.reimport.line.go(U.reimport.hit(_, l, o), l, o, n)
+      == String.append(U.reimport.head(n), String.drop(l, String.length(U.reimport.head(o))))
+      : String}
+  %Equal.sym(Bool, String.starts_with(l, U.reimport.head(o)), True{}, eh)
+    : {U.reimport.line.go(_, l, o, n)
+      == String.append(U.reimport.head(n), String.drop(l, String.length(U.reimport.head(o))))
+      : String}
+  {==}
+
+# LAW: one move, with whether it is the first move of the old hash given as a
+# parameter: the first rewrites the line, and no move after it touches it
+# again; one of another hash does not name the line, which is left for the
+# moves after it
+law names_new.arm:
+  for c: Bool
+  for +o: String
+  for +n: String
+  for +t: List<&2, U.Swap>
+  for +l: String
+  for +old: String
+  for +new: String
+  for ec: {String.eq(o, old) == c : Bool}
+  for +ok: {Laws.moves.ok(U.Swap{o, n} <> t) == True{} : Bool}
+  for to: {Bool.pick(Maybe<&2, String>, c, Some{n}, Laws.moved.to(t, old)) == Some{new}
+    : Maybe<&2, String>}
+  for +hit: {String.starts_with(l, U.reimport.head(old)) == True{} : Bool}
+  for +pold: {Str.clear(old, '/') == True{} : Bool}
+  for ih: {Laws.moved.to(t, old) == Some{new} : Maybe<&2, String>}
+    -> {String.starts_with(U.reimport.many.line(t, l), U.reimport.head(new)) == True{} : Bool}
+  {String.starts_with(U.reimport.many.line(t, U.reimport.line(l, o, n)),
+    U.reimport.head(new)) == True{} : Bool}
+
+def names_new.arm(c, o, n, t, l, old, new, ec, ok, to, hit, pold, ih):
+  match c:
+    case True{}:
+      %Equal.cong(Maybe<&2, String>, String, m => some.of(m), Some{n}, Some{new}, to)
+        : {String.starts_with(U.reimport.many.line(t, U.reimport.line(l, o, n)),
+          U.reimport.head(_)) == True{} : Bool}
+      %Equal.sym(String, U.reimport.line(l, o, n),
+        String.append(U.reimport.head(n), String.drop(l, String.length(U.reimport.head(o)))),
+        line_hits(l, o, n, ok_old_full(o, n, t, ok),
+          Equal.trans(Bool, String.starts_with(l, U.reimport.head(o)),
+            String.starts_with(l, U.reimport.head(old)), True{},
+            Equal.cong(String, Bool, q => String.starts_with(l, U.reimport.head(q)), o, old,
+              Str.string_eq_true(o, old, ec)),
+            hit)))
+        : {String.starts_with(U.reimport.many.line(t, _), U.reimport.head(n)) == True{} : Bool}
+      %Equal.sym(String,
+        U.reimport.many.line(t,
+          String.append(U.reimport.head(n), String.drop(l, String.length(U.reimport.head(o))))),
+        String.append(U.reimport.head(n), String.drop(l, String.length(U.reimport.head(o)))),
+        many_keeps(t,
+          String.append(U.reimport.head(n), String.drop(l, String.length(U.reimport.head(o)))),
+          names_none_new(t, n, String.drop(l, String.length(U.reimport.head(o))),
+            plain_slash(n, ok_new_plain(o, n, t, ok)), ok_new_miss(o, n, t, ok),
+            ok_rest(o, n, t, ok))))
+        : {String.starts_with(_, U.reimport.head(n)) == True{} : Bool}
+      Eq.starts_append(U.reimport.head(n), String.drop(l, String.length(U.reimport.head(o))))
+    case False{}:
+      %Equal.sym(String, U.reimport.line(l, o, n), l,
+        line_keeps(l, o, n,
+          prefix_other(l, old, o, pold, plain_slash(o, ok_old_plain(o, n, t, ok)), hit, ec)))
+        : {String.starts_with(U.reimport.many.line(t, _), U.reimport.head(new)) == True{} : Bool}
+      ih(to)
+
+# LAW: a line that names an old hash starts, after every move, with the hash
+# the first move of it sends it to
+law names_new:
+  for ss: List<&2, U.Swap>
+  for +l: String
+  for +old: String
+  for +new: String
+  for +ok: {Laws.moves.ok(ss) == True{} : Bool}
+  for to: {Laws.moved.to(ss, old) == Some{new} : Maybe<&2, String>}
+  for +hit: {String.starts_with(l, U.reimport.head(old)) == True{} : Bool}
+  for +pold: {Str.clear(old, '/') == True{} : Bool}
+  {String.starts_with(U.reimport.many.line(ss, l), U.reimport.head(new)) == True{} : Bool}
+
+def names_new(ss, l, old, new, ok, to, hit, pold):
+  match ss:
+    case []:
+      Empty.absurd({String.starts_with(l, U.reimport.head(new)) == True{} : Bool},
+        none_some(new, to))
+    case U.Swap{+o, +n} <> +t:
+      names_new.arm(String.eq(o, old), o, n, t, l, old, new, {==}, ok, to, hit, pold,
+        x => names_new(t, l, old, new, ok_rest(o, n, t, ok), x, hit, pold))
+
+# LAW: a hash a move is found for is plain, as every old hash of the moves is
+law moved_plain.arm:
+  for c: Bool
+  for +o: String
+  for +n: String
+  for +t: List<&2, U.Swap>
+  for +old: String
+  for +new: String
+  for ec: {String.eq(o, old) == c : Bool}
+  for +ok: {Laws.moves.ok(U.Swap{o, n} <> t) == True{} : Bool}
+  for to: {Bool.pick(Maybe<&2, String>, c, Some{n}, Laws.moved.to(t, old)) == Some{new}
+    : Maybe<&2, String>}
+  for ih: {Laws.moved.to(t, old) == Some{new} : Maybe<&2, String>}
+    -> {Str.clear(old, '/') == True{} : Bool}
+  {Str.clear(old, '/') == True{} : Bool}
+
+def moved_plain.arm(c, o, n, t, old, new, ec, ok, to, ih):
+  match c:
+    case True{}:
+      %Str.string_eq_true(o, old, ec) : {Str.clear(_, '/') == True{} : Bool}
+      plain_slash(o, ok_old_plain(o, n, t, ok))
+    case False{}:
+      ih(to)
+
+law moved_plain:
+  for ss: List<&2, U.Swap>
+  for +old: String
+  for +new: String
+  for +ok: {Laws.moves.ok(ss) == True{} : Bool}
+  for to: {Laws.moved.to(ss, old) == Some{new} : Maybe<&2, String>}
+  {Str.clear(old, '/') == True{} : Bool}
+
+def moved_plain(ss, old, new, ok, to):
+  match ss:
+    case []:
+      Empty.absurd({Str.clear(old, '/') == True{} : Bool}, none_some(new, to))
+    case U.Swap{+o, +n} <> +t:
+      moved_plain.arm(String.eq(o, old), o, n, t, old, new, {==}, ok, to,
+        x => moved_plain(t, old, new, ok_rest(o, n, t, ok), x))
+
+def Laws.rewrite_names_new(ss, text, i, old, new, ok, to, hit):
+  Equal.trans(Bool,
+    String.starts_with(Laws.line.at(String.lines(U.reimport.many(ss, text)), i),
+      U.reimport.head(new)),
+    String.starts_with(U.reimport.many.line(ss, Laws.line.at(String.lines(text), i)),
+      U.reimport.head(new)),
+    True{},
+    Equal.trans(Bool,
+      String.starts_with(Laws.line.at(String.lines(U.reimport.many(ss, text)), i),
+        U.reimport.head(new)),
+      String.starts_with(Laws.line.at(U.reimport.many.lines(ss, String.lines(text)), i),
+        U.reimport.head(new)),
+      String.starts_with(U.reimport.many.line(ss, Laws.line.at(String.lines(text), i)),
+        U.reimport.head(new)),
+      Equal.cong(List<&2, String>, Bool,
+        ls => String.starts_with(Laws.line.at(ls, i), U.reimport.head(new)),
+        String.lines(U.reimport.many(ss, text)),
+        U.reimport.many.lines(ss, String.lines(text)),
+        Laws.rewrite_by_line(ss, text, ok)),
+      Equal.cong(String, Bool, x => String.starts_with(x, U.reimport.head(new)),
+        Laws.line.at(U.reimport.many.lines(ss, String.lines(text)), i),
+        U.reimport.many.line(ss, Laws.line.at(String.lines(text), i)),
+        at_many(ss, String.lines(text), i))),
+    names_new(ss, Laws.line.at(String.lines(text), i), old, new, ok, to, hit,
+      moved_plain(ss, old, new, ok, to)))
