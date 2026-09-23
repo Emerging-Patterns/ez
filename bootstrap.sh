@@ -50,7 +50,8 @@ awk '
 
 src() { awk -v h="$1" -v k="$2" '$1 == h && $2 == "src" && $3 == k { print $4 }' "$tmp/table"; }
 
-for h in $(cut -d' ' -f1 "$tmp/table" | sort -u); do
+cut -d' ' -f1 "$tmp/table" | sort -u >"$tmp/hashes"
+while read -r h; do
   # the manifest ez writes: `<sum> <path>` per file, sorted by path
   awk -v h="$h" '$1 == h && $2 == "file" { print $4, $3 }' "$tmp/table" |
     LC_ALL=C sort -t' ' -k2 >"$tmp/manifest"
@@ -59,10 +60,6 @@ for h in $(cut -d' ' -f1 "$tmp/table" | sort -u); do
   fi
   kind=$(src "$h" kind)
   [ "$kind" = git ] || die "$h is kind '$kind'; this script only fetches git pins (use ez fetch)"
-  case $(sum "$tmp/manifest") in
-    "${h#0x}"*) ;;
-    *) die "$h: the lock's files table does not hash to this name" ;;
-  esac
   url=$(src "$h" url); rev=$(src "$h" rev); root=$(src "$h" root)
   printf 'bootstrap: %s from %s at %s\n' "$h" "$url" "$rev" >&2
   rm -rf "$tmp/work" "$stage"
@@ -77,6 +74,11 @@ for h in $(cut -d' ' -f1 "$tmp/table" | sort -u); do
     cp "$from" "$stage/$path"
   done <"$tmp/manifest"
   cp "$tmp/manifest" "$stage/manifest"
+  # ez names a package "0x" and the first 32 hex digits of its manifest's sha256
+  case $(sum "$stage/manifest") in
+    "${h#0x}"*) ;;
+    *) die "$h: the manifest does not hash to this name" ;;
+  esac
   rm -rf "${lib:?}/$h"
   mv "$stage" "$lib/$h"
-done
+done <"$tmp/hashes"
