@@ -193,20 +193,23 @@ law classify_home:
   {Tgt.classify("~/" ++ rest) == Tgt.Local{"~/" ++ rest} : Tgt.Place}
 
 # LAW: two segments of letters, digits, `-`, `_` and `.`, neither of them `.`
-# or `..`, are that repository on GitHub. `vercel/next.js` is one, and so is
-# `o/r.git`, which is cached without its `.git` as its URL would be.
+# or `..`, and the second not ending in `.bend`, are that repository on
+# GitHub. `vercel/next.js` is one, and so is `o/r.git`, which is cached without
+# its `.git` as its URL would be. `src/main.bend` is not.
 # EZ-RES-3
 law classify_github:
   for +a: String
   for +b: String
   for ea: {Tgt.seg(a) == True{} : Bool}
   for eb: {Tgt.seg(b) == True{} : Bool}
+  for ef: {Tgt.bend.file(b) == False{} : Bool}
   {Tgt.classify(a ++ ("/" ++ b))
     == Tgt.Remote{"https://github.com/" ++ (a ++ ("/" ++ b)),
       "github.com/" ++ Tgt.ungit(a ++ ("/" ++ b))} : Tgt.Place}
 
 # LAW: anything else is a path: a word with no `://`, not starting `git@`,
-# `/`, `./`, `../` or `~/`, and not two such segments around a slash. The
+# `/`, `./`, `../` or `~/`, and not two such segments around a slash with
+# the second not ending in `.bend`. The
 # empty word is not a target at all, and is refused.
 # EZ-RES-3
 law classify_else:
@@ -219,7 +222,8 @@ law classify_else:
   for e3: {False{} == String.starts_with(text, "../") : Bool}
   for e4: {False{} == String.starts_with(text, "~/") : Bool}
   for no: @a:String -> @b:String -> {text == a ++ ("/" ++ b) : String}
-    -> {Tgt.seg(a) == True{} : Bool} -> {Tgt.seg(b) == True{} : Bool} -> Empty
+    -> {Tgt.seg(a) == True{} : Bool} -> {Tgt.seg(b) == True{} : Bool}
+    -> {Tgt.bend.file(b) == False{} : Bool} -> Empty
   {Tgt.classify(text) == Tgt.Local{text} : Tgt.Place}
 
 # LAW: a slug that would leave the cache is refused

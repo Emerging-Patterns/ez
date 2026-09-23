@@ -180,16 +180,26 @@ def halve(text: String) -> Halves:
     case SCon{+h, +t}:
       halve.at(kind(h), h, t, _u => halve(t))
 
+# a word naming a Bend file. As the second of two segments it is the last
+# component of a path, `src/main.bend`, and not a repository.
+def bend.file(+text: String) -> Bool:
+  String.ends_with(text, ".bend")
+
+# the second segment of a shorthand: a segment that is not a Bend file
+def repo.seg(+text: String) -> Bool:
+  Bool.and(seg(text), Bool.not(bend.file(text)))
+
 # both segments of a shorthand, where there are two
 def github.halves(halves: Halves) -> Bool:
   match halves:
     case Uncut{}:
       False{}
     case Two{left, right}:
-      Bool.and(seg(left), seg(right))
+      Bool.and(seg(left), repo.seg(right))
 
-# `owner/repo`: exactly two segments, each a `seg`. A second slash leaves
-# the right half with a slash in it, which no segment holds.
+# `owner/repo`: exactly two segments, each a `seg`, the second not ending in
+# `.bend`. A second slash leaves the right half with a slash in it, which no
+# segment holds.
 def github.ok(text: String) -> Bool:
   github.halves(halve(text))
 

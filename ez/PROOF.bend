@@ -518,15 +518,34 @@ def looks_seg(a, x, e):
     case SCon{+h, +t}:
       looks_first(Tgt.kind(h), t, x, e)
 
-# LAW: two segments around a slash are a shorthand
+# LAW: three tests that answered as a shorthand needs them to
+law and_repo:
+  for x: Bool
+  for y: Bool
+  for z: Bool
+  for ex: {x == True{} : Bool}
+  for ey: {y == True{} : Bool}
+  for ez: {z == False{} : Bool}
+  {Bool.and(x, Bool.and(y, Bool.not(z))) == True{} : Bool}
+
+def and_repo(x, y, z, ex, ey, ez):
+  %Equal.sym(Bool, x, True{}, ex) :
+    {Bool.and(_, Bool.and(y, Bool.not(z))) == True{} : Bool}
+  %Equal.sym(Bool, y, True{}, ey) : {Bool.and(_, Bool.not(z)) == True{} : Bool}
+  %Equal.sym(Bool, z, False{}, ez) : {Bool.not(_) == True{} : Bool}
+  {==}
+
+# LAW: two segments around a slash, the second not a Bend file, are a
+# shorthand
 law github_two:
   for +a: String
   for +b: String
   for ea: {Tgt.seg(a) == True{} : Bool}
   for eb: {Tgt.seg(b) == True{} : Bool}
+  for ef: {Tgt.bend.file(b) == False{} : Bool}
   {Tgt.github.ok(a ++ ("/" ++ b)) == True{} : Bool}
 
-def github_two(a, b, ea, eb):
+def github_two(a, b, ea, eb, ef):
   +ga = ea
   Equal.trans(Bool,
     Tgt.github.halves(Tgt.halve(a ++ ("/" ++ b))),
@@ -535,12 +554,7 @@ def github_two(a, b, ea, eb):
     Equal.cong(Tgt.Halves, Bool, y => Tgt.github.halves(y),
       Tgt.halve(a ++ ("/" ++ b)), Tgt.Two{a, b},
       halve_name(a, b, seg_name(a, ga))),
-    Equal.trans(Bool,
-      Bool.and(Tgt.seg(a), Tgt.seg(b)),
-      Bool.and(True{}, Tgt.seg(b)),
-      True{},
-      Equal.cong(Bool, Bool, y => Bool.and(y, Tgt.seg(b)), Tgt.seg(a), True{}, ga),
-      eb))
+    and_repo(Tgt.seg(a), Tgt.seg(b), Tgt.bend.file(b), ga, eb, ef))
 
 # LAW: nor does the second segment of a shorthand hold `://`
 law no_url_two:
@@ -564,7 +578,7 @@ def no_url_two(a, b, ea, eb):
         Equal.sym(String, b ++ "", b, Eq.append_nil(b)))),
     no_url(b, "", seg_name(b, eb)))
 
-def Laws.classify_github(a, b, ea, eb):
+def Laws.classify_github(a, b, ea, eb, ef):
   +ga = ea
   +gb = eb
   %nonempty_app(a, '/', b) : {Tgt.classify.empty(_, a ++ ("/" ++ b))
@@ -579,7 +593,7 @@ def Laws.classify_github(a, b, ea, eb):
     == Tgt.Remote{"https://github.com/" ++ (a ++ ("/" ++ b)),
       "github.com/" ++ Tgt.ungit(a ++ ("/" ++ b))} : Tgt.Place}
   %Equal.sym(Bool, Tgt.github.ok(a ++ ("/" ++ b)), True{},
-    github_two(a, b, ga, gb)) : {Tgt.classify.hub(_, a ++ ("/" ++ b))
+    github_two(a, b, ga, gb, ef)) : {Tgt.classify.hub(_, a ++ ("/" ++ b))
     == Tgt.Remote{"https://github.com/" ++ (a ++ ("/" ++ b)),
       "github.com/" ++ Tgt.ungit(a ++ ("/" ++ b))} : Tgt.Place}
   {==}
@@ -829,12 +843,15 @@ law github_no.two:
   for ex: {Tgt.seg(a) == x : Bool}
   for y: Bool
   for ey: {Tgt.seg(b) == y : Bool}
+  for z: Bool
+  for ez: {Tgt.bend.file(b) == z : Bool}
   for et: {text == a ++ ("/" ++ b) : String}
   for no: @p:String -> @q:String -> {text == p ++ ("/" ++ q) : String}
-    -> {Tgt.seg(p) == True{} : Bool} -> {Tgt.seg(q) == True{} : Bool} -> Empty
-  {Bool.and(x, y) == False{} : Bool}
+    -> {Tgt.seg(p) == True{} : Bool} -> {Tgt.seg(q) == True{} : Bool}
+    -> {Tgt.bend.file(q) == False{} : Bool} -> Empty
+  {Bool.and(x, Bool.and(y, Bool.not(z))) == False{} : Bool}
 
-def github_no.two(_text, a, b, x, ex, y, ey, et, no):
+def github_no.two(_text, a, b, x, ex, y, ey, z, ez, et, no):
   match x:
     case False{}:
       {==}
@@ -843,7 +860,11 @@ def github_no.two(_text, a, b, x, ex, y, ey, et, no):
         case False{}:
           {==}
         case True{}:
-          Empty.absurd({True{} == False{} : Bool}, no(a, b, et, ex, ey))
+          match z:
+            case True{}:
+              {==}
+            case False{}:
+              Empty.absurd({True{} == False{} : Bool}, no(a, b, et, ex, ey, ez))
 
 # LAW: the halves a word was cut into, given as a parameter
 law github_no.arm:
@@ -851,7 +872,8 @@ law github_no.arm:
   for r: Tgt.Halves
   for er: {Tgt.halve(text) == r : Tgt.Halves}
   for no: @p:String -> @q:String -> {text == p ++ ("/" ++ q) : String}
-    -> {Tgt.seg(p) == True{} : Bool} -> {Tgt.seg(q) == True{} : Bool} -> Empty
+    -> {Tgt.seg(p) == True{} : Bool} -> {Tgt.seg(q) == True{} : Bool}
+    -> {Tgt.bend.file(q) == False{} : Bool} -> Empty
   {Tgt.github.halves(r) == False{} : Bool}
 
 def github_no.arm(text, r, er, no):
@@ -860,13 +882,15 @@ def github_no.arm(text, r, er, no):
       {==}
     case Tgt.Two{+a, +b}:
       github_no.two(text, a, b, Tgt.seg(a), {==}, Tgt.seg(b), {==},
+        Tgt.bend.file(b), {==},
         halve_two(text, a, b, er), no)
 
 # LAW: a word that is not two segments around a slash is not a shorthand
 law github_no:
   for +text: String
   for no: @p:String -> @q:String -> {text == p ++ ("/" ++ q) : String}
-    -> {Tgt.seg(p) == True{} : Bool} -> {Tgt.seg(q) == True{} : Bool} -> Empty
+    -> {Tgt.seg(p) == True{} : Bool} -> {Tgt.seg(q) == True{} : Bool}
+    -> {Tgt.bend.file(q) == False{} : Bool} -> Empty
   {Tgt.github.ok(text) == False{} : Bool}
 
 def github_no(text, no):

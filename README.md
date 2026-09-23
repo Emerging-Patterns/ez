@@ -111,11 +111,11 @@ entry = "bolt/main.bend"
 or starting `git@`, is a git URL and is kept. A target starting `/`, `./`,
 `../` or `~/` is a path. `owner/repo` (exactly two segments of letters,
 digits, `-`, `_` and `.`, neither of them `.` or `..`) is
-`https://github.com/owner/repo`, so `vercel/next.js` is GitHub. Anything else
-is a path. A relative path with one slash and plain names, such as
-`src/main.bend`, reads as `owner/repo`; write it `./src/main.bend`. The
-checkout and the binary are cached under `$XDG_CACHE_HOME/ez/tool/<slug>`
-(`~/.cache/ez/tool/<slug>` when that is unset); the slug of a URL or of
+`https://github.com/owner/repo` unless the second segment ends in `.bend`, so
+`vercel/next.js` is GitHub and `src/main.bend` is a path. Anything else is a
+path. The checkout and the binary are cached under
+`$XDG_CACHE_HOME/ez/tool/<slug>` (`~/.cache/ez/tool/<slug>` when that is
+unset); the slug of a URL or of
 `owner/repo` drops a trailing `.git`.
 
 A remote resolves to `git ls-remote <url> HEAD`. A path resolves to a clean
