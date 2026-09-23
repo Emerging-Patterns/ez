@@ -477,6 +477,94 @@ law root_skips_ez:
   for text: String
   {P.roots.one(W.Source{".ez/" ++ p, text}) == [] : List<&2, String>}
 
+# The import scan. A root of the lock is a line bend's loader reads as an
+# import of a hub package. The loader trims each line of a file's header and
+# splits an import at its runs of white space, so what stands between
+# `import`, the path, `as` and the name may be any run of spaces and tabs, and
+# the line may be indented and may trail blanks.
+
+# a character of a run of white space in an import line
+type Gap is Data:
+  Sp{}
+  Tab{}
+
+# the character a gap stands for
+def gap.char(one: Gap) -> Char:
+  match one:
+    case Sp{}:
+      ' '
+    case Tab{}:
+      '\t'
+
+# a run of spaces and tabs as text
+def gap(gs: List<&2, Gap>) -> String:
+  match gs:
+    case []:
+      ""
+    case g <> t:
+      SCon{gap.char(g), gap(t)}
+
+# whether a string holds no white space, as the path and the name of an
+# import do
+def solid(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      Bool.and(Bool.not(K.blank(h)), solid(t))
+
+# an import of a hub package as a line of a source file: its indentation,
+# `import`, a run of spaces and tabs, `0x<hash>/<path>`, a run, `as`, a run,
+# the name, and the blanks that trail it
+def hub.line(
+  lead: List<&2, Gap>,
+  one: List<&2, Gap>,
+  hash: String,
+  path: String,
+  two: List<&2, Gap>,
+  three: List<&2, Gap>,
+  name: String,
+  tail: List<&2, Gap>
+) -> String:
+  gap(lead) ++ ("import" ++ (gap(one) ++ (("0x" ++ (hash ++ SCon{'/', path}))
+    ++ (gap(two) ++ ("as" ++ (gap(three) ++ (name ++ gap(tail))))))))
+
+# LAW: a line bend reads as an import of a hub package names a root of the
+# lock, whatever run of spaces and tabs stands between `import` and the path,
+# the path and `as`, and `as` and the name, however the line is indented and
+# whatever blanks trail it, so long as the lines above it leave the header
+# open, and whatever lines follow it. `ez doctor` reads the same roots.
+# EZ-DOC-3
+law root_reads_as_bend:
+  for +at: String
+  for +text: String
+  for +pre: List<&2, String>
+  for +post: List<&2, String>
+  for +ms: List<&2, String>
+  for +fs: List<&2, String>
+  for +lead: List<&2, Gap>
+  for +o: Gap
+  for +os: List<&2, Gap>
+  for +hash: String
+  for +path: String
+  for +w: Gap
+  for +ws: List<&2, Gap>
+  for +r: Gap
+  for +rs: List<&2, Gap>
+  for +n: Char
+  for +ns: String
+  for +tail: List<&2, Gap>
+  for ez: {String.starts_with(at, ".ez/") == False{} : Bool}
+  for ls: {String.lines(text) == List.append(&2, String, pre,
+    hub.line(lead, o <> os, hash, path, w <> ws, r <> rs, SCon{n, ns}, tail) <> post)
+    : List<&2, String>}
+  for hd: {K.scan.walk(pre, K.Head{True{}, [], []}) == K.Head{True{}, ms, fs} : K.Head}
+  for +hp: {slashless(hash) == True{} : Bool}
+  for hs: {solid(hash) == True{} : Bool}
+  for pp: {solid(path) == True{} : Bool}
+  for +np: {solid(SCon{n, ns}) == True{} : Bool}
+  {L.seen.holds(P.roots.one(W.Source{at, text}), "0x" ++ hash) == True{} : Bool}
+
 # Idempotence. A plain lock that succeeds writes ez.lock.toml and lays under
 # BEND_LIB every tree a clone answered and the planner passed. It writes no
 # ledger and no source, and neither file it writes is a tracked `.bend` file,
