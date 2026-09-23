@@ -147,10 +147,17 @@ def next.swaps(nx: Next) -> List<&2, U.Swap>:
 def plain(+read: M.Read) -> Next:
   Next{read, read, "", [], [], [], [], [], [], [], []}
 
+# a refusal's reason, never empty. An empty reason is no refusal at all, so
+# an upgrade that stopped with one would otherwise go on to lock the ledger
+# as it was, and a pin that halted with one would drop out of the ledger the
+# upgrade writes. The interpreter never answers with an empty reason.
+def halt.why(+why: String) -> String:
+  Bool.pick(String, String.is_empty(why), "ez: the upgrade stopped without a reason", why)
+
 # an upgrade that refuses, or still asks: the lock is not made, and nothing is
 # written
 def stopped(+read: M.Read, +why: String, asks: List<&2, Ask>) -> Next:
-  Next{read, read, why, asks, [], [], [], [], [], [], []}
+  Next{read, read, halt.why(why), asks, [], [], [], [], [], [], []}
 
 # ---------------------------------------------------------------------------
 # looking an answer up
@@ -720,7 +727,7 @@ def deps.join(fate: Fate, rest: Deps) -> Deps:
       Deps{ds, ss, es, any, sy, tr, List.append(&2, Ask, more, asks), bad}
     case Halts{why}:
       Deps{ds, ss, es, any, sy, tr, asks, _bad} = rest
-      Deps{ds, ss, es, any, sy, tr, asks, why}
+      Deps{ds, ss, es, any, sy, tr, asks, halt.why(why)}
 
 # every dependency, in the order the ledger wrote them
 def deps.walk(+rs: List<&2, Reply>, +only: String, +hub: String, ds: List<&2, M.Dep>) -> Deps:
@@ -971,7 +978,7 @@ def tools.join(pinned: Pinned, rest: Tools) -> Tools:
       Tools{ts, any, sy, List.append(&2, Ask, more, asks), bad}
     case PinHalt{why}:
       Tools{ts, any, sy, asks, _bad} = rest
-      Tools{ts, any, sy, asks, why}
+      Tools{ts, any, sy, asks, halt.why(why)}
 
 # every tool, in the order the ledger wrote them
 def tools.walk(+rs: List<&2, Reply>, +only: String, ts: List<&2, M.Tool>) -> Tools:

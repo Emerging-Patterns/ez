@@ -163,6 +163,18 @@ The tables below keep the closed laws as they were at `f009e42`; none of them is
 | trim_quoted | Q | struct | eztoml's `trim` leaves a quoted value as it is. | EZ-DOC-1 (supporting, from the spike) |
 | strip_quoted | Q | struct | eztoml's `strip` of a quoted value is the value. | EZ-DOC-1 (supporting, from the spike) |
 
+**Update:** WP6's second half states the upgrade's moves over `P.ledger.next` and `P.refuses`, in the vocabulary `ups`, `pin`, `rev_only`, `tagged`, `onward.yes`, `moved.to`, `moved.ok`, `forward.ok` and `follow.ok`. Each proof is a lemma per def of `Up.dep.tip`, the walk by induction over the ledger's dependencies, and the model through each way `Up.next` ends (the `mv.` lemmas in `lock/PROOF.bend`).
+
+| Law | Kind | Proof | Claim | Points toward |
+| :---- | :---- | :---- | :---- | :---- |
+| upgrade_forward_moves_onward | Q | struct | A pin by its commit alone is left in `P.ledger.next` as a pin from a repository with no tag, at its commit or at the default branch tip the remote named when the remote said the tip descends from it. | EZ-RES-5 (tagged) |
+| upgrade_forward_refuses_off | Q | struct | Asked about, with a tip that is another commit the remote says does not descend from it, the lock refuses. | EZ-RES-5 (tagged) |
+| upgrade_forward_reaches_tip | Q | struct | Asked about, when the lock does not refuse, it is at the tip in `P.ledger.next`. | EZ-RES-5 (tagged) |
+| upgrade_tag_follows | Q | struct | A pin through a tag keeps its tag and is at its commit or at the commit the remote names for the tag, when the remote said it descends from the pin. | EZ-RES-8 (tagged) |
+| upgrade_tag_resolves | Q | struct | Asked about, when the lock does not refuse, it is at the commit its tag names. | EZ-RES-8 (tagged) |
+| upgrade_tag_refuses_off | Q | struct | Asked about, with a tag that names another commit the remote says does not descend from the pin, the lock refuses. | EZ-RES-8 (tagged) |
+| upgrade_tag_refuses_drift | Q | struct | Asked about, with a tag that still names the pinned commit whose checkout `U.agree` rejects, the lock refuses. | EZ-RES-8 (tagged) |
+
 ### git/LAWS.bend
 
 | Law | Kind | Proof | Claim | Points toward |
@@ -193,6 +205,9 @@ The tables below keep the closed laws as they were at `f009e42`; none of them is
 | choose_greatest_release | Q | struct | No release in the list is newer than the tag `choose` answers. | EZ-RES-1 (tagged) |
 | choose_greatest_prerelease | Q | struct | With no release, no semver-ish tag is newer than the tag `choose` answers. | EZ-RES-1 (tagged) |
 | choose_is_a_tag | Q | struct | A tag `choose` answers is one of the tags in the list. | EZ-RES-1 (tagged) |
+| tip_of_head | Q | struct | The default branch tip is the commit HEAD's commit row names. | EZ-RES-5 (tagged, WP6) |
+| tip_skips_other | Q | struct | A row that is not HEAD's names no tip. | EZ-RES-5 (tagged, WP6) |
+| tip_skips_symref | Q | struct | Nor does HEAD's symref row, whose first field is not a commit. | EZ-RES-5 (tagged, WP6) |
 
 ### manifest/LAWS.bend
 
@@ -435,8 +450,9 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | EZ-RES-2 | none | none | No law. **Update:** `pkg/absent_entry_refused` states the refusal over the package walk (A0); the precedence and the command wait for A2. |
 | EZ-RES-3 | none | target_* , expand_* | Examples only. |
 | EZ-RES-4 | source_of_hub (supporting) | hub_holds | One example. |
-| EZ-RES-5 | none | sha256_aims_forward, sha256_advances, sha256_remote_tip, sha256_remote_branch, sha256_retarget | Examples only. |
+| EZ-RES-5 | none | sha256_aims_forward, sha256_advances, sha256_remote_tip, sha256_remote_branch, sha256_retarget | Examples only. **Update:** proved by `lock/upgrade_forward_moves_onward`, `lock/upgrade_forward_refuses_off` and `lock/upgrade_forward_reaches_tip` over the planner, with `git/tip_of_head`, `git/tip_skips_other` and `git/tip_skips_symref` for the tip (WP6), relative to EZ-LED-4. |
 | EZ-RES-6 | none | unselected_holds | One example. |
+| EZ-RES-8 | none | tag_follows, same_rev_drifts, tag_moved_off | Examples only. **Update:** proved by `lock/upgrade_tag_follows`, `lock/upgrade_tag_resolves`, `lock/upgrade_tag_refuses_off` and `lock/upgrade_tag_refuses_drift` over the planner (WP6), relative to EZ-LED-4. |
 | EZ-VEN-1 | none | sha256_vendor_flag, vendor_flag_true, vendor_flag_absent, sha256_allowlist, sha256_retarget | Examples only. |
 | EZ-VEN-2, EZ-VEN-3 | none | imports_follow_hash | One example covering both. |
 | EZ-VEN-4 | none | none | No law. |
@@ -485,7 +501,7 @@ This section checks each requirement in the RFC draft against what the code does
 
 | ID | Verdict | Evidence |
 | :---- | :---- | :---- |
-| EZ-DOC-1 | partly | `Lock.render.tools` (`lock/lock.bend:630`) then `T.parse` and `L.packs` gives back the sorted packs on one example (`lock_roundtrip`). `[lock] bend` and `[lock] version` are never read back. |
+| EZ-DOC-1 | partly (**Update:** proved in WP4, see "Phase three progress") | `Lock.render.tools` (`lock/lock.bend:630`) then `T.parse` and `L.packs` gives back the sorted packs on one example (`lock_roundtrip`). `[lock] bend` and `[lock] version` are never read back. |
 | EZ-DOC-2 | unknown (**Update:** proved in WP3, see "Phase three progress") | No law or code path re-renders a parsed lock. eztoml's `T.render` does no escaping, so a value holding `"` would not round-trip. |
 | EZ-DOC-3 | fails (**Update:** proved in WP1, see "Phase three progress") | See "What ez lock reads" below. On a fresh clone of this repository, the three non-vendored git dependencies (shake, eztoml, snap) have no tree under `.ez/lib`, `read.git` reads the missing manifest as `""` (`lock/lock.bend:287-293`), and the lock is written with empty `files` tables and exit 0. The committed lock is not reproduced. |
 | EZ-DOC-4 | partly | Holds for the lock bytes when the world is unchanged (output is sorted, the old lock is never read). A repeated `--upgrade` re-clones and re-lays every selected pin and rewrites `.ez/origins.toml`. |
@@ -565,8 +581,13 @@ What the README's reproducibility sentence ("`ez lock` never has to consult anyt
 | WP2 | done | `ez lock --upgrade` in the same planner: `lock/up.bend` (the upgrade's questions, `Up.next`), the upgrade's answers in `lock/run.bend`, one plan of effects in the stated order. `Up.run`, `Pin.upgrade` and `ez/upgrade.bend` are deleted; `ez/pin.bend` keeps only the plain lock's `gap`. EZ-OUT-2's law is tagged: `lock_refusal_writes_nothing` holds of every World, plain or upgrade. `P.ledger.next`, `P.wants.up`, `P.answered` and `W.dep` are the vocabulary WP6 and WP7 state their laws in. Behavior changes: ez.toml is written once, and nothing is written when the upgrade or the lock after it refuses (before, ez.toml, `.gitignore`, sources, trees and `.ez/origins.toml` could be left by a later stage's failure); `.ez/origins.toml` is not written; a moved vendored tree is laid under `.ez/lib` and any other moved tree under `$BEND_LIB`, where before every selected dependency's tree was laid under `.ez/lib`; a pinned commit that drifted is `U.judge`'s `Drift` and refused before anything is laid; once one pin refuses, no more questions are asked; a kept pin no longer asks the hub about its hash; and the upgrade's lines go to stdout as before, without the `import ...` hint `ez add` prints. |
 | WP3 | done | EZ-DOC-2 proved. The lock renders each package as one block of text filed as a `K.File` under its hash and sorts the blocks with `K.file.sort`, so pkg's `sort_perm` gives `lock_order_free` for a package list with distinct hashes, and `pack_order_free` is `sort_perm` under a block. `walk_keeps_hashes_distinct` is the walk invariant, one lemma per step def as for sources, and `plain_lock_hashes_distinct` carries it to `P.packs`, which discharges the premise for every lock the planner writes. `hashes_sorted` was already deleted with the trails. No lock bytes change: this repository's lock round-trips byte for byte. `L.has` now compares the wanted hash first, as pkg's `fresh` does, which changes no answer. |
 | WP5a | done | EZ-DOC-4 for a plain lock: `lock/lock_idempotent` (run again on the World it leaves, a plain lock writes the same bytes to ez.lock.toml) and `lock/relock_lays_nothing` (after one that succeeded, no tree arrives by a clone that passes). The World a lock leaves is `after` in `lock/LAWS.bend`: a refused lock leaves the World it read, and one that succeeded leaves every tree it laid read from BEND_LIB with the bytes it was checked with. The proof is `clone_reproduces` read backwards: a clone that passed weighed to the ledger's narHash, so the same bytes from BEND_LIB are judged the same, and the Inputs are unchanged. EZ-DOC-4 stays pending until WP5b proves the `--upgrade` half. |
+| WP4 | done | EZ-DOC-1 proved, sections then text. `lockable` also refuses a file path holding `=` (`path_eq_unlockable`, `path_eq_named`): eztoml v0.1.0 cuts a pair at its first `=` even in a quoted key ([eztoml#24](https://github.com/Emerging-Patterns/eztoml/issues/24), closed, fixed in 0.2.x), and such a lock did not restore. Sections: `render_is_doc` (the block render is `T.render` of the document) and `lock_sections_read_back`, over the new `check/toml.bend` (`sections_read`: any document whose names and keys the reader can take back parses back as itself). Text: `lock_reads_back`, `lock_hub_reads_back`, `lock_tools_read_back` (tagged), against `canon` (hash order, files in path order and once) and `tools.canon` (no `vendor`). `check/str.bend` gained order, list and string lemmas. |
 | WP8 | done | EZ-HASH-2 (`sha/nar_dir_order_free`). |
-| WP4, WP5b, WP6, WP7 | open | |
+| WP6 (first half) | done | EZ-RES-4 (`lock/upgrade_holds_hub`) and EZ-RES-6 (`lock/upgrade_one_frames_deps`, `lock/upgrade_one_frames_tools`, `lock/upgrade_one_asks_alone`) proved over `P.ledger.next` and `P.wants.up`, relative to EZ-LED-4. The frames are one lemma per step of a dependency's or tool's fate (it keeps the entry's name), an induction over the walk with `M.find` or `M.tool.find`, and one pass through the pipeline after the walks, stated once for any reading `f` of the model. The questions law compares the upgrade of the ledger with the upgrade of the entries named `NAME` alone, through the walks' keys: the questions, the refusal and the import swaps they leave. No behavior changes. The check time of `lock/PROOF.bend` is unchanged (14 s before, 13 s after, one run each). |
+| WP6 (second half) | done | EZ-RES-5 and EZ-RES-8 proved over the planner, relative to EZ-LED-4 (see the lock and git tables). Besides the RFC's laws, two say that a pin the upgrade asks about is at the commit the remote named when the lock does not refuse, so a tag is re-resolved and not only allowed to be. Found while proving: WP2's upgrade read an empty refusal reason as no refusal, so a dependency or tool whose pin halted with the reason "" dropped out of the ledger it wrote, and an upgrade that stopped with "" locked ez.toml as it was. Only an answer `Miss` with an empty reason reaches either, and the interpreter never builds one, so the binary is unchanged; `Up.halt.why` gives every refusal a reason. `lock/PROOF.bend` checks in about 13 s before and after. The tool laws the RFC mentions are not written. |
+| WP5b, WP7 | open | |
+
+A later change moves ez to eztoml 0.2.x once eztoml proves its own render and parse round trip: EZ-DOC-1's text layer then rests on that pinned proof, as a Trusted row pointing at eztoml's requirement, the `=` refusal lifts, and `bootstrap.sh`'s awk, which also cuts a pair at its first `=`, is fixed with it.
 
 The demand loop's cost, measured in WP1 on this repository's own lock with every tree already under BEND_LIB (five git packages, all imported directly, so two rounds of `wants` and one `plan`): 0.21 s for the binary before WP1 and 0.53 s after, median of seven runs each. Every round of `wants` scans every tracked source for imports again, since the World holds texts and not scans, and `plan` scans once more and checks every package's SHA-256 once. With every tree to clone (an empty BEND_LIB) the clones dominate: 7.3 s before and 7.4 s after. The design's first risk is real but small; if WP2 makes it matter, the World can carry each source's scanned imports instead of its text.
 

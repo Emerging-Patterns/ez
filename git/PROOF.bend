@@ -1698,3 +1698,28 @@ def mem.choose(names, c, ec, e):
 
 def Laws.choose_is_a_tag(names, e):
   mem.choose(names, String.is_empty(G.latest.rel(names)), {==}, e)
+
+# The default branch tip. HEAD's row is found by comparing its name, and its
+# first field is taken only when it is a commit, so the premise on each
+# comparison is rewritten to the arm it picks. A commit is forty characters,
+# so it is never the empty answer that passes to the next row.
+
+def Laws.tip_of_head(rev, rest, e):
+  match rev:
+    case SNil{}:
+      Eq.bit.absurd2(&2, {G.tip.rev(G.Row{"", "HEAD"} <> rest) == "" : String}, e)
+    case SCon{+c, +t}:
+      %e : {G.tip.step(String.is_empty(G.tip.rev.hex(_, SCon{c, t})),
+        G.tip.rev.hex(_, SCon{c, t}), _u => G.tip.rev(rest)) == SCon{c, t} : String}
+      {==}
+
+def Laws.tip_skips_other(rev, _name, rest, e):
+  %e : {G.tip.step(String.is_empty(G.tip.rev.pick(_, G.is_rev(rev), rev)),
+    G.tip.rev.pick(_, G.is_rev(rev), rev), _u => G.tip.rev(rest)) == G.tip.rev(rest)
+    : String}
+  {==}
+
+def Laws.tip_skips_symref(rev, rest, e):
+  %e : {G.tip.step(String.is_empty(G.tip.rev.hex(_, rev)), G.tip.rev.hex(_, rev),
+    _u => G.tip.rev(rest)) == G.tip.rev(rest) : String}
+  {==}
