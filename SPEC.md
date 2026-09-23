@@ -28,7 +28,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | ID | Requirement | Level | Status | Law |
 | :---- | :---- | :---- | :---- | :---- |
 | EZ-HASH-1 | The 0x hash of a file list with distinct paths depends only on its (path, sum) pairs, not on the order they were found in. | Proved | proved | pkg/LAWS.bend hash_perm |
-| EZ-HASH-2 | The NAR serialization of a directory does not depend on the order its entries are listed in. | Proved | pending | |
+| EZ-HASH-2 | The NAR serialization of a directory does not depend on the order its entries are listed in. | Proved | proved | sha/LAWS.bend nar_dir_order_free |
 | EZ-HASH-3 | When ez writes a package under `<lib>/<h>`, `h` is the 0x hash of the file list whose manifest it writes beside the files. | Proved | pending | |
 | EZ-HASH-4 | ez's 0x hash for an entry equals the hash `bend --publish` assigns to it. | Trusted | | |
 | EZ-HASH-5 | ez's narHash equals `nix hash path --type sha256 --sri` of the same tree. | Trusted | | |
