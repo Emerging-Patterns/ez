@@ -450,6 +450,15 @@ The rewritten `K.pkg_of`, and `K.of` over every tracked file, give the hash, roo
 - The plan is the lock's `Plan`: two `Say` lines and `Success` when bend's answer agrees, and no effect with `Refused` otherwise, run by `Run.exec.plan`.
 - The laws are listed in [ez-law-inventory.md](ez-law-inventory.md) under WP11. EZ-PUB-1, EZ-PUB-2 and EZ-OUT-2 are proved.
 
+**Update (WP12, `ez doctor`).** `ez doctor` is in planner form in the same shape: `doctor/world.bend` (the World and the questions), `doctor/plan.bend` (pure), and `doctor/run.bend` (the interpreter), which `ez/main.bend` dispatches to. `ez/doctor.bend` and `ez/drift.bend` are deleted, with the untagged `hash_of_local`; `lock_needless`, `lock_needed` and `lock_names` move to `doctor/LAWS.bend`. Where it differs from the commands above:
+
+- The World is `{cc, lib, ledger: Maybe, lock: Maybe, replies}`: `$CC` and `$BEND_LIB` as they are set, "" when unset, which the planner turns into the compiler (`cc`) and the library (`.ez/lib`) it reports on, and the texts of the ledger and the lock.
+- Three questions of its own: `Probe{name}`, a program asked for its version (bend through `run/bend`), and `Lib{dir}`, the names `ls` gives for the library, both answered with what the program printed; and `Sources`, the lock's own listing (`W.Listing`, answered by `Run.read.listing`), every `.bend` file git tracks with its text. Every question depends only on what the World read, so doctor asks in one round. The library is looked in only when the lock records a package, and the sources are read only when the ledger reads.
+- The import lines are the lock's roots (`P.roots`), so doctor and `ez lock` agree on what the source imports, and the lock's packages are read by `L.hashes`, not grepped. The ledger is seen without its tools (`ledger.seen`) before anything is decided.
+- The plan is the lock's `Plan`: one `Say` per line and `Refused{""}` when any line is a problem, so it prints what it found and exits 1, as before.
+- The laws, all in `doctor/LAWS.bend` unless named otherwise: `doctor_writes_nothing` (EZ-VEN-4); `doctor_reports_unrecorded`, `doctor_reports_unused`, `doctor_drift_fails` (EZ-VEN-5); `doctor_ignores_tools`, with `manifest/tool_section_not_dep`, `tool_section_is_tool`, `tool_needs_no_hash`, `lock/lock_origins_skip_tools`, `upgrade_origins_skip_tools`, `add/add_keeps_tools`, `remove/remove_keeps_tools` and `remove_refuses_tool` (EZ-LED-5); and the untagged `doctor_needs_ledger`, `doctor_refuses_unread`, `lock_needless`, `lock_needed`, `lock_names`. EZ-VEN-4, EZ-VEN-5 and EZ-LED-5 are proved.
+- Choices made with the maintainer away, as `cargo check` would: the sources are the tracked files, as the lock's are; no ez.toml, or one that does not read, fails the command and compares nothing; a lock that does not parse fails it whatever the ledger holds; and a lock that is missing fails it only when the ledger has dependencies, which keeps #67.
+
 ## Work packages
 
 |  |

@@ -16642,3 +16642,14 @@ def Laws.upgrade_unmoved_vends_the_ledger(w, up, ok, kept):
                 W.judged.of(Up.next(only, W.parsed(ledger), ups), replies), ok, kept,
                 mv.stop_empty(Up.next(only, W.parsed(ledger), ups), listing, replies, ok),
                 rf.good(Up.next(only, W.parsed(ledger), ups), listing, replies, ok))
+
+# EZ-LED-5: the origins are read off the parsed ledger's dependencies, so
+# the ledger is rewritten into the model the premise names and the tools are
+# never looked at.
+def Laws.lock_origins_skip_tools(_s, _n, _e, _b, _h, ds, _ts, g):
+  %g : {L.ledger.read(_) == L.ledger.origins(ds) : List<&2, L.Origin>}
+  {==}
+
+def Laws.upgrade_origins_skip_tools(_nx, _n, _e, _b, _h, ds, _ts, g):
+  %g : {L.ledger.read(_) == L.ledger.origins(ds) : List<&2, L.Origin>}
+  {==}

@@ -6,7 +6,7 @@ import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ../sha/sha.bend as Sha
-import ../ez/drift.bend as D
+import ../doctor/plan.bend as DP
 import ../ez/quiet.bend as Q
 import ../check/kit.bend as Check
 import ../check/world.bend as W
@@ -44,7 +44,7 @@ def publish(+hub: String, +at: String, +text: String) -> IO(String):
 def named(+at: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     +out : String <- R.exec(["grep", "-ohE", "0x[0-9a-f]{32}", at])
-    return D.uniq(List.sort(~String, ~String.is_le,
+    return DP.once(List.sort(~String, ~String.is_le,
       W.nonblank(String.lines(R.text(out)))))
 
 # the entry, locked against the hub that is serving the two packages. The hub

@@ -595,3 +595,39 @@ law rewrite_nothing_named:
   for +text: String
   for none: {names.none.all(ss, String.lines(text)) == True{} : Bool}
   {U.reimport.many(ss, text) == text : String}
+
+# A `[tools.*]` section is a pinned CLI and nothing else: the reader files it
+# among the tools, never among the dependencies, and never asks it for a
+# `hash`, wherever it stands in the ledger. Every command reads the ledger
+# through this reader, so what it says holds of each of them.
+
+# LAW: a `[tools.*]` section adds no dependency
+# EZ-LED-5
+law tool_section_not_dep:
+  for ss1: List<&2, T.Sect>
+  for +n: String
+  for +ps: List<&2, T.Kv>
+  for +ss2: List<&2, T.Sect>
+  {M.deps(List.append(&2, T.Sect, ss1, T.Sect{"tools." ++ n, ps} <> ss2))
+    == M.deps(List.append(&2, T.Sect, ss1, ss2)) : List<&2, M.Dep>}
+
+# LAW: it is read as the tool it names, where it stands among the tools
+# EZ-LED-5
+law tool_section_is_tool:
+  for ss1: List<&2, T.Sect>
+  for +n: String
+  for +ps: List<&2, T.Kv>
+  for +ss2: List<&2, T.Sect>
+  {M.tools(List.append(&2, T.Sect, ss1, T.Sect{"tools." ++ n, ps} <> ss2))
+    == List.append(&2, M.Tool, M.tools(ss1), M.tool_of("tools." ++ n, ps) <> M.tools(ss2))
+    : List<&2, M.Tool>}
+
+# LAW: and it is never the section a ledger is refused for lacking a `hash`
+# EZ-LED-5
+law tool_needs_no_hash:
+  for ss1: List<&2, T.Sect>
+  for +n: String
+  for +ps: List<&2, T.Kv>
+  for +ss2: List<&2, T.Sect>
+  {M.missing(List.append(&2, T.Sect, ss1, T.Sect{"tools." ++ n, ps} <> ss2))
+    == M.missing(List.append(&2, T.Sect, ss1, ss2)) : String}

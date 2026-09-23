@@ -455,7 +455,7 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | EZ-RES-8 | none | tag_follows, same_rev_drifts, tag_moved_off | Examples only. **Update:** proved by `lock/upgrade_tag_follows`, `lock/upgrade_tag_resolves`, `lock/upgrade_tag_refuses_off` and `lock/upgrade_tag_refuses_drift` over the planner (WP6), relative to EZ-LED-4. |
 | EZ-VEN-1 | none | sha256_vendor_flag, vendor_flag_true, vendor_flag_absent, sha256_allowlist, sha256_retarget | Examples only. |
 | EZ-VEN-2, EZ-VEN-3 | none | imports_follow_hash | One example covering both. |
-| EZ-VEN-4 | none | none | No law. |
+| EZ-VEN-4 | none | none | No law. **Update:** proved by `doctor/doctor_writes_nothing` (WP12). |
 | EZ-TOOL-1 to EZ-TOOL-6 | none | none | No law. The tool laws that exist are about target classification (EZ-RES-3) and build file choice, which the RFC does not list. **Update:** EZ-TOOL-1 and EZ-TOOL-3 to EZ-TOOL-9 are proved over the tool planner (WP9); see "Tool progress". |
 | EZ-OUT-1 | none | hub_404_teaches, hub_other_miss_kept, drift_names_the_tag | Examples, and they pin the whole message, not the prefix. |
 | EZ-TRUST-3 | judge_have, judge_refuse, judge_miss (by `refl`) | hash_match, hash_refuse | ez checks hub bodies against the requested hash itself, so this is not purely trusted. |
@@ -526,7 +526,7 @@ This section checks each requirement in the RFC draft against what the code does
 | EZ-VEN-1 | fails | Only `ez lock --upgrade` writes allowlist lines (`manifest/upgrade.bend:165-218`), and only when a vendored hash moves. `ez add` records `vendor = false` and never writes `.gitignore` (`ez/cmd.bend:371-373`). `ez remove` leaves the line and the tree. `ez init` writes `.ez/`, which makes any `!.ez/lib/<h>` line inert because git cannot re-include under an excluded directory (`ez/cmd.bend:247-248`). |
 | EZ-VEN-2 | partly | Lines that start exactly `import 0x<old>/` at column 0 in any `*.bend` outside `.ez` and `.git` are rewritten (`manifest/upgrade.bend:230-254`; `ez/upgrade.bend:350-354`). Indented lines, which the package walk accepts, are not. Swaps apply in sequence, so if one dependency's new hash is another's old one, lines chain. |
 | EZ-VEN-3 | partly | Other lines are kept, but the file is split with `String.lines`, rejoined with `\n`, and re-encoded, so invalid UTF-8 elsewhere in a rewritten file can change. Files with no match are not written. |
-| EZ-VEN-4 | holds | `ez/doctor.bend` has no file write. Like every command, doctor runs `Env.make()` first, which creates `.ez`, `bin` and the library directory (`ez/main.bend:218-222`, `ez/env.bend:37-41`). |
+| EZ-VEN-4 | holds | `ez/doctor.bend` has no file write. Like every command, doctor runs `Env.make()` first, which creates `.ez`, `bin` and the library directory (`ez/main.bend:218-222`, `ez/env.bend:37-41`). (**Update:** proved in WP12, see "Doctor progress".) |
 
 ### Tools
 
@@ -632,6 +632,12 @@ The design for converting `ez add` and `ez remove`, [ez-add-planner.md](ez-add-p
 | WP | State | Scope |
 | :---- | :---- | :---- |
 | WP11 | done | `ez publish` in planner form (`pub/world.bend`, `pub/plan.bend`, `pub/run.bend`), asking the tool commands' `Locate` and `Read` and two questions of its own, `Tracked` (`git ls-files -v`) and `Upload` (`bend <entry> --publish`), the last asked only once every other check passed; the plan says two lines and writes nothing, run by the lock's `Run.exec.plan`. Deleted: `pub/pub.bend`, with `answer`, `judge*`, `Said`, `status*`, `clean*`, `sent*`, `publish*`, and the law `answer_is_a_name` and `same_is_agreed`, which were about them. Laws in `pub/LAWS.bend`: `pub_refusal_writes_nothing` (EZ-OUT-2); `clean_is_all_blank`, `untracked_is_dirty`, `modified_is_dirty`, `staged_is_dirty`, `assumed_is_untracked`, `skipped_is_untracked`, `pub_dirty_refuses`, `pub_gitless_refuses`, `pub_stray_sends_nothing`, `pub_stop_sends_nothing`, `pub_unsent_refuses` (EZ-PUB-1); `unread_never_agrees`, `differs_never_agrees`, `ours_agrees`, `progress_is_not_an_answer`, `import_is_not_an_answer`, `is_name_needs_0x`, `is_name_needs_length`, `is_name_needs_hex`, `is_name_hex34`, `pub_needs_agreement`, `pub_reports_ours` (EZ-PUB-2); and the untagged `pub_needs_ledger`. EZ-PUB-1, EZ-PUB-2 and EZ-OUT-2 are proved. Behavior changes, each shown on the binary first with a stand-in `bend`: no ledger, or one that does not parse, is refused where `main.bend` was published; a package file git does not track (ignored, or in a directory the enclosing repository ignores, or marked `--assume-unchanged` or `--skip-worktree`) is refused before the upload where it was sent; a second `0x` name that is not ez's refuses where the first was taken; and the import line names the entry's path inside the package, as bend prints it. Found and not changed: `ez add` prints the same entry-name-only import line for a package that climbs out of its entry's directory (`add/plan.bend`, `says`). |
+
+### Doctor progress
+
+| WP | State | Scope |
+| :---- | :---- | :---- |
+| WP12 | done | `ez doctor` in planner form (`doctor/world.bend`, `doctor/plan.bend`, `doctor/run.bend`), asking for versions, the library's names and the lock's listing of the tracked sources, and judging the import lines the lock judges (`P.roots`). Deleted: `ez/doctor.bend`, `ez/drift.bend`, `ez/hash_of_local`. Laws: `doctor_writes_nothing` (EZ-VEN-4); `doctor_reports_unrecorded`, `doctor_reports_unused`, `doctor_drift_fails` (EZ-VEN-5); `doctor_ignores_tools`, `manifest/tool_section_not_dep`, `tool_section_is_tool`, `tool_needs_no_hash`, `lock/lock_origins_skip_tools`, `upgrade_origins_skip_tools`, `add/add_keeps_tools`, `remove/remove_keeps_tools`, `remove_refuses_tool` (EZ-LED-5). EZ-VEN-4, EZ-VEN-5 and EZ-LED-5 proved. Behavior changes in [ez-spec.md](ez-spec.md) under "Decided behavior changes". |
 
 ## Missing behavior
 

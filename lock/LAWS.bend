@@ -1525,3 +1525,33 @@ law upgrade_unmoved_vends_the_ledger:
   for +ok: {P.refuses(w) == False{} : Bool}
   for kept: {P.put(w, "ez.toml") == P.Kept{} : P.Wrote}
   {vends(w) == I.vended(ledger.deps(W.parsed(W.ledger.of(w)))) : List<&2, String>}
+
+# LAW: the origins `ez lock` reads packages by are the dependencies of
+# ez.toml alone: a `[tools.*]` pin is never an origin, whatever tools the
+# ledger pins. `ez lock --upgrade` reads the ledger it leaves the same way
+# (`W.next.origins`, through `L.ledger.read`).
+# EZ-LED-5
+law lock_origins_skip_tools:
+  for +s: String
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +ds: List<&2, M.Dep>
+  for ts: List<&2, M.Tool>
+  for g: {M.Good{M.Manifest{n, e, b, h, ds, ts}} == M.parse(s) : M.Read}
+  {W.origins(Some{s}) == L.ledger.origins(ds) : List<&2, L.Origin>}
+
+# LAW: and so are the origins `ez lock --upgrade` reads packages by, over the
+# ledger the upgrade leaves, whatever tools that ledger pins
+# EZ-LED-5
+law upgrade_origins_skip_tools:
+  for +nx: Up.Next
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +ds: List<&2, M.Dep>
+  for ts: List<&2, M.Tool>
+  for g: {M.Good{M.Manifest{n, e, b, h, ds, ts}} == Up.next.read(nx) : M.Read}
+  {W.next.origins(nx) == L.ledger.origins(ds) : List<&2, L.Origin>}

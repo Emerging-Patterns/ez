@@ -4212,3 +4212,72 @@ def Laws.rewrite_names_new(ss, text, i, old, new, ok, to, hit):
         at_many(ss, String.lines(text), i))),
     names_new(ss, Laws.line.at(String.lines(text), i), old, new, ok, to, hit,
       moved_plain(ss, old, new, ok, to)))
+
+# ---------------------------------------------------------------------------
+# EZ-LED-5: a `[tools.*]` section is judged at its own head, where its name
+# does not start `deps.`, and every section before it is passed over the same
+# way on both sides, so each law is an induction over the sections before it.
+
+def Laws.tool_section_not_dep(ss1, n, ps, ss2):
+  match ss1:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.cong(List<&2, M.Dep>, List<&2, M.Dep>,
+        x => M.deps.put(String.starts_with(M.name_of(h), "deps."), h, x),
+        M.deps(List.append(&2, T.Sect, t, T.Sect{"tools." ++ n, ps} <> ss2)),
+        M.deps(List.append(&2, T.Sect, t, ss2)),
+        Laws.tool_section_not_dep(t, n, ps, ss2))
+
+# LAW: a section filed ahead of two lists of tools is filed ahead of the first
+law tools_put_append:
+  for b: Bool
+  for +h: T.Sect
+  for xs: List<&2, M.Tool>
+  for +ys: List<&2, M.Tool>
+  {M.tools.put(b, h, List.append(&2, M.Tool, xs, ys))
+    == List.append(&2, M.Tool, M.tools.put(b, h, xs), ys) : List<&2, M.Tool>}
+
+def tools_put_append(b, h, _xs, _ys):
+  match b:
+    case True{}:
+      match h:
+        case T.Sect{_n, _ps}:
+          {==}
+    case False{}:
+      {==}
+
+def Laws.tool_section_is_tool(ss1, n, ps, ss2):
+  match ss1:
+    case []:
+      %Equal.sym(Bool, String.starts_with(n, ""), True{}, Eq.starts_nil(n))
+        : {M.tools.put(_, T.Sect{"tools." ++ n, ps}, M.tools(ss2))
+          == M.tool_of("tools." ++ n, ps) <> M.tools(ss2) : List<&2, M.Tool>}
+      {==}
+    case +h <> +t:
+      Equal.trans(List<&2, M.Tool>,
+        M.tools.put(String.starts_with(M.name_of(h), "tools."), h,
+          M.tools(List.append(&2, T.Sect, t, T.Sect{"tools." ++ n, ps} <> ss2))),
+        M.tools.put(String.starts_with(M.name_of(h), "tools."), h,
+          List.append(&2, M.Tool, M.tools(t), M.tool_of("tools." ++ n, ps) <> M.tools(ss2))),
+        List.append(&2, M.Tool,
+          M.tools.put(String.starts_with(M.name_of(h), "tools."), h, M.tools(t)),
+          M.tool_of("tools." ++ n, ps) <> M.tools(ss2)),
+        Equal.cong(List<&2, M.Tool>, List<&2, M.Tool>,
+          x => M.tools.put(String.starts_with(M.name_of(h), "tools."), h, x),
+          M.tools(List.append(&2, T.Sect, t, T.Sect{"tools." ++ n, ps} <> ss2)),
+          List.append(&2, M.Tool, M.tools(t), M.tool_of("tools." ++ n, ps) <> M.tools(ss2)),
+          Laws.tool_section_is_tool(t, n, ps, ss2)),
+        tools_put_append(String.starts_with(M.name_of(h), "tools."), h, M.tools(t),
+          M.tool_of("tools." ++ n, ps) <> M.tools(ss2)))
+
+def Laws.tool_needs_no_hash(ss1, n, ps, ss2):
+  match ss1:
+    case []:
+      {==}
+    case +h <> +t:
+      Equal.cong(String, String,
+        x => M.missing.at(M.missing.is(h), M.name_of(h), x),
+        M.missing(List.append(&2, T.Sect, t, T.Sect{"tools." ++ n, ps} <> ss2)),
+        M.missing(List.append(&2, T.Sect, t, ss2)),
+        Laws.tool_needs_no_hash(t, n, ps, ss2))
