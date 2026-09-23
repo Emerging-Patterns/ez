@@ -6,10 +6,12 @@ import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ../lock/run.bend as Run
+import ../lock/plan.bend as P
 import ../lock/world.bend as W
 import ../ez/env.bend as Env
 import ../ez/cap.bend as Cap
 import ../ez/args.bend as Args
+import ../ez/ends.bend as E
 import ../init/run.bend as InitRun
 import ../remove/run.bend as RemoveRun
 import ../add/run.bend as AddRun
@@ -26,19 +28,12 @@ def load() -> IO(M.Read):
     t : Maybe<&2, String> <- F.read(toml())
     return M.parse(F.text_of(t))
 
-# a failed run must fail the command, or a script around it learns nothing
-def report.exit(ok: Bool) -> IO(Unit):
-  match ok:
-    case True{}:
-      IO.pure(Unit, Unit{})
-    case False{}:
-      IO.die(Unit, 1, "")
-
-# a run's output, printed, and its status turned into this program's
+# a run's output, printed, and the command ended on it (`E.ran`): a failed
+# run must fail the command, or a script around it learns nothing
 def report(+out: String) -> IO(Unit):
   do IO<Unit>:
     IO.write(R.text(out))
-    report.exit(R.ok(out))
+    Run.end(E.ran(out))
 
 # the same, with a word in front of it for a run the kernel ended rather than
 # the program. bend prints that all terms check before it emits any C, so a
@@ -47,7 +42,7 @@ def report(+out: String) -> IO(Unit):
 def report.capped(+why: String, +out: String) -> IO(Unit):
   do IO<Unit>:
     IO.write(why ++ R.text(out))
-    report.exit(R.ok(out))
+    Run.end(E.ran(out))
 
 # the entry file a ledger names, or "main.bend" when it names none
 def entry.or(+file: String) -> String:
@@ -82,47 +77,17 @@ def refuse(ledger: M.Read) -> IO(Unit):
 # `ez run` spends after that is the user's own program spending it, which is
 # not ez's to ration.
 #
-# `bend f -o out` checks without running main. A clean file prints nothing at
-# all, and a library entry, having no main, checks clean and then exits 1 with
-# "no main to run" from the emit. A check failure throws before the emit, so
-# that message can only follow a check that passed.
-#
-# It is matched as a whole line, because that is the shape of the thing being
-# claimed: bend prints it as `Error: no main to run` and nothing else. Asked as
-# a substring of the whole output, the same words appearing anywhere — inside
-# some other error's text, or in a source line bend echoed back while
-# reporting on it — would answer yes and mean nothing, and a failing check
-# would read as a passing one. Two other line-shaped facts in this tree were
-# being asked of whole files the same way, and one of them silently dropped a
-# test before it was caught.
-def no.main(+line: String) -> Bool:
-  String.eq(line, "Error: no main to run")
+# Whether a check passed is `E.check.passed`: bend exited 0, or said only
+# that the entry has no main.
 
-# whether any line of the output is that one. The rest of the walk is bound
-# before the `Bool.or` rather than written under it: `Bool.or` is an ordinary
-# function and reduces both sides, so a recursive call sitting inside one is
-# not a branch the condition can decline. Bound first it is a plain fold over
-# a handful of lines, which is what the rest of this tree does too.
-def said.no.main(ls: List<&2, String>) -> Bool:
-  match ls:
-    case Nil{}:
-      False{}
-    case Con{+h, t}:
-      +rest = said.no.main(t)
-      Bool.or(no.main(h), rest)
-
-def check.passed(+out: String) -> Bool:
-  Bool.or(R.ok(out), said.no.main(String.lines(R.text(out))))
-
-# a passing check says so, since bend says nothing when it is happy
+# a passing check says so, since bend says nothing when it is happy, and a
+# failing one shows what bend said
 def check.said(passed: Bool, entry: String, text: String) -> IO(Unit):
   match passed:
     case True{}:
       IO.print("ok " ++ entry)
     case False{}:
-      do IO<Unit>:
-        IO.write(text)
-        IO.die(Unit, 1, "")
+      IO.write(text)
 
 # the entry checked, and never run
 def check() -> IO(Unit):
@@ -130,7 +95,8 @@ def check() -> IO(Unit):
     r : M.Read <- load()
     +at : String <- IO.pure(String, entry(r))
     +out : String <- Env.exec(["bend", at, "-o", ".ez/check.js"])
-    check.said(check.passed(out), at, R.text(out))
+    check.said(E.check.passed(out), at, R.text(out))
+    Run.end(E.checked(out))
 
 # where a build lands when nothing said: `bin/<package name>.out`. The name
 # and not the entry file, because the entry is where a program starts and the
@@ -176,16 +142,18 @@ def publish() -> IO(Unit):
 # rewritten imports and the lock in one plan. Either writes nothing when it
 # refuses, and a missing ledger is refused. `--package` is only a filter on an
 # upgrade.
-def lock.go(ok: Bool, up: Bool, +name: String) -> IO(Unit):
-  match ok:
-    case True{}:
+# `--package` without `--upgrade` is refused before anything is read
+# (`E.lock.flags`).
+def lock.go(flags: P.Outcome, up: Bool, +name: String) -> IO(Unit):
+  match flags:
+    case P.Success{}:
       Run.run(up, name)
-    case False{}:
-      IO.die(Unit, 1, "ez: --package needs --upgrade")
+    case P.Refused{why}:
+      Run.end(P.Refused{why})
 
 # `ez lock` and `ez lock --upgrade [--package NAME]`
 def lock(+up: Bool, +name: String) -> IO(Unit):
-  lock.go(Bool.or(up, String.is_empty(name)), up, name)
+  lock.go(E.lock.flags(up, name), up, name)
 
 # `ez fetch`, planned by fetch/plan.bend: BEND_LIB filled from the lock, with
 # nothing re-resolved, and nothing laid unless every package checks

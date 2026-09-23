@@ -15,6 +15,8 @@ import ../ez/env.bend as Env
 import ../ez/cap.bend as Cap
 import ./quiet.bend as Q
 import ./sorted.bend as Sort
+import ../ez/ends.bend as E
+import ../lock/run.bend as Run
 
 # every file of a kind in the tree, sorted, so a run's report is the same twice
 # over. Base has no readdir, so this is `find`. `.claude` is skipped along with
@@ -138,19 +140,13 @@ def report(ps: List<&2, String>, as: List<&2, String>, +gigs: String, +passed: N
         short(rest)
         return passed
 
-# anything that failed fails the command, or a script around it learns nothing
-def done.exit(all: Bool) -> IO(Unit):
-  match all:
-    case True{}:
-      IO.pure(Unit, Unit{})
-    case False{}:
-      IO.die(Unit, 1, "")
-
-# the count, and the exit status it implies. A run's last line is its verdict.
+# the count, and the exit status it implies. A run's last line is its verdict,
+# and anything that failed fails the command (`E.counted`), or a script around
+# it learns nothing.
 def done(+passed: Nat, +total: Nat) -> IO(Unit):
   do IO<Unit>:
     IO.print("PASS: " ++ Nat.show(passed) ++ " / " ++ Nat.show(total))
-    done.exit(Nat.is_eq(passed, total))
+    Run.end(E.counted(passed, total))
 
 # `ez prove`: every PROOF.bend in the tree, run at once and reported in the
 # tree's order. There is no budget: a proof that takes long is still a proof,

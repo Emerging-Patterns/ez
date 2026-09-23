@@ -503,3 +503,23 @@ def asks_led(b, g, w):
 
 def Laws.fetch_asks_anchored(w):
   asks_led(F.ledger(w), F.lock(w), w)
+
+# ---------------------------------------------------------------------------
+# EZ-OUT-1
+
+# LAW: a plan ends with the status of whether it refuses
+law plan_code:
+  for pl: P.Plan
+  {P.code(pl) == P.status.of(FP.refuses.plan(pl)) : U32}
+
+def plan_code(pl):
+  match pl:
+    case P.Plan{_es, o}:
+      match o:
+        case P.Success{}:
+          {==}
+        case P.Refused{_why}:
+          {==}
+
+def Laws.fetch_exits_as_it_refuses(w):
+  plan_code(FP.plan(w))

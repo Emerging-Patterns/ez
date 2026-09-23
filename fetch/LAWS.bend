@@ -20,6 +20,13 @@ law fetch_refusal_writes_nothing:
   for r: {FP.refuses(w) == True{} : Bool}
   {P.writes(FP.plan(w)) == False{} : Bool}
 
+# LAW: `ez fetch` ends with the status of its plan's outcome, which is 1
+# exactly when it refuses and 0 when it does not
+# EZ-OUT-1
+law fetch_exits_as_it_refuses:
+  for +w: F.World
+  {P.code(FP.plan(w)) == P.status.of(FP.refuses(w)) : U32}
+
 # LAW: with no ez.toml, `ez fetch` refuses, whatever the lock says
 # EZ-LED-6
 law fetch_needs_ledger:

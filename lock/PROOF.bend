@@ -615,6 +615,33 @@ def Laws.lock_refusal_writes_nothing(w, r):
           W.listing.of(W.next(args, ledger, ups), listing),
           W.judged.of(W.next(args, ledger, ups), replies)}), r)
 
+# LAW: a plan made from what was decided ends with the status of that
+# decision, whatever the upgrade decided around it
+law made_code:
+  for +nx: Up.Next
+  for +cs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for d: P.Doc
+  {P.code(P.made(nx, cs, js, d)) == P.status.of(P.refuses.doc(d)) : U32}
+
+def made_code(_nx, _cs, _js, d):
+  match d:
+    case P.Doc{_text}:
+      {==}
+    case P.Stop{_why}:
+      {==}
+
+def Laws.lock_exits_as_it_refuses(w):
+  match w:
+    case W.World{+args, +ledger, listing, +replies, +ups}:
+      made_code(W.next(args, ledger, ups),
+        P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
+        W.judged.of(W.next(args, ledger, ups), replies),
+        P.decide(W.Inputs{Up.next.read(W.next(args, ledger, ups)),
+          Up.next.stop(W.next(args, ledger, ups)),
+          W.listing.of(W.next(args, ledger, ups), listing),
+          W.judged.of(W.next(args, ledger, ups), replies)}))
+
 # A plain World's args say no `--upgrade`; the other arm contradicts the
 # premise, and in this one the upgrade is `Up.plain`, which asks nothing.
 def Laws.plain_lock_asks_no_upgrade(w, e):

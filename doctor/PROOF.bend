@@ -607,3 +607,23 @@ def Laws.lock_needed(_n):
 
 def Laws.lock_names(_deps, _h, _t):
   {==}
+
+# ---------------------------------------------------------------------------
+# EZ-OUT-1
+
+# LAW: a plan ends with the status of whether it fails the command
+law plan_code:
+  for pl: P.Plan
+  {P.code(pl) == P.status.of(DP.refuses.plan(pl)) : U32}
+
+def plan_code(pl):
+  match pl:
+    case P.Plan{_es, o}:
+      match o:
+        case P.Success{}:
+          {==}
+        case P.Refused{_why}:
+          {==}
+
+def Laws.doctor_exits_as_it_fails(w):
+  plan_code(DP.plan(w))

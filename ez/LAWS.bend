@@ -1,7 +1,9 @@
 # ez: the laws. The human states them; PROOF.bend must prove them. The string
 # facts a test run turns on live here: what bend's own chatter is and what a
 # `#|` trailer asks for. The clock's by.effect deadline lives here too.
-# The OS half of the clock is not among them.
+# The OS half of the clock is not among them. The statuses a line exits with
+# before any command runs (ez/line.bend), and the ends of the commands that
+# are not planners (ez/ends.bend), are here too, for EZ-OUT-1.
 import Base
 import ./quiet.bend as Q
 import ./gate.bend as G
@@ -13,6 +15,11 @@ import ../ez/pin.bend as Pin
 import ../ez/env.bend as Env
 import ../pkg/path.bend as P
 import ../ez/named.bend as Named
+import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
+import ../ez/line.bend as L
+import ../ez/ends.bend as E
+import ../lock/plan.bend as LP
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 
 # quiet: bend's chatter is not the program's output
 
@@ -586,3 +593,104 @@ law gap_of_narless_pin:
   {Pin.gap(M.Tool{n, e, b, M.Git{url, rev, tag, root, "", vend}})
     == "ez: tools." ++ n ++ " has no narHash; run `ez lock --upgrade --package " ++
       n ++ "` to pin it" : String}
+
+# ---------------------------------------------------------------------------
+# line: the status a line exits with before any command runs (ez/line.bend).
+# ez/main.bend exits with `L.status` of `L.line` of what Shake parsed, and a
+# line that names a command runs it, whose plan's end is its own status.
+
+# LAW: `ez help`, and `ez help <path>` whose every word names a command under
+# the one before it, shows help and exits 0
+# EZ-OUT-1
+law help_exits_zero:
+  for +app: Shake.Cli
+  for +path: List<&2, String>
+  for known: {L.unknown.word(path, L.subs(app)) == None{} : Maybe<&2, String>}
+  {L.status(L.line(app, Fail{Shake.NeedHelp{path}})) == L.Exits{0} : L.Status}
+
+# LAW: `ez help <path>` with a word that names no command there, `ez help
+# bogus`, is a usage error and exits 1
+# EZ-OUT-1
+law help_unknown_exits_one:
+  for +app: Shake.Cli
+  for +path: List<&2, String>
+  for +w: String
+  for miss: {L.unknown.word(path, L.subs(app)) == Some{w} : Maybe<&2, String>}
+  {L.status(L.line(app, Fail{Shake.NeedHelp{path}})) == L.Exits{1} : L.Status}
+
+# LAW: every other line Shake refuses exits 1: an unknown command or a word
+# too many (`Unexpected`), an unknown flag, a missing argument or value, or a
+# value it does not allow
+# EZ-OUT-1
+law usage_error_exits_one:
+  for +app: Shake.Cli
+  for e: Shake.ParseErr
+  for no: {L.asks.help(e) == False{} : Bool}
+  {L.status(L.line(app, Fail{e})) == L.Exits{1} : L.Status}
+
+# LAW: a bare `ez` shows help and exits 0, whatever Shake bound
+# EZ-OUT-1
+law bare_exits_zero:
+  for +app: Shake.Cli
+  for +bs: List<&2, Shake.Bind>
+  {L.status(L.line(app, Done{Shake.Matched{[], bs}})) == L.Exits{0} : L.Status}
+
+# LAW: a path that names no command and is not empty, a bare `ez tool`,
+# exits 1
+# EZ-OUT-1
+law group_exits_one:
+  for +app: Shake.Cli
+  for +m: Shake.Matched
+  for none: {L.is.help(L.command(L.path(m))) == True{} : Bool}
+  for some: {String.is_empty(L.path(m)) == False{} : Bool}
+  {L.status(L.line(app, Done{m})) == L.Exits{1} : L.Status}
+
+# LAW: a path that names a command runs that command, with what Shake bound
+# EZ-OUT-1
+law command_runs:
+  for +app: Shake.Cli
+  for +m: Shake.Matched
+  for named: {L.is.help(L.command(L.path(m))) == False{} : Bool}
+  {L.line(app, Done{m}) == L.Runs{L.command(L.path(m)), m} : L.Line}
+
+# LAW: and the line decides no status for it: the command's own end does
+# EZ-OUT-1
+law command_ends_its_own:
+  for +app: Shake.Cli
+  for +m: Shake.Matched
+  for named: {L.is.help(L.command(L.path(m))) == False{} : Bool}
+  {L.status(L.line(app, Done{m})) == L.Ends{} : L.Status}
+
+# ---------------------------------------------------------------------------
+# ends: the commands that are not planners (ez/ends.bend). Each ends with an
+# outcome, as a plan does, and the interpreter exits with its `LP.status`.
+
+# LAW: `ez build` and `ez run` exit 1 exactly when bend did not exit 0, and 0
+# when it did
+# EZ-OUT-1
+law ran_exits_as_bend:
+  for +out: String
+  {LP.status(E.ran(out)) == LP.status.of(Bool.not(R.ok(out))) : U32}
+
+# LAW: `ez check` exits 1 exactly when the check did not pass, and 0 when it
+# did
+# EZ-OUT-1
+law check_exits_as_it_passes:
+  for +out: String
+  {LP.status(E.checked(out)) == LP.status.of(Bool.not(E.check.passed(out))) : U32}
+
+# LAW: `ez test` and `ez prove` exit 1 exactly when a file did not pass, and
+# 0 when every one did
+# EZ-OUT-1
+law gate_exits_as_it_counts:
+  for +passed: Nat
+  for +total: Nat
+  {LP.status(E.counted(passed, total))
+    == LP.status.of(Bool.not(Nat.is_eq(passed, total))) : U32}
+
+# LAW: `ez lock --package NAME` without `--upgrade` is refused, and exits 1
+# EZ-OUT-1
+law package_needs_upgrade:
+  for +name: String
+  for ne: {String.is_empty(name) == False{} : Bool}
+  {LP.status(E.lock.flags(False{}, name)) == 1 : U32}

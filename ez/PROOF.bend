@@ -14,6 +14,11 @@ import ../ez/env.bend as Env
 import ../pkg/path.bend as P
 import ../manifest/manifest.bend as M
 import ./key.bend as K
+import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
+import ../ez/line.bend as L
+import ../ez/ends.bend as E
+import ../lock/plan.bend as LP
+import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
@@ -1522,4 +1527,83 @@ def Laws.gap_of_narless_pin(n, _e, _b, _url, _rev, _tag, _root, _vend, fr):
   %fr : {Pin.gap.git(_, True{}, n) == "ez: tools." ++ n ++
     " has no narHash; run `ez lock --upgrade --package " ++ n ++ "` to pin it"
     : String}
+  {==}
+
+# ---------------------------------------------------------------------------
+# line: each law is the premise rewritten into the one match `L.line` turns
+# on, or, for a parse error, a case split on the error
+
+def Laws.help_exits_zero(app, path, known):
+  %Equal.sym(Maybe<&2, String>, L.unknown.word(path, L.subs(app)), None{}, known)
+    : {L.status(L.line.help(_, app, path)) == L.Exits{0} : L.Status}
+  {==}
+
+def Laws.help_unknown_exits_one(app, path, w, miss):
+  %Equal.sym(Maybe<&2, String>, L.unknown.word(path, L.subs(app)), Some{w}, miss)
+    : {L.status(L.line.help(_, app, path)) == L.Exits{1} : L.Status}
+  {==}
+
+def Laws.usage_error_exits_one(app, e, no):
+  match e:
+    case Shake.NeedHelp{path}:
+      Eq.bit.absurd2(&2, {L.status(L.line(app, Fail{Shake.NeedHelp{path}})) == L.Exits{1}
+        : L.Status}, no)
+    case Shake.Unexpected{_arg}:
+      {==}
+    case Shake.UnknownFlag{_flag}:
+      {==}
+    case Shake.Missing{_name}:
+      {==}
+    case Shake.BadValue{_name, _value}:
+      {==}
+
+def Laws.bare_exits_zero(_app, _bs):
+  {==}
+
+def Laws.group_exits_one(app, m, none, some):
+  %Equal.sym(Bool, L.is.help(L.command(L.path(m))), True{}, none)
+    : {L.status(L.line.run(_, L.command(L.path(m)), app, m)) == L.Exits{1} : L.Status}
+  %Equal.sym(Bool, String.is_empty(L.path(m)), False{}, some)
+    : {L.status(L.line.group(_, app, m)) == L.Exits{1} : L.Status}
+  {==}
+
+def Laws.command_runs(app, m, named):
+  %Equal.sym(Bool, L.is.help(L.command(L.path(m))), False{}, named)
+    : {L.line.run(_, L.command(L.path(m)), app, m) == L.Runs{L.command(L.path(m)), m}
+      : L.Line}
+  {==}
+
+def Laws.command_ends_its_own(app, m, named):
+  Equal.cong(L.Line, L.Status, l => L.status(l), L.line(app, Done{m}),
+    L.Runs{L.command(L.path(m)), m}, Laws.command_runs(app, m, named))
+
+# ---------------------------------------------------------------------------
+# ends: each command's outcome is `E.outcome.of` of whether it passed, so one
+# case split on that bit answers for all of them
+
+# LAW: an outcome made from a bit ends with the status of its negation
+law outcome_status:
+  for b: Bool
+  {LP.status(E.outcome.of(b)) == LP.status.of(Bool.not(b)) : U32}
+
+def outcome_status(b):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.ran_exits_as_bend(out):
+  outcome_status(R.ok(out))
+
+def Laws.check_exits_as_it_passes(out):
+  outcome_status(E.check.passed(out))
+
+def Laws.gate_exits_as_it_counts(passed, total):
+  outcome_status(Nat.is_eq(passed, total))
+
+def Laws.package_needs_upgrade(name, ne):
+  %Equal.sym(Bool, String.is_empty(name), False{}, ne)
+    : {LP.status(Bool.pick(LP.Outcome, Bool.or(False{}, _), LP.Success{},
+      LP.Refused{"ez: --package needs --upgrade"})) == 1 : U32}
   {==}

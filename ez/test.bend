@@ -15,6 +15,8 @@ import ./gate.bend as G
 import ./quiet.bend as Q
 import ./clock.bend as Clock
 import ./prove.bend as P
+import ../ez/ends.bend as E
+import ../lock/run.bend as Run
 
 # how many comparisons were made, and how many of them held
 type Tally is Data:
@@ -89,7 +91,7 @@ def done.go(+passed: Nat, +total: Nat) -> IO(Unit):
   do IO<Unit>:
     IO.print("tests are a last resort for what you cannot prove")
     IO.print("PASS: " ++ Nat.show(passed) ++ " / " ++ Nat.show(total))
-    P.done.exit(Nat.is_eq(passed, total))
+    Run.end(E.counted(passed, total))
 
 # what a whole run amounts to
 def done(score: Tally) -> IO(Unit):

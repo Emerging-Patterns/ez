@@ -30,6 +30,13 @@ law add_refusal_writes_nothing:
   for r: {AP.refuses(w) == True{} : Bool}
   {P.writes(AP.plan(w)) == False{} : Bool}
 
+# LAW: `ez add` ends with the status of its plan's outcome, which is 1
+# exactly when it refuses and 0 when it does not
+# EZ-OUT-1
+law add_exits_as_it_refuses:
+  for +w: A.World
+  {P.code(AP.plan(w)) == P.status.of(AP.refuses(w)) : U32}
+
 # LAW: with no ez.toml, `ez add` refuses, whatever it was asked to add
 # EZ-LED-6
 law add_needs_ledger:
