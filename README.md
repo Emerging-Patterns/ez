@@ -218,7 +218,9 @@ removed too, unless another dependency still names that hash. A name the
 ledger does not have stops `ez remove` with exit 1, and it writes nothing,
 as `cargo remove` does.
 Without `vendor = true`, the tree is not committed: `ez fetch` fills `BEND_LIB` from the
-lock, and `ez lock` fetches a git dependency whose tree is not under
+lock, checking every file against the lock's sum and every package against
+its name before it lays anything, and refuses with exit 1, writing nothing,
+when there is no ez.toml or no lock, as `uv sync --frozen` does. `ez lock` fetches a git dependency whose tree is not under
 `BEND_LIB` at the ledger's `rev`, checks it against `narHash`, and leaves it
 there once the lock is written. A fetch or a check that fails stops the lock
 with exit 1, and a lock that stops writes nothing: not the lock, and no tree. `ez doctor`
