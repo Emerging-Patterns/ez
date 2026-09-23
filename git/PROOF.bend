@@ -1,24 +1,13 @@
 # git: the proofs. `bend PROOF.bend` is the gate.
 import Base
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
-import ../lock/lock.bend as L
 import ../git/git.bend as G
 import ../pkg/path.bend as P
 import ../check/eq.bend as Eq
 import ../pkg/PROOF.bend as Pk
 import ./LAWS.bend as Laws
 
-# The six keys are written out as literals on both sides, so every lookup in
-# `L.src_of` decides against a literal and computes: `kind` finds "git", each
-# named key finds the pair written for it, and `tag` runs off the end of the
-# six into whatever follows. Nothing is left symbolic but the values, and they
-# are carried through untouched.
-def Laws.origin_read(_url, _rev, _entry, _root, _nar, _ts):
-  {==}
-
-# A ref's length or alphabet is rewritten into `Bool.and`. A table's
-# name is rewritten into the keep-or-drop arm. The two root laws
-# rewrite a depth comparison into the climb count.
+# A ref's length or alphabet is rewritten into `Bool.and`. The two root
+# laws rewrite a depth comparison into the climb count.
 
 def Laws.is_rev_needs_40(ref, e):
   %e : {Bool.and(_, G.hex.all(String.to_list(ref))) == False{} : Bool}
@@ -32,16 +21,6 @@ def Laws.is_rev_needs_hex(ref, e0, e1):
 def Laws.is_rev_hex40(ref, e0, e1):
   %e0 : {Bool.and(_, G.hex.all(String.to_list(ref))) == True{} : Bool}
   %e1 : {_ == True{} : Bool}
-  {==}
-
-def Laws.but_drops(n, ps, rest):
-  Equal.cong(Bool, List<&2, T.Sect>,
-    b => G.but.put(b, T.Sect{n, ps}, G.but(rest, n)),
-    String.eq(n, n), True{}, Eq.string_eq_self(n))
-
-def Laws.but_keeps(n, m, ps, rest, e):
-  %e : {G.but.put(_, T.Sect{n, ps}, G.but(rest, m))
-    == T.Sect{n, ps} <> G.but(rest, m) : List<&2, T.Sect>}
   {==}
 
 # LAW: a number compared with itself is equal

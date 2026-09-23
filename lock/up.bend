@@ -26,6 +26,7 @@ import ../manifest/render.bend as Rend
 import ../manifest/upgrade.bend as U
 import ../manifest/ignore.bend as I
 import ../git/git.bend as Git
+import ../pkg/pkg.bend as K
 import ../hub/hub.bend as Web
 import ../sha/sha.bend as Sha
 import ../ez/say.bend as Say
@@ -33,7 +34,10 @@ import ../ez/say.bend as Say
 # ---------------------------------------------------------------------------
 # questions and answers
 
-# a question the upgrade asks, answered by one IO action
+# a question the upgrade asks, answered by one IO action. `ez add`
+# (add/plan.bend) asks four of them too: `Tags`, `Head` and `Refs` to resolve
+# a ref, and `Clone` for the checkout it walks, with `url` the source as git
+# is to read it, which that planner anchors itself.
 type Ask is Data:
   Refs{url: String, ref: String}                 # `git ls-remote url refs/tags/<ref> ... refs/heads/<ref>`
   Head{url: String}                              # `git ls-remote --symref url HEAD`
@@ -44,6 +48,7 @@ type Ask is Data:
   HubHas{hub: String, hash: String}              # the hub's manifest for a hash a dependency moved to
   Ignore{}                                       # `.gitignore`, "" when missing
   Sources{}                                      # every `.bend` file outside `.ez` and `.git`
+  Clone{url: String, rev: String}                # a checkout at rev: narHash and every file's text, for `ez add`
 
 # one source file of the project, with its text
 type Found is Data:
@@ -59,6 +64,7 @@ type Answer is Data:
   HubSaid{got: Web.Got}                                                        # HubHas
   Text{text: String}                                                           # Ignore
   Files{files: List<&2, Found>}                                                # Sources
+  Cloned{nar: String, files: List<&2, K.Source>}                               # Clone
   Miss{why: String}                                                            # any question IO could not answer
 
 # one question, answered
@@ -171,6 +177,8 @@ def key(ask: Ask) -> String:
       "ignore"
     case Sources{}:
       "sources"
+    case Clone{url, rev}:
+      "clone\n" ++ url ++ "\n" ++ rev
 
 # an answer looked up, or none yet
 type Heard is Data:

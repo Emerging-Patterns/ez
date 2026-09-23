@@ -26,7 +26,7 @@ import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./cap.bend as Cap
 import ./env.bend as Env
-import ./target.bend as Tgt
+import ../ez/target.bend as Tgt
 import ./key.bend as K
 import ../run/bend.bend as Bend
 import ../ez/say.bend as Say

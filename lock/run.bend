@@ -392,6 +392,87 @@ def answer.sources() -> IO(Up.Answer):
       "-not", "-path", "*/.ez/*", "-not", "-path", "*/.git/*"])
     found.listed(R.ok(out), R.text(out))
 
+# a checkout `ez add` walks, which could not be made or read: removed, and
+# the question answered with why
+def whole.miss(+work: String, +why: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    _rm : String <- R.exec(["rm", "-rf", work])
+    return Up.Miss{why}
+
+# a command of the checkout that worked goes on with it; one that failed ends
+# it
+def whole.ran(ok: Bool, +work: String, +why: String, go: Unit -> IO(Up.Answer)) -> IO(Up.Answer):
+  match ok:
+    case True{}:
+      go(Unit{})
+    case False{}:
+      whole.miss(work, why)
+
+# one git command of the checkout, and the rest of it when it worked
+def whole.run(+work: String, what: String, args: List<&2, String>, go: Unit -> IO(Up.Answer)) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    +out : String <- R.exec(args)
+    whole.ran(R.ok(out), work, "ez: git " ++ what ++ ": " ++ String.trim(R.text(out)), go)
+
+# a file read, in front of the rest
+def whole.put(got: Maybe<&2, String>, +at: String, rest: List<&2, K.Source>) -> List<&2, K.Source>:
+  match got:
+    case None{}:
+      rest
+    case Some{text}:
+      K.Source{at, text} <> rest
+
+# every listed file of the checkout, read, with its path from the checkout's
+# top. One that cannot be read as text, such as a link to a directory, is
+# left out, as the walk would find it missing.
+def whole.read(+work: String, ps: List<&2, String>) -> IO(List<&2, K.Source>):
+  match ps:
+    case []:
+      IO.pure(List<&2, K.Source>, [])
+    case +h <> t:
+      do IO<List<&2, K.Source>>:
+        m : Maybe<&2, String> <- F.read(h)
+        rest : List<&2, K.Source> <- whole.read(work, t)
+        return whole.put(m, String.drop(h, (1n + String.length(work) : Nat)), rest)
+
+# the checkout, its `.git` removed, weighed, and every file of it read; then
+# removed. Nothing is laid: `ez add` lays the tree from its plan.
+def whole.weigh(+work: String, +rev: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
+    +s : Say.Spin <- Say.hold(Say.hashing(rev))
+    +nar : String <- Git.nar(work)
+    Say.done(s)
+    +out : String <- R.exec(["find", work, "(", "-type", "f", "-o", "-type", "l", ")"])
+    fs : List<&2, K.Source> <- whole.read(work, nonempty(String.lines(R.text(out))))
+    _rm : String <- R.exec(["rm", "-rf", work])
+    return Up.Cloned{nar, fs}
+
+# a scratch directory made, or why it could not be
+def whole.dir(ok: Bool, +work: String, +url: String, +rev: String) -> IO(Up.Answer):
+  match ok:
+    case False{}:
+      IO.pure(Up.Answer, Up.Miss{"ez: no scratch directory to clone into: " ++ work})
+    case True{}:
+      do IO<Up.Answer>:
+        +s : Say.Spin <- Say.hold(Say.git.fetch(url))
+        +from : String <- Git.anchored(url)
+        a : Up.Answer <- whole.run(work, "init", ["git", "init", "-q", work], _u =>
+          whole.run(work, "fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", from, rev], _v =>
+            whole.run(work, "checkout", ["git", "-C", work, "checkout", "-q", rev], _w =>
+              whole.weigh(work, rev))))
+        Say.done(s)
+        return a
+
+# a checkout at a rev for `ez add`: a shallow clone into a scratch directory
+# outside the project and BEND_LIB, weighed, and every file's text read, so
+# the planner walks the package itself. The scratch directory is removed
+# whether or not the clone worked, so a refused add leaves no trace.
+def answer.whole(+url: String, +rev: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    +tmp : String <- R.exec(["mktemp", "-d"])
+    whole.dir(R.ok(tmp), String.trim(R.text(tmp)), url, rev)
+
 # one of the upgrade's questions, answered
 def answer.up(+lib: String, ask: Up.Ask) -> IO(Up.Answer):
   match ask:
@@ -413,6 +494,8 @@ def answer.up(+lib: String, ask: Up.Ask) -> IO(Up.Answer):
       answer.ignore()
     case Up.Sources{}:
       answer.sources()
+    case Up.Clone{url, rev}:
+      answer.whole(url, rev)
 
 # every one of them, answered
 def answer.ups(+lib: String, asks: List<&2, Up.Ask>) -> IO(List<&2, Up.Reply>):

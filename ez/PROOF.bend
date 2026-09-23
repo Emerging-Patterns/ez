@@ -9,8 +9,8 @@ import Base
 import ./drift.bend as D
 import ./gate.bend as G
 import ../ez/pin.bend as Pin
-import ./target.bend as Tgt
-import ./named.bend as Named
+import ../ez/target.bend as Tgt
+import ../ez/named.bend as Named
 import ./env.bend as Env
 import ./doctor.bend as Doctor
 import ../pkg/path.bend as P
@@ -1286,13 +1286,6 @@ def Laws.dirs_build_out(cmd, out, ec, eb, eo):
     == [] : List<&2, String>}
   %eb : {Env.dirs.build(_, String.is_empty(out)) == [] : List<&2, String>}
   %eo : {Bool.pick(List<&2, String>, _, ["bin"], []) == [] : List<&2, String>}
-  {==}
-
-# A missing ledger is the `Bad` arm, and a `Bad` read renders as nothing.
-def Laws.ledger_missing_unwritten(_cmd):
-  {==}
-
-def Laws.ledger_present_parsed(_s, _cmd):
   {==}
 
 # named: a walk from the end of a text has passed a slash once it has passed
