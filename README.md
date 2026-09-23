@@ -10,19 +10,27 @@ install tools for a whole project.
 
 ## Install
 
-Install Bend, then build ez with it:
+Install Bend, then fetch the packages ez builds itself with, and build it:
 
 ```bash
 curl -fsSL https://bend-lang.com/install.sh | sh
 git clone https://github.com/Emerging-Patterns/ez
 cd ez
+sh bootstrap.sh
+mkdir -p bin
 BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
 ```
 
-Nothing is fetched: the one package ez builds itself with is vendored, and
-`bend` only needs telling where it is, since it looks in `~/.bend/lib`
-otherwise. Put `bin/ez.bin` on your PATH as `ez`. The command is
-`ez tool run`. To name it `ezx`, put this next to that `ez`:
+ez's dependencies are pinned to git revs, and `ez fetch` is what fetches
+them, which ez cannot run before it is built. `bootstrap.sh` is that one
+step, and the one helper script in the repo: it reads `ez.lock.toml`,
+fetches each package at its pinned rev into `.ez/lib`, and checks every file's
+sha256 and the package's `0x` name against the lock. It needs `git` and
+`sha256sum` (or `shasum`), and nothing comes from the hub. `bend` then only
+needs telling where the packages are, since it looks in `~/.bend/lib`
+otherwise. With nix none of this is needed; see below. Put `bin/ez.bin` on
+your PATH as `ez`. The command is `ez tool run`. To name it `ezx`, put this
+next to that `ez`:
 
 ```sh
 printf '%s\n' '#!/bin/sh' 'exec ez tool run "$@"' > ezx && chmod +x ezx
