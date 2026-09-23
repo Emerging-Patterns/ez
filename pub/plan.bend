@@ -329,16 +329,11 @@ def root.of(got: K.Walked) -> String:
     case K.Refused{_why}:
       "."
 
-# a path of the project, as it is written inside a package rooted at `root`
-def inside(+root: String, +path: String) -> String:
-  Bool.pick(String, String.eq(root, "."), path,
-    String.drop(path, (String.length(root) + 1n : Nat)))
-
 # the entry's path inside the package, which is where the hub serves it: the
 # entry's name, under the directories the package re-rooted above it when an
 # import climbs out of the entry's directory
 def at(+world: PW.World) -> String:
-  inside(root.of(walked(world)), entry(world))
+  K.inside(root.of(walked(world)), entry(world))
 
 # the files of a package, as paths of the project
 def paths(+root: String, fs: List<&2, K.Source>) -> List<&2, String>:
@@ -601,16 +596,11 @@ def decide(+world: PW.World) -> Verdict:
 # ---------------------------------------------------------------------------
 # the plan
 
-# the import line a consumer writes for the package: the hash, the entry's
-# path inside the package, and the entry's name as the alias, the way bend
-# prints it
-def import.line(+hash: String, +at: String) -> String:
-  "import " ++ hash ++ "/" ++ at ++ " as " ++ G.title(Path.unbend(Path.base(at)))
-
-# what a publish that agreed says: the hash ez computed, then the import line.
-# It writes nothing.
+# what a publish that agreed says: the hash ez computed, then the import line
+# for the entry's path inside the package (`G.import.line`, which `ez add`
+# prints too). It writes nothing.
 def made(+world: PW.World) -> P.Plan:
-  P.Plan{[P.Say{hash(world)}, P.Say{import.line(hash(world), at(world))}],
+  P.Plan{[P.Say{hash(world)}, P.Say{G.import.line(hash(world), at(world))}],
     P.Success{}}
 
 # the plan for where a World stands. One that still asks is a World the
@@ -715,20 +705,3 @@ def sends.v(verdict: Verdict) -> Bool:
 # whether `ez publish` gets as far as the upload on a World
 def sends(+world: PW.World) -> Bool:
   sends.v(decide(world))
-
-# the lines a plan says, in order
-def said.in(es: List<&2, P.Effect>) -> List<&2, String>:
-  match es:
-    case []:
-      []
-    case e <> t:
-      match e:
-        case P.Say{text}:
-          text <> said.in(t)
-        case _:
-          said.in(t)
-
-# the lines a plan says
-def said(pl: P.Plan) -> List<&2, String>:
-  P.Plan{es, _outcome} = pl
-  said.in(es)
