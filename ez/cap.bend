@@ -69,10 +69,22 @@ def why(+out: String, +gigs: String) -> String:
   Bool.pick(String, killed(out),
     "killed for memory at " ++ gigs ++ "G: raise EZ_CAP\n", "")
 
+# what is said when nothing is capping the jobs
+def warning() -> String:
+  "warning: systemd-run --user cannot cap `bend`, so no `bend` is capped"
+
 # a warning printed once when nothing is capping the jobs
 def warn(on: Bool) -> IO(Unit):
   match on:
     case True{}:
       IO.pure(Unit, Unit{})
     case False{}:
-      IO.write("warning: systemd-run --user cannot cap `bend`, so no `bend` is capped\n")
+      IO.write(warning() ++ "\n")
+
+# the same warning on stderr, for a command whose stdout is the program's
+def warn.err(on: Bool) -> IO(Unit):
+  match on:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      IO.print_err(warning())

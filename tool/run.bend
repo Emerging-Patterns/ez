@@ -11,6 +11,11 @@
 # `Run.end.at`. It decides nothing; that it reads and executes faithfully is
 # EZ-TRUST-2.
 #
+# What it asks and builds on the way is captured, and a build's output is
+# shown on stderr only when the build fails. The program alone is started on
+# ez's own stdin, stdout and stderr (`Pass.run`), as `cargo run` hands the
+# terminal to the program once the build is done.
+#
 # `sync` asks the planner which pins to install (`TP.sync`) and installs
 # each in turn as `ez tool install <name>` would.
 import Base
@@ -24,6 +29,7 @@ import ../pkg/path.bend as P
 import ../run/bend.bend as Bend
 import ../ez/cap.bend as Cap
 import ../ez/say.bend as Say
+import ../ez/pass.bend as Pass
 import ./world.bend as TW
 import ./plan.bend as TP
 
@@ -112,21 +118,22 @@ def exec.lay(layout: TP.Lay) -> IO(Unit):
         _rm : String <- R.exec(["rm", "-rf", dir])
         Run.exec.all("", ws)
 
-# a build's output, kept when it failed
+# a build's output, shown on stderr when it failed, since stdout is the
+# program's, as cargo keeps its own words off it
 def compile.said(ok: Bool, +why: String, +text: String) -> IO(Unit):
   match ok:
     case True{}:
       IO.pure(Unit, Unit{})
     case False{}:
       do IO<Unit>:
-        IO.write(why ++ text)
+        IO.print_err(String.trim_end(why ++ text))
         IO.die(Unit, 1, "")
 
 # `bend <file> -o <out>` under the memory cap, with the checkout's library
 def compile(+lib: String, +file: String, +out: String) -> IO(Unit):
   do IO<Unit>:
     +on : Bool <- Cap.ok()
-    Cap.warn(on)
+    Cap.warn.err(on)
     +g : String <- Cap.gb()
     _mk : String <- R.exec(["mkdir", "-p", P.dir(out)])
     +bin : String <- R.exec(Cap.argv(on, g, lib, ["bend", file, "-o", out]))
@@ -166,17 +173,16 @@ def link.after(ok: Bool, +at: String, +text: String, says: List<&2, String>) -> 
     case True{}:
       tell(says)
 
-# the program started with its words, or the link written, and the status
-# the program exited with, 0 when none was started
+# the program started with its words on ez's own stdin, stdout and stderr,
+# or the link written, and the status the program exited with, 0 when none
+# was started. What the program prints reaches the person as it prints it,
+# and it reads what ez would have read.
 def exec.finish(fin: TP.Finish) -> IO(U32):
   match fin:
     case TP.Idle{}:
       IO.pure(U32, 0)
     case TP.Launch{bin, args}:
-      do IO<U32>:
-        +out : String <- R.exec(List.append(&2, String, [bin], args))
-        IO.write(R.text(out))
-        return TP.program(U32.read(R.code(out)))
+      Pass.run(List.append(&2, String, [bin], args))
     case TP.Link{bin, +dir, +name, says}:
       +at = dir ++ "/" ++ name
       do IO<U32>:

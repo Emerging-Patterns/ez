@@ -162,8 +162,11 @@ created when it is missing; with none of the three, install and upgrade
 refuse before anything is built. `ez tool upgrade` reads that commit again,
 builds it when no binary is kept for its record, and writes that link again.
 A binary already built for that record is left in place. Neither
-command runs the binary. `ez tool run` does, and the built program's status
-is the status of the command. A target, ledger, fetch, build or link that
+command runs the binary. `ez tool run` does, as `cargo run` does: it says
+on stderr what it resolves and builds, and a build that fails shows bend's
+output there too, then the built program reads ez's stdin and prints
+straight to the terminal as it goes, and its status is the status of the
+command. A target, ledger, fetch, build or link that
 fails exits 1, and a command that refuses writes nothing: no checkout, no
 binary, no link. `ez tool sync` checks every pin against the lock before it
 installs any.
