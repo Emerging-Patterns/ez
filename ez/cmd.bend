@@ -1,17 +1,18 @@
 # ez/cmd: what each subcommand does. Everything that touches the network or the
-# file system goes through one process effect, because bend links no TLS and
-# Base has neither mkdir nor readdir.
+# file system goes through a process effect, because bend links no TLS and
+# Base has neither mkdir nor readdir: snap's `exec` for a program whose answer
+# ez reads, and `ez/pass.bend` for the one `ez run` hands the terminal to.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
-import ../manifest/manifest.bend as M
 import ../lock/run.bend as Run
 import ../lock/plan.bend as P
-import ../lock/world.bend as W
 import ../ez/env.bend as Env
 import ../ez/cap.bend as Cap
 import ../ez/args.bend as Args
 import ../ez/ends.bend as E
+import ../ez/start.bend as S
+import ../ez/pass.bend as Pass
 import ../init/run.bend as InitRun
 import ../remove/run.bend as RemoveRun
 import ../add/run.bend as AddRun
@@ -22,53 +23,28 @@ import ../pub/run.bend as PubRun
 def toml() -> String:
   "ez.toml"
 
-# the ledger on disk, parsed
-def load() -> IO(M.Read):
-  do IO<M.Read>:
+# what `ez check`, `ez build` or `ez run` does, decided from ez.toml as it is
+# on disk (`S.start`): a missing or unreadable ledger is refused before
+# anything is started or made
+def started(+ask: S.Ask) -> IO(S.Start):
+  do IO<S.Start>:
     t : Maybe<&2, String> <- F.read(toml())
-    return M.parse(F.text_of(t))
+    return S.start(ask, t)
 
-# a run's output, printed, and the command ended on it (`E.ran`): a failed
-# run must fail the command, or a script around it learns nothing
-def report(+out: String) -> IO(Unit):
-  do IO<Unit>:
-    IO.write(R.text(out))
-    Run.end(E.ran(out))
+# a refusal said, and the command ended on it with exit 1
+def refused(+why: String) -> IO(Unit):
+  Run.end(P.Refused{why})
 
-# the same, with a word in front of it for a run the kernel ended rather than
-# the program. bend prints that all terms check before it emits any C, so a
-# build killed at the cap is otherwise indistinguishable from one that worked
-# and wrote nothing.
+# a build's output, printed with a word in front of it for a run the kernel
+# ended rather than the program, and the command ended on it (`E.ran`): a
+# failed build must fail the command, or a script around it learns nothing.
+# bend prints that all terms check before it emits any C, so a build killed at
+# the cap is otherwise indistinguishable from one that worked and wrote
+# nothing.
 def report.capped(+why: String, +out: String) -> IO(Unit):
   do IO<Unit>:
     IO.write(why ++ R.text(out))
     Run.end(E.ran(out))
-
-# the entry file a ledger names, or "main.bend" when it names none
-def entry.or(+file: String) -> String:
-  Bool.pick(String, String.is_empty(file), "main.bend", file)
-
-# the name a ledger gives the package, or `app` when there is no ledger to ask
-def named(ledger: M.Read) -> String:
-  match ledger:
-    case M.Bad{_why}:
-      "app"
-    case M.Good{m}:
-      M.Manifest{n, _e, _b, _h, _ds, _ts} = m
-      n
-
-# the entry file of a ledger that was read
-def entry(ledger: M.Read) -> String:
-  match ledger:
-    case M.Bad{_why}:
-      "main.bend"
-    case M.Good{m}:
-      M.Manifest{_n, e, _b, _h, _ds, _ts} = m
-      entry.or(e)
-
-# a ledger that would not parse stops the command before it does damage
-def refuse(ledger: M.Read) -> IO(Unit):
-  IO.die(Unit, 1, "ez: " ++ M.show(ledger))
 
 # `ez check` and `ez run` are not capped, and `ez build` is. The wall
 # `ez/cap.bend` exists for is bend's C backend: emitting the C for a large
@@ -89,44 +65,72 @@ def check.said(passed: Bool, entry: String, text: String) -> IO(Unit):
     case False{}:
       IO.write(text)
 
-# the entry checked, and never run
+# the entry checked, and never run, once `.ez` is there for its JS. The
+# entry is the word after `bend` on the line.
+def check.go(start: S.Start) -> IO(Unit):
+  match start:
+    case S.Refused{why}:
+      refused(why)
+    case S.Starts{+line}:
+      do IO<Unit>:
+        Env.make(Env.dirs("check", ""))
+        +out : String <- Env.exec(line)
+        check.said(E.check.passed(out), Args.at(line, 1n), R.text(out))
+        Run.end(E.checked(out))
+
+# `ez check`
 def check() -> IO(Unit):
   do IO<Unit>:
-    r : M.Read <- load()
-    +at : String <- IO.pure(String, entry(r))
-    +out : String <- Env.exec(["bend", at, "-o", ".ez/check.js"])
-    check.said(E.check.passed(out), at, R.text(out))
-    Run.end(E.checked(out))
+    start : S.Start <- started(S.Check{})
+    check.go(start)
 
-# where a build lands when nothing said: `bin/<package name>.out`. The name
-# and not the entry file, because the entry is where a program starts and the
-# name is what it is called — a package named `bolt` with its entry at
-# `bolt/main.bend` builds `bin/bolt.out` and not `bin/main.out`.
-def build.named(+name: String) -> String:
-  "bin/" ++ name ++ ".out"
+# a native binary, named after the package (`S.build.out`), once the
+# directory it lands in is there. This is the one command that reaches bend's
+# C backend, so it is the one that runs under the memory cap.
+def build.go(start: S.Start, +out: String) -> IO(Unit):
+  match start:
+    case S.Refused{why}:
+      refused(why)
+    case S.Starts{line}:
+      do IO<Unit>:
+        Env.make(Env.dirs("build", out))
+        +cap : Bool <- Cap.ok()
+        Cap.warn(cap)
+        +g : String <- Cap.gb()
+        +bin : String <- Cap.run(cap, line)
+        report.capped(Cap.why(bin, g), bin)
 
-# where a build lands: what was asked for, or the default
-def build.out(+at: String, +name: String) -> String:
-  Bool.pick(String, String.is_empty(at), build.named(name), at)
-
-# a native binary, named after the package. This is the one command that
-# reaches bend's C backend, so it is the one that runs under the memory cap.
+# `ez build [out]`
 def build(+out: String) -> IO(Unit):
   do IO<Unit>:
-    +r : M.Read <- load()
-    +cap : Bool <- Cap.ok()
-    Cap.warn(cap)
-    +g : String <- Cap.gb()
-    +bin : String <- Cap.run(cap, ["bend", entry(r), "-o",
-      build.out(out, named(r))])
-    report.capped(Cap.why(bin, g), bin)
+    start : S.Start <- started(S.Build{out})
+    build.go(start, out)
 
-# the entry run, which checks it first, with every word after `run`
+# the program `ez run` starts, on ez's own stdin, stdout and stderr, with the
+# project's BEND_LIB set for it, and the status it exited with; 0 when the
+# run was refused, which starts none
+def run.started(start: S.Start, +at: String) -> IO(U32):
+  match start:
+    case S.Refused{_why}:
+      IO.pure(U32, 0)
+    case S.Starts{line}:
+      Pass.run(Env.line(at, line))
+
+# a run, and how it ends: exit 1 with the reason for a refusal, and the
+# program's own status otherwise (`S.code`, EZ-OUT-1)
+def run.go(+start: S.Start) -> IO(Unit):
+  do IO<Unit>:
+    at : String <- Env.lib()
+    +program : U32 <- run.started(start, at)
+    +code : U32 <- IO.pure(U32, S.code(start, program))
+    Run.end.at(U32.is_eq(code, 0), code, S.why(start))
+
+# `ez run [args..]`: the entry run by bend, which checks it first, with every
+# word after `run`, as `cargo run` runs a project's binary
 def run(as: List<&2, String>) -> IO(Unit):
   do IO<Unit>:
-    r : M.Read <- load()
-    +out : String <- Env.exec(Args.run.line(entry(r), as))
-    report(out)
+    +start : S.Start <- started(S.Run{as})
+    run.go(start)
 
 # `ez publish`, planned by pub/plan.bend: the entry the ledger names, sent to
 # the hub once the tree is clean and git tracks every file of the package,

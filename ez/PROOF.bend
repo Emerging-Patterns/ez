@@ -17,6 +17,7 @@ import ./key.bend as K
 import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
+import ../ez/start.bend as S
 import ../lock/plan.bend as LP
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../check/eq.bend as Eq
@@ -1593,7 +1594,7 @@ def outcome_status(b):
     case False{}:
       {==}
 
-def Laws.ran_exits_as_bend(out):
+def Laws.build_exits_as_bend(out):
   outcome_status(R.ok(out))
 
 def Laws.check_exits_as_it_passes(out):
@@ -1606,4 +1607,33 @@ def Laws.package_needs_upgrade(name, ne):
   %Equal.sym(Bool, String.is_empty(name), False{}, ne)
     : {LP.status(Bool.pick(LP.Outcome, Bool.or(False{}, _), LP.Success{},
       LP.Refused{"ez: --package needs --upgrade"})) == 1 : U32}
+  {==}
+
+# ---------------------------------------------------------------------------
+# start: `S.start` of a ledger that is there reads it, so each law about a
+# parsed ledger is its hypothesis put in place of `M.parse(t)`, and the rest
+# is computation. A named entry needs its emptiness too, for `S.entry.or`.
+
+def Laws.start_needs_ledger(_ask):
+  {==}
+
+def Laws.start_needs_parse(ask, _t, why, bad):
+  %bad : {S.read(ask, _) == S.Refused{"ez: error: " ++ why} : S.Start}
+  {==}
+
+def Laws.run_starts_entry(_t, _n, e, _b, _h, _ds, _ts, a, ws, good, named):
+  %good : {S.read(S.Run{a <> ws}, _) == S.Starts{"bend" <> (e <> ws)} : S.Start}
+  %named : {S.Starts{"bend" <> (Bool.pick(String, _, "main.bend", e) <> ws)}
+    == S.Starts{"bend" <> (e <> ws)} : S.Start}
+  {==}
+
+def Laws.run_starts_main(_t, _n, _b, _h, _ds, _ts, a, ws, good):
+  %good : {S.read(S.Run{a <> ws}, _) == S.Starts{"bend" <> ("main.bend" <> ws)}
+    : S.Start}
+  {==}
+
+def Laws.run_refusal_exits_one(_why, _program):
+  {==}
+
+def Laws.run_exits_with_program(_line, _program):
   {==}
