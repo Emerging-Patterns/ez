@@ -409,6 +409,13 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | hint_sync_when_tools | C | refl | Wording of the `sync` hint with tools. | none (incidental) |
 | hint_sync_without_tools | C | refl | Wording of the `sync` hint without tools. | none (incidental) |
 
+**Update:** A3 and A6 of [ez-add-planner.md](ez-add-planner.md) add `add_keep_idem`, tagged EZ-LED-2, the untagged `vendor_reads_back`, and four untagged lemmas in `manifest/PROOF.bend` (`find_last.arm`, `find_last`, `revend_again`, `readd_again`). A3 also renders the vendor key bare, `vendor = true`, where ez wrote `vendor = "true"`; `M.flag` reads both. EZ-LED-2 stays pending until `ez add` is in planner form and `add_edits_ledger` (A2) ties the command to `R.add.keep`, when A7 flips it. `vendor_reads_back` fixes the ledger around the dependency and is proved by computation for each bit, so it is two cases rather than a law over ledgers, and it carries no EZ-LED-4 tag.
+
+| Law | Kind | Proof | Claim | Points toward |
+| :---- | :---- | :---- | :---- | :---- |
+| add_keep_idem | Q | struct | `R.add.keep`, the edit `ez add` makes, twice equals once: the second add finds the entry the first wrote (`find_last`), so the vendor bit it keeps is that entry's (`revend_again`), and the rest is `add_idem`. | EZ-LED-2 (the model law; the plan law is A2's) |
+| vendor_reads_back | Q | struct | For either bit, a git dependency's vendor bit, in one fixed ledger rendered by `R.show` and parsed back by `M.parse`, is the bit. | none (a check of the bare spelling; EZ-LED-4 needs every ledger) |
+
 ## Coverage by RFC requirement
 
 | Requirement | Quantified laws | Closed laws | Status today |
@@ -420,9 +427,9 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | EZ-HASH-5 | none | sri_empty_digest, sri_empty_dir | Trusted, two examples. |
 | EZ-HASH-6 | none | hex_empty, hex_abc, hex_manifest | Trusted, three examples. The sha/LAWS.bend header says the digest comes from Giulio2002/bend-sha256 and is proved there against an executable FIPS spec. |
 | EZ-DOC-1 | lock_names_hub (one field) | lock_roundtrip, tools_are_not_packages, tool_pin_reads_back | One sample. |
-| EZ-DOC-2 | pack_ins_le, render_keeps_packages_without_tools | hashes_sorted | Partial. |
+| EZ-DOC-2 | pack_ins_le, render_keeps_packages_without_tools | hashes_sorted | Partial. **Update:** proved by `lock/lock_order_free`, `lock/pack_order_free` and `lock/plain_lock_hashes_distinct` (WP3). |
 | EZ-DOC-3 | origin_first, origin_agrees, origin_read, but_drops, but_keeps | hashes_sorted | The resolver's ledger-over-cache rule is proved. The whole-command frame property is not stated. **Update:** proved by `lock/lock_reproducible` and `lock/clone_reproduces` over the planner (WP1). |
-| EZ-DOC-4 | none | same_rev_keeps (supporting) | No law. |
+| EZ-DOC-4 | none | same_rev_keeps (supporting) | No law. **Update:** proved for a plain lock by `lock/lock_idempotent` and `lock/relock_lays_nothing` over the planner (WP5a); the `--upgrade` half is WP5b. |
 | EZ-DOC-5 | rev_of_names_the_commit, tag_of_names_the_tag (supporting) | none | No law about the command. **Update:** proved by `lock/plain_lock_keeps_ledger` and `lock/plain_lock_pins_ledger_sources` over the planner (WP1). |
 | EZ-RES-1 | is_rev_* (supporting), peeled_agrees | none | No law about tag selection. **Update:** the decisions are proved over what `git ls-remote` printed, and tagged: `choose_release`, `choose_prerelease`, `choose_greatest_release`, `choose_greatest_prerelease`, `choose_is_a_tag` (with `latest_greatest` and `latest_rel_greatest` under them), `branch_of_symref`, `branch_skips_*`, `exact_*` and `is_rev_*`. Pending until `ez add` asks through the planner (A2 of the add design). |
 | EZ-RES-2 | none | none | No law. |
@@ -479,7 +486,7 @@ This section checks each requirement in the RFC draft against what the code does
 | ID | Verdict | Evidence |
 | :---- | :---- | :---- |
 | EZ-DOC-1 | partly | `Lock.render.tools` (`lock/lock.bend:630`) then `T.parse` and `L.packs` gives back the sorted packs on one example (`lock_roundtrip`). `[lock] bend` and `[lock] version` are never read back. |
-| EZ-DOC-2 | unknown | No law or code path re-renders a parsed lock. eztoml's `T.render` does no escaping, so a value holding `"` would not round-trip. |
+| EZ-DOC-2 | unknown (**Update:** proved in WP3, see "Phase three progress") | No law or code path re-renders a parsed lock. eztoml's `T.render` does no escaping, so a value holding `"` would not round-trip. |
 | EZ-DOC-3 | fails (**Update:** proved in WP1, see "Phase three progress") | See "What ez lock reads" below. On a fresh clone of this repository, the three non-vendored git dependencies (shake, eztoml, snap) have no tree under `.ez/lib`, `read.git` reads the missing manifest as `""` (`lock/lock.bend:287-293`), and the lock is written with empty `files` tables and exit 0. The committed lock is not reproduced. |
 | EZ-DOC-4 | partly | Holds for the lock bytes when the world is unchanged (output is sorted, the old lock is never read). A repeated `--upgrade` re-clones and re-lays every selected pin and rewrites `.ez/origins.toml`. |
 | EZ-DOC-5 | holds | Dependency revs are copied from ez.toml (`ledger.put`, `lock/lock.bend:147-153`). `Pin.fill` only fills an empty tool `rev` or `narHash` (`ez/pin.bend:136-149`). Nothing checks that the tree under `.ez/lib` matches the pinned rev. |
@@ -555,11 +562,27 @@ What the README's reproducibility sentence ("`ez lock` never has to consult anyt
 | :---- | :---- | :---- |
 | WP0 | done | `check/str.bend`: the spike's list and char lemmas, `string_eq_true`, `split_join`. |
 | WP1 | done | Plain `ez lock` in planner form: `lock/world.bend` (the World, `accept`, `inputs`, `reclone`), `lock/plan.bend` (`wants`, `plan`, `step`, `put`, `refuses`, `lockable`), `lock/run.bend` (the interpreter). The IO half of `lock/lock.bend` and the spike are deleted. EZ-DOC-3 and EZ-DOC-5 proved; EZ-OUT-2's law for a plain lock is in, untagged. Behavior changes: no local import is followed, so an untracked file a tracked one imports never reaches the lock; every package is checked against its `0x` name, and a BEND_LIB tree is judged as a clone at the ledger's narHash; a lock that is not `lockable` is refused; a refused lock writes and lays nothing, and a cloned tree is laid under BEND_LIB only by a lock that succeeds. `ez lock --upgrade` keeps its own stages (`Up.run`, `Pin.upgrade`) and then locks through the same planner. |
+| WP3 | done | EZ-DOC-2 proved. The lock renders each package as one block of text filed as a `K.File` under its hash and sorts the blocks with `K.file.sort`, so pkg's `sort_perm` gives `lock_order_free` for a package list with distinct hashes, and `pack_order_free` is `sort_perm` under a block. `walk_keeps_hashes_distinct` is the walk invariant, one lemma per step def as for sources, and `plain_lock_hashes_distinct` carries it to `P.packs`, which discharges the premise for every lock the planner writes. `hashes_sorted` was already deleted with the trails. No lock bytes change: this repository's lock round-trips byte for byte. `L.has` now compares the wanted hash first, as pkg's `fresh` does, which changes no answer. |
+| WP5a | done | EZ-DOC-4 for a plain lock: `lock/lock_idempotent` (run again on the World it leaves, a plain lock writes the same bytes to ez.lock.toml) and `lock/relock_lays_nothing` (after one that succeeded, no tree arrives by a clone that passes). The World a lock leaves is `after` in `lock/LAWS.bend`: a refused lock leaves the World it read, and one that succeeded leaves every tree it laid read from BEND_LIB with the bytes it was checked with. The proof is `clone_reproduces` read backwards: a clone that passed weighed to the ledger's narHash, so the same bytes from BEND_LIB are judged the same, and the Inputs are unchanged. EZ-DOC-4 stays pending until WP5b proves the `--upgrade` half. |
 | WP8 | done | EZ-HASH-2 (`sha/nar_dir_order_free`). |
-| A5 (add design) | done | EZ-RES-1's greatest-release laws in `git/LAWS.bend`: `latest_greatest`, `latest_rel_greatest`, `choose_greatest_release`, `choose_greatest_prerelease`, `choose_is_a_tag`, each over any list with the tag anywhere in it, in the order `ord.ver` gives (numeric parts as numbers, zero-padded; semver pre-release precedence). The existing ref-choice laws are tagged EZ-RES-1. Probing the real binary found no bug in the comparator. The row stays pending until A2 lands `add_pins_chosen` and `add_commit_asks_nothing`. |
-| WP2 to WP7 | open | |
+| WP2, WP4, WP5b, WP6, WP7 | open | |
 
 The demand loop's cost, measured in WP1 on this repository's own lock with every tree already under BEND_LIB (five git packages, all imported directly, so two rounds of `wants` and one `plan`): 0.21 s for the binary before WP1 and 0.53 s after, median of seven runs each. Every round of `wants` scans every tracked source for imports again, since the World holds texts and not scans, and `plan` scans once more and checks every package's SHA-256 once. With every tree to clone (an empty BEND_LIB) the clones dominate: 7.3 s before and 7.4 s after. The design's first risk is real but small; if WP2 makes it matter, the World can carry each source's scanned imports instead of its text.
+
+### Add and remove progress
+
+The design for converting `ez add` and `ez remove`, [ez-add-planner.md](ez-add-planner.md), is accepted with every recommendation. It decides seven behavior changes: a refused `ez add` lays nothing; `ez add` stops writing `.ez/origins.toml`; a re-added vendored dependency is laid under `.ez/lib` and its old committed tree dropped; `ez remove` drops a vendored dependency's committed tree unless another dependency names the same hash; `ez remove` of a name the ledger does not have refuses; a package whose imports climb out of its checkout is refused; and `vendor = true` is written as a bare boolean. EZ-LED-8 now says a leading `~/` is expanded when the path is recorded. Its spike, `pkg/tree/`, makes the package walk a pure function of a checkout's files, computes the same hash as `K.pkg_of` on five entries of this repository, and proves three untagged laws toward EZ-RES-2 and EZ-HASH-3.
+
+| WP | State | Scope |
+| :---- | :---- | :---- |
+| A0 | open | Shared plan types in `plan/plan.bend`, git questions in `git/ask.bend`, the pure walk promoted and `K.pkg_of` rewritten over it. |
+| A1 | open | `ez remove` in planner form. |
+| A2 | open | `ez add` in planner form. |
+| A3 | open | Bare `vendor = true`. |
+| A4 | open | `ez init` in planner form. |
+| A5 | done | EZ-RES-1's greatest-release laws in `git/LAWS.bend`: `latest_greatest`, `latest_rel_greatest`, `choose_greatest_release`, `choose_greatest_prerelease`, `choose_is_a_tag`, each over any list with the tag anywhere in it, in the order `ord.ver` gives (numeric parts as numbers, zero-padded; semver pre-release precedence). The existing ref-choice laws are tagged EZ-RES-1. Probing the real binary found no bug in the comparator. The row stays pending until A2 lands `add_pins_chosen` and `add_commit_asks_nothing`. |
+| A6 | open | EZ-LED-2 over `Rend.add.keep`. |
+| A7 | open | Flip the rows whose halves have all landed. |
 
 ## Missing behavior
 

@@ -22,6 +22,16 @@ law add_idem:
   for +d: M.Dep
   {R.add(R.add(m, d), d) == R.add(m, d) : M.Manifest}
 
+# LAW: and adding it twice with the edit `ez add` makes, the one that keeps a
+# vendor bit the ledger already set, is adding it once. The second add finds
+# the entry the first one wrote, so the bit it keeps is the bit the first one
+# gave, and the dependency it adds is the one already there.
+# EZ-LED-2
+law add_keep_idem:
+  for m: M.Manifest
+  for +d: M.Dep
+  {R.add.keep(R.add.keep(m, d), d) == R.add.keep(m, d) : M.Manifest}
+
 # The rest of the ledger: the reading of a parsed document into a model, and
 # the writing of that model back out. A ledger is a file a person edits, so
 # every one of these is a claim about what ez will do with what they wrote.
@@ -262,7 +272,7 @@ law source_omits_absent_tag:
   for nar: String
   {R.source(M.Git{url, rev, "", root, nar, False{}})
     == R.line("git", url) ++ R.line("rev", rev) ++ R.line("root", root)
-      ++ R.line("narHash", nar) ++ R.line("vendor", "") : String}
+      ++ R.line("narHash", nar) ++ R.line.bare("vendor", "") : String}
 
 # LAW: a dependency's section is headed by that dependency's own name
 law dep_opens_its_section:
@@ -352,6 +362,18 @@ law source_of_vendor:
   for e: {False{} == String.is_empty(M.value(pairs, "git")) : Bool}
   {M.source.vendor(M.source_of(pairs)) == M.flag(M.value(pairs, "vendor"))
     : Bool}
+
+# LAW: the vendor bit ez renders reads back as the bit it rendered. The key is
+# written bare, `vendor = true`, which TOML reads as a boolean and ez reads as
+# the same bit it reads from the quoted spelling an older ez wrote; a bit that
+# is not set leaves no key, which reads as not set. EZ-LED-4 needs the round
+# trip for every ledger; this is stated for one fixed ledger around the
+# dependency, so it checks the spelling and carries no requirement.
+law vendor_reads_back:
+  for v: Bool
+  {M.source.vendor(M.source.dep(M.dep(M.parse(R.show(M.Manifest{"app", "", "",
+    "", [M.Dep{"dep", "0x1", "", M.Git{"u", "r", "", ".", "n", v}}], []})),
+    "dep"))) == v : Bool}
 
 # LAW: a dependency added again keeps the `vendor = true` the ledger already
 # gave it. `ez add` has no way to say it, so dropping it would drop the tree
