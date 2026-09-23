@@ -85,6 +85,7 @@ tag = "v0.1.0"
 
 [tools.bolt]
 git = "https://github.com/Emerging-Patterns/bolt"
-rev = "09117af1726b803f9b6e58907d1629455b6c4bb6"
+rev = "bee8f22cc127b2336a46f6af5c9cca51122759c5"
+tag = "v1.3.4"
 root = "."
-narHash = "sha256-UD84tarXrEn71PTa8TBmOKJFsH/hoHQfofkB0UIuDMg="
+narHash = "sha256-ufakKA4HHNdx9vXD1z1x6GxtxHhUtr2LbiS1A+hf2M8="
