@@ -20,7 +20,7 @@ Items for review:
 - [x] <!-- REVIEW (resolved): Tag selection changes: a release beats any pre-release, the default branch is asked of the remote, and refs resolve exactly. EZ-RES-1 states the new behavior. -->
 - [x] <!-- REVIEW (resolved): `owner/repo` allows `.` in both segments, so `vercel/next.js` is GitHub. EZ-RES-3 states the new behavior. -->
 - [x] <!-- REVIEW (resolved): The tool cache key records the built file and the bend version beside the commit. EZ-TOOL-2 states the new behavior. -->
-- [x] <!-- REVIEW (resolved): If bend can report a package's hash without uploading, `ez publish` compares before it uploads. If it cannot, the check stays after the upload and EZ-PUB-2 says so. -->
+- [x] <!-- REVIEW (resolved): If bend can report a package's hash without uploading, `ez publish` compares before it uploads. If it cannot, the check stays after the upload and EZ-PUB-2 says so. bend 2.0.25 cannot, so the check stays after the upload. -->
 - [x] <!-- REVIEW (resolved): The proof gate moves out of `ez test` into its own command, `ez prove`, which `mkProofs` runs. `ez test` may call it. -->
 - [x] <!-- REVIEW (resolved): `SPEC.md` is the single requirement list. The bolt rule parses only its requirement table rows. -->
 - [x] <!-- REVIEW (resolved): `mkLint` joins ez's flake checks now, with `[tools.bolt]` moved to v0.8.1 and `closed` and `law` at `warn` until the first rollout phase is done. `unsafe` stays at `error`. -->
@@ -375,7 +375,7 @@ EZ-TOOL-5 is stated over the planner's outcome, not over a real process. The pla
 | EZ-PUB-1 | `ez publish` refuses when `git status --porcelain --untracked-files=normal` names any path. | Proved | pending |
 | EZ-PUB-2 | `ez publish` succeeds only when a line of bend's output is exactly a `0x` name and equals ez's own hash. Any other answer exits 1. | Proved | pending |
 
-Both are new. `pub/LAWS.bend` already proves the decision functions for all inputs (`clean_is_all_blank`, `answer_is_a_name`, `unread_never_agrees`, `differs_never_agrees`); what is pending is stating them over the command's plan. EZ-PUB-2 describes the verdict, not the ordering. Today the comparison runs after bend has uploaded. If bend can report a package's hash without uploading, publish compares first and EZ-PUB-2 gains "and uploads nothing otherwise"; if it cannot, the check stays after the upload.
+Both are new. `pub/LAWS.bend` already proves the decision functions for all inputs (`clean_is_all_blank`, `answer_is_a_name`, `unread_never_agrees`, `differs_never_agrees`); what is pending is stating them over the command's plan. EZ-PUB-2 describes the verdict, not the ordering, and the comparison runs after bend has uploaded. We looked for a way to compare first and found none: bend 2.0.25 has no option that stops `--publish` between computing the hash and posting it, and the only workaround, pointing `BEND_HUB` at a dead address and reading the hash from a progress line, depends on output bend does not promise and mines the proof of work twice. The check stays after the upload. EZ-PUB-2 promises that a disagreement exits 1 and prints no import line, not that nothing was sent.
 
 ### Outcomes and incidental output
 
@@ -469,7 +469,7 @@ For EZ-VEN-1, one pure function derives the gitignore allowlist from the ledger,
 
 For EZ-TOOL-2, the tool cache records the built file and the bend version beside the commit.
 
-For EZ-PUB-2, if bend can report a package's hash without uploading, `ez publish` compares before it uploads.
+For EZ-PUB-2, nothing changes. bend 2.0.25 cannot report a package's hash without uploading, so the check stays after the upload.
 
 For the proof gate, a new `ez prove` command runs `bend` on every PROOF.bend and applies the exact `All terms check.` rule, and `mkProofs` runs it instead of `ez test`.
 
