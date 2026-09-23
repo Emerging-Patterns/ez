@@ -72,7 +72,7 @@ law add_edits_ledger:
   for +w: A.World
   for +m: M.Manifest
   for good: {A.read(w) == M.Good{m} : M.Read}
-  for ok: {AP.refuses(w) == False{} : Bool}
+  for +ok: {AP.refuses(w) == False{} : Bool}
   {P.put.plan(AP.plan(w), "ez.toml")
     == P.Put{Rend.show(Rend.add.keep(m, AP.added(w)))} : P.Wrote}
 
@@ -85,7 +85,7 @@ law add_syncs_allowlist:
   for +w: A.World
   for +m: M.Manifest
   for good: {A.read(w) == M.Good{m} : M.Read}
-  for ok: {AP.refuses(w) == False{} : Bool}
+  for +ok: {AP.refuses(w) == False{} : Bool}
   {AP.after(P.put.plan(AP.plan(w), ".gitignore"), A.ignore(w))
     == I.sync(A.deps.of(Rend.add.keep(m, AP.added(w))), A.ignore(w)) : String}
 

@@ -288,9 +288,21 @@ def entry(+world: A.World) -> String:
   Bool.pick(String, String.is_empty(A.entry.arg(world)),
     Git.entry.maybe(tree.toml(world)), A.entry.arg(world))
 
+# fuel enough for a walk over these files: one step for the entry and one for
+# every import it can queue, and every import is a line of some file. So a
+# walk over a checkout never runs out, and the fuel is a function of the
+# checkout rather than a number, which keeps the walk from unrolling when a
+# proof reasons about a checkout it does not know.
+def fuel(fs: List<&2, K.Source>) -> Nat:
+  match fs:
+    case []:
+      1n
+    case K.Source{_at, text} <> t:
+      (List.length(&2, String, String.lines(text)) + fuel(t) : Nat)
+
 # the package the entry is published as, walked over the checkout's files
 def walked(+world: A.World) -> K.Walked:
-  K.of(Path.norm(entry(world)), files(world))
+  K.of.fuel(fuel(files(world)), Path.norm(entry(world)), files(world))
 
 # the name the dependency is recorded under (EZ-LED-7)
 def name(+world: A.World) -> String:
@@ -688,15 +700,20 @@ def front(fs: List<&2, W.Source>) -> List<&2, W.Source>:
         case h2 <> t2:
           h <> front(h2 <> t2)
 
+# a file's text
+def text.of(src: W.Source) -> String:
+  W.Source{_at, text} = src
+  text
+
 # the last file's text, "" for no file
 def last(fs: List<&2, W.Source>) -> String:
   match fs:
     case []:
       ""
-    case W.Source{_at, text} <> t:
+    case h <> t:
       match t:
         case []:
-          text
+          text.of(h)
         case h2 <> t2:
           last(h2 <> t2)
 

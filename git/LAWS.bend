@@ -35,6 +35,7 @@ law is_rev_hex40:
   for e0: {True{} == Nat.is_eq(String.length(ref), 40n) : Bool}
   for e1: {True{} == G.hex.all(String.to_list(ref)) : Bool}
   {G.is_rev(ref) == True{} : Bool}
+
 # LAW: when the entry sits at the same depth as the checkout root, the
 # recorded root is a climb of nothing off the entry's own directory.
 law root_rel_here:
