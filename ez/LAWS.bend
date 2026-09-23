@@ -14,6 +14,7 @@ import ../manifest/manifest.bend as M
 import ./pin.bend as Pin
 import ./cmd.bend as Cmd
 import ./env.bend as Env
+import ./doctor.bend as Doctor
 import ../pkg/path.bend as P
 import ./named.bend as Named
 
@@ -288,6 +289,26 @@ law out_name:
 law root_skips_ez:
   for +p: String
   {Cmd.root.keep(".ez/" ++ p) == [] : List<&2, String>}
+
+# doctor: the lock is judged against the ledger it resolves
+
+# LAW: a ledger with no dependencies never makes the lock a problem, whatever
+# the lock names, so `ez doctor` passes a project that has nothing to lock
+law lock_needless:
+  for hs: List<&2, String>
+  {Doctor.lock.wrong(0n, hs) == False{} : Bool}
+
+# LAW: a ledger with dependencies and a lock that names no package is one
+law lock_needed:
+  for n: Nat
+  {Doctor.lock.wrong(1n+n, []) == True{} : Bool}
+
+# LAW: a lock that names a package is never one, however many the ledger has
+law lock_names:
+  for deps: Nat
+  for h: String
+  for t: List<&2, String>
+  {Doctor.lock.wrong(deps, h <> t) == False{} : Bool}
 
 # env: the directories ez makes before a command runs. Only a command that
 # writes into one without making it gets it, so `ez help`, `ez doctor` and a

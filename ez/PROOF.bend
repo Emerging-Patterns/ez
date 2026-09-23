@@ -12,6 +12,7 @@ import ./pin.bend as Pin
 import ./target.bend as Tgt
 import ./named.bend as Named
 import ./env.bend as Env
+import ./doctor.bend as Doctor
 import ../pkg/path.bend as P
 import ../manifest/manifest.bend as M
 import ../check/eq.bend as Eq
@@ -1186,6 +1187,22 @@ def Laws.root_skips_ez(p):
   Equal.cong(Bool, List<&2, String>,
     k => Bool.pick(List<&2, String>, k, [], [".ez/" ++ p]),
     String.starts_with(".ez/" ++ p, ".ez/"), True{}, Eq.starts_append(".ez/", p))
+
+# doctor: the lock's verdict turns on the list first, so the no-dependency law
+# splits on it and the other two are the arm they name.
+
+def Laws.lock_needless(hs):
+  match hs:
+    case []:
+      {==}
+    case _h <> _t:
+      {==}
+
+def Laws.lock_needed(_n):
+  {==}
+
+def Laws.lock_names(_deps, _h, _t):
+  {==}
 
 # env: each premise is rewritten into the test the pick turns on.
 
