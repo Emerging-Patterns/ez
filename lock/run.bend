@@ -3,8 +3,14 @@
 # (lock/plan.bend) what is still open, answers each question by IO, and adds
 # the answers to the World, until nothing is left to ask. Then it runs the
 # planner's plan. It decides nothing: which packages to read, whether their
-# bytes are the ones the ledger names, and what is written are the planner's.
-# That it reads and executes faithfully is EZ-TRUST-2.
+# bytes are the ones the ledger names, where an upgrade moves a pin, and what
+# is written are the planner's. That it reads and executes faithfully is
+# EZ-TRUST-2. Under `--upgrade` it also answers the upgrade's questions
+# (lock/up.bend): what git prints for refs, the default branch and tags,
+# ancestry, checkouts at a rev, the hub's manifest for a moved hash,
+# `.gitignore`, and the project's sources. A new checkout's package is walked
+# from its entry here, by `K.pkg_of`, which is interpreter code under
+# EZ-TRUST-2 until `ez add` is converted.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
@@ -15,6 +21,7 @@ import ../pkg/path.bend as P
 import ../ez/say.bend as Say
 import ./lock.bend as L
 import ./world.bend as W
+import ./up.bend as Up
 import ./plan.bend as Plan
 
 # ---------------------------------------------------------------------------
@@ -253,10 +260,176 @@ def answer.all(+lib: String, asks: List<&2, W.Ask>) -> IO(List<&2, W.Reply>):
         rest : List<&2, W.Reply> <- answer.all(lib, t)
         return W.Reply{h, a} <> rest
 
+# ---------------------------------------------------------------------------
+# answering the upgrade's questions
+
+# what git printed, and whether it succeeded, kept as it was
+def git.said(+what: String, args: List<&2, String>) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    +s : Say.Spin <- Say.hold(what)
+    +out : String <- R.exec(args)
+    Say.done(s)
+    return Up.Printed{R.ok(out), R.text(out)}
+
+# the refs a ref could name: a tag, its peeled form, and a branch, all at
+# once, because which of them exists is the question
+def answer.refs(+url: String, +ref: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    +from : String <- Git.anchored(url)
+    git.said(Say.resolving.at(url), ["git", "ls-remote", from, "refs/tags/" ++ ref,
+      "refs/tags/" ++ ref ++ "^{}", "refs/heads/" ++ ref])
+
+# HEAD on the remote, with the branch it is a symref to
+def answer.head(+url: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    +from : String <- Git.anchored(url)
+    git.said(Say.resolving.at(url), ["git", "ls-remote", "--symref", from, "HEAD"])
+
+# every tag on the remote
+def answer.tags(+url: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    +from : String <- Git.anchored(url)
+    git.said(Say.resolving.at(url), ["git", "ls-remote", "--tags", from])
+
+# whether `tip` descends from `pin`, asked of a blobless bare clone
+def answer.above(+lib: String, +url: String, +pin: String, +tip: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    yes : Bool <- Git.descendant.at(lib ++ "/.work-above", url, pin, tip)
+    return Up.Onward{yes}
+
+# the checkout's package, walked from its entry the way `ez add` walks it, with
+# the directory its paths are written from, against the repo
+def tree.walk(+work: String, +at: String, +nar: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    +p : K.Pkg <- K.pkg_in(work, at)
+    +fs : List<&2, K.File> <- IO.pure(List<&2, K.File>, K.pkg.files(p))
+    ss : List<&2, String> <- disk.all(K.pkg.root(p), fs)
+    +rt : String <- IO.pure(String, Git.root.rel(P.join(work, at), K.pkg.root(p), at))
+    _rm : String <- R.exec(["rm", "-rf", work])
+    return Up.Checkout{nar, rt, K.manifest_of(fs), ss}
+
+# the entry has to be in the checkout for there to be a package to walk
+def tree.entry(ok: Bool, +work: String, +at: String, +url: String, +rev: String, +nar: String) -> IO(Up.Answer):
+  match ok:
+    case True{}:
+      tree.walk(work, at, nar)
+    case False{}:
+      do IO<Up.Answer>:
+        _rm : String <- R.exec(["rm", "-rf", work])
+        return Up.Miss{"ez: " ++ at ++ " is not in " ++ url ++ " at " ++ rev}
+
+# a checkout at a rev: cloned, its `.git` removed, weighed, and walked. An
+# entry that was not recorded is read from the checkout. Nothing is laid and
+# nothing is noted: a tree the upgrade moves to is laid by the plan, once the
+# upgrade and the lock both succeed.
+def answer.tree(+lib: String, +url: String, +rev: String, +entry: String) -> IO(Up.Answer):
+  +work = lib ++ "/.work-" ++ rev
+  do IO<Up.Answer>:
+    _rm : String <- R.exec(["rm", "-rf", work])
+    _mk : String <- R.exec(["mkdir", "-p", work])
+    Git.clone(work, url, rev)
+    +at : String <- Git.entry.for(Bool.not(String.is_empty(entry)), entry, work)
+    _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
+    +s : Say.Spin <- Say.hold(Say.hashing(rev))
+    +nar : String <- Git.nar(work)
+    Say.done(s)
+    +ck : String <- R.exec(["test", "-f", P.join(work, at)])
+    tree.entry(R.ok(ck), work, at, url, rev, nar)
+
+# a commit's NAR hash, for a tool
+def answer.weigh(+url: String, +rev: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    +nar : String <- Git.weigh(url, rev)
+    return Up.Weighed{nar}
+
+# the hub's manifest for a hash a dependency moved to
+def answer.hubhas(+hub: String, +hash: String) -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    g : Web.Got <- Web.fetch(L.url_of(hub, hash, "manifest"), L.want(hash))
+    return Up.HubSaid{g}
+
+# the ignore file, "" when it is missing
+def answer.ignore() -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    m : Maybe<&2, String> <- F.read(".gitignore")
+    return Up.Text{F.text_of(m)}
+
+# one source in front of the rest, or the first that could not be read
+def found.put(got: Maybe<&2, String>, +at: String, rest: Up.Answer) -> Up.Answer:
+  match got:
+    case None{}:
+      Up.Miss{"ez: " ++ at ++ " could not be read"}
+    case Some{text}:
+      match rest:
+        case Up.Files{fs}:
+          Up.Files{Up.Found{at, text} <> fs}
+        case _:
+          rest
+
+# every listed source, read
+def found.all(ps: List<&2, String>) -> IO(Up.Answer):
+  match ps:
+    case []:
+      IO.pure(Up.Answer, Up.Files{[]})
+    case +h <> t:
+      do IO<Up.Answer>:
+        m : Maybe<&2, String> <- F.read(h)
+        rest : Up.Answer <- found.all(t)
+        return found.put(m, h, rest)
+
+def found.listed(ok: Bool, +text: String) -> IO(Up.Answer):
+  match ok:
+    case True{}:
+      found.all(nonempty(String.lines(text)))
+    case False{}:
+      IO.pure(Up.Answer, Up.Miss{"ez: could not list sources: " ++ String.trim(text)})
+
+# every Bend source of the project. Vendored trees and the gate's shadow live
+# under .ez, and a checkout's .git is not source, so neither is rewritten.
+def answer.sources() -> IO(Up.Answer):
+  do IO<Up.Answer>:
+    +out : String <- R.exec(["find", ".", "-name", "*.bend",
+      "-not", "-path", "*/.ez/*", "-not", "-path", "*/.git/*"])
+    found.listed(R.ok(out), R.text(out))
+
+# one of the upgrade's questions, answered
+def answer.up(+lib: String, ask: Up.Ask) -> IO(Up.Answer):
+  match ask:
+    case Up.Refs{url, ref}:
+      answer.refs(url, ref)
+    case Up.Head{url}:
+      answer.head(url)
+    case Up.Tags{url}:
+      answer.tags(url)
+    case Up.Above{url, pin, tip}:
+      answer.above(lib, url, pin, tip)
+    case Up.Tree{url, rev, entry}:
+      answer.tree(lib, url, rev, entry)
+    case Up.Weigh{url, rev}:
+      answer.weigh(url, rev)
+    case Up.HubHas{hub, hash}:
+      answer.hubhas(hub, hash)
+    case Up.Ignore{}:
+      answer.ignore()
+    case Up.Sources{}:
+      answer.sources()
+
+# every one of them, answered
+def answer.ups(+lib: String, asks: List<&2, Up.Ask>) -> IO(List<&2, Up.Reply>):
+  match asks:
+    case []:
+      IO.pure(List<&2, Up.Reply>, [])
+    case +h <> t:
+      do IO<List<&2, Up.Reply>>:
+        a : Up.Answer <- answer.up(lib, h)
+        rest : List<&2, Up.Reply> <- answer.ups(lib, t)
+        return Up.Reply{h, a} <> rest
+
 # the World with more answers in it
-def more(world: W.World, rs: List<&2, W.Reply>) -> W.World:
-  W.World{args, ledger, listing, replies} = world
-  W.World{args, ledger, listing, List.append(&2, W.Reply, replies, rs)}
+def more(world: W.World, rs: List<&2, W.Reply>, us: List<&2, Up.Reply>) -> W.World:
+  W.World{args, ledger, listing, replies, ups} = world
+  W.World{args, ledger, listing, List.append(&2, W.Reply, replies, rs),
+    List.append(&2, Up.Reply, ups, us)}
 
 # ---------------------------------------------------------------------------
 # executing a plan
@@ -304,8 +477,12 @@ def exec(+lib: String, effect: Plan.Effect) -> IO(Unit):
       do IO<Unit>:
         _rm : String <- R.exec(["rm", "-rf", dir])
         lay.all(dir, fs)
+    case Plan.Drop{hash}:
+      do IO<Unit>:
+        _rm : String <- R.exec(["rm", "-rf", ".ez/lib/" ++ hash])
+        return Unit{}
     case Plan.Say{text}:
-      IO.print_err(text)
+      IO.print(text)
 
 # every effect, in order
 def exec.all(+lib: String, es: List<&2, Plan.Effect>) -> IO(Unit):
@@ -339,10 +516,11 @@ def exec.plan(+lib: String, pl: Plan.Plan) -> IO(Unit):
 # or its plan run
 def loop.step(st: Plan.Step, +lib: String, world: W.World, go: W.World -> IO(Unit)) -> IO(Unit):
   match st:
-    case Plan.Asking{asks}:
+    case Plan.Asking{asks, ups}:
       do IO<Unit>:
         rs : List<&2, W.Reply> <- answer.all(lib, asks)
-        go(more(world, rs))
+        us : List<&2, Up.Reply> <- answer.ups(lib, ups)
+        go(more(world, rs, us))
     case Plan.Run{pl}:
       exec.plan(lib, pl)
 
@@ -351,7 +529,7 @@ def loop.step(st: Plan.Step, +lib: String, world: W.World, go: W.World -> IO(Uni
 def loop(fuel: Nat, +lib: String, +world: W.World) -> IO(Unit):
   match fuel:
     case 0n:
-      IO.die(Unit, 1, "ez: the lock kept asking for packages")
+      IO.die(Unit, 1, "ez: the lock kept asking questions")
     case 1n+f:
       loop.step(Plan.step(world), lib, world, w => loop(f, lib, w))
 
@@ -363,4 +541,4 @@ def run(args: W.Args) -> IO(Unit):
     lib : String <- bend.lib()
     led : Maybe<&2, String> <- read.ledger()
     ls : W.Listing <- read.listing()
-    loop(U32.to_nat(100000), lib, W.World{args, led, ls, []})
+    loop(U32.to_nat(100000), lib, W.World{args, led, ls, [], []})
