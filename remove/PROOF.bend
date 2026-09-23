@@ -7,6 +7,8 @@ import ../manifest/render.bend as Rend
 import ../manifest/ignore.bend as I
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
+import ../manifest/LAWS.bend as ML
+import ../manifest/PROOF.bend as MP
 import ./LAWS.bend as Laws
 
 # LAW: removing committed trees writes nothing at any path
@@ -71,7 +73,7 @@ def refused_read(led, name, ignore, r):
     case M.Bad{_why}:
       {==}
     case M.Good{+m}:
-      refused_has(RP.named(RP.deps.of(m), name), m, name, ignore, r)
+      refused_has(Bool.and(RP.named(RP.deps.of(m), name), Rend.renderable(Rend.remove(m, name))), m, name, ignore, r)
 
 def Laws.remove_refusal_writes_nothing(w, r):
   match w:
@@ -91,7 +93,8 @@ def Laws.remove_refuses_unread(name, _s, ignore, _why, bad):
 # the premise gives, which is the arm that refuses.
 def Laws.remove_refuses_absent(name, _s, ignore, m, good, no):
   %good : {RP.refuses.plan(RP.plan.read(_, name, ignore)) == True{} : Bool}
-  %no : {RP.refuses.plan(RP.plan.has(_, m, name, ignore)) == True{} : Bool}
+  %no : {RP.refuses.plan(RP.plan.has(Bool.and(_, Rend.renderable(Rend.remove(m, name))),
+    m, name, ignore)) == True{} : Bool}
   {==}
 
 # LAW: a plan over a ledger that names the dependency writes the edited
@@ -132,7 +135,7 @@ def edits_has(h, m, name, ignore, ok):
 def Laws.remove_edits_ledger(name, s, ignore, m, good, ok):
   %good : {P.put.plan(RP.plan.read(_, name, ignore), "ez.toml")
     == P.Put{Rend.show(Rend.remove(m, name))} : P.Wrote}
-  edits_has(RP.named(RP.deps.of(m), name), m, name, ignore,
+  edits_has(Bool.and(RP.named(RP.deps.of(m), name), Rend.renderable(Rend.remove(m, name))), m, name, ignore,
     Equal.trans(Bool,
       RP.refuses.plan(RP.plan.read(M.Good{m}, name, ignore)),
       RP.refuses.plan(RP.plan.read(M.parse(s), name, ignore)),
@@ -194,7 +197,7 @@ def syncs_has(h, m, name, ignore, ok):
 def Laws.remove_syncs_allowlist(name, s, ignore, m, good, ok):
   %good : {RP.after(P.put.plan(RP.plan.read(_, name, ignore), ".gitignore"), ignore)
     == I.sync(RP.deps.of(Rend.remove(m, name)), ignore) : String}
-  syncs_has(RP.named(RP.deps.of(m), name), m, name, ignore,
+  syncs_has(Bool.and(RP.named(RP.deps.of(m), name), Rend.renderable(Rend.remove(m, name))), m, name, ignore,
     Equal.trans(Bool,
       RP.refuses.plan(RP.plan.read(M.Good{m}, name, ignore)),
       RP.refuses.plan(RP.plan.read(M.parse(s), name, ignore)),
@@ -231,3 +234,53 @@ def plan_code(pl):
 
 def Laws.remove_exits_as_it_refuses(w):
   plan_code(RP.plan(w))
+
+# ---------------------------------------------------------------------------
+# EZ-LED-4
+
+# what a path was written with. Proof vocabulary.
+def wrote.text(w: P.Wrote) -> String:
+  match w:
+    case P.Kept{}:
+      ""
+    case P.Put{t}:
+      t
+
+# LAW: a plan over a ledger that does not refuse was given True
+law has_ok:
+  for h: Bool
+  for +m: M.Manifest
+  for +name: String
+  for +ignore: String
+  for ok: {RP.refuses.plan(RP.plan.has(h, m, name, ignore)) == False{} : Bool}
+  {h == True{} : Bool}
+
+def has_ok(h, m, name, ignore, ok):
+  match h:
+    case True{}:
+      {==}
+    case False{}:
+      Eq.bit.absurd2(&2, {False{} == True{} : Bool}, ok)
+
+# A remove that does not refuse writes `Rend.remove`'s ledger, which it made
+# sure is renderable, so the manifest's round trip reads it back.
+def Laws.remove_ledger_reads_back(name, s, ignore, m, text, good, ok, put):
+  +ok2 = Equal.trans(Bool,
+    RP.refuses.plan(RP.plan.read(M.Good{m}, name, ignore)),
+    RP.refuses.plan(RP.plan.read(M.parse(s), name, ignore)),
+    False{},
+    Equal.cong(M.Read, Bool, x => RP.refuses.plan(RP.plan.read(x, name, ignore)),
+      M.Good{m}, M.parse(s), good),
+    ok)
+  +er = Eq.and.right(RP.named(RP.deps.of(m), name), Rend.renderable(Rend.remove(m, name)),
+    has_ok(Bool.and(RP.named(RP.deps.of(m), name), Rend.renderable(Rend.remove(m, name))),
+      m, name, ignore, ok2))
+  +p = Equal.trans(P.Wrote, P.Put{Rend.show(Rend.remove(m, name))},
+    P.put.plan(RP.plan(RP.World{name, Some{s}, ignore}), "ez.toml"), P.Put{text},
+    Equal.sym(P.Wrote, P.put.plan(RP.plan(RP.World{name, Some{s}, ignore}), "ez.toml"),
+      P.Put{Rend.show(Rend.remove(m, name))}, Laws.remove_edits_ledger(name, s, ignore, m, good, ok)),
+    put)
+  +t = Equal.cong(P.Wrote, String, w => wrote.text(w), P.Put{Rend.show(Rend.remove(m, name))},
+    P.Put{text}, p)
+  %t : {M.parse(_) == M.Good{Rend.remove(m, name)} : M.Read}
+  ML.ledger_reads_back(Rend.remove(m, name), er)

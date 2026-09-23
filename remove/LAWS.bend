@@ -119,3 +119,19 @@ law remove_refuses_tool:
   for tool: {M.tool.has(ts, name) == True{} : Bool}
   for no: {False{} == RP.named(ds, name) : Bool}
   {RP.refuses(RP.World{name, Some{s}, ignore}) == True{} : Bool}
+
+# LAW: and the ledger it writes there reads back as the ledger `Rend.remove`
+# gave. A ledger that, with the dependency dropped, could not be written so
+# that it reads back is refused, with no effect.
+# EZ-LED-4
+law remove_ledger_reads_back:
+  for +name: String
+  for +s: String
+  for +ignore: String
+  for +m: M.Manifest
+  for +text: String
+  for +good: {M.Good{m} == M.parse(s) : M.Read}
+  for +ok: {RP.refuses(RP.World{name, Some{s}, ignore}) == False{} : Bool}
+  for put: {P.put.plan(RP.plan(RP.World{name, Some{s}, ignore}), "ez.toml") == P.Put{text}
+    : P.Wrote}
+  {M.parse(text) == M.Good{Rend.remove(m, name)} : M.Read}

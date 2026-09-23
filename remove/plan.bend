@@ -141,14 +141,20 @@ def edits(+led: M.Manifest, +name: String, +ignore: String) -> List<&2, P.Effect
 def absent(+name: String) -> String:
   "ez: " ++ toml() ++ " has no dependency named " ++ name
 
-# the plan for a ledger that read: the edits when it names the dependency, a
-# refusal when it does not
+# the refusal for a ledger that names the dependency but, with it dropped,
+# cannot be written so that it reads back (EZ-LED-4), or for a name it does
+# not have
+def refusal(named: Bool, +name: String) -> String:
+  Bool.pick(String, named, Rend.unrenderable(), absent(name))
+
+# the plan for a ledger that read: the edits when it names the dependency and
+# the ledger left can be written, a refusal when not
 def plan.has(has: Bool, +led: M.Manifest, +name: String, +ignore: String) -> P.Plan:
   match has:
     case True{}:
       P.Plan{edits(led, name, ignore), P.Success{}}
     case False{}:
-      P.Plan{[], P.Refused{absent(name)}}
+      P.Plan{[], P.Refused{refusal(named(deps.of(led), name), name)}}
 
 # the plan for the ledger as read. One that did not read, or is not there,
 # is refused before anything else, and its reason is the one every command
@@ -158,7 +164,8 @@ def plan.read(led: M.Read, +name: String, +ignore: String) -> P.Plan:
     case M.Bad{why}:
       P.Plan{[], P.Refused{"ez: " ++ M.show(M.Bad{why})}}
     case M.Good{+m}:
-      plan.has(named(deps.of(m), name), m, name, ignore)
+      plan.has(Bool.and(named(deps.of(m), name), Rend.renderable(Rend.remove(m, name))),
+        m, name, ignore)
 
 # `ez remove` over a World
 def plan(world: World) -> P.Plan:
