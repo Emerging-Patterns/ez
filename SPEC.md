@@ -41,7 +41,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | EZ-LED-1 | A ledger that does not parse is never read into a model, and renders as nothing, so no command writes a guess over it. | Proved | pending | |
 | EZ-LED-2 | Adding a dependency to a ledger model twice is adding it once. | Proved | pending | |
 | EZ-LED-3 | Removing a dependency from a ledger model twice is removing it once. | Proved | pending | |
-| EZ-LED-4 | A ledger ez rendered parses back to the model it was rendered from. | Proved | pending | |
+| EZ-LED-4 | A ledger ez rendered parses back to the model it was rendered from. | Proved | pending | manifest/LAWS.bend vendor_reads_back |
 | EZ-LED-5 | A `[tools.*]` section is a tool, never a dependency, and needs no `hash`. | Proved | pending | |
 | EZ-LED-6 | `ez init` writes nothing when a ledger exists, and `ez add`, `ez remove` and `ez lock`, with or without `--upgrade`, refuse and write nothing when there is none. | Proved | pending | ez/LAWS.bend init_keeps_ledger; ez/LAWS.bend ledger_missing_unwritten |
 | EZ-LED-7 | A dependency's ledger name is `--rename` when given, which must be a TOML bare key; otherwise the name the ledger already records for that source; otherwise the target's `[package] name` when it is a TOML bare key; otherwise the repository's name; otherwise the directory's name. A name the ledger gives a different source is refused, and so is a `--rename` of a source the ledger records under another name. | Proved | pending | ez/LAWS.bend rename_wins; ez/LAWS.bend rename_dotted; ez/LAWS.bend rename_moved; ez/LAWS.bend rename_clash; ez/LAWS.bend name_keeps; ez/LAWS.bend own_package; ez/LAWS.bend own_invalid; ez/LAWS.bend leaf_is_last; ez/LAWS.bend clash_same; ez/LAWS.bend clash_other; ez/LAWS.bend clash_hub |
@@ -120,6 +120,7 @@ What stands between a pending requirement that has tagged laws and the status pr
 
 | ID | Proved so far | Left to prove |
 | :---- | :---- | :---- |
+| EZ-LED-4 | The vendor bit: a git dependency's `vendor` key, rendered bare as `vendor = true` or left out, parses back to the bit it was rendered from, for one fixed ledger around it. | Every other field, for every model a command renders: that parsing `R.show(m)` reads back `m`. |
 | EZ-LED-6 | The decisions: `Cmd.init.plan` plans no write over a ledger that exists, and `Cmd.ledger.of` reads a missing ledger, for a command that works on one, as a read that renders as nothing. | That `ez init`, `ez add`, `ez remove` and `ez lock` act on those decisions and write nothing else first, which needs them in planner form. |
 | EZ-LED-7 | The decision functions in `ez/named.bend`: `as`, `name`, `own`, `had`, `clash` and `moved`. | That `ez add` records the dependency under the name they return and writes nothing when they refuse, which needs `ez add` in planner form. |
 | EZ-LED-8 | `P.anchor` keeps a URL and an absolute path and joins a relative path to the project root. | That every git command handed a ledger source is handed it through `Git.anchored`, and that `ez add` records the target as given, which needs the commands in planner form. |

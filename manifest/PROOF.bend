@@ -957,3 +957,12 @@ def Laws.allowlist_keeps_other_lines(ds, ls):
     rules_are_ez(I.has(I.tag(ls), I.Star{}), I.has(I.tag(ls), I.Lib{}),
       I.has(I.tag(ls), I.Pkgs{})),
     block_others(ds, I.tag(ls)))
+
+# The vendor bit read back. Each bit renders one fixed ledger, and parsing
+# that text is a computation the checker runs to its end.
+def Laws.vendor_reads_back(v):
+  match v:
+    case True{}:
+      {==}
+    case False{}:
+      {==}

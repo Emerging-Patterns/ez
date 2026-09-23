@@ -396,6 +396,12 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | hint_sync_when_tools | C | refl | Wording of the `sync` hint with tools. | none (incidental) |
 | hint_sync_without_tools | C | refl | Wording of the `sync` hint without tools. | none (incidental) |
 
+**Update:** A3 of [ez-add-planner.md](ez-add-planner.md) renders the vendor key bare, `vendor = true`, where ez wrote `vendor = "true"`; `M.flag` reads both. It adds one tagged law. EZ-LED-4 stays pending until the round trip is proved for every field.
+
+| Law | Kind | Proof | Claim | Points toward |
+| :---- | :---- | :---- | :---- | :---- |
+| vendor_reads_back | Q | struct | For either bit, a git dependency's vendor bit, rendered by `R.show` and parsed back by `M.parse`, is the bit. | EZ-LED-4 (the vendor field) |
+
 ## Coverage by RFC requirement
 
 | Requirement | Quantified laws | Closed laws | Status today |
