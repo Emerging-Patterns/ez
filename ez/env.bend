@@ -6,7 +6,7 @@
 # execvp'd like any other program, so no shell is involved.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
-import ./args.bend as Args
+import ../ez/args.bend as Args
 
 # a value, or the fallback when the variable was unset or empty
 def or_else(+value: String, +alt: String) -> String:

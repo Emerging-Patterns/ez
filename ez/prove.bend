@@ -10,9 +10,9 @@
 # nothing proved. Only the bare line means every term was proved outright.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
-import ./args.bend as Args
-import ./env.bend as Env
-import ./cap.bend as Cap
+import ../ez/args.bend as Args
+import ../ez/env.bend as Env
+import ../ez/cap.bend as Cap
 import ./quiet.bend as Q
 import ./sorted.bend as Sort
 

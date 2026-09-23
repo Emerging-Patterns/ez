@@ -131,29 +131,38 @@ digits, `-`, `_` and `.`, neither of them `.` or `..`) is
 path. The checkout and the binary are cached under
 `$XDG_CACHE_HOME/ez/tool/<slug>` (`~/.cache/ez/tool/<slug>` when that is
 unset); the slug of a URL or of
-`owner/repo` drops a trailing `.git`.
+`owner/repo` drops a trailing `.git`, and a URL with no host,
+`file:///srv/repo`, is cached as `file://localhost/srv/repo` is.
 
 A remote resolves to `git ls-remote <url> HEAD`. A path resolves to a clean
 `HEAD`. A name that matches a `[tools.*]` pin resolves to the rev in
-`ez.lock.toml`. The checkout is reused while `rev` is that commit. The binary
-is reused while `key` names that commit, the same built file and the same
-`bend version`, so a pin's `bin` or `entry` and a free run of the same commit
-do not share a binary, and a new bend rebuilds it. A dirty worktree, or a path
-that is not a checkout, has no commit and is built every time.
+`ez.lock.toml`, which has to be a full commit. A remote's checkout is kept
+per commit, under `<slug>/<rev>/src`, and reused while its `rev` record names
+that commit. Every binary is kept under `<slug>/bin/<record>/`, named by its
+`key`: that commit, the built file and `bend version`, so a pin's `bin` or
+`entry`, a free run of the same repository at another commit, and a new bend
+each build their own binary and none rebuilds another's. A worktree with
+uncommitted or untracked changes (untracked files count whatever the
+repository's own settings hide), or a path that is not the top of a checkout,
+has no commit and is built every time.
 
-`ez tool install` fetches the lock and builds `<slug>/bin/<name>.out`, then
+`ez tool install` fetches the lock and builds `<slug>/bin/<record>/<name>.out`, then
 links that file onto PATH as `<name>`. Each long step says what it is doing
 before it waits, and on success the command names what it installed and where
 the link is. `<name>` is the package name in the
-target's `ez.toml` (`bolt` for bolt), or `app` when the ledger names none.
+target's `ez.toml` (`bolt` for bolt), or `app` when the ledger names none;
+a name that is not a TOML bare key is refused.
 The link is `$EZ_TOOL_BIN/<name>` when `EZ_TOOL_BIN` is set, otherwise
 `$XDG_BIN_HOME/<name>`, otherwise `~/.local/bin/<name>`. The directory is
-created when it is missing. `ez tool upgrade` reads that commit again and
-rebuilds when it is not the one in `rev`, or when the binary is missing,
-and writes that link again. The same commit is left in place. Neither
+created when it is missing; with none of the three, install and upgrade
+refuse before anything is built. `ez tool upgrade` reads that commit again,
+builds it when no binary is kept for its record, and writes that link again.
+A binary already built for that record is left in place. Neither
 command runs the binary. `ez tool run` does, and the built program's status
 is the status of the command. A target, ledger, fetch, build or link that
-fails exits 1.
+fails exits 1, and a command that refuses writes nothing: no checkout, no
+binary, no link. `ez tool sync` checks every pin against the lock before it
+installs any.
 
 `ez add` takes the same kind of target. A relative path is recorded as it
 was given, relative to the project, which is the directory ez runs in, since

@@ -65,6 +65,11 @@ def rest(as: List<&2, String>) -> List<&2, String>:
     case Con{_h, t}:
       t
 
+# the command `ez run` starts: bend on the entry, with every word after
+# `run` (EZ-TOOL-9)
+def run.line(+entry: String, as: List<&2, String>) -> List<&2, String>:
+  "bend" <> (entry <> rest(as))
+
 # `n` words dropped. What remains when the list runs out first is nothing.
 def drop(xs: List<&2, String>, count: Nat) -> List<&2, String>:
   match xs count:
