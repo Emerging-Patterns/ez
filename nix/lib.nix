@@ -259,6 +259,64 @@ rec {
       })
       (copyTree src "bolt");
 
+  # ez's own repo as a fresh clone would have it, with no network: the
+  # tracked files of src in a new git repo, the lock's BEND_LIB copied into
+  # .ez/lib, then the README's steps. `sh bootstrap.sh` must fetch nothing and
+  # leave .ez/lib as nix built it, `bend <bin> -o bin/<name>.bin` must build,
+  # and that binary's `lock`, with ez.lock.toml deleted, must write the
+  # committed lock back byte for byte. `bendLib` is BEND_LIB as in mkProofs;
+  # nativeBuildInputs is the C toolchain `bend -o` uses, as in toolPackage.
+  mkFresh = {
+    src,
+    bend ? defaultBend,
+    name ? "fresh",
+    bendLib ? null,
+    nativeBuildInputs ? [ llvm.clang ],
+  }:
+    let
+      tree = bendLibFor bendLib src null;
+      file = builtFile src null;
+      bin = "bin/${pkgName src null}.bin";
+    in
+    if tree == null then
+      throw "mkFresh needs src/ez.lock.toml or a bendLib"
+    else
+      pkgs.runCommand name {
+        nativeBuildInputs = [ bend pkgs.git ] ++ nativeBuildInputs;
+      } ''
+        export HOME=$TMPDIR/home
+        mkdir -p "$HOME"
+        cp -r ${src} src
+        chmod -R u+w src
+        cd src
+        # a clone: every tracked file, in the index `ez lock` lists roots from
+        git init -q
+        git add -A
+        mkdir -p .ez
+        cp -r ${tree} .ez/lib
+        chmod -R u+w .ez/lib
+        # every manifest already matches, so bootstrap fetches and changes nothing
+        sh bootstrap.sh 2> bootstrap.err || { cat bootstrap.err; exit 1; }
+        if [ -s bootstrap.err ]; then
+          echo "bootstrap.sh fetched, but ${tree} already had every package:"
+          cat bootstrap.err
+          exit 1
+        fi
+        diff -r ${tree} .ez/lib
+        # the README's build
+        mkdir -p bin
+        BEND_LIB=$PWD/.ez/lib bend ${lib.escapeShellArg file} -o ${lib.escapeShellArg bin}
+        # the lock again, from the committed inputs alone. Every dependency is
+        # a git pin whose tree is already under BEND_LIB, so nothing is fetched.
+        rm ez.lock.toml
+        BEND_LIB=$PWD/.ez/lib ${lib.escapeShellArg "./${bin}"} lock
+        cmp ${src}/ez.lock.toml ez.lock.toml || {
+          diff -u ${src}/ez.lock.toml ez.lock.toml
+          exit 1
+        }
+        echo ok > $out
+      '';
+
   # CC=bend-cc and BEND_LIB=$PWD/.ez/lib. bend-cc belongs in packages.
   # `src`, when set, puts every locked `[tools.*]` on PATH.
   # extraHook runs after those exports.
