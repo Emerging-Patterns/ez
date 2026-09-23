@@ -252,6 +252,29 @@ def pack.values(pack: L.Pack) -> List<&2, String>:
   L.Pack{hash, src, fs} = pack
   hash <> List.append(&2, String, src.values(src), file.values(fs))
 
+# whether a file path holds no `=`. A path is written as a quoted key, and
+# the pinned eztoml reader (v0.1.0) cuts a pair line at its first `=`, even
+# one inside a quoted key
+# (https://github.com/Emerging-Patterns/eztoml/issues/24), so a path holding
+# one would read back as another path with another sum. The restriction can
+# lift once ez moves to eztoml 0.2.x.
+def path.eqless(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      +rest = path.eqless(t)
+      Bool.and(Bool.not(Char.is_eq(h, '=')), rest)
+
+# whether no file path of a package holds `=`
+def paths.ok(fs: List<&2, K.File>) -> Bool:
+  match fs:
+    case []:
+      True{}
+    case K.File{at, _sum} <> t:
+      +rest = paths.ok(t)
+      Bool.and(path.eqless(at), rest)
+
 # whether every package can be written, and no hash is written twice
 def packs.ok(ps: List<&2, L.Pack>) -> Bool:
   match ps:
@@ -259,7 +282,8 @@ def packs.ok(ps: List<&2, L.Pack>) -> Bool:
       True{}
     case +h <> +t:
       +rest = packs.ok(t)
-      Bool.and(Bool.and(clean.all(pack.values(h)), Bool.not(L.has(t, L.pack.hash(h)))),
+      Bool.and(Bool.and(paths.ok(L.pack.files(h)),
+        Bool.and(clean.all(pack.values(h)), Bool.not(L.has(t, L.pack.hash(h))))),
         rest)
 
 # every name, key and value a tool pin writes
@@ -281,10 +305,64 @@ def tools.ok(ts: List<&2, M.Tool>) -> Bool:
       Bool.and(clean.all(tool.values(h)), rest)
 
 # whether a lock can be written so that it reads back: every hash is written
-# once, and no hash, key or value holds `"`, `\` or a newline. The planner
+# once, no hash, key or value holds `"`, `\` or a newline, and no file path
+# holds `=` (eztoml#24, above). The planner
 # refuses a lock that is not, so every lock ez writes is one of these.
 def lockable(ps: List<&2, L.Pack>, ts: List<&2, M.Tool>, hub: String) -> Bool:
   Bool.and(clean(hub), Bool.and(packs.ok(ps), tools.ok(ts)))
+
+# the first path among a package's files that holds `=`, or "" when none
+# does. A path that holds one is not empty, so "" is never such a path.
+def path.eq.pick(ok: Bool, at: String, rest: String) -> String:
+  match ok:
+    case True{}:
+      rest
+    case False{}:
+      at
+
+def path.eq.first(fs: List<&2, K.File>) -> String:
+  match fs:
+    case []:
+      ""
+    case K.File{+at, _sum} <> t:
+      path.eq.pick(path.eqless(at), at, path.eq.first(t))
+
+# why a package with such a path cannot be locked, naming it and the path
+def path.eq.why(+hash: String, +at: String) -> String:
+  "ez: ez.lock.toml cannot be written: package " ++ hash ++ " has a file " ++
+    at ++ " whose path holds `=`, which the lock's TOML reader would cut the" ++
+    " key at (https://github.com/Emerging-Patterns/eztoml/issues/24)"
+
+# the reason for the first package with such a path, or the rest's
+def packs.eq.pick(none: Bool, +hash: String, +at: String, rest: String) -> String:
+  match none:
+    case True{}:
+      rest
+    case False{}:
+      path.eq.why(hash, at)
+
+# why the first package with a path holding `=` cannot be locked, or "" when
+# no package has one
+def packs.eq(ps: List<&2, L.Pack>) -> String:
+  match ps:
+    case []:
+      ""
+    case L.Pack{+hash, _src, fs} <> t:
+      +at = path.eq.first(fs)
+      packs.eq.pick(String.is_empty(at), hash, at, packs.eq(t))
+
+# the reason a lock that is not `lockable` gives: the package and path when a
+# path holds `=`, which is the one case a clean-looking lock hides
+def lockable.pick(none: Bool, why: String) -> String:
+  match none:
+    case True{}:
+      "ez: ez.lock.toml cannot be written: a hash repeats, or a hash, path or value holds a quote, a backslash or a newline"
+    case False{}:
+      why
+
+def lockable.why(ps: List<&2, L.Pack>) -> String:
+  +why = packs.eq(ps)
+  lockable.pick(String.is_empty(why), why)
 
 # ---------------------------------------------------------------------------
 # the lock's text, or why there is none
@@ -300,7 +378,7 @@ def doc.lockable(ok: Bool, +hub: String, packs: List<&2, L.Pack>, ts: List<&2, M
     case True{}:
       Doc{L.render.tools(ts, hub, packs)}
     case False{}:
-      Stop{"ez: ez.lock.toml cannot be written: a hash repeats, or a hash, path or value holds a quote, a backslash or a newline"}
+      Stop{lockable.why(packs)}
 
 # a walk with nothing left to ask is the lock. One that still has a question
 # is a World the interpreter did not finish, and is refused rather than

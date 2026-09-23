@@ -1343,3 +1343,52 @@ def Laws.strip_quoted(v):
         String.to_list(v),
         back_quote(String.to_list(v))),
       Str.from_to(v)))
+
+# What the lock may hold. A path holding `=` makes its package's `paths.ok`
+# False, and an `and` with a False half is False whichever side it is on.
+
+# LAW: an `and` whose right half is False is False
+law and_false:
+  for a: Bool
+  {Bool.and(a, False{}) == False{} : Bool}
+
+def and_false(a):
+  match a:
+    case False{}:
+      {==}
+    case True{}:
+      {==}
+
+def Laws.path_eq_unlockable(hash, src, at, sum, fs, rest, ts, hub, e):
+  %e : {Bool.and(P.clean(hub), Bool.and(Bool.and(Bool.and(Bool.and(_,
+    P.paths.ok(fs)), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src,
+    K.File{at, sum} <> fs})), Bool.not(L.has(rest, hash)))), P.packs.ok(rest)),
+    P.tools.ok(ts))) == False{} : Bool}
+  and_false(P.clean(hub))
+
+# LAW: a path that holds `=` is not empty
+law eqless_filled:
+  for +at: String
+  for e: {False{} == P.path.eqless(at) : Bool}
+  {False{} == String.is_empty(at) : Bool}
+
+def eqless_filled(at, e):
+  match at:
+    case SNil{}:
+      Eq.bit.absurd(&2, {False{} == String.is_empty(SNil{}) : Bool}, e)
+    case SCon{h, t}:
+      {==}
+
+# The first path the scan finds is the one given, and it is not empty, so
+# the reason is the one that names it.
+def named.why(+why: String) -> String:
+  P.lockable.pick(String.is_empty(why), why)
+
+def Laws.path_eq_named(hash, src, at, sum, fs, rest, e):
+  f = eqless_filled(at, e)
+  %e : {named.why(P.packs.eq.pick(String.is_empty(P.path.eq.pick(_, at,
+    P.path.eq.first(fs))), hash, P.path.eq.pick(_, at, P.path.eq.first(fs)),
+    P.packs.eq(rest))) == P.path.eq.why(hash, at) : String}
+  %f : {named.why(P.packs.eq.pick(_, hash, at, P.packs.eq(rest)))
+    == P.path.eq.why(hash, at) : String}
+  {==}

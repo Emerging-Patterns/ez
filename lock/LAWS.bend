@@ -177,6 +177,40 @@ law render_keeps_packages_without_tools:
   for ps: List<&2, L.Pack>
   {L.render.pick(True{}, hub, ps, []) == L.render(hub, ps) : String}
 
+# What the lock may hold. The pinned eztoml reader cuts a pair line at its
+# first `=`, even inside a quoted key
+# (https://github.com/Emerging-Patterns/eztoml/issues/24), so a file path
+# holding one would read back as another path. The planner refuses such a
+# lock rather than write one that does not read back.
+
+# LAW: a package list with a file whose path holds `=` is not lockable,
+# whatever else it holds
+law path_eq_unlockable:
+  for +hash: String
+  for +src: L.Src
+  for +at: String
+  for +sum: String
+  for +fs: List<&2, K.File>
+  for +rest: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for e: {False{} == P.path.eqless(at) : Bool}
+  {P.lockable(L.Pack{hash, src, K.File{at, sum} <> fs} <> rest, ts, hub) == False{}
+    : Bool}
+
+# LAW: and the refusal names the package and the path, so the author knows
+# which file to rename
+law path_eq_named:
+  for +hash: String
+  for +src: L.Src
+  for +at: String
+  for +sum: String
+  for +fs: List<&2, K.File>
+  for +rest: List<&2, L.Pack>
+  for +e: {False{} == P.path.eqless(at) : Bool}
+  {P.lockable.why(L.Pack{hash, src, K.File{at, sum} <> fs} <> rest)
+    == P.path.eq.why(hash, at) : String}
+
 # The planner (plan.bend) over the World (world.bend). Every law below is
 # about what plain `ez lock` does, stated over the plan it returns; the
 # interpreter that executes the plan is EZ-TRUST-2.
