@@ -15,6 +15,30 @@ tag = "v0.1.0"
 "main.bend" = "def1bf1385ed2be7e40d3021c7900df3fa69b7461d4ac2aed85c5c4fa6a33a4f"
 "toml.bend" = "6b35d002371ec519209f92448b3a8011930643a63333049dd11fc2b101bc7ab9"
 
+[packages."0x0a372da4a053652f70ded7d6e0d19330".source]
+kind = "git"
+url = "https://github.com/Emerging-Patterns/ezhttp"
+rev = "68419d690f8d81919ae9c7ada1830e10ed31c2ca"
+entry = "ezhttp/main.bend"
+root = "ezhttp"
+narHash = "sha256-qZgitdcapYx7uE23KbzWeVIxAjefvNZ6cBh3iSbUyVc="
+tag = "v0.4.0"
+
+[packages."0x0a372da4a053652f70ded7d6e0d19330".files]
+"b64.bend" = "7bf2cd0e2947db17a299e739fa8defa91b6275ef5b4fac70c87809bafb0a6420"
+"body.bend" = "3f45a3613417b1e6a430e6a85bffd9dc52eccec1274cb96d15bcd9e8650b3399"
+"cache.bend" = "f2f348b05c396c7e121425cc5b49d13ae828f6110d26cb8420c7356ac478c1ae"
+"client.bend" = "8ec4c45d3adb9cf889151def84d26cf513bad85d6b765b6579111ec6012b4d10"
+"cookie.bend" = "c8264b3f3d371872dd8d87c7f7f528a0379fa361817560a531f05e993a5a5e08"
+"cors.bend" = "cad2e8e7eedbd87cc37fbf65f720584ae035aada5ff5cb3c18daba54ff6a2a7d"
+"effs/wire.c" = "37a1e2b4a3d39ae08216a90f8b460051beb3139088addb412b8274ace8f16c8d"
+"effs/wire.js" = "051ccf59ac03d33a49efcc9cf5ea503a287330bf16809ea5d4a9aea10d8bfd4f"
+"http.bend" = "7622e0cd3da5f669f8a15bfce44fa90b9af77b156c39228e8c637247887f7e7a"
+"main.bend" = "e0a0906566d4064045a49cf2c0a2b21d286c9091de619a48702ab698e84a9171"
+"server.bend" = "ebec77b7c2a73ec8e7d8230c336c139fdddb1152d759216deb0b42f4f4504108"
+"url.bend" = "a13c8acd86c5643c5f3b02e30550aeb2af9d043b5abbfe1fee2980b1c0aae254"
+"wire.bend" = "e6d672218e3fafeaf83a6178c32622a921bd41ae54d36864ab2eaaf438b9609c"
+
 [packages."0x33de775bd13bab25b3e2d6f5bbcb8776".source]
 kind = "git"
 url = "https://github.com/Giulio2002/bend-sha256"
@@ -29,30 +53,6 @@ narHash = "sha256-FLTyFw5HkOrl/T6E8hbs/XVwL05oGmcJARW9I9eHdgA="
 "packed.bend" = "17e916ea93b7d0b028d06b0a626abc869d48ce879606908decbc68ff741c98e1"
 "sha256.bend" = "995cca1d2f9c8b4863de92ade74ccf91aa4f1f73ef613fd918aec2483bb5de20"
 "state.bend" = "24b4bb267fe94bd1615a8cff6aa090fff766c9009b5f9aa1c08a865b87d06230"
-
-[packages."0x4dc5182d578920eeb43d8db11d399d9a".source]
-kind = "git"
-url = "https://github.com/Emerging-Patterns/ezhttp"
-rev = "68419d690f8d81919ae9c7ada1830e10ed31c2ca"
-entry = "ezhttp/main.bend"
-root = "ezhttp"
-narHash = "sha256-qZgitdcapYx7uE23KbzWeVIxAjefvNZ6cBh3iSbUyVc="
-tag = "v0.4.0"
-
-[packages."0x4dc5182d578920eeb43d8db11d399d9a".files]
-"b64.bend" = "c74063ad4c4de8d535eb7700157ad8c9e9823db3bd166f2dc13350a8c7c13402"
-"body.bend" = "3f45a3613417b1e6a430e6a85bffd9dc52eccec1274cb96d15bcd9e8650b3399"
-"cache.bend" = "ff2f4f997a5b0e04707f01878b797b4b0bb432b39b27ee7d9274ba0bc7363660"
-"client.bend" = "d13854c0703860c0a9338d3dbd1bcae3060dc99648e5c34b4a8b8f800ee406ae"
-"cookie.bend" = "fc2890d760847e4df119ae9f187d3a69826506a884d50ab4bbd3836eefd06991"
-"cors.bend" = "cf18f49be99f37ddc9e1a2b0254bc567b497d94f34790a62bee0c551cced9f1d"
-"effs/wire.c" = "a85abeed7f5c3b0625468347f9b99d23e7ece74786969c38b69bc9d9bbc85987"
-"effs/wire.js" = "051ccf59ac03d33a49efcc9cf5ea503a287330bf16809ea5d4a9aea10d8bfd4f"
-"http.bend" = "3ddfec4d5c051869f17b8f5b212e95f2029e673194fceda1c5c065d4453cad72"
-"main.bend" = "e0a0906566d4064045a49cf2c0a2b21d286c9091de619a48702ab698e84a9171"
-"server.bend" = "dd43e8a3c90cae89e719efd41ef6c0a44e681e64d9a9805cf06b69bfcb3e2076"
-"url.bend" = "65c3eb1b5402f842809db3dc026c847f6abef6185edd8cc3c8576ae5e2361dee"
-"wire.bend" = "e6d672218e3fafeaf83a6178c32622a921bd41ae54d36864ab2eaaf438b9609c"
 
 [packages."0x9bfd9d57916f3439316c2775fd1f10b4".source]
 kind = "git"
