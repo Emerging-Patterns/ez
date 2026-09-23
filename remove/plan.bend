@@ -34,16 +34,6 @@ def toml() -> String:
 def ignore.file() -> String:
   ".gitignore"
 
-# the name asked for
-def name(world: World) -> String:
-  World{n, _ledger, _ignore} = world
-  n
-
-# the ledger's text, or None
-def ledger(world: World) -> Maybe<&2, String>:
-  World{_n, l, _ignore} = world
-  l
-
 # the ledger as read: what the file says, or, with no file, a read that did
 # not parse and says why. A missing ledger is not an empty one to write back.
 def read.of(got: Maybe<&2, String>) -> M.Read:
@@ -53,10 +43,6 @@ def read.of(got: Maybe<&2, String>) -> M.Read:
         "ledger, and ez init makes one"}
     case Some{text}:
       M.parse(text)
-
-# the ledger as `ez remove` reads it on a World
-def read(world: World) -> M.Read:
-  read.of(ledger(world))
 
 # the dependencies of a ledger that was read
 def deps.of(manifest: M.Manifest) -> List<&2, M.Dep>:
@@ -144,12 +130,12 @@ def ignore.put(same: Bool, +next: String, rest: List<&2, P.Effect>) -> List<&2, 
 # what `ez remove` does to a ledger that names the dependency: the ledger
 # written without it, the allowlist derived from what is left, and each
 # committed tree it leaves unnamed removed
-def edits(+m: M.Manifest, +name: String, +ignore: String) -> List<&2, P.Effect>:
-  +left = deps.of(Rend.remove(m, name))
+def edits(+led: M.Manifest, +name: String, +ignore: String) -> List<&2, P.Effect>:
+  +left = deps.of(Rend.remove(led, name))
   +next = I.sync(left, ignore)
-  P.Write{toml(), Rend.show(Rend.remove(m, name))} <>
+  P.Write{toml(), Rend.show(Rend.remove(led, name))} <>
     ignore.put(String.eq(next, ignore), next,
-      P.drops.of(gone(deps.of(m), name, left), []))
+      P.drops.of(gone(deps.of(led), name, left), []))
 
 # the refusal for a name the ledger does not have
 def absent(+name: String) -> String:
@@ -157,10 +143,10 @@ def absent(+name: String) -> String:
 
 # the plan for a ledger that read: the edits when it names the dependency, a
 # refusal when it does not
-def plan.has(has: Bool, +m: M.Manifest, +name: String, +ignore: String) -> P.Plan:
+def plan.has(has: Bool, +led: M.Manifest, +name: String, +ignore: String) -> P.Plan:
   match has:
     case True{}:
-      P.Plan{edits(m, name, ignore), P.Success{}}
+      P.Plan{edits(led, name, ignore), P.Success{}}
     case False{}:
       P.Plan{[], P.Refused{absent(name)}}
 
