@@ -3,6 +3,7 @@ import Base
 import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
+import ./up.bend as Up
 import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../check/eq.bend as Eq
@@ -103,20 +104,23 @@ def Laws.spec_hash(h, rest, e):
     h <> String.split(rest, '/'),
     spec_split(h, rest, e))
 
-# The planner. A plan's effects are the cloned trees laid, then the lock
-# written; a lay writes no path a law names, so what the plan leaves at a path
-# is what the planner decided.
+# The planner. A made plan's effects are the lines a person is told, the
+# checked trees laid, the upgrade's files, the committed trees removed, and the
+# lock written last. A line, a lay and a removal write no path, and the lock's
+# write comes after every other, so what the plan leaves at the lock's path is
+# what the planner decided, plain or upgrade.
 
 # LAW: one tree laid, or passed over, leaves every path as it was
 law pick_put:
   for b: Bool
   for v: W.Verdict
+  for pl: P.Place
   for +h: String
   for +rest: List<&2, P.Effect>
   for +p: String
-  {P.put.in(P.lay.pick(b, v, h, rest), p) == P.put.in(rest, p) : P.Wrote}
+  {P.put.in(P.lay.pick(b, v, pl, h, rest), p) == P.put.in(rest, p) : P.Wrote}
 
-def pick_put(b, v, _h, _rest, _p):
+def pick_put(b, v, _pl, _h, _rest, _p):
   match b:
     case True{}:
       match v:
@@ -127,67 +131,165 @@ def pick_put(b, v, _h, _rest, _p):
     case False{}:
       {==}
 
-# LAW: and so do all of them
+# LAW: and so do all of them, wherever each is laid
 law lays_put:
   for +cs: List<&2, String>
+  for +vs: List<&2, String>
   for js: List<&2, W.Judged>
   for +rest: List<&2, P.Effect>
   for +p: String
-  {P.put.in(P.lays(cs, js, rest), p) == P.put.in(rest, p) : P.Wrote}
+  {P.put.in(P.lays(cs, vs, js, rest), p) == P.put.in(rest, p) : P.Wrote}
 
-def lays_put(cs, js, rest, p):
+def lays_put(cs, vs, js, rest, p):
   match js:
     case []:
       {==}
     case W.Judged{+h, +v} <> +t:
       Equal.trans(P.Wrote,
-        P.put.in(P.lay.pick(L.seen.holds(cs, h), v, h, P.lays(cs, t, rest)), p),
-        P.put.in(P.lays(cs, t, rest), p),
+        P.put.in(P.lay.pick(L.seen.holds(cs, h), v, P.place.of(L.seen.holds(vs, h)),
+          h, P.lays(cs, vs, t, rest)), p),
+        P.put.in(P.lays(cs, vs, t, rest), p),
         P.put.in(rest, p),
-        pick_put(L.seen.holds(cs, h), v, h, P.lays(cs, t, rest), p),
-        lays_put(cs, t, rest, p))
+        pick_put(L.seen.holds(cs, h), v, P.place.of(L.seen.holds(vs, h)), h,
+          P.lays(cs, vs, t, rest), p),
+        lays_put(cs, vs, t, rest, p))
 
-# LAW: what a plan leaves at the lock's path is what the planner decided
+# LAW: a line a person is told leaves every path as it was
+law says_put:
+  for ss: List<&2, String>
+  for +rest: List<&2, P.Effect>
+  for +p: String
+  {P.put.in(P.says.of(ss, rest), p) == P.put.in(rest, p) : P.Wrote}
+
+def says_put(ss, rest, p):
+  match ss:
+    case []:
+      {==}
+    case _h <> t:
+      says_put(t, rest, p)
+
+# LAW: and so does a committed tree removed
+law drops_put:
+  for ds: List<&2, String>
+  for +rest: List<&2, P.Effect>
+  for +p: String
+  {P.put.in(P.drops.of(ds, rest), p) == P.put.in(rest, p) : P.Wrote}
+
+def drops_put(ds, rest, p):
+  match ds:
+    case []:
+      {==}
+    case _h <> t:
+      drops_put(t, rest, p)
+
+# LAW: the upgrade's files are written before what follows them, so a path
+# whose last write follows them is left holding that write
+law edits_last:
+  for es: List<&2, Up.Edit>
+  for +rest: List<&2, P.Effect>
+  for +p: String
+  for +t: String
+  for e: {P.put.in(rest, p) == P.Put{t} : P.Wrote}
+  {P.put.in(P.edits.of(es, rest), p) == P.Put{t} : P.Wrote}
+
+def edits_last(es, rest, p, t, e):
+  match es:
+    case []:
+      e
+    case Up.Edit{at, text} <> tl:
+      Equal.cong(P.Wrote, P.Wrote, x => P.put.one(P.Write{at, text}, p, x),
+        P.put.in(P.edits.of(tl, rest), p), P.Put{t}, edits_last(tl, rest, p, t, e))
+
+# LAW: what a plan leaves at the lock's path is what the planner decided,
+# whatever the upgrade wrote around it
 law made_put:
+  for +nx: Up.Next
   for +cs: List<&2, String>
   for +js: List<&2, W.Judged>
   for d: P.Doc
-  {P.put.plan(P.made(cs, js, d), "ez.lock.toml") == Laws.put.doc(d) : P.Wrote}
+  {P.put.plan(P.made(nx, cs, js, d), "ez.lock.toml") == Laws.put.doc(d) : P.Wrote}
 
-def made_put(cs, js, d):
+def made_put(nx, cs, js, d):
   match d:
-    case P.Doc{text}:
-      lays_put(cs, js, [P.Write{P.lockfile(), text}], "ez.lock.toml")
+    case P.Doc{+text}:
+      Equal.trans(P.Wrote,
+        P.put.in(P.says.of(Up.next.says(nx),
+          P.lays(cs, Up.next.vends(nx), js,
+            P.edits.of(Up.next.edits(nx),
+              P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}]))))),
+          "ez.lock.toml"),
+        P.put.in(P.lays(cs, Up.next.vends(nx), js,
+          P.edits.of(Up.next.edits(nx),
+            P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}])))),
+          "ez.lock.toml"),
+        P.Put{text},
+        says_put(Up.next.says(nx),
+          P.lays(cs, Up.next.vends(nx), js,
+            P.edits.of(Up.next.edits(nx),
+              P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}])))),
+          "ez.lock.toml"),
+        Equal.trans(P.Wrote,
+          P.put.in(P.lays(cs, Up.next.vends(nx), js,
+            P.edits.of(Up.next.edits(nx),
+              P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}])))),
+            "ez.lock.toml"),
+          P.put.in(P.edits.of(Up.next.edits(nx),
+            P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}]))),
+            "ez.lock.toml"),
+          P.Put{text},
+          lays_put(cs, Up.next.vends(nx), js,
+            P.edits.of(Up.next.edits(nx),
+              P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}]))),
+            "ez.lock.toml"),
+          edits_last(Up.next.edits(nx),
+            P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}])),
+            "ez.lock.toml", text,
+            edits_last(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}]),
+              "ez.lock.toml", text,
+              drops_put(Up.next.drops(nx), [P.Write{P.lockfile(), text}],
+                "ez.lock.toml")))))
     case P.Stop{_why}:
       {==}
 
-# LAW: and at ez.toml it leaves nothing, whatever was decided
+# LAW: and a plain lock leaves nothing at ez.toml, whatever was decided
 law made_keeps_ledger:
+  for +led: M.Read
   for +cs: List<&2, String>
   for +js: List<&2, W.Judged>
   for d: P.Doc
-  {P.put.plan(P.made(cs, js, d), "ez.toml") == P.Kept{} : P.Wrote}
+  {P.put.plan(P.made(Up.plain(led), cs, js, d), "ez.toml") == P.Kept{} : P.Wrote}
 
-def made_keeps_ledger(cs, js, d):
+def made_keeps_ledger(_led, cs, js, d):
   match d:
     case P.Doc{text}:
-      lays_put(cs, js, [P.Write{P.lockfile(), text}], "ez.toml")
+      lays_put(cs, [], js, [P.Write{P.lockfile(), text}], "ez.toml")
     case P.Stop{_why}:
       {==}
 
-# LAW: what plain `ez lock` writes to its lock is a function of what the
-# planner decided over the World's Inputs
+# LAW: what `ez lock` writes to its lock is a function of what the planner
+# decided over the World's Inputs
 law put_decides:
   for w: W.World
   {P.put(w, "ez.lock.toml") == Laws.put.doc(P.decide(W.inputs(w))) : P.Wrote}
 
 def put_decides(w):
   match w:
-    case W.World{_args, +ledger, listing, +replies}:
-      made_put(P.cloned(replies),
-        W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
-        P.decide(W.Inputs{ledger, listing,
-          W.judge(W.origins(ledger), W.ledger.hub(ledger), replies)}))
+    case W.World{+args, +ledger, listing, +replies, +ups}:
+      made_put(W.next(args, ledger, ups),
+        P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
+        W.judged.of(W.next(args, ledger, ups), replies),
+        P.decide(W.Inputs{Up.next.read(W.next(args, ledger, ups)),
+          Up.next.stop(W.next(args, ledger, ups)),
+          W.listing.of(W.next(args, ledger, ups), listing),
+          W.judged.of(W.next(args, ledger, ups), replies)}))
 
 def Laws.lock_reproducible(w1, w2, e):
   Equal.trans(P.Wrote,
@@ -303,47 +405,99 @@ law reclone_inputs:
 
 def reclone_inputs(w):
   match w:
-    case W.World{_args, +ledger, listing, replies}:
+    case W.World{+args, +ledger, listing, replies, +ups}:
       Equal.cong(List<&2, W.Judged>, W.Inputs,
-        js => W.Inputs{ledger, listing, js},
-        W.judge(W.origins(ledger), W.ledger.hub(ledger),
-          W.reclone.all(W.origins(ledger), replies)),
-        W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
-        reclone_judged(W.origins(ledger), W.ledger.hub(ledger), replies))
+        js => W.Inputs{Up.next.read(W.next(args, ledger, ups)),
+          Up.next.stop(W.next(args, ledger, ups)),
+          W.listing.of(W.next(args, ledger, ups), listing),
+          List.append(&2, W.Judged,
+            W.judge(W.next.origins(W.next(args, ledger, ups)),
+              W.next.hub(W.next(args, ledger, ups)),
+              W.laid.replies(Up.next.trees(W.next(args, ledger, ups)),
+                W.next.origins(W.next(args, ledger, ups)),
+                W.next.hub(W.next(args, ledger, ups)))), js)},
+        W.judge(W.next.origins(W.next(args, ledger, ups)),
+          W.next.hub(W.next(args, ledger, ups)),
+          W.reclone.all(W.next.origins(W.next(args, ledger, ups)), replies)),
+        W.judge(W.next.origins(W.next(args, ledger, ups)),
+          W.next.hub(W.next(args, ledger, ups)), replies),
+        reclone_judged(W.next.origins(W.next(args, ledger, ups)),
+          W.next.hub(W.next(args, ledger, ups)), replies))
 
 def Laws.clone_reproduces(w):
   Laws.lock_reproducible(W.reclone(w), w, reclone_inputs(w))
 
-def Laws.plain_lock_keeps_ledger(w, _e):
+# A plain lock's World is one whose args say no `--upgrade`; the other arm
+# contradicts the premise.
+def Laws.plain_lock_keeps_ledger(w, e):
   match w:
-    case W.World{_args, +ledger, listing, +replies}:
-      made_keeps_ledger(P.cloned(replies),
-        W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
-        P.decide(W.Inputs{ledger, listing,
-          W.judge(W.origins(ledger), W.ledger.hub(ledger), replies)}))
+    case W.World{args, +ledger, listing, +replies, ups}:
+      match args:
+        case W.Args{up, only}:
+          match up:
+            case True{}:
+              Eq.bit.absurd2(&2, {P.put(W.World{W.Args{True{}, only}, ledger, listing,
+                replies, ups}, "ez.toml") == P.Kept{} : P.Wrote}, e)
+            case False{}:
+              made_keeps_ledger(W.parsed(ledger),
+                P.cloned(W.replies.of(Up.plain(W.parsed(ledger)), replies)),
+                W.judged.of(Up.plain(W.parsed(ledger)), replies),
+                P.decide(W.Inputs{W.parsed(ledger), "", listing,
+                  W.judged.of(Up.plain(W.parsed(ledger)), replies)}))
 
-# LAW: a plan made from a refusal has no effect that writes
+# LAW: a plan made from a refusal has no effect that writes, whatever the
+# upgrade decided around it
 law made_refused:
+  for +nx: Up.Next
   for +cs: List<&2, String>
   for +js: List<&2, W.Judged>
   for d: P.Doc
   for r: {P.refuses.doc(d) == True{} : Bool}
-  {P.writes(P.made(cs, js, d)) == False{} : Bool}
+  {P.writes(P.made(nx, cs, js, d)) == False{} : Bool}
 
-def made_refused(cs, js, d, r):
+def made_refused(nx, cs, js, d, r):
   match d:
     case P.Doc{text}:
-      Eq.bit.absurd(&2, {P.writes(P.made(cs, js, P.Doc{text})) == False{} : Bool}, r)
+      Eq.bit.absurd(&2, {P.writes(P.made(nx, cs, js, P.Doc{text})) == False{} : Bool}, r)
     case P.Stop{_why}:
       {==}
 
 def Laws.lock_refusal_writes_nothing(w, r):
   match w:
-    case W.World{_args, +ledger, listing, +replies}:
-      made_refused(P.cloned(replies),
-        W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
-        P.decide(W.Inputs{ledger, listing,
-          W.judge(W.origins(ledger), W.ledger.hub(ledger), replies)}), r)
+    case W.World{+args, +ledger, listing, +replies, +ups}:
+      made_refused(W.next(args, ledger, ups),
+        P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
+        W.judged.of(W.next(args, ledger, ups), replies),
+        P.decide(W.Inputs{Up.next.read(W.next(args, ledger, ups)),
+          Up.next.stop(W.next(args, ledger, ups)),
+          W.listing.of(W.next(args, ledger, ups), listing),
+          W.judged.of(W.next(args, ledger, ups), replies)}), r)
+
+# A plain World's args say no `--upgrade`; the other arm contradicts the
+# premise, and in this one the upgrade is `Up.plain`, which asks nothing.
+def Laws.plain_lock_asks_no_upgrade(w, e):
+  match w:
+    case W.World{args, +ledger, listing, replies, ups}:
+      match args:
+        case W.Args{up, only}:
+          match up:
+            case True{}:
+              Eq.bit.absurd2(&2, {P.wants.up(W.World{W.Args{True{}, only}, ledger,
+                listing, replies, ups}) == [] : List<&2, Up.Ask>}, e)
+            case False{}:
+              {==}
+
+def Laws.plain_lock_ledger_next(w, e):
+  match w:
+    case W.World{args, +ledger, listing, replies, ups}:
+      match args:
+        case W.Args{up, only}:
+          match up:
+            case True{}:
+              Eq.bit.absurd2(&2, {P.ledger.next(W.World{W.Args{True{}, only}, ledger,
+                listing, replies, ups}) == W.parsed(ledger) : M.Read}, e)
+            case False{}:
+              {==}
 
 # The walk's sources, one step at a time. Each lemma is one def of the step,
 # with the value it branches on given as a parameter.
@@ -507,17 +661,26 @@ def Laws.walk_pins_ledger_sources(fuel, orgs, js, wk, e):
         Laws.walk_pins_ledger_sources(f, orgs, js, P.walk.step(orgs, js, wk),
           step_pins(orgs, js, wk, e)))
 
-def Laws.plain_lock_pins_ledger_sources(w, _e):
+def Laws.plain_lock_pins_ledger_sources(w, e):
   match w:
-    case W.World{_args, +ledger, listing, +replies}:
-      match listing:
-        case W.Unlisted{why}:
-          {==}
-        case W.Listed{fs}:
-          Laws.walk_pins_ledger_sources(U32.to_nat(100000),
-            L.ledger.read(W.parsed(ledger)),
-            W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
-            P.Walk{P.roots(fs), [], [], ""}, {==})
+    case W.World{args, +ledger, listing, +replies, ups}:
+      match args:
+        case W.Args{up, only}:
+          match up:
+            case True{}:
+              Eq.bit.absurd2(&2, {Laws.pinned.all(W.origins(ledger),
+                P.packs(W.World{W.Args{True{}, only}, ledger, listing, replies, ups}))
+                == P.packs(W.World{W.Args{True{}, only}, ledger, listing, replies, ups})
+                : List<&2, L.Pack>}, e)
+            case False{}:
+              match listing:
+                case W.Unlisted{why}:
+                  {==}
+                case W.Listed{fs}:
+                  Laws.walk_pins_ledger_sources(U32.to_nat(100000),
+                    L.ledger.read(W.parsed(ledger)),
+                    W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
+                    P.Walk{P.roots(fs), [], [], ""}, {==})
 
 # `.ez/` is a prefix of anything appended to it, which `starts_append` holds,
 # and that picks the arm that keeps nothing.

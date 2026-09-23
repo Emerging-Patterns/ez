@@ -220,10 +220,15 @@ with only a `rev` moves to the default branch tip when the pinned commit is
 an ancestor of it, and stays a commit pin. A hub dependency does not move.
 The upgrade itself fetches only the dependencies it re-pins; the lock it
 then writes fetches any other git dependency whose tree is missing, the way
-a plain `ez lock` does. A dependency marked
-`vendor` is laid out again under the new hash, and the gitignore allowlist
-follows it. An import line that names a hash that moved is rewritten to
-name the new one.
+a plain `ez lock` does. A pinned commit whose tree no longer weighs to the
+pin is a drift, and stops the upgrade. A dependency marked
+`vendor` is laid out again under `.ez/lib/<new hash>`, its old tree is
+removed, and the gitignore allowlist follows it; any other moved tree is
+left under `BEND_LIB`. An import line that names a hash that moved is
+rewritten to name the new one. The upgrade and the lock are one plan: ez.toml is
+written once, then `.gitignore`, the rewritten sources and the lock, and an
+upgrade that stops, or a lock after it that stops, writes nothing at all. It
+does not write `.ez/origins.toml`.
 
 The ledger is enough on its own. `ez lock` reads the ledger, the `.bend`
 files `git ls-files` lists (so it refuses outside a git repository), the

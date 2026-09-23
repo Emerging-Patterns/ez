@@ -6,6 +6,8 @@ import Base
 import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
+import ./up.bend as Up
+import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 
 # LAW: a package resolves to the origin recorded for it, whatever origins
@@ -103,7 +105,8 @@ law render_keeps_packages_without_tools:
   {L.render.pick(True{}, hub, ps, []) == L.render(hub, ps) : String}
 
 # The planner (plan.bend) over the World (world.bend). Every law below is
-# about what plain `ez lock` does, stated over the plan it returns; the
+# about what `ez lock` does, stated over the plan it returns; one with a
+# premise that the args say no `--upgrade` is about a plain lock only. The
 # interpreter that executes the plan is EZ-TRUST-2.
 
 # what a plan leaves at the lock's path, from what the planner decided. Law
@@ -115,8 +118,9 @@ def put.doc(doc: P.Doc) -> P.Wrote:
     case P.Stop{_why}:
       P.Kept{}
 
-# LAW: the lock depends on nothing in a World but its Inputs: the ledger, the
-# committed sources, and the verdict on every answer. Two Worlds that agree on
+# LAW: the lock depends on nothing in a World but its Inputs: the ledger it is
+# made from (ez.toml, or the one an upgrade leaves), the upgrade's refusal,
+# the committed sources, and the verdict on every answer. Two Worlds that agree on
 # those write the same bytes to ez.lock.toml, or both write none, however they
 # differ otherwise.
 # EZ-DOC-3
@@ -165,13 +169,33 @@ law plain_lock_pins_ledger_sources:
   {pinned.all(W.origins(W.ledger.of(w)), P.packs(w)) == P.packs(w)
     : List<&2, L.Pack>}
 
-# LAW: a plain lock that refuses writes, lays and removes nothing. Its plan
-# has no effect at all; the reason is how it ends. This is EZ-OUT-2 for a
-# plain lock, and it is tagged once `--upgrade` is planned too.
+# LAW: `ez lock` that refuses, plain or `--upgrade`, writes, lays and removes
+# nothing: not the lock, not ez.toml, `.gitignore` or a source, and no tree.
+# Its plan has no effect at all; the reason is how it ends. An upgrade whose
+# remote answers refuse it, or whose lock then refuses, is such a World.
+# EZ-OUT-2
 law lock_refusal_writes_nothing:
   for +w: W.World
   for r: {P.refuses(w) == True{} : Bool}
   {P.writes(P.plan(w)) == False{} : Bool}
+
+# The upgrade's decisions (lock/up.bend) are stated over `P.ledger.next`, the
+# ledger model an upgrade renders into ez.toml, and over the questions it asks,
+# `P.wants.up`. A plain lock is the World whose args say no `--upgrade`, and it
+# is what these two say it is.
+
+# LAW: a plain lock asks no upgrade question, so it asks a remote nothing but
+# the tree at a rev the ledger already pins
+law plain_lock_asks_no_upgrade:
+  for w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
+  {P.wants.up(w) == [] : List<&2, Up.Ask>}
+
+# LAW: and the ledger a plain lock leaves is ez.toml as it is
+law plain_lock_ledger_next:
+  for w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
+  {P.ledger.next(w) == W.parsed(W.ledger.of(w)) : M.Read}
 
 # LAW: a tree read from BEND_LIB is judged exactly as the same bytes cloned
 # at the pinned rev and weighed to the ledger's narHash
