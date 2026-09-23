@@ -416,7 +416,7 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | EZ-DOC-1 | lock_names_hub (one field) | lock_roundtrip, tools_are_not_packages, tool_pin_reads_back | One sample. |
 | EZ-DOC-2 | pack_ins_le, render_keeps_packages_without_tools | hashes_sorted | Partial. |
 | EZ-DOC-3 | origin_first, origin_agrees, origin_read, but_drops, but_keeps | hashes_sorted | The resolver's ledger-over-cache rule is proved. The whole-command frame property is not stated. **Update:** proved by `lock/lock_reproducible` and `lock/clone_reproduces` over the planner (WP1). |
-| EZ-DOC-4 | none | same_rev_keeps (supporting) | No law. |
+| EZ-DOC-4 | none | same_rev_keeps (supporting) | No law. **Update:** proved for a plain lock by `lock/lock_idempotent` and `lock/relock_lays_nothing` over the planner (WP5a); the `--upgrade` half is WP5b. |
 | EZ-DOC-5 | rev_of_names_the_commit, tag_of_names_the_tag (supporting) | none | No law about the command. **Update:** proved by `lock/plain_lock_keeps_ledger` and `lock/plain_lock_pins_ledger_sources` over the planner (WP1). |
 | EZ-RES-1 | is_rev_* (supporting), peeled_agrees | none | No law about tag selection. |
 | EZ-RES-2 | none | none | No law. |
@@ -549,10 +549,26 @@ What the README's reproducibility sentence ("`ez lock` never has to consult anyt
 | :---- | :---- | :---- |
 | WP0 | done | `check/str.bend`: the spike's list and char lemmas, `string_eq_true`, `split_join`. |
 | WP1 | done | Plain `ez lock` in planner form: `lock/world.bend` (the World, `accept`, `inputs`, `reclone`), `lock/plan.bend` (`wants`, `plan`, `step`, `put`, `refuses`, `lockable`), `lock/run.bend` (the interpreter). The IO half of `lock/lock.bend` and the spike are deleted. EZ-DOC-3 and EZ-DOC-5 proved; EZ-OUT-2's law for a plain lock is in, untagged. Behavior changes: no local import is followed, so an untracked file a tracked one imports never reaches the lock; every package is checked against its `0x` name, and a BEND_LIB tree is judged as a clone at the ledger's narHash; a lock that is not `lockable` is refused; a refused lock writes and lays nothing, and a cloned tree is laid under BEND_LIB only by a lock that succeeds. `ez lock --upgrade` keeps its own stages (`Up.run`, `Pin.upgrade`) and then locks through the same planner. |
+| WP5a | done | EZ-DOC-4 for a plain lock: `lock/lock_idempotent` (run again on the World it leaves, a plain lock writes the same bytes to ez.lock.toml) and `lock/relock_lays_nothing` (after one that succeeded, no tree arrives by a clone that passes). The World a lock leaves is `after` in `lock/LAWS.bend`: a refused lock leaves the World it read, and one that succeeded leaves every tree it laid read from BEND_LIB with the bytes it was checked with. The proof is `clone_reproduces` read backwards: a clone that passed weighed to the ledger's narHash, so the same bytes from BEND_LIB are judged the same, and the Inputs are unchanged. EZ-DOC-4 stays pending until WP5b proves the `--upgrade` half. |
 | WP8 | done | EZ-HASH-2 (`sha/nar_dir_order_free`). |
-| WP2 to WP7 | open | |
+| WP2 to WP4, WP5b, WP6, WP7 | open | |
 
 The demand loop's cost, measured in WP1 on this repository's own lock with every tree already under BEND_LIB (five git packages, all imported directly, so two rounds of `wants` and one `plan`): 0.21 s for the binary before WP1 and 0.53 s after, median of seven runs each. Every round of `wants` scans every tracked source for imports again, since the World holds texts and not scans, and `plan` scans once more and checks every package's SHA-256 once. With every tree to clone (an empty BEND_LIB) the clones dominate: 7.3 s before and 7.4 s after. The design's first risk is real but small; if WP2 makes it matter, the World can carry each source's scanned imports instead of its text.
+
+### Add and remove progress
+
+The design for converting `ez add` and `ez remove`, [ez-add-planner.md](ez-add-planner.md), is accepted with every recommendation. It decides seven behavior changes: a refused `ez add` lays nothing; `ez add` stops writing `.ez/origins.toml`; a re-added vendored dependency is laid under `.ez/lib` and its old committed tree dropped; `ez remove` drops a vendored dependency's committed tree unless another dependency names the same hash; `ez remove` of a name the ledger does not have refuses; a package whose imports climb out of its checkout is refused; and `vendor = true` is written as a bare boolean. EZ-LED-8 now says a leading `~/` is expanded when the path is recorded. Its spike, `pkg/tree/`, makes the package walk a pure function of a checkout's files, computes the same hash as `K.pkg_of` on five entries of this repository, and proves three untagged laws toward EZ-RES-2 and EZ-HASH-3.
+
+| WP | State | Scope |
+| :---- | :---- | :---- |
+| A0 | open | Shared plan types in `plan/plan.bend`, git questions in `git/ask.bend`, the pure walk promoted and `K.pkg_of` rewritten over it. |
+| A1 | open | `ez remove` in planner form. |
+| A2 | open | `ez add` in planner form. |
+| A3 | open | Bare `vendor = true`. |
+| A4 | open | `ez init` in planner form. |
+| A5 | open | EZ-RES-1: the release chosen is the greatest. |
+| A6 | open | EZ-LED-2 over `Rend.add.keep`. |
+| A7 | open | Flip the rows whose halves have all landed. |
 
 ## Missing behavior
 
