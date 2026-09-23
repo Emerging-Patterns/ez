@@ -45,10 +45,7 @@ type Ver is Data:
 type Cut is Data:
   Cut{left: String, right: String}
 
-# a git command that failed stops the command, with whatever git said. Read
-# here rather than in `lock/restore.bend`, because both halves of ez's git
-# work — vendoring a repo and rebuilding it from the lock — run the same
-# commands and must fail the same way.
+# a git command that failed stops the command, with whatever git said
 def ran(ok: Bool, what: String, text: String) -> IO(Unit):
   match ok:
     case True{}:

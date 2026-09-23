@@ -20,7 +20,7 @@ import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
 import ../git/git.bend as Git
-import ../lock/restore.bend as Restore
+import ../fetch/run.bend as FetchRun
 import ../pkg/path.bend as P
 import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
@@ -276,23 +276,10 @@ def bend.is() -> IO(String):
     +out : String <- Bend.version()
     return bend.said(R.ok(out), R.text(out))
 
-# a lock that is not there cannot be fetched
-def fetch.gone(+src: String) -> IO(Unit):
-  IO.die(Unit, 1, "ez: " ++ src ++ " has no ez.lock.toml")
-
-# the lock's text, fetched into `lib`
-def fetch.go(got: Maybe<&2, String>, +src: String, +lib: String) -> IO(Unit):
-  match got:
-    case None{}:
-      fetch.gone(src)
-    case Some{body}:
-      Restore.restore.at(T.sects(T.parse(body)), lib)
-
-# BEND_LIB filled from the checkout's lock
+# BEND_LIB filled from the checkout's lock, planned by fetch/plan.bend, with
+# every relative path in the lock read from the checkout
 def fetch(+src: String, +lib: String) -> IO(Unit):
-  do IO<Unit>:
-    m : Maybe<&2, String> <- F.read(src ++ "/ez.lock.toml")
-    fetch.go(m, src, lib)
+  FetchRun.fill(src, lib)
 
 # a build's output, kept when it failed. A success says nothing: the
 # program's own output follows.
