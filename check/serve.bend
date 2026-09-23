@@ -14,14 +14,23 @@
 # opening it at run time, and Base's TCP has no crypto at all.
 import Base
 
-# a string's length where a Nat would be too dear: a body is thousands of
-# characters and every one of them would be a Succ
+# how many bytes a character takes in UTF-8, which is how the socket carries it
+def width(+code: U32) -> U32:
+  Bool.pick(U32, U32.is_lt(code, 128), 1,
+    Bool.pick(U32, U32.is_lt(code, 2048), 2,
+      Bool.pick(U32, U32.is_lt(code, 65536), 3, 4)))
+
+# a string's length in the bytes it goes over the wire as, which is what a
+# Content-Length or a chunk size counts, held in a U32 where a Nat would be too
+# dear: a body is thousands of characters and every one of them would be a
+# Succ. A character is not a byte: `bend --publish` sends a non-ASCII source
+# as it is, and counting characters would wait forever for the rest.
 def size(text: String) -> U32:
   match text:
     case SNil{}:
       0
-    case SCon{_c, t}:
-      U32.inc(size(t))
+    case SCon{c, t}:
+      U32.add(width(Char.to_u32(c)), size(t))
 
 # the nth of a list of words, or "" when it is not there
 def at(xs: List<&2, String>, index: Nat) -> String:
