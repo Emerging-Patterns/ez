@@ -163,6 +163,18 @@ The tables below keep the closed laws as they were at `f009e42`; none of them is
 | trim_quoted | Q | struct | eztoml's `trim` leaves a quoted value as it is. | EZ-DOC-1 (supporting, from the spike) |
 | strip_quoted | Q | struct | eztoml's `strip` of a quoted value is the value. | EZ-DOC-1 (supporting, from the spike) |
 
+**Update:** WP6's second half states the upgrade's moves over `P.ledger.next` and `P.refuses`, in the vocabulary `ups`, `pin`, `rev_only`, `tagged`, `onward.yes`, `moved.to`, `moved.ok`, `forward.ok` and `follow.ok`. Each proof is a lemma per def of `Up.dep.tip`, the walk by induction over the ledger's dependencies, and the model through each way `Up.next` ends (the `mv.` lemmas in `lock/PROOF.bend`).
+
+| Law | Kind | Proof | Claim | Points toward |
+| :---- | :---- | :---- | :---- | :---- |
+| upgrade_forward_moves_onward | Q | struct | A pin by its commit alone is left in `P.ledger.next` as a pin from a repository with no tag, at its commit or at the default branch tip the remote named when the remote said the tip descends from it. | EZ-RES-5 (tagged) |
+| upgrade_forward_refuses_off | Q | struct | Asked about, with a tip that is another commit the remote says does not descend from it, the lock refuses. | EZ-RES-5 (tagged) |
+| upgrade_forward_reaches_tip | Q | struct | Asked about, when the lock does not refuse, it is at the tip in `P.ledger.next`. | EZ-RES-5 (tagged) |
+| upgrade_tag_follows | Q | struct | A pin through a tag keeps its tag and is at its commit or at the commit the remote names for the tag, when the remote said it descends from the pin. | EZ-RES-8 (tagged) |
+| upgrade_tag_resolves | Q | struct | Asked about, when the lock does not refuse, it is at the commit its tag names. | EZ-RES-8 (tagged) |
+| upgrade_tag_refuses_off | Q | struct | Asked about, with a tag that names another commit the remote says does not descend from the pin, the lock refuses. | EZ-RES-8 (tagged) |
+| upgrade_tag_refuses_drift | Q | struct | Asked about, with a tag that still names the pinned commit whose checkout `U.agree` rejects, the lock refuses. | EZ-RES-8 (tagged) |
+
 ### git/LAWS.bend
 
 | Law | Kind | Proof | Claim | Points toward |
@@ -193,6 +205,9 @@ The tables below keep the closed laws as they were at `f009e42`; none of them is
 | choose_greatest_release | Q | struct | No release in the list is newer than the tag `choose` answers. | EZ-RES-1 (tagged) |
 | choose_greatest_prerelease | Q | struct | With no release, no semver-ish tag is newer than the tag `choose` answers. | EZ-RES-1 (tagged) |
 | choose_is_a_tag | Q | struct | A tag `choose` answers is one of the tags in the list. | EZ-RES-1 (tagged) |
+| tip_of_head | Q | struct | The default branch tip is the commit HEAD's commit row names. | EZ-RES-5 (tagged, WP6) |
+| tip_skips_other | Q | struct | A row that is not HEAD's names no tip. | EZ-RES-5 (tagged, WP6) |
+| tip_skips_symref | Q | struct | Nor does HEAD's symref row, whose first field is not a commit. | EZ-RES-5 (tagged, WP6) |
 
 ### manifest/LAWS.bend
 
@@ -435,8 +450,9 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | EZ-RES-2 | none | none | No law. **Update:** `pkg/absent_entry_refused` states the refusal over the package walk (A0); the precedence and the command wait for A2. |
 | EZ-RES-3 | none | target_* , expand_* | Examples only. |
 | EZ-RES-4 | source_of_hub (supporting) | hub_holds | One example. |
-| EZ-RES-5 | none | sha256_aims_forward, sha256_advances, sha256_remote_tip, sha256_remote_branch, sha256_retarget | Examples only. |
+| EZ-RES-5 | none | sha256_aims_forward, sha256_advances, sha256_remote_tip, sha256_remote_branch, sha256_retarget | Examples only. **Update:** proved by `lock/upgrade_forward_moves_onward`, `lock/upgrade_forward_refuses_off` and `lock/upgrade_forward_reaches_tip` over the planner, with `git/tip_of_head`, `git/tip_skips_other` and `git/tip_skips_symref` for the tip (WP6), relative to EZ-LED-4. |
 | EZ-RES-6 | none | unselected_holds | One example. |
+| EZ-RES-8 | none | tag_follows, same_rev_drifts, tag_moved_off | Examples only. **Update:** proved by `lock/upgrade_tag_follows`, `lock/upgrade_tag_resolves`, `lock/upgrade_tag_refuses_off` and `lock/upgrade_tag_refuses_drift` over the planner (WP6), relative to EZ-LED-4. |
 | EZ-VEN-1 | none | sha256_vendor_flag, vendor_flag_true, vendor_flag_absent, sha256_allowlist, sha256_retarget | Examples only. |
 | EZ-VEN-2, EZ-VEN-3 | none | imports_follow_hash | One example covering both. |
 | EZ-VEN-4 | none | none | No law. |
@@ -566,7 +582,8 @@ What the README's reproducibility sentence ("`ez lock` never has to consult anyt
 | WP3 | done | EZ-DOC-2 proved. The lock renders each package as one block of text filed as a `K.File` under its hash and sorts the blocks with `K.file.sort`, so pkg's `sort_perm` gives `lock_order_free` for a package list with distinct hashes, and `pack_order_free` is `sort_perm` under a block. `walk_keeps_hashes_distinct` is the walk invariant, one lemma per step def as for sources, and `plain_lock_hashes_distinct` carries it to `P.packs`, which discharges the premise for every lock the planner writes. `hashes_sorted` was already deleted with the trails. No lock bytes change: this repository's lock round-trips byte for byte. `L.has` now compares the wanted hash first, as pkg's `fresh` does, which changes no answer. |
 | WP5a | done | EZ-DOC-4 for a plain lock: `lock/lock_idempotent` (run again on the World it leaves, a plain lock writes the same bytes to ez.lock.toml) and `lock/relock_lays_nothing` (after one that succeeded, no tree arrives by a clone that passes). The World a lock leaves is `after` in `lock/LAWS.bend`: a refused lock leaves the World it read, and one that succeeded leaves every tree it laid read from BEND_LIB with the bytes it was checked with. The proof is `clone_reproduces` read backwards: a clone that passed weighed to the ledger's narHash, so the same bytes from BEND_LIB are judged the same, and the Inputs are unchanged. EZ-DOC-4 stays pending until WP5b proves the `--upgrade` half. |
 | WP8 | done | EZ-HASH-2 (`sha/nar_dir_order_free`). |
-| WP4, WP5b, WP6, WP7 | open | |
+| WP6 (EZ-RES-5, EZ-RES-8) | done | Proved over the planner, relative to EZ-LED-4 (see the lock and git tables). Besides the RFC's laws, two say that a pin the upgrade asks about is at the commit the remote named when the lock does not refuse, so a tag is re-resolved and not only allowed to be. Found while proving: WP2's upgrade read an empty refusal reason as no refusal, so a dependency or tool whose pin halted with the reason "" dropped out of the ledger it wrote, and an upgrade that stopped with "" locked ez.toml as it was. Only an answer `Miss` with an empty reason reaches either, and the interpreter never builds one, so the binary is unchanged; `Up.halt.why` gives every refusal a reason. `lock/PROOF.bend` checks in about 13 s before and after. The tool laws the RFC mentions are not written. |
+| WP4, WP5b, WP6 (EZ-RES-4, EZ-RES-6), WP7 | open | |
 
 The demand loop's cost, measured in WP1 on this repository's own lock with every tree already under BEND_LIB (five git packages, all imported directly, so two rounds of `wants` and one `plan`): 0.21 s for the binary before WP1 and 0.53 s after, median of seven runs each. Every round of `wants` scans every tracked source for imports again, since the World holds texts and not scans, and `plan` scans once more and checks every package's SHA-256 once. With every tree to clone (an empty BEND_LIB) the clones dominate: 7.3 s before and 7.4 s after. The design's first risk is real but small; if WP2 makes it matter, the World can carry each source's scanned imports instead of its text.
 
