@@ -243,3 +243,32 @@ law choose_is_a_tag:
   exs ys: List<&2, String>
   {List.append(&2, String, xs, G.choose(names) <> ys) == names
     : List<&2, String>}
+
+# The default branch tip `ez lock --upgrade` moves a pin by its commit alone
+# to is `tip.rev` of what `ls-remote --symref <url> HEAD` printed: the commit
+# on HEAD's own row, and not the symref row above it.
+
+# LAW: the tip is the commit HEAD's commit row names
+# EZ-RES-5
+law tip_of_head:
+  for +rev: String
+  for rest: List<&2, G.Row>
+  for e: {True{} == G.is_rev(rev) : Bool}
+  {G.tip.rev(G.Row{rev, "HEAD"} <> rest) == rev : String}
+
+# LAW: a row that is not HEAD's names no tip
+# EZ-RES-5
+law tip_skips_other:
+  for +rev: String
+  for +name: String
+  for rest: List<&2, G.Row>
+  for e: {False{} == String.eq(name, "HEAD") : Bool}
+  {G.tip.rev(G.Row{rev, name} <> rest) == G.tip.rev(rest) : String}
+
+# LAW: nor does HEAD's symref row, whose first field is not a commit
+# EZ-RES-5
+law tip_skips_symref:
+  for +rev: String
+  for rest: List<&2, G.Row>
+  for e: {False{} == G.is_rev(rev) : Bool}
+  {G.tip.rev(G.Row{rev, "HEAD"} <> rest) == G.tip.rev(rest) : String}
