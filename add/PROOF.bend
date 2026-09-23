@@ -334,8 +334,8 @@ law effects_is:
   for k: K.Walked
   for +w: A.World
   for s: {AP.outcome.k(k, w) == P.Success{} : P.Outcome}
-  {AP.effects.k(k, w) == AP.effects.of(AP.dep.of(wh(k), wr(k), w), wh(k), wf(k), ws(k),
-    A.manifest.of(A.read(w)), w) : List<&2, P.Effect>}
+  {AP.effects.k(k, w) == AP.effects.of(AP.dep.of(wh(k), wr(k), w), wh(k), AP.at.of(wr(k), w),
+    wf(k), ws(k), A.manifest.of(A.read(w)), w) : List<&2, P.Effect>}
 
 def effects_is(k, w, s):
   match k:
@@ -343,7 +343,7 @@ def effects_is(k, w, s):
       {==}
     case K.Asks{at}:
       Eq.bit.absurd(&2, {AP.effects.k(K.Asks{at}, w) == AP.effects.of(AP.dep.of("", "", w),
-        "", [], [], A.manifest.of(A.read(w)), w) : List<&2, P.Effect>},
+        "", AP.at.of("", w), [], [], A.manifest.of(A.read(w)), w) : List<&2, P.Effect>},
         Equal.trans(Bool, False{}, win(AP.outcome.k(K.Asks{at}, w)), True{},
           Equal.sym(Bool, win(AP.outcome.k(K.Asks{at}, w)), False{},
             asks_loses(got(w), at, w)),
@@ -351,7 +351,7 @@ def effects_is(k, w, s):
             P.Success{}, s)))
     case K.Refused{why}:
       Eq.bit.absurd(&2, {AP.effects.k(K.Refused{why}, w) == AP.effects.of(AP.dep.of("", "", w),
-        "", [], [], A.manifest.of(A.read(w)), w) : List<&2, P.Effect>},
+        "", AP.at.of("", w), [], [], A.manifest.of(A.read(w)), w) : List<&2, P.Effect>},
         Equal.trans(Bool, False{}, win(AP.outcome.k(K.Refused{why}, w)), True{},
           Equal.sym(Bool, win(AP.outcome.k(K.Refused{why}, w)), False{},
             refused_loses(got(w), why, w)),
@@ -399,14 +399,15 @@ def drops_keep(gs, rest, p, e):
 # LAW: so what follows the `.gitignore` write writes nothing
 law tail_keep:
   for +h: String
+  for +a: String
   for +w: A.World
   for gs: List<&2, String>
   for +p: String
-  {P.put.in(P.drops.of(gs, AP.says(h, w)), p) == P.Kept{} : P.Wrote}
+  {P.put.in(P.drops.of(gs, AP.says(h, a, w)), p) == P.Kept{} : P.Wrote}
 
-def tail_keep(h, w, gs, p):
-  drops_keep(gs, AP.says(h, w), p,
-    says_keep(String.is_empty(AP.tag(w)), AP.import.line(h, Path.base(AP.entry(w))),
+def tail_keep(h, a, w, gs, p):
+  drops_keep(gs, AP.says(h, a, w), p,
+    says_keep(String.is_empty(AP.tag(w)), Git.import.line(h, a),
       AP.tag(w) ++ " is " ++ AP.rev(w), p))
 
 # LAW: and nothing after the ledger's write writes ez.toml
@@ -415,17 +416,18 @@ law ignore_keeps_ledger:
   for +next: String
   for gs: List<&2, String>
   for +h: String
+  for +a: String
   for +w: A.World
-  {P.put.in(AP.ignore.put(b, next, P.drops.of(gs, AP.says(h, w))), "ez.toml") == P.Kept{}
+  {P.put.in(AP.ignore.put(b, next, P.drops.of(gs, AP.says(h, a, w))), "ez.toml") == P.Kept{}
     : P.Wrote}
 
-def ignore_keeps_ledger(b, next, gs, h, w):
+def ignore_keeps_ledger(b, next, gs, h, a, w):
   match b:
     case True{}:
-      tail_keep(h, w, gs, "ez.toml")
+      tail_keep(h, a, w, gs, "ez.toml")
     case False{}:
-      %Equal.sym(P.Wrote, P.put.in(P.drops.of(gs, AP.says(h, w)), "ez.toml"), P.Kept{},
-        tail_keep(h, w, gs, "ez.toml"))
+      %Equal.sym(P.Wrote, P.put.in(P.drops.of(gs, AP.says(h, a, w)), "ez.toml"), P.Kept{},
+        tail_keep(h, a, w, gs, "ez.toml"))
         : {P.put.one(P.Write{".gitignore", next}, "ez.toml", _) == P.Kept{} : P.Wrote}
       {==}
 
@@ -445,26 +447,30 @@ def write_then_keep(text, tail, e):
 law edits_of:
   for +d: M.Dep
   for +h: String
+  for +a: String
   for fs: List<&2, K.Source>
   for ss: List<&2, K.File>
   for +m: M.Manifest
   for +w: A.World
-  {P.put.in(AP.effects.of(d, h, fs, ss, m, w), "ez.toml")
+  {P.put.in(AP.effects.of(d, h, a, fs, ss, m, w), "ez.toml")
     == P.Put{Rend.show(Rend.add.keep(m, d))} : P.Wrote}
 
-def edits_of(d, h, _fs, _ss, m, w):
+def edits_of(d, h, a, _fs, _ss, m, w):
   write_then_keep(Rend.show(Rend.add.keep(m, d)),
     AP.ignore.put(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w),
-      P.drops.of(gss(d, h, m), AP.says(h, w))),
+      P.drops.of(gss(d, h, m), AP.says(h, a, w))),
     ignore_keeps_ledger(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w), gss(d, h, m),
-      h, w))
+      h, a, w))
 
 # the dependency and the effects of the walk of an add, named
 def dd(+w: A.World) -> M.Dep:
   AP.dep.of(wh(AP.walked(w)), wr(AP.walked(w)), w)
 
+def aa(+w: A.World) -> String:
+  AP.at.of(wr(AP.walked(w)), w)
+
 def eff(+w: A.World) -> List<&2, P.Effect>:
-  AP.effects.of(dd(w), wh(AP.walked(w)), wf(AP.walked(w)), ws(AP.walked(w)),
+  AP.effects.of(dd(w), wh(AP.walked(w)), aa(w), wf(AP.walked(w)), ws(AP.walked(w)),
     A.manifest.of(A.read(w)), w)
 
 # the manifest of a ledger that read, as the premise gives it
@@ -487,7 +493,7 @@ def Laws.add_edits_ledger(w, m, good, ok):
     : {P.put.in(_, "ez.toml") == P.Put{Rend.show(Rend.add.keep(m, dd(w)))} : P.Wrote}
   %good_m(w, m, good)
     : {P.put.in(eff(w), "ez.toml") == P.Put{Rend.show(Rend.add.keep(_, dd(w)))} : P.Wrote}
-  edits_of(dd(w), wh(AP.walked(w)), wf(AP.walked(w)), ws(AP.walked(w)),
+  edits_of(dd(w), wh(AP.walked(w)), aa(w), wf(AP.walked(w)), ws(AP.walked(w)),
     A.manifest.of(A.read(w)), w)
 
 # LAW: what `.gitignore` holds after the effects: the text `I.sync` gave,
@@ -499,22 +505,23 @@ law syncs_arm:
   for +text: String
   for gs: List<&2, String>
   for +h: String
+  for +a: String
   for +w: A.World
   for eb: {String.eq(next, ig) == b : Bool}
   {AP.after(P.put.one(P.Write{"ez.toml", text}, ".gitignore",
-    P.put.in(AP.ignore.put(b, next, P.drops.of(gs, AP.says(h, w))), ".gitignore")), ig)
+    P.put.in(AP.ignore.put(b, next, P.drops.of(gs, AP.says(h, a, w))), ".gitignore")), ig)
     == next : String}
 
-def syncs_arm(b, next, ig, text, gs, h, w, eb):
+def syncs_arm(b, next, ig, text, gs, h, a, w, eb):
   match b:
     case True{}:
-      %Equal.sym(P.Wrote, P.put.in(P.drops.of(gs, AP.says(h, w)), ".gitignore"), P.Kept{},
-        tail_keep(h, w, gs, ".gitignore"))
+      %Equal.sym(P.Wrote, P.put.in(P.drops.of(gs, AP.says(h, a, w)), ".gitignore"), P.Kept{},
+        tail_keep(h, a, w, gs, ".gitignore"))
         : {AP.after(P.put.one(P.Write{"ez.toml", text}, ".gitignore", _), ig) == next : String}
       Equal.sym(String, next, ig, Str.string_eq_true(next, ig, eb))
     case False{}:
-      %Equal.sym(P.Wrote, P.put.in(P.drops.of(gs, AP.says(h, w)), ".gitignore"), P.Kept{},
-        tail_keep(h, w, gs, ".gitignore"))
+      %Equal.sym(P.Wrote, P.put.in(P.drops.of(gs, AP.says(h, a, w)), ".gitignore"), P.Kept{},
+        tail_keep(h, a, w, gs, ".gitignore"))
         : {AP.after(P.put.one(P.Write{"ez.toml", text}, ".gitignore",
           P.put.one(P.Write{".gitignore", next}, ".gitignore", _)), ig) == next : String}
       {==}
@@ -524,16 +531,17 @@ def syncs_arm(b, next, ig, text, gs, h, w, eb):
 law syncs_of:
   for +d: M.Dep
   for +h: String
+  for +a: String
   for fs: List<&2, K.Source>
   for ss: List<&2, K.File>
   for +m: M.Manifest
   for +w: A.World
-  {AP.after(P.put.in(AP.effects.of(d, h, fs, ss, m, w), ".gitignore"), A.ignore(w))
+  {AP.after(P.put.in(AP.effects.of(d, h, a, fs, ss, m, w), ".gitignore"), A.ignore(w))
     == nxt(d, m, w) : String}
 
-def syncs_of(d, h, _fs, _ss, m, w):
+def syncs_of(d, h, a, _fs, _ss, m, w):
   syncs_arm(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w), A.ignore(w),
-    Rend.show(Rend.add.keep(m, d)), gss(d, h, m), h, w, {==})
+    Rend.show(Rend.add.keep(m, d)), gss(d, h, m), h, a, w, {==})
 
 def Laws.add_syncs_allowlist(w, m, good, ok):
   %Equal.sym(P.Plan, AP.plan(w), P.Plan{AP.effects.k(AP.walked(w), w), P.Success{}},
@@ -550,8 +558,116 @@ def Laws.add_syncs_allowlist(w, m, good, ok):
   %good_m(w, m, good)
     : {AP.after(P.put.in(eff(w), ".gitignore"), A.ignore(w))
       == I.sync(A.deps.of(Rend.add.keep(_, dd(w))), A.ignore(w)) : String}
-  syncs_of(dd(w), wh(AP.walked(w)), wf(AP.walked(w)), ws(AP.walked(w)),
+  syncs_of(dd(w), wh(AP.walked(w)), aa(w), wf(AP.walked(w)), ws(AP.walked(w)),
     A.manifest.of(A.read(w)), w)
+
+# ---------------------------------------------------------------------------
+# what an add says
+
+# LAW: the lines a person is told end with the import line
+law says_last:
+  for c: Bool
+  for +a: String
+  for +b: String
+  {AP.last.go(P.said.in(Bool.pick(List<&2, P.Effect>, c, [P.Say{a}], [P.Say{b}, P.Say{a}])),
+    "") == a : String}
+
+def says_last(c, _a, _b):
+  match c:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# LAW: the committed trees removed ahead of them say nothing
+law drops_said:
+  for gs: List<&2, String>
+  for rest: List<&2, P.Effect>
+  {P.said.in(P.drops.of(gs, rest)) == P.said.in(rest) : List<&2, String>}
+
+def drops_said(gs, rest):
+  match gs:
+    case []:
+      {==}
+    case _h <> t:
+      drops_said(t, rest)
+
+# LAW: nor does the `.gitignore` write, whether or not it is made
+law ignore_said:
+  for b: Bool
+  for +next: String
+  for rest: List<&2, P.Effect>
+  {P.said.in(AP.ignore.put(b, next, rest)) == P.said.in(rest) : List<&2, String>}
+
+def ignore_said(b, _next, _rest):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# LAW: the effects of a package end what they say with the import line for
+# the entry at `a` inside it
+law says_of:
+  for +d: M.Dep
+  for +h: String
+  for +a: String
+  for fs: List<&2, K.Source>
+  for ss: List<&2, K.File>
+  for +m: M.Manifest
+  for +w: A.World
+  {AP.last.go(P.said.in(AP.effects.of(d, h, a, fs, ss, m, w)), "") == Git.import.line(h, a)
+    : String}
+
+def says_of(d, h, a, _fs, _ss, m, w):
+  %Equal.sym(List<&2, String>,
+    P.said.in(AP.ignore.put(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w),
+      P.drops.of(gss(d, h, m), AP.says(h, a, w)))),
+    P.said.in(P.drops.of(gss(d, h, m), AP.says(h, a, w))),
+    ignore_said(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w),
+      P.drops.of(gss(d, h, m), AP.says(h, a, w))))
+    : {AP.last.go(_, "") == Git.import.line(h, a) : String}
+  %Equal.sym(List<&2, String>, P.said.in(P.drops.of(gss(d, h, m), AP.says(h, a, w))),
+    P.said.in(AP.says(h, a, w)), drops_said(gss(d, h, m), AP.says(h, a, w)))
+    : {AP.last.go(_, "") == Git.import.line(h, a) : String}
+  says_last(String.is_empty(AP.tag(w)), Git.import.line(h, a),
+    AP.tag(w) ++ " is " ++ AP.rev(w))
+
+# LAW: a walk that ends in success ends what the add says with the import
+# line for its package's entry
+law says_k:
+  for k: K.Walked
+  for +w: A.World
+  for s: {AP.outcome.k(k, w) == P.Success{} : P.Outcome}
+  {AP.last.go(P.said.in(AP.effects.k(k, w)), "")
+    == Git.import.line(AP.hash.of(k), AP.at.of(AP.root.of(k), w)) : String}
+
+def says_k(k, w, s):
+  match k:
+    case K.Walked{+h, +r, fs, ss}:
+      says_of(AP.dep.of(h, r, w), h, AP.at.of(r, w), fs, ss, A.manifest.of(A.read(w)), w)
+    case K.Asks{at}:
+      Eq.bit.absurd(&2, {AP.last.go(P.said.in(AP.effects.k(K.Asks{at}, w)), "")
+        == Git.import.line("", AP.at.of(".", w)) : String},
+        Equal.trans(Bool, False{}, win(AP.outcome.k(K.Asks{at}, w)), True{},
+          Equal.sym(Bool, win(AP.outcome.k(K.Asks{at}, w)), False{},
+            asks_loses(got(w), at, w)),
+          Equal.cong(P.Outcome, Bool, o => win(o), AP.outcome.k(K.Asks{at}, w),
+            P.Success{}, s)))
+    case K.Refused{why}:
+      Eq.bit.absurd(&2, {AP.last.go(P.said.in(AP.effects.k(K.Refused{why}, w)), "")
+        == Git.import.line("", AP.at.of(".", w)) : String},
+        Equal.trans(Bool, False{}, win(AP.outcome.k(K.Refused{why}, w)), True{},
+          Equal.sym(Bool, win(AP.outcome.k(K.Refused{why}, w)), False{},
+            refused_loses(got(w), why, w)),
+          Equal.cong(P.Outcome, Bool, o => win(o), AP.outcome.k(K.Refused{why}, w),
+            P.Success{}, s)))
+
+def Laws.add_says_import(w, ok):
+  %Equal.sym(P.Plan, AP.plan(w), P.Plan{AP.effects.k(AP.walked(w), w), P.Success{}},
+    succeeds(w, ok))
+    : {AP.last(_) == Git.import.line(AP.hash(w), AP.at(w)) : String}
+  says_k(AP.walked(w), w, won(w, ok))
 
 # ---------------------------------------------------------------------------
 # refusals after the walk
@@ -765,7 +881,7 @@ def Laws.add_commit_asks_nothing(w, hex):
 # a walk's package with its hash and file list made again from its texts
 def fix(k: K.Walked) -> K.Walked:
   match k:
-    case K.Walked{_h, r, +fs, _ss}:
+    case K.Walked{_h, +r, +fs, _ss}:
       K.Walked{K.hash_of(K.files_of(K.laid.sums(fs))), r, fs, K.files_of(K.laid.sums(fs))}
     case K.Asks{at}:
       K.Asks{at}
@@ -991,17 +1107,18 @@ law ignore_lays:
   for +next: String
   for gs: List<&2, String>
   for +h: String
+  for +a: String
   for +w: A.World
-  {P.lays.named(AP.ignore.put(b, next, P.drops.of(gs, AP.says(h, w)))) == True{} : Bool}
+  {P.lays.named(AP.ignore.put(b, next, P.drops.of(gs, AP.says(h, a, w)))) == True{} : Bool}
 
-def ignore_lays(b, _next, gs, h, w):
+def ignore_lays(b, _next, gs, h, a, w):
   match b:
     case True{}:
-      drops_lays(gs, AP.says(h, w), says_lays(String.is_empty(AP.tag(w)),
-        AP.import.line(h, Path.base(AP.entry(w))), AP.tag(w) ++ " is " ++ AP.rev(w)))
+      drops_lays(gs, AP.says(h, a, w), says_lays(String.is_empty(AP.tag(w)),
+        Git.import.line(h, a), AP.tag(w) ++ " is " ++ AP.rev(w)))
     case False{}:
-      drops_lays(gs, AP.says(h, w), says_lays(String.is_empty(AP.tag(w)),
-        AP.import.line(h, Path.base(AP.entry(w))), AP.tag(w) ++ " is " ++ AP.rev(w)))
+      drops_lays(gs, AP.says(h, a, w), says_lays(String.is_empty(AP.tag(w)),
+        Git.import.line(h, a), AP.tag(w) ++ " is " ++ AP.rev(w)))
 
 # LAW: both halves of an `and` that are True
 law both:
@@ -1018,18 +1135,19 @@ def both(x, y, ex, ey):
 # LAW: the effects of a package made again from its texts lay a named tree
 law lays_of:
   for +d: M.Dep
+  for +a: String
   for +fs: List<&2, K.Source>
   for +m: M.Manifest
   for +w: A.World
-  {P.lays.named(AP.effects.of(d, lh(fs), fs, lsum(fs), m, w)) == True{} : Bool}
+  {P.lays.named(AP.effects.of(d, lh(fs), a, fs, lsum(fs), m, w)) == True{} : Bool}
 
-def lays_of(d, fs, m, w):
+def lays_of(d, a, fs, m, w):
   both(P.lay.named(lh(fs), lay.files(fs)),
     P.lays.named(AP.ignore.put(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w),
-      P.drops.of(gss(d, lh(fs), m), AP.says(lh(fs), w)))),
+      P.drops.of(gss(d, lh(fs), m), AP.says(lh(fs), a, w)))),
     lay_canon(fs),
     ignore_lays(String.eq(nxt(d, m, w), A.ignore(w)), nxt(d, m, w), gss(d, lh(fs), m),
-      lh(fs), w))
+      lh(fs), a, w))
 
 law lays_fixed:
   for k: K.Walked
@@ -1038,8 +1156,8 @@ law lays_fixed:
 
 def lays_fixed(k, w):
   match k:
-    case K.Walked{_h, r, +fs, _ss}:
-      lays_of(AP.dep.of(lh(fs), r, w), fs, A.manifest.of(A.read(w)), w)
+    case K.Walked{_h, +r, +fs, _ss}:
+      lays_of(AP.dep.of(lh(fs), r, w), AP.at.of(r, w), fs, A.manifest.of(A.read(w)), w)
     case K.Asks{_at}:
       {==}
     case K.Refused{_why}:

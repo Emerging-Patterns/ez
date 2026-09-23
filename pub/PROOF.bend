@@ -518,7 +518,7 @@ law said_made:
   for v: PP.Verdict
   for +w: PW.World
   for ok: {PP.succeeds.plan(PP.plan.v(v, w)) == True{} : Bool}
-  {PP.said(PP.plan.v(v, w)) == [PP.hash(w), PP.import.line(PP.hash(w), PP.at(w))]
+  {P.said(PP.plan.v(v, w)) == [PP.hash(w), G.import.line(PP.hash(w), PP.at(w))]
     : List<&2, String>}
 
 def said_made(v, w, ok):
@@ -526,11 +526,11 @@ def said_made(v, w, ok):
     case PP.Go{}:
       {==}
     case PP.Wait{asks}:
-      Eq.bit.absurd(&2, {PP.said(PP.plan.v(PP.Wait{asks}, w))
-        == [PP.hash(w), PP.import.line(PP.hash(w), PP.at(w))] : List<&2, String>}, ok)
+      Eq.bit.absurd(&2, {P.said(PP.plan.v(PP.Wait{asks}, w))
+        == [PP.hash(w), G.import.line(PP.hash(w), PP.at(w))] : List<&2, String>}, ok)
     case PP.Stop{why}:
-      Eq.bit.absurd(&2, {PP.said(PP.plan.v(PP.Stop{why}, w))
-        == [PP.hash(w), PP.import.line(PP.hash(w), PP.at(w))] : List<&2, String>}, ok)
+      Eq.bit.absurd(&2, {P.said(PP.plan.v(PP.Stop{why}, w))
+        == [PP.hash(w), G.import.line(PP.hash(w), PP.at(w))] : List<&2, String>}, ok)
 
 def Laws.pub_reports_ours(w, ok):
   said_made(PP.decide(w), w, ok)

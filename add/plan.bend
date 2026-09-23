@@ -525,14 +525,17 @@ def ignore.put(same: Bool, +next: String, rest: List<&2, P.Effect>) -> List<&2, 
     case False{}:
       P.Write{A.ignore.file(), next} <> rest
 
-# the import line a package is reachable by, from its entry file's name
-def import.line(+hash: String, +base: String) -> String:
-  "import " ++ hash ++ "/" ++ base ++ " as " ++ Git.title(Path.unbend(base))
+# the entry's path inside a package rooted at `root`, which is where the hub
+# serves it: its name alone, unless an import climbs out of its directory and
+# re-roots the package above it
+def at.of(+root: String, +world: A.World) -> String:
+  K.inside(root, Path.norm(entry(world)))
 
 # the lines a person is told: the commit a tag or branch turned out to be,
-# and the import line the package is now reachable by
-def says(+hash: String, +world: A.World) -> List<&2, P.Effect>:
-  +line = import.line(hash, Path.base(entry(world)))
+# and the import line the package is now reachable by, for the entry at `at`
+# inside it. `Git.import.line` is the line `ez publish` prints too.
+def says(+hash: String, +at: String, +world: A.World) -> List<&2, P.Effect>:
+  +line = Git.import.line(hash, at)
   Bool.pick(List<&2, P.Effect>, String.is_empty(tag(world)), [P.Say{line}],
     [P.Say{tag(world) ++ " is " ++ rev(world)}, P.Say{line}])
 
@@ -542,6 +545,7 @@ def says(+hash: String, +world: A.World) -> List<&2, P.Effect>:
 def effects.of(
   +dep: M.Dep,
   +hash: String,
+  +at: String,
   fs: List<&2, K.Source>,
   ss: List<&2, K.File>,
   +manifest: M.Manifest,
@@ -554,13 +558,14 @@ def effects.of(
     List.append(&2, W.Source, srcs(fs), [W.Source{"manifest", K.manifest_of(ss)}])} <>
     (P.Write{A.toml(), Rend.show(Rend.add.keep(manifest, dep))} <>
       ignore.put(String.eq(next, A.ignore(world)), next,
-        P.drops.of(gone(old, hash, left), says(hash, world))))
+        P.drops.of(gone(old, hash, left), says(hash, at, world))))
 
 # the effects of an add whose walk made a package; none otherwise
 def effects.k(walk: K.Walked, +world: A.World) -> List<&2, P.Effect>:
   match walk:
-    case K.Walked{+h, root, fs, ss}:
-      effects.of(dep.of(h, root, world), h, fs, ss, A.manifest.of(A.read(world)), world)
+    case K.Walked{+h, +root, fs, ss}:
+      effects.of(dep.of(h, root, world), h, at.of(root, world), fs, ss,
+        A.manifest.of(A.read(world)), world)
     case K.Asks{_at}:
       []
     case K.Refused{_why}:
@@ -702,3 +707,44 @@ def after(wrote: P.Wrote, +was: String) -> String:
       was
     case P.Put{text}:
       text
+
+# the hash of the package the walk made, "" when it made none
+def hash.of(walk: K.Walked) -> String:
+  match walk:
+    case K.Walked{h, _root, _fs, _ss}:
+      h
+    case K.Asks{_at}:
+      ""
+    case K.Refused{_why}:
+      ""
+
+# the directory its paths are written from, "." when it made none
+def root.of(walk: K.Walked) -> String:
+  match walk:
+    case K.Walked{_h, root, _fs, _ss}:
+      root
+    case K.Asks{_at}:
+      "."
+    case K.Refused{_why}:
+      "."
+
+# the package's hash on a World
+def hash(+world: A.World) -> String:
+  hash.of(walked(world))
+
+# the entry's path inside the package on a World, which is where the hub
+# serves it
+def at(+world: A.World) -> String:
+  at.of(root.of(walked(world)), world)
+
+# the last of some lines, `prev` when there are none after it
+def last.go(ls: List<&2, String>, +prev: String) -> String:
+  match ls:
+    case []:
+      prev
+    case h <> t:
+      last.go(t, h)
+
+# the last line a plan says, "" when it says none
+def last(pl: P.Plan) -> String:
+  last.go(P.said(pl), "")

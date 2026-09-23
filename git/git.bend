@@ -318,6 +318,13 @@ def title.go(cs: List<&2, Char>) -> String:
 def title(text: String) -> String:
   title.go(String.to_list(text))
 
+# the import line a consumer writes for a package: the hash, the entry's path
+# inside the package, which is where the hub serves it, and the entry's name
+# as the alias, the way bend prints it. `ez add` and `ez publish` both print
+# this line.
+def import.line(+hash: String, +at: String) -> String:
+  "import " ++ hash ++ "/" ++ at ++ " as " ++ title(P.unbend(P.base(at)))
+
 # `main.bend` when neither the entry nor the bin was named. That is the file
 # `ez init` writes when it is not told an entry.
 def entry.main(no: Bool, +binary: String) -> String:
