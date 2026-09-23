@@ -1723,3 +1723,18 @@ def Laws.tip_skips_symref(rev, rest, e):
   %e : {G.tip.step(String.is_empty(G.tip.rev.hex(_, rev)), G.tip.rev.hex(_, rev),
     _u => G.tip.rev(rest)) == G.tip.rev(rest) : String}
   {==}
+
+# Each emptiness the premises give is rewritten into the arm it picks.
+def Laws.entry_pick_entry(file, binary, e):
+  %e : {G.entry.bin(_, file, binary) == file : String}
+  {==}
+
+def Laws.entry_pick_bin(file, binary, e0, e1):
+  %e0 : {G.entry.bin(_, file, binary) == binary : String}
+  %e1 : {G.entry.main(_, binary) == binary : String}
+  {==}
+
+def Laws.entry_pick_main(file, binary, e0, e1):
+  %e0 : {G.entry.bin(_, file, binary) == "main.bend" : String}
+  %e1 : {G.entry.main(_, binary) == "main.bend" : String}
+  {==}

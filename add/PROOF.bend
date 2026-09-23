@@ -1075,3 +1075,128 @@ def lays_v(v, w):
 
 def Laws.add_lays_named(w):
   lays_v(AP.decide(w), w)
+
+# ---------------------------------------------------------------------------
+# the commit pinned
+
+# LAW: the commit a found rev gives is that rev, "" giving none
+law found_rev:
+  for +e: String
+  for why: String
+  {AP.tip.rev(AP.tip.found(e, why)) == e : String}
+
+def found_rev(e, _why):
+  match e:
+    case SNil{}:
+      {==}
+    case SCon{_h, _t}:
+      {==}
+
+# LAW: a named ref's commit is what `Git.exact` reads from what was printed
+law named_rev:
+  for s: Up.Said
+  for +w: A.World
+  {AP.tip.rev(AP.tip.refs(s, w))
+    == Git.exact(Git.rows(String.lines(AP.said.text(s))), A.ref(w)) : String}
+
+def named_rev(s, w):
+  match s:
+    case Up.Said{+text}:
+      found_rev(Git.exact(Git.rows(String.lines(text)), A.ref(w)),
+        "ez: " ++ A.url(w) ++ " has no ref named " ++ A.ref(w))
+    case Up.Unsaid{_why}:
+      {==}
+    case Up.Unasked{_ask}:
+      {==}
+
+law rev_named:
+  for +w: A.World
+  for nr: {Git.is_rev(A.ref(w)) == False{} : Bool}
+  for ne: {String.is_empty(A.ref(w)) == False{} : Bool}
+  {AP.rev(w) == Git.exact(AP.rows(w, AP.QRefs{A.ref(w)}), A.ref(w)) : String}
+
+def rev_named(w, nr, ne):
+  %Equal.sym(Bool, Git.is_rev(A.ref(w)), False{}, nr)
+    : {AP.tip.rev(AP.tip.of(_, String.is_empty(A.ref(w)), w))
+      == Git.exact(AP.rows(w, AP.QRefs{A.ref(w)}), A.ref(w)) : String}
+  %Equal.sym(Bool, String.is_empty(A.ref(w)), False{}, ne)
+    : {AP.tip.rev(AP.tip.of(False{}, _, w))
+      == Git.exact(AP.rows(w, AP.QRefs{A.ref(w)}), A.ref(w)) : String}
+  named_rev(AP.said(w, AP.QRefs{A.ref(w)}), w)
+
+def Laws.add_pins_named(w, nr, ne, ok):
+  Equal.trans(String, M.source.rev(M.source.dep(AP.added(w))), AP.rev(w),
+    Git.exact(AP.rows(w, AP.QRefs{A.ref(w)}), A.ref(w)),
+    Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)), AP.added(w),
+      AP.dep.of(wh(AP.walked(w)), wr(AP.walked(w)), w), added_ok(w, ok)),
+    rev_named(w, nr, ne))
+
+# LAW: the chosen tag's commit, when a tag was chosen
+law chosen_rev:
+  for s: Up.Said
+  for +w: A.World
+  for c: {String.is_empty(Git.choose(Git.tag.names(Git.rows(String.lines(AP.said.text(s))))))
+    == False{} : Bool}
+  {AP.tip.rev(AP.tip.tags(s, w)) == Git.exact(Git.rows(String.lines(AP.said.text(s))),
+    Git.choose(Git.tag.names(Git.rows(String.lines(AP.said.text(s)))))) : String}
+
+def chosen_rev(s, w, c):
+  match s:
+    case Up.Said{+text}:
+      %Equal.sym(Bool, String.is_empty(Git.choose(Git.tag.names(Git.rows(String.lines(text))))),
+        False{}, c)
+        : {AP.tip.rev(AP.tip.chosen(_, Git.choose(Git.tag.names(Git.rows(String.lines(text)))),
+          Git.rows(String.lines(text)), w)) == Git.exact(Git.rows(String.lines(text)),
+          Git.choose(Git.tag.names(Git.rows(String.lines(text))))) : String}
+      found_rev(Git.exact(Git.rows(String.lines(text)),
+        Git.choose(Git.tag.names(Git.rows(String.lines(text))))),
+        "ez: " ++ A.url(w) ++ " has no tag named " ++
+          Git.choose(Git.tag.names(Git.rows(String.lines(text)))))
+    case Up.Unsaid{why}:
+      Eq.bit.absurd2(&2, {AP.tip.rev(AP.tip.tags(Up.Unsaid{why}, w))
+        == Git.exact(Git.rows(String.lines(AP.said.text(Up.Unsaid{why}))),
+          Git.choose(Git.tag.names(Git.rows(String.lines(AP.said.text(Up.Unsaid{why}))))))
+        : String}, c)
+    case Up.Unasked{ask}:
+      Eq.bit.absurd2(&2, {AP.tip.rev(AP.tip.tags(Up.Unasked{ask}, w))
+        == Git.exact(Git.rows(String.lines(AP.said.text(Up.Unasked{ask}))),
+          Git.choose(Git.tag.names(Git.rows(String.lines(AP.said.text(Up.Unasked{ask}))))))
+        : String}, c)
+
+law rev_chosen:
+  for +w: A.World
+  for none: {A.ref(w) == "" : String}
+  for c: {String.is_empty(Git.choose(Git.tag.names(AP.rows(w, AP.QTags{})))) == False{}
+    : Bool}
+  {AP.rev(w) == Git.exact(AP.rows(w, AP.QTags{}),
+    Git.choose(Git.tag.names(AP.rows(w, AP.QTags{})))) : String}
+
+def rev_chosen(w, none, c):
+  %Equal.sym(String, A.ref(w), "", none)
+    : {AP.tip.rev(AP.tip.of(Git.is_rev(_), String.is_empty(_), w))
+      == Git.exact(AP.rows(w, AP.QTags{}), Git.choose(Git.tag.names(AP.rows(w, AP.QTags{}))))
+      : String}
+  chosen_rev(AP.said(w, AP.QTags{}), w, c)
+
+def Laws.add_pins_chosen_rev(w, none, c, ok):
+  Equal.trans(String, M.source.rev(M.source.dep(AP.added(w))), AP.rev(w),
+    Git.exact(AP.rows(w, AP.QTags{}), Git.choose(Git.tag.names(AP.rows(w, AP.QTags{})))),
+    Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)), AP.added(w),
+      AP.dep.of(wh(AP.walked(w)), wr(AP.walked(w)), w), added_ok(w, ok)),
+    rev_chosen(w, none, c))
+
+law rev_commit:
+  for +w: A.World
+  for hex: {Git.is_rev(A.ref(w)) == True{} : Bool}
+  {AP.rev(w) == A.ref(w) : String}
+
+def rev_commit(w, hex):
+  %Equal.sym(Bool, Git.is_rev(A.ref(w)), True{}, hex)
+    : {AP.tip.rev(AP.tip.of(_, String.is_empty(A.ref(w)), w)) == A.ref(w) : String}
+  {==}
+
+def Laws.add_pins_commit(w, hex, ok):
+  Equal.trans(String, M.source.rev(M.source.dep(AP.added(w))), AP.rev(w), A.ref(w),
+    Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)), AP.added(w),
+      AP.dep.of(wh(AP.walked(w)), wr(AP.walked(w)), w), added_ok(w, ok)),
+    rev_commit(w, hex))

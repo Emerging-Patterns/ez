@@ -178,3 +178,35 @@ law add_walk_refused:
 law add_lays_named:
   for +w: A.World
   {AP.lays.named(AP.effects(AP.plan(w))) == True{} : Bool}
+
+# LAW: with no ref, when a tag is semver-ish, the commit pinned is the one
+# the remote's tags name for the tag `Git.choose` takes, through its peeled
+# row when it is annotated (`Git.exact`)
+# EZ-RES-1
+law add_pins_chosen_rev:
+  for +w: A.World
+  for none: {A.ref(w) == "" : String}
+  for c: {String.is_empty(Git.choose(Git.tag.names(AP.rows(w, AP.QTags{})))) == False{}
+    : Bool}
+  for ok: {AP.refuses(w) == False{} : Bool}
+  {M.source.rev(M.source.dep(AP.added(w))) == Git.exact(AP.rows(w, AP.QTags{}),
+    Git.choose(Git.tag.names(AP.rows(w, AP.QTags{})))) : String}
+
+# LAW: a named ref pins the commit `Git.exact` reads for exactly that name
+# from what the remote answered: the tag first, then the branch
+# EZ-RES-1
+law add_pins_named:
+  for +w: A.World
+  for nr: {Git.is_rev(A.ref(w)) == False{} : Bool}
+  for ne: {String.is_empty(A.ref(w)) == False{} : Bool}
+  for ok: {AP.refuses(w) == False{} : Bool}
+  {M.source.rev(M.source.dep(AP.added(w)))
+    == Git.exact(AP.rows(w, AP.QRefs{A.ref(w)}), A.ref(w)) : String}
+
+# LAW: a 40-hex ref is pinned as the commit it is
+# EZ-RES-1
+law add_pins_commit:
+  for +w: A.World
+  for hex: {Git.is_rev(A.ref(w)) == True{} : Bool}
+  for ok: {AP.refuses(w) == False{} : Bool}
+  {M.source.rev(M.source.dep(AP.added(w))) == A.ref(w) : String}

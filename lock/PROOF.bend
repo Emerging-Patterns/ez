@@ -9542,3 +9542,24 @@ def Laws.upgrade_tag_resolves(w, n, tip, tag, branch, up, named, sel, refs, ok):
                       sel),
                     refs),
                   mv.stop_empty(Up.next(only, W.parsed(ledger), ups), listing, replies, ok)))
+
+# No ledger reads as a `Bad`, which a plain lock takes as it is and an
+# upgrade leaves as it is, and `need.why` refuses it.
+def Laws.lock_needs_ledger(up, _only, _listing, _rs, _us):
+  match up:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# The same once the read is rewritten to the `Bad` the premise gives.
+def Laws.lock_refuses_unread(up, only, s, listing, rs, us, _why, bad):
+  match up:
+    case True{}:
+      %bad : {P.refuses.doc(P.decide(W.inputs.of(Up.next(only, _, us), listing, rs))) == True{}
+        : Bool}
+      {==}
+    case False{}:
+      %bad : {P.refuses.doc(P.decide(W.inputs.of(Up.plain(_), listing, rs))) == True{}
+        : Bool}
+      {==}

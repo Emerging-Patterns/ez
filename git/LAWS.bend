@@ -228,3 +228,33 @@ law tip_skips_symref:
   for rest: List<&2, G.Row>
   for e: {False{} == G.is_rev(rev) : Bool}
   {G.tip.rev(G.Row{rev, "HEAD"} <> rest) == G.tip.rev(rest) : String}
+
+# The entry `ez add` walks when none is given: the checkout's `[package]
+# entry`, else its `bin`, else `main.bend` (`G.entry.pick`, over the values
+# its ez.toml gives, "" for one it does not).
+
+# LAW: an entry the package names is the one taken
+# EZ-RES-2
+law entry_pick_entry:
+  for +file: String
+  for +binary: String
+  for e: {False{} == String.is_empty(file) : Bool}
+  {G.entry.pick(file, binary) == file : String}
+
+# LAW: with no entry, its bin
+# EZ-RES-2
+law entry_pick_bin:
+  for +file: String
+  for +binary: String
+  for e0: {True{} == String.is_empty(file) : Bool}
+  for e1: {False{} == String.is_empty(binary) : Bool}
+  {G.entry.pick(file, binary) == binary : String}
+
+# LAW: with neither, `main.bend`
+# EZ-RES-2
+law entry_pick_main:
+  for +file: String
+  for +binary: String
+  for e0: {True{} == String.is_empty(file) : Bool}
+  for e1: {True{} == String.is_empty(binary) : Bool}
+  {G.entry.pick(file, binary) == "main.bend" : String}
