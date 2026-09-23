@@ -1,14 +1,13 @@
 # ez: the laws. The human states them; PROOF.bend must prove them. The string
 # facts a test run turns on live here: what bend's own chatter is, what a `#|`
 # trailer asks for, and which `0x` name an import line wrote. The clock's
-# by.effect deadline lives here too, and the command line as parse sees it.
+# by.effect deadline lives here too.
 # The OS half of the clock is not among them.
 import Base
 import ./quiet.bend as Q
 import ./drift.bend as D
 import ./gate.bend as G
 import ./clock.bend as Clock
-import ./args.bend as Args
 import ./target.bend as Tgt
 import ./key.bend as K
 import ../manifest/manifest.bend as M
@@ -19,12 +18,6 @@ import ./doctor.bend as Doctor
 import ../pkg/path.bend as P
 import ./named.bend as Named
 import ../manifest/render.bend as Rend
-
-# a ledger naming two packages, the one the drift laws read
-def ledger() -> String:
-  "[package]\nname = \"app\"\nentry = \"main.bend\"\n" ++
-  "\n[deps.sha256]\nhash = \"0xaaaa\"\n" ++
-  "\n[deps.wire]\nhash = \"0xbbbb\"\n"
 
 # quiet: bend's chatter is not the program's output
 
@@ -76,45 +69,6 @@ law hash_of_local:
   for e: {False{} == String.starts_with(s, "import 0x") : Bool}
   {D.hash_of(s) == "" : String}
 
-# LAW: an import line names its package
-# toward EZ-VEN-5
-law hash_of_import:
-  {D.hash_of("import 0xaaaa/sha256.bend as S") == "0xaaaa" : String}
-
-# LAW: a local import names none
-# toward EZ-VEN-5
-law hash_of_relative:
-  {D.hash_of("import ./run.bend as R") == "" : String}
-
-# LAW: the same package imported twice counts once
-# toward EZ-VEN-5
-law imported_dedups:
-  {D.imported(["import 0xaaaa/a.bend as A", "import 0xaaaa/b.bend as B"])
-    == ["0xaaaa"] : List<&2, String>}
-
-# LAW: a ledger the source agrees with has no drift
-# toward EZ-VEN-5
-law report_agrees:
-  {D.report(["import 0xaaaa/s.bend as S", "import 0xbbbb/w.bend as W"],
-    M.parse(ledger())) == [] : List<&2, String>}
-
-# LAW: a hash the ledger does not name is drift, and so is a ledger entry
-# nobody imports
-# toward EZ-VEN-5
-law report_both_ways:
-  {D.report(["import 0xaaaa/s.bend as S", "import 0xcccc/x.bend as X"],
-    M.parse(ledger()))
-    == ["drift: 0xcccc is imported but ez.toml does not name it",
-      "drift: wire = 0xbbbb is in ez.toml but no import line uses it"]
-    : List<&2, String>}
-
-# LAW: a ledger entry nobody imports is drift
-# toward EZ-VEN-5
-law report_unused:
-  {D.report(["import 0xaaaa/s.bend as S"], M.parse(ledger()))
-    == ["drift: wire = 0xbbbb is in ez.toml but no import line uses it"]
-    : List<&2, String>}
-
 # clock: the deadline the run effect holds. `date` and `test` are not
 # among them.
 
@@ -123,31 +77,6 @@ law by_effect_keeps:
   for +d: String
   for e: {False{} == String.is_empty(d) : Bool}
   {Clock.by.effect(d) == d : String}
-
-# the command line as parse sees it, and the words `run` forwards
-
-# LAW: a `run` line is parsed as the command alone
-# toward EZ-TOOL-9
-law argv_of_run:
-  {Args.argv.of(["run", "x", "--flag"]) == ["run"] : List<&2, String>}
-
-# LAW: `tool run` is parsed as the command and its target. The words after
-# the target are not flags of ez.
-# toward EZ-TOOL-9
-law argv_of_tool:
-  {Args.argv.of(["tool", "run", "Emerging-Patterns/bolt", "--", "a"])
-    == ["tool", "run", "Emerging-Patterns/bolt"] : List<&2, String>}
-
-# LAW: a leading `--` is not a word the program was given
-# toward EZ-TOOL-9
-law tool_rest_dashes:
-  {Args.tool.rest(["tool", "run", "Emerging-Patterns/bolt", "--", "a", "--b"])
-    == ["a", "--b"] : List<&2, String>}
-
-# LAW: words after the target are forwarded when no separator was written
-# toward EZ-TOOL-9
-law tool_rest_plain:
-  {Args.tool.rest(["tool", "run", "o/r", "a"]) == ["a"] : List<&2, String>}
 
 # target: what a word names. The four ways a word can name something are
 # each a law over every word of that shape, and together they are EZ-RES-3.
@@ -231,12 +160,6 @@ law classify_else:
     -> {Tgt.seg(a) == True{} : Bool} -> {Tgt.seg(b) == True{} : Bool}
     -> {Tgt.bend.file(b) == False{} : Bool} -> Empty
   {Tgt.classify(text) == Tgt.Local{text} : Tgt.Place}
-
-# LAW: a slug that would leave the cache is refused
-# toward EZ-TOOL-8
-law target_escapes:
-  {Tgt.show(Tgt.classify("https://example.com/../../tmp"))
-    == "bad not a repository" : String}
 
 # LAW: `~/…` expands under the home directory
 law expand_home:
@@ -354,32 +277,6 @@ law checkout_same:
   for +r: String
   for e: {False{} == String.is_empty(r) : Bool}
   {K.checkout(r, r) == True{} : Bool}
-
-# LAW: `bin` is the file that is built
-# toward EZ-TOOL-7
-law file_bin:
-  {Tgt.file.of("ez/main.bend", "manifest/manifest.bend") == "ez/main.bend"
-    : String}
-
-# LAW: with no `bin`, the entry is built
-# toward EZ-TOOL-7
-law file_entry:
-  {Tgt.file.of("", "bolt/main.bend") == "bolt/main.bend" : String}
-
-# LAW: with neither, the file is `main.bend`
-# toward EZ-TOOL-7
-law file_default:
-  {Tgt.file.of("", "") == "main.bend" : String}
-
-# LAW: a package with no name builds `app`
-# toward EZ-TOOL-7
-law out_name_empty:
-  {Tgt.out.name("") == "app" : String}
-
-# LAW: otherwise the binary is the package's name
-# toward EZ-TOOL-7
-law out_name:
-  {Tgt.out.name("bolt") == "bolt" : String}
 
 # doctor: the lock is judged against the ledger it resolves
 

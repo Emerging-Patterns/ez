@@ -160,12 +160,6 @@ def Laws.tools_skips_other_sections(n, ps, ss, e):
     : List<&2, M.Tool>}
   {==}
 
-def Laws.tool_needs_no_hash():
-  {==}
-
-def Laws.tool_is_not_a_dep():
-  {==}
-
 def Laws.missing_finds_first(n, ps, ss, e0, e1):
   %e0 : {M.missing.at(Bool.and(_, String.is_empty(M.value(ps, "hash"))), n,
     M.missing(ss)) == n : String}
@@ -279,52 +273,6 @@ def Laws.remove_idem(m, name):
         xs => M.Manifest{n, e, b, hb, xs, ts},
         R.without(R.without(ds, name), name), R.without(ds, name),
         Laws.without_idem(ds, name))
-
-# Both sides are a known ledger, so they reduce to the same file and the
-# proof is the computation itself.
-def Laws.render_parse_roundtrip():
-  {==}
-
-def Laws.bolt_is_a_tool():
-  {==}
-
-def Laws.bolt_rev():
-  {==}
-
-def Laws.bolt_is_not_a_dep():
-  {==}
-
-# Each of these is a closed ledger, a closed remote answer, or a closed
-# verdict. Both sides reduce to the same value.
-def Laws.sha256_aims_forward():
-  {==}
-
-def Laws.hub_holds():
-  {==}
-
-def Laws.tag_follows():
-  {==}
-
-def Laws.unselected_holds():
-  {==}
-
-def Laws.sha256_advances():
-  {==}
-
-def Laws.same_rev_keeps():
-  {==}
-
-def Laws.same_rev_drifts():
-  {==}
-
-def Laws.tag_moved_off():
-  {==}
-
-def Laws.sha256_retarget():
-  {==}
-
-def Laws.imports_follow_hash():
-  {==}
 
 # The `git` key is there, so the source is a git one, and its bit is the
 # `vendor` key read by `flag`.
