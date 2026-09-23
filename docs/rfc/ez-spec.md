@@ -340,7 +340,7 @@ EZ-VEN-1 is not true today: only `ez lock --upgrade` writes the allowlist, `ez a
 
 EZ-VEN-2 and EZ-VEN-3 together specify rewriting completely: the first says what changes, the second says nothing else does. The match is exact at column 0, so an indented import (which the package walk accepts) is not rewritten; the requirement states the column-0 rule so that a change to it is a behavior change. Swaps apply one after another, so the law should quantify over swap lists with distinct old and new hashes. The single closed example, `imports_follow_hash`, covers both requirements on one file.
 
-EZ-VEN-4 holds today (`ez/doctor.bend` has no file write) and is only provable because of the planner split, where it becomes a claim that the plan `doctor_plan` returns contains no effect under the project root other than the directories every command creates. Every command runs `Env.make()` first, which creates `.ez`, `bin` and the library directory; that is recorded as accidental in the inventory. EZ-VEN-5 is new; the drift report has six closed laws in `ez/LAWS.bend` (`report_both_ways` and the rest) and no requirement until now.
+EZ-VEN-4 holds today (`ez/doctor.bend` has no file write) and is only provable because of the planner split, where it becomes a claim that the plan `doctor_plan` returns contains no effect under the project root. Every command used to run `Env.make()` first, which created `.ez`, `bin` and the library directory; that was recorded as accidental in the inventory and is fixed, so `ez doctor` creates nothing (`Env.dirs`, law `dirs_other`). EZ-VEN-5 is new; the drift report has six closed laws in `ez/LAWS.bend` (`report_both_ways` and the rest) and no requirement until now.
 
 #### Fetch (EZ-FETCH)
 

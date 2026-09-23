@@ -11,6 +11,7 @@ import ./gate.bend as G
 import ./pin.bend as Pin
 import ./target.bend as Tgt
 import ./named.bend as Named
+import ./env.bend as Env
 import ../pkg/path.bend as P
 import ../manifest/manifest.bend as M
 import ../check/eq.bend as Eq
@@ -1185,6 +1186,38 @@ def Laws.root_skips_ez(p):
   Equal.cong(Bool, List<&2, String>,
     k => Bool.pick(List<&2, String>, k, [], [".ez/" ++ p]),
     String.starts_with(".ez/" ++ p, ".ez/"), True{}, Eq.starts_append(".ez/", p))
+
+# env: each premise is rewritten into the test the pick turns on.
+
+def Laws.dirs_other(cmd, out, ec, eb):
+  %ec : {Bool.pick(List<&2, String>, _, [".ez"],
+    Env.dirs.build(String.eq(cmd, "build"), String.is_empty(out)))
+    == [] : List<&2, String>}
+  %eb : {Env.dirs.build(_, String.is_empty(out)) == [] : List<&2, String>}
+  {==}
+
+def Laws.dirs_check(cmd, out, ec):
+  %ec : {Bool.pick(List<&2, String>, _, [".ez"],
+    Env.dirs.build(String.eq(cmd, "build"), String.is_empty(out)))
+    == [".ez"] : List<&2, String>}
+  {==}
+
+def Laws.dirs_build(cmd, out, ec, eb, eo):
+  %ec : {Bool.pick(List<&2, String>, _, [".ez"],
+    Env.dirs.build(String.eq(cmd, "build"), String.is_empty(out)))
+    == ["bin"] : List<&2, String>}
+  %eb : {Env.dirs.build(_, String.is_empty(out)) == ["bin"] : List<&2, String>}
+  %eo : {Bool.pick(List<&2, String>, _, ["bin"], []) == ["bin"]
+    : List<&2, String>}
+  {==}
+
+def Laws.dirs_build_out(cmd, out, ec, eb, eo):
+  %ec : {Bool.pick(List<&2, String>, _, [".ez"],
+    Env.dirs.build(String.eq(cmd, "build"), String.is_empty(out)))
+    == [] : List<&2, String>}
+  %eb : {Env.dirs.build(_, String.is_empty(out)) == [] : List<&2, String>}
+  %eo : {Bool.pick(List<&2, String>, _, ["bin"], []) == [] : List<&2, String>}
+  {==}
 
 # A ledger that is there picks the arm that plans nothing.
 def Laws.init_keeps_ledger(_s, _name, _at):

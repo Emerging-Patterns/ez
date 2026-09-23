@@ -13,6 +13,7 @@ import ./target.bend as Tgt
 import ../manifest/manifest.bend as M
 import ./pin.bend as Pin
 import ./cmd.bend as Cmd
+import ./env.bend as Env
 import ../pkg/path.bend as P
 import ./named.bend as Named
 
@@ -287,6 +288,43 @@ law out_name:
 law root_skips_ez:
   for +p: String
   {Cmd.root.keep(".ez/" ++ p) == [] : List<&2, String>}
+
+# env: the directories ez makes before a command runs. Only a command that
+# writes into one without making it gets it, so `ez help`, `ez doctor` and a
+# mistyped command leave the directory they ran in as they found it.
+
+# LAW: a command other than `check` and `build` has nothing made for it
+law dirs_other:
+  for +cmd: String
+  for +out: String
+  for ec: {False{} == String.eq(cmd, "check") : Bool}
+  for eb: {False{} == String.eq(cmd, "build") : Bool}
+  {Env.dirs(cmd, out) == [] : List<&2, String>}
+
+# LAW: `check` has `.ez` made, where its JS goes
+law dirs_check:
+  for +cmd: String
+  for +out: String
+  for ec: {True{} == String.eq(cmd, "check") : Bool}
+  {Env.dirs(cmd, out) == [".ez"] : List<&2, String>}
+
+# LAW: `build` told nothing has `bin` made, where its binary goes
+law dirs_build:
+  for +cmd: String
+  for +out: String
+  for ec: {False{} == String.eq(cmd, "check") : Bool}
+  for eb: {True{} == String.eq(cmd, "build") : Bool}
+  for eo: {True{} == String.is_empty(out) : Bool}
+  {Env.dirs(cmd, out) == ["bin"] : List<&2, String>}
+
+# LAW: and `build` told where to write has nothing made in the project
+law dirs_build_out:
+  for +cmd: String
+  for +out: String
+  for ec: {False{} == String.eq(cmd, "check") : Bool}
+  for eb: {True{} == String.eq(cmd, "build") : Bool}
+  for eo: {False{} == String.is_empty(out) : Bool}
+  {Env.dirs(cmd, out) == [] : List<&2, String>}
 
 # cmd: `ez init` starts a project and never writes over one
 

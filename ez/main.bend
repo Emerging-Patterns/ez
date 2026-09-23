@@ -197,9 +197,13 @@ def fail(+app: Shake.Cli, err: Shake.ParseErr) -> IO(Unit):
     case other:
       fail.err(app, other)
 
-# a successful parse: the command named by the path, then its bindings
+# a successful parse: the directories the command writes into made, then the
+# command named by the path, with its bindings
 def go.done(+as: List<&2, String>, +matched: Shake.Matched) -> IO(Unit):
-  dispatch(command(String.join(Shake.path_of(matched), "/")), matched, as)
+  +path = String.join(Shake.path_of(matched), "/")
+  do IO<Unit>:
+    Env.make(Env.dirs(path, Shake.get(matched, "out")))
+    dispatch(command(path), matched, as)
 
 # the parse result
 def go.parsed(
@@ -219,6 +223,5 @@ def go(+app: Shake.Cli, +as: List<&2, String>) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    Env.make()
     as : List<&2, String> <- Args.all()
     go(spec(), as)
