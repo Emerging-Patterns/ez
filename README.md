@@ -128,9 +128,11 @@ unset); the slug of a URL or of
 
 A remote resolves to `git ls-remote <url> HEAD`. A path resolves to a clean
 `HEAD`. A name that matches a `[tools.*]` pin resolves to the rev in
-`ez.lock.toml`. The checkout is reused while `rev` is that commit, and the
-binary is reused while it was built from that commit. A dirty worktree, or a
-path that is not a checkout, has no commit and is built every time.
+`ez.lock.toml`. The checkout is reused while `rev` is that commit. The binary
+is reused while `key` names that commit, the same built file and the same
+`bend version`, so a pin's `bin` or `entry` and a free run of the same commit
+do not share a binary, and a new bend rebuilds it. A dirty worktree, or a path
+that is not a checkout, has no commit and is built every time.
 
 `ez tool install` fetches the lock and builds `<slug>/bin/<name>.out`, then
 links that file onto PATH as `<name>`. Each long step says what it is doing
@@ -242,7 +244,11 @@ an explicit lock path. `bendLib`, when set, is the store path used as
 that tree on its own. Every file comes from a fixed-output derivation keyed
 by the sha256 the lock already records, so the build needs no network and
 `bend` never reaches the hub. `mkProofs` runs `ez prove` over a copy of
-`src`, and this repo's own `proofs` check is that.
+`src`, and this repo's own `proofs` check is that. This repo's `fresh` check
+(`mkFresh`) is a clone with no network: `sh bootstrap.sh` over that tree
+fetches nothing, the build above builds, and `ez lock` with `ez.lock.toml`
+deleted writes it back byte for byte. CI also follows the install steps
+above without nix and runs `ez prove`.
 
 `ez prove` is the gate. It runs `bend` on every PROOF.bend in the tree, all at
 once, and passes a proof only when the first line bend prints is exactly

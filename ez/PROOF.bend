@@ -10,6 +10,7 @@ import ./drift.bend as D
 import ./gate.bend as G
 import ./pin.bend as Pin
 import ./target.bend as Tgt
+import ./key.bend as K
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
@@ -1163,6 +1164,102 @@ def Laws.out_name_empty():
 
 def Laws.out_name():
   {==}
+
+# key: the hypothesis rewrites one comparison to False, and what is left is an
+# `and` ending in False behind the comparisons it did not name. Those are
+# open, so the lemmas below take them apart one bit at a time.
+
+# LAW: an `and` whose last half is False is False
+law and_false1:
+  for x: Bool
+  {Bool.and(x, False{}) == False{} : Bool}
+
+def and_false1(x):
+  match x:
+    case False{}:
+      {==}
+    case True{}:
+      {==}
+
+# LAW: and so is one with two open bits before the False
+law and_false2:
+  for x: Bool
+  for y: Bool
+  {Bool.and(x, Bool.and(y, False{})) == False{} : Bool}
+
+def and_false2(x, y):
+  match x:
+    case False{}:
+      {==}
+    case True{}:
+      and_false1(y)
+
+# LAW: and one with three
+law and_false3:
+  for x: Bool
+  for y: Bool
+  for z: Bool
+  {Bool.and(x, Bool.and(y, Bool.and(z, False{}))) == False{} : Bool}
+
+def and_false3(x, y, z):
+  match x:
+    case False{}:
+      {==}
+    case True{}:
+      and_false2(y, z)
+
+def Laws.key_rev_differs(_r0, f0, b0, r1, f1, b1, e):
+  %e : {Bool.and(Bool.not(String.is_empty(r1)),
+    Bool.and(_, Bool.and(String.eq(f0, f1), String.eq(b0, b1)))) == False{}
+    : Bool}
+  and_false1(Bool.not(String.is_empty(r1)))
+
+def Laws.key_file_differs(r0, _f0, b0, r1, _f1, b1, e):
+  %e : {Bool.and(Bool.not(String.is_empty(r1)),
+    Bool.and(String.eq(r0, r1), Bool.and(_, String.eq(b0, b1)))) == False{}
+    : Bool}
+  and_false2(Bool.not(String.is_empty(r1)), String.eq(r0, r1))
+
+def Laws.key_bend_differs(r0, f0, _b0, r1, f1, _b1, e):
+  %e : {Bool.and(Bool.not(String.is_empty(r1)),
+    Bool.and(String.eq(r0, r1), Bool.and(String.eq(f0, f1), _))) == False{}
+    : Bool}
+  and_false3(Bool.not(String.is_empty(r1)), String.eq(r0, r1), String.eq(f0, f1))
+
+# the empty commit computes, and the `and` stops at it whatever was recorded
+def Laws.key_no_rev(was, _f, _b):
+  match was:
+    case K.Key{_r0, _f0, _b0}:
+      {==}
+
+# the resolved commit has a first char, so the empty one on record is not
+# equal to it. The empty resolved commit is the arm the premise rules out.
+def Laws.key_none_misses(r, f, b, e):
+  match r:
+    case SNil{}:
+      Eq.bit.absurd(&2, {K.reuse(K.none(), K.Key{"", f, b}) == False{} : Bool},
+        e)
+    case SCon{_h, _t}:
+      {==}
+
+# the commit is not empty, and each field equals itself
+def Laws.key_same_reuses(r, f, b, e):
+  %e : {Bool.and(Bool.not(_),
+    Bool.and(String.eq(r, r), Bool.and(String.eq(f, f), String.eq(b, b))))
+    == True{} : Bool}
+  %Equal.sym(Bool, String.eq(r, r), True{}, Eq.string_eq_self(r)) :
+    {Bool.and(_, Bool.and(String.eq(f, f), String.eq(b, b))) == True{} : Bool}
+  %Equal.sym(Bool, String.eq(f, f), True{}, Eq.string_eq_self(f)) :
+    {Bool.and(_, String.eq(b, b)) == True{} : Bool}
+  Eq.string_eq_self(b)
+
+def Laws.checkout_differs(_was, now, e):
+  %e : {Bool.and(Bool.not(String.is_empty(now)), _) == False{} : Bool}
+  and_false1(Bool.not(String.is_empty(now)))
+
+def Laws.checkout_same(r, e):
+  %e : {Bool.and(Bool.not(_), String.eq(r, r)) == True{} : Bool}
+  Eq.string_eq_self(r)
 
 # `.ez/` is a prefix of anything appended to it, which `starts_append` holds,
 # and that picks the arm that keeps nothing.
