@@ -170,7 +170,7 @@ def clone.run(+work: String, what: String, args: List<&2, String>, go: Unit -> I
 # the checkout's package, walked from its entry the way `ez add` walked it
 def clone.walk(+work: String, +entry: String, +nar: String) -> IO(W.Answer):
   do IO<W.Answer>:
-    +p : K.Pkg <- K.pkg_of(P.join(work, entry))
+    +p : K.Pkg <- K.pkg_in(work, entry)
     +fs : List<&2, K.File> <- IO.pure(List<&2, K.File>, K.pkg.files(p))
     ss : List<&2, String> <- disk.all(K.pkg.root(p), fs)
     _rm : String <- R.exec(["rm", "-rf", work])
