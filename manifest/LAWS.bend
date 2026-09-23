@@ -7,6 +7,7 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./manifest.bend as M
 import ./render.bend as R
 import ./ignore.bend as I
+import ../check/str.bend as Str
 
 # LAW: dropping a dependency drops every entry of that name, so dropping twice
 # is dropping once. `ez remove` on a ledger it already edited is a no-op.
@@ -394,8 +395,8 @@ law readd_keeps_vendor:
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, v}}))) == True{} : Bool}
 
 # LAW: the gitignore allowlist names exactly the hashes of the dependencies
-# the ledger marks `vendor = true`, in the ledger's order, whatever the file
-# said before. `ez add`, `ez remove` and `ez lock --upgrade` write the file
+# the ledger marks `vendor = true`, each once, in the order the ledger first
+# names them, whatever the file said before. `ez add`, `ez remove` and `ez lock --upgrade` write the file
 # `I.sync` makes from these lines, so after any of them the allowlist is the
 # ledger's and no one else's.
 # EZ-VEN-1
@@ -412,3 +413,55 @@ law allowlist_keeps_other_lines:
   for +ds: List<&2, M.Dep>
   for +ls: List<&2, String>
   {I.others(I.lines(ds, ls)) == I.others(ls) : List<&2, String>}
+
+# The text layer. `I.sync` reads `.gitignore` into its lines, derives the
+# allowlist over them with `I.lines`, and writes them back, each ending with a
+# newline; a file whose lines did not change comes back as it was, byte for
+# byte. `I.file.lines` is how a file reads as lines: an empty file has none,
+# and a last line with no newline after it is a line. Every law below takes a
+# ledger whose vendored hashes hold no newline, as a `0x` name never does.
+
+# LAW: after `I.sync`, the allowlist of the file names exactly the vendored
+# hashes, each once, in the order the ledger first names them
+# EZ-VEN-1
+law sync_allowlist_is_the_ledger:
+  for +ds: List<&2, M.Dep>
+  for +text: String
+  for +ev: {Str.clear.all(I.vended(ds), '\n') == True{} : Bool}
+  {I.hashes(I.file.lines(I.sync(ds, text))) == I.vended(ds) : List<&2, String>}
+
+# LAW: and every line of the file that is not ez's is kept, byte for byte and
+# in order
+# EZ-VEN-1
+law sync_keeps_other_lines:
+  for +ds: List<&2, M.Dep>
+  for +text: String
+  for +ev: {Str.clear.all(I.vended(ds), '\n') == True{} : Bool}
+  {I.others(I.file.lines(I.sync(ds, text))) == I.others(I.file.lines(text))
+    : List<&2, String>}
+
+# whether a list of hashes names each hash once. Law vocabulary: ez never
+# calls it.
+def distinct(hs: List<&2, String>) -> Bool:
+  match hs:
+    case []:
+      True{}
+    case +h <> +t:
+      +rest = distinct(t)
+      Bool.and(Bool.not(I.named(t, h)), rest)
+
+# LAW: the allowlist names each vendored hash once. Two dependencies that
+# share a tree share its one line, where the first of them is.
+# EZ-VEN-1
+law vended_once:
+  for ds: List<&2, M.Dep>
+  {distinct(I.vended(ds)) == True{} : Bool}
+
+# LAW: applying `I.sync` twice is applying it once: the file it writes is
+# already in sync, and comes back byte for byte
+# EZ-VEN-1
+law sync_idempotent:
+  for +ds: List<&2, M.Dep>
+  for +text: String
+  for +ev: {Str.clear.all(I.vended(ds), '\n') == True{} : Bool}
+  {I.sync(ds, I.sync(ds, text)) == I.sync(ds, text) : String}

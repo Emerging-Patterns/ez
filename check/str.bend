@@ -667,3 +667,116 @@ law split_join:
 def split_join(p, ps, c, e):
   split_join.go(ps, p, c, Eq.and.left(clear(p, c), clear.all(ps, c), e),
     Eq.and.right(clear(p, c), clear.all(ps, c), e))
+
+# The pieces a split leaves. A reader cuts a file at its newlines and a writer
+# joins the lines back; the pieces hold no newline, and so a line a rewrite
+# builds from them holds none either, which is what lets the file be cut
+# again into the same lines.
+
+# LAW: one char of the split, with which way the comparison went given as a
+# parameter: a cut adds an empty piece, and a char that is not the separator
+# is pushed onto a piece that held none
+law split_clear.arm:
+  for +h: Char
+  for ps: List<&2, String>
+  for +c: Char
+  for b: Bool
+  for eb: {Char.is_eq(h, c) == b : Bool}
+  for ih: {clear.all(ps, c) == True{} : Bool}
+  {clear.all(String.split.fin(h, ps, b), c) == True{} : Bool}
+
+def split_clear.arm(h, ps, c, b, eb, ih):
+  match ps b:
+    case Nil{} True{}:
+      ih
+    case Nil{} False{}:
+      %Equal.sym(Bool, Char.is_eq(h, c), False{}, eb)
+        : {Bool.and(Bool.and(Bool.not(_), True{}), True{}) == True{} : Bool}
+      {==}
+    case y <> ys True{}:
+      ih
+    case y <> ys False{}:
+      %Equal.sym(Bool, Char.is_eq(h, c), False{}, eb)
+        : {Bool.and(Bool.and(Bool.not(_), clear(y, c)), clear.all(ys, c))
+          == True{} : Bool}
+      ih
+
+# LAW: no piece of a split holds the separator it was cut at
+law split_clear:
+  for s: String
+  for +c: Char
+  {clear.all(String.split(s, c), c) == True{} : Bool}
+
+def split_clear(s, c):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      split_clear.arm(h, String.split(t, c), c, Char.is_eq(h, c), {==},
+        split_clear(t, c))
+
+# LAW: an `and` whose first half is the first half of an `and` that answered
+# True is the second half's answer
+law and_true_left:
+  for u: Bool
+  for v: Bool
+  for eu: {u == True{} : Bool}
+  {Bool.and(u, v) == v : Bool}
+
+def and_true_left(u, _v, eu):
+  match u:
+    case True{}:
+      {==}
+    case False{}:
+      Eq.bit.absurd(&2, {Bool.and(False{}, _v) == _v : Bool}, eu)
+
+# LAW: where the brackets fall in two `and`s does not change the answer
+law and_assoc:
+  for u: Bool
+  for v: Bool
+  for w: Bool
+  {Bool.and(u, Bool.and(v, w)) == Bool.and(Bool.and(u, v), w) : Bool}
+
+def and_assoc(u, _v, _w):
+  match u:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# LAW: two strings joined hold no copy of a char exactly when neither does
+law clear_append:
+  for a: String
+  for +b: String
+  for +c: Char
+  {clear(String.append(a, b), c) == Bool.and(clear(a, c), clear(b, c)) : Bool}
+
+def clear_append(a, b, c):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      %Equal.sym(Bool, clear(String.append(t, b), c),
+        Bool.and(clear(t, c), clear(b, c)), clear_append(t, b, c))
+        : {Bool.and(Bool.not(Char.is_eq(h, c)), _)
+          == Bool.and(Bool.and(Bool.not(Char.is_eq(h, c)), clear(t, c)),
+            clear(b, c)) : Bool}
+      and_assoc(Bool.not(Char.is_eq(h, c)), clear(t, c), clear(b, c))
+
+# LAW: what is left of a string with no copy of a char, once its front is
+# dropped, holds none either
+law drop_clear:
+  for s: String
+  for n: Nat
+  for +c: Char
+  for e: {clear(s, c) == True{} : Bool}
+  {clear(String.drop(s, n), c) == True{} : Bool}
+
+def drop_clear(s, n, c, e):
+  match s n:
+    case SNil{} _:
+      {==}
+    case SCon{+h, +t} 0n:
+      e
+    case SCon{+h, +t} 1n+p:
+      drop_clear(t, p, c, Eq.and.right(Bool.not(Char.is_eq(h, c)), clear(t, c), e))

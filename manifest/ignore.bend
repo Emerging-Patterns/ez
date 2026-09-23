@@ -22,8 +22,9 @@
 # every allowlist line inert. That line is replaced, where it stands, by
 # whichever of the three the file does not already have.
 #
-# Where the allowlist goes. The vendored hashes are written as one block, in
-# the ledger's order, where the file's first allowlist line was. A file with
+# Where the allowlist goes. The vendored hashes are written as one block, each
+# once, in the order the ledger first names them, where the file's first
+# allowlist line was. A file with
 # none gets the block at its end, which is where the upgrade has always
 # appended one, preceded by whichever of the three rules the file lacks.
 import Base
@@ -171,55 +172,76 @@ def others(ls: List<&2, String>) -> List<&2, String>:
     case +h <> t:
       others.put(kind(h), h, others(t))
 
-# a hash joins the allowlist only when there is one. `M.parse` refuses a
-# dependency with no hash, so this only guards a model built by hand.
-def vended.hash(empty: Bool, +hash: String, rest: List<&2, String>) -> List<&2, String>:
-  match empty:
+# a dependency's hash, in front of the rest, when its tree is committed
+def vendors.put(vend: Bool, +hash: String, rest: List<&2, String>) -> List<&2, String>:
+  match vend:
+    case True{}:
+      hash <> rest
+    case False{}:
+      rest
+
+# the hash of every dependency marked `vendor = true`, in the order the ledger
+# wrote them. Two dependencies may name one hash.
+def vendors(ds: List<&2, M.Dep>) -> List<&2, String>:
+  match ds:
+    case []:
+      []
+    case +h <> t:
+      vendors.put(M.source.vendor(M.source.dep(h)), M.dep.hash(h), vendors(t))
+
+# whether a list of hashes already names a hash
+def named(hs: List<&2, String>, +hash: String) -> Bool:
+  match hs:
+    case []:
+      False{}
+    case h <> t:
+      +rest = named(t, hash)
+      Bool.or(String.eq(h, hash), rest)
+
+# a hash in front of the rest, unless it is passed over
+def once.put(skip: Bool, +hash: String, rest: List<&2, String>) -> List<&2, String>:
+  match skip:
     case True{}:
       rest
     case False{}:
       hash <> rest
 
-# a dependency joins the allowlist only when its tree is committed
-def vended.put(vend: Bool, +hash: String, rest: List<&2, String>) -> List<&2, String>:
-  match vend:
+# the hashes seen so far, with this one when it was kept
+def once.seen(skip: Bool, +hash: String, +seen: List<&2, String>) -> List<&2, String>:
+  match skip:
     case True{}:
-      vended.hash(String.is_empty(hash), hash, rest)
+      seen
     case False{}:
-      rest
+      hash <> seen
 
-# the hashes the allowlist must name: every dependency marked `vendor = true`,
-# in the order the ledger wrote them
-def vended(ds: List<&2, M.Dep>) -> List<&2, String>:
-  match ds:
+# each hash once, where it first appears, passing over any `seen` already
+# holds. An empty hash names no tree; `M.parse` refuses a dependency with
+# none, so that only guards a model built by hand.
+def once.go(hs: List<&2, String>, +seen: List<&2, String>) -> List<&2, String>:
+  match hs:
     case []:
       []
     case +h <> t:
-      vended.put(M.source.vendor(M.source.dep(h)), M.dep.hash(h), vended(t))
+      +skip = Bool.or(String.is_empty(h), named(seen, h))
+      once.put(skip, h, once.go(t, once.seen(skip, h, seen)))
 
-# the same walk as `vended`, writing each hash's line
-def allows.hash(empty: Bool, +hash: String, rest: List<&2, String>) -> List<&2, String>:
-  match empty:
-    case True{}:
-      rest
-    case False{}:
-      allow(hash) <> rest
+# the hashes the allowlist must name: every dependency marked `vendor = true`,
+# each hash once, in the order the ledger first names it. Two dependencies
+# that share a tree share its one line.
+def vended(ds: List<&2, M.Dep>) -> List<&2, String>:
+  once.go(vendors(ds), [])
 
-# a dependency's line, when its tree is committed
-def allows.put(vend: Bool, +hash: String, rest: List<&2, String>) -> List<&2, String>:
-  match vend:
-    case True{}:
-      allows.hash(String.is_empty(hash), hash, rest)
-    case False{}:
-      rest
+# one allowlist line per hash
+def allow.each(hs: List<&2, String>) -> List<&2, String>:
+  match hs:
+    case []:
+      []
+    case +h <> t:
+      allow(h) <> allow.each(t)
 
 # the allowlist lines of a ledger, in its order
 def allows(ds: List<&2, M.Dep>) -> List<&2, String>:
-  match ds:
-    case []:
-      []
-    case +h <> t:
-      allows.put(M.source.vendor(M.source.dep(h)), M.dep.hash(h), allows(t))
+  allow.each(vended(ds))
 
 # whether two kinds are the same rule. Two allowlist lines are never asked.
 def same(left: Rule, right: Rule) -> Bool:
