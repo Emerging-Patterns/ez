@@ -11,6 +11,10 @@ import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/LAWS.bend as KL
+import ../manifest/upgrade.bend as U
+import ../manifest/ignore.bend as I
+import ../manifest/LAWS.bend as ML
+import ../check/str.bend as Str
 
 # LAW: a package resolves to the origin recorded for it, whatever origins
 # follow. A second record of the same hash never shadows the first, so the
@@ -592,3 +596,205 @@ law trim_quoted:
 law strip_quoted:
   for +v: String
   {T.strip(T.quote(v), '"', '"') == v : String}
+
+# What an upgrade writes around the ledger (EZ-VEN-1's `ez lock --upgrade`
+# half, EZ-VEN-2, EZ-VEN-3). The upgrade writes `.gitignore` as `I.sync`
+# makes it from the file it read over the dependencies it leaves, and each
+# source it read with every moved hash rewritten (`U.reimport.many`), when
+# that changes it. The laws below say so of the plan, `P.put`, and the laws
+# of `manifest/LAWS.bend` say what `I.sync` and `U.reimport.many` do to a
+# text. A source is one the interpreter listed, a `.bend` file outside `.ez`
+# and `.git`; the laws take the ones the upgrade read, and a path the World
+# names once, as the interpreter lists each file once.
+
+# what the upgrade decides on a World. Law vocabulary: ez never calls it.
+def up.next(world: W.World) -> Up.Next:
+  W.World{args, +ledger, _listing, _replies, ups} = world
+  W.next(args, ledger, ups)
+
+# the hashes whose trees the upgrade commits under `.ez/lib`: the vendored
+# hashes of the dependencies it leaves
+def vends(world: W.World) -> List<&2, String>:
+  Up.next.vends(up.next(world))
+
+# the hashes it moved, each with the hash that replaces it in an import
+def swaps(world: W.World) -> List<&2, U.Swap>:
+  Up.next.swaps(up.next(world))
+
+# the sources it read
+def found(world: W.World) -> List<&2, Up.Found>:
+  Up.next.found(up.next(world))
+
+# a file's text as the World answered it, "" when it did not
+def ignore.said(said: Up.Said) -> String:
+  match said:
+    case Up.Said{text}:
+      text
+    case Up.Unsaid{_why}:
+      ""
+    case Up.Unasked{_ask}:
+      ""
+
+# `.gitignore` as the World answered the upgrade
+def ignore.read(world: W.World) -> String:
+  W.World{_args, _ledger, _listing, _replies, ups} = world
+  ignore.said(Up.text.said(ups, Up.Ignore{}))
+
+# whether no source of a list is at a path
+def found.miss(fs: List<&2, Up.Found>, +path: String) -> Bool:
+  match fs:
+    case []:
+      True{}
+    case Up.Found{at, _text} <> t:
+      +rest = found.miss(t, path)
+      Bool.and(Bool.not(String.eq(at, path)), rest)
+
+# the dependencies of a ledger model, none when it did not parse
+def ledger.deps(read: M.Read) -> List<&2, M.Dep>:
+  match read:
+    case M.Bad{_why}:
+      []
+    case M.Good{m}:
+      M.Manifest{_n, _e, _b, _h, ds, _ts} = m
+      ds
+
+# what a path holds after a plan: what the plan wrote there, or what it held
+def left.at(wrote: P.Wrote, +before: String) -> String:
+  match wrote:
+    case P.Kept{}:
+      before
+    case P.Put{text}:
+      text
+
+# LAW: when `ez lock --upgrade` writes `.gitignore`, its allowlist names
+# exactly the hashes whose trees the upgrade commits, the vendored hashes of
+# the dependencies it leaves, each once. No source the upgrade read is at
+# `.gitignore`, and no vendored hash holds a newline.
+# EZ-VEN-1
+law upgrade_allowlist_is_the_ledger:
+  for +w: W.World
+  for +text: String
+  for put: {P.put(w, ".gitignore") == P.Put{text} : P.Wrote}
+  for +miss: {found.miss(found(w), ".gitignore") == True{} : Bool}
+  for +ev: {Str.clear.all(vends(w), '\n') == True{} : Bool}
+  {I.hashes(I.file.lines(text)) == vends(w) : List<&2, String>}
+
+# LAW: and keeps every line of the `.gitignore` it read that is not ez's,
+# byte for byte and in order
+# EZ-VEN-1
+law upgrade_allowlist_keeps_other_lines:
+  for +w: W.World
+  for +text: String
+  for put: {P.put(w, ".gitignore") == P.Put{text} : P.Wrote}
+  for +miss: {found.miss(found(w), ".gitignore") == True{} : Bool}
+  for +ev: {Str.clear.all(vends(w), '\n') == True{} : Bool}
+  {I.others(I.file.lines(text)) == I.others(I.file.lines(ignore.read(w)))
+    : List<&2, String>}
+
+# LAW: and when it writes ez.toml, the hashes it commits are the vendored
+# hashes of the ledger model it renders there, `P.ledger.next`, so the
+# allowlist is that ledger's relative to EZ-LED-4
+# EZ-VEN-1
+law upgrade_vends_the_ledger:
+  for +w: W.World
+  for +text: String
+  for put: {P.put(w, "ez.toml") == P.Put{text} : P.Wrote}
+  for +miss: {found.miss(found(w), "ez.toml") == True{} : Bool}
+  {vends(w) == I.vended(ledger.deps(P.ledger.next(w))) : List<&2, String>}
+
+# LAW: a `.bend` source the upgrade read, once, holds afterwards its text
+# with every moved hash rewritten, when `ez lock --upgrade` does not refuse.
+# The laws of `manifest/LAWS.bend` say what that rewriting does to the text.
+law upgrade_rewrites_sources:
+  for +w: W.World
+  for +at: String
+  for +text: String
+  for +pre: List<&2, Up.Found>
+  for +post: List<&2, Up.Found>
+  for fs: {found(w) == List.append(&2, Up.Found, pre, Up.Found{at, text} <> post)
+    : List<&2, Up.Found>}
+  for +mp: {found.miss(pre, at) == True{} : Bool}
+  for +mq: {found.miss(post, at) == True{} : Bool}
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  for ok: {P.refuses(w) == False{} : Bool}
+  {left.at(P.put(w, at), text) == U.reimport.many(swaps(w), text) : String}
+
+# LAW: so when an upgrade moves a hash, every line of such a source that
+# starts `import <old>/` starts `import <new>/` afterwards, for the moves an
+# upgrade makes (`ML.moves.ok`)
+# EZ-VEN-2
+law upgrade_rewrites_imports:
+  for +w: W.World
+  for +at: String
+  for +text: String
+  for +pre: List<&2, Up.Found>
+  for +post: List<&2, Up.Found>
+  for fs: {found(w) == List.append(&2, Up.Found, pre, Up.Found{at, text} <> post)
+    : List<&2, Up.Found>}
+  for +mp: {found.miss(pre, at) == True{} : Bool}
+  for +mq: {found.miss(post, at) == True{} : Bool}
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  for ok: {P.refuses(w) == False{} : Bool}
+  for +i: Nat
+  for +old: String
+  for +new: String
+  for +mv: {ML.moves.ok(swaps(w)) == True{} : Bool}
+  for +to: {ML.moved.to(swaps(w), old) == Some{new} : Maybe<&2, String>}
+  for hit: {String.starts_with(ML.line.at(String.lines(text), i), U.reimport.head(old))
+    == True{} : Bool}
+  {String.starts_with(ML.line.at(String.lines(left.at(P.put(w, at), text)), i),
+    U.reimport.head(new)) == True{} : Bool}
+
+# LAW: and every other line of it is left byte for byte as it was
+# EZ-VEN-3
+law upgrade_leaves_other_lines:
+  for +w: W.World
+  for +at: String
+  for +text: String
+  for +pre: List<&2, Up.Found>
+  for +post: List<&2, Up.Found>
+  for fs: {found(w) == List.append(&2, Up.Found, pre, Up.Found{at, text} <> post)
+    : List<&2, Up.Found>}
+  for +mp: {found.miss(pre, at) == True{} : Bool}
+  for +mq: {found.miss(post, at) == True{} : Bool}
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  for ok: {P.refuses(w) == False{} : Bool}
+  for +i: Nat
+  for +mv: {ML.moves.ok(swaps(w)) == True{} : Bool}
+  for miss: {ML.names.none(swaps(w), ML.line.at(String.lines(text), i)) == True{} : Bool}
+  {ML.line.at(String.lines(left.at(P.put(w, at), text)), i)
+    == ML.line.at(String.lines(text), i) : String}
+
+# LAW: and no line is added or dropped
+# EZ-VEN-3
+law upgrade_keeps_line_count:
+  for +w: W.World
+  for +at: String
+  for +text: String
+  for +pre: List<&2, Up.Found>
+  for +post: List<&2, Up.Found>
+  for fs: {found(w) == List.append(&2, Up.Found, pre, Up.Found{at, text} <> post)
+    : List<&2, Up.Found>}
+  for +mp: {found.miss(pre, at) == True{} : Bool}
+  for +mq: {found.miss(post, at) == True{} : Bool}
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  for ok: {P.refuses(w) == False{} : Bool}
+  for +mv: {ML.moves.ok(swaps(w)) == True{} : Bool}
+  {List.length(&2, String, String.lines(left.at(P.put(w, at), text)))
+    == List.length(&2, String, String.lines(text)) : Nat}
+
+# LAW: and a source none of whose lines names a moved hash is not written
+# EZ-VEN-3
+law upgrade_writes_only_hits:
+  for +w: W.World
+  for +at: String
+  for +text: String
+  for +pre: List<&2, Up.Found>
+  for +post: List<&2, Up.Found>
+  for fs: {found(w) == List.append(&2, Up.Found, pre, Up.Found{at, text} <> post)
+    : List<&2, Up.Found>}
+  for +mp: {found.miss(pre, at) == True{} : Bool}
+  for +mq: {found.miss(post, at) == True{} : Bool}
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  for none: {ML.names.none.all(swaps(w), String.lines(text)) == True{} : Bool}
+  {P.put(w, at) == P.Kept{} : P.Wrote}
