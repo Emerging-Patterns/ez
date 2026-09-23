@@ -9,7 +9,6 @@ import Base
 import ./world.bend as F
 import ./plan.bend as FP
 import ../lock/plan.bend as P
-import ../add/plan.bend as AP
 
 # LAW: `ez fetch` that refuses writes, lays and removes nothing: no tree
 # under BEND_LIB, not even one of a package that checked before the one that
@@ -69,7 +68,7 @@ law fetch_lays_the_lock:
 # EZ-HASH-3
 law fetch_lays_named:
   for +w: F.World
-  {AP.lays.named(FP.effects(FP.plan(w))) == True{} : Bool}
+  {P.lays.named(FP.effects(FP.plan(w))) == True{} : Bool}
 
 # LAW: every checkout `ez fetch` asks for is asked of the source the lock
 # records for that package, anchored at the project: a URL and an absolute

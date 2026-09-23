@@ -28,6 +28,7 @@ import ./up.bend as Up
 import ./lock.bend as L
 import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
+import ../pkg/path.bend as Path
 import ../ez/pin.bend as Pin
 
 # ---------------------------------------------------------------------------
@@ -474,10 +475,17 @@ type Outcome is Data:
 type Plan is Data:
   Plan{effects: List<&2, Effect>, outcome: Outcome}
 
+# one of the upgrade's questions, as the upgrade looks its answer up (`ask`,
+# with the source the ledger records) and as git is asked it (`git`, with
+# that source anchored at the directory the lock runs in, `Up.anchor`). The
+# interpreter answers `git` and records the answer under `ask`.
+type Query is Data:
+  Query{ask: Up.Ask, git: Up.Ask}
+
 # the questions still open, the lock's and the upgrade's, or the plan once
 # there are none
 type Step is Data:
-  Asking{asks: List<&2, W.Ask>, ups: List<&2, Up.Ask>}
+  Asking{asks: List<&2, W.Ask>, ups: List<&2, Query>}
   Run{plan: Plan}
 
 # what a plan leaves at one path: nothing written, or this text
@@ -515,18 +523,6 @@ def cloned(rs: List<&2, W.Reply>) -> List<&2, String>:
     case W.Reply{ask, answer} <> t:
       List.append(&2, String, cloned.one(W.ask.hash(ask), answer), cloned(t))
 
-# each file with its text, as it is laid
-def laid(fs: List<&2, K.File>, ss: List<&2, String>) -> List<&2, W.Source>:
-  match fs ss:
-    case Nil{} Nil{}:
-      []
-    case Nil{} Con{_s, _t}:
-      []
-    case Con{_f, _g} Nil{}:
-      []
-    case Con{f, g} Con{s, t}:
-      W.Source{K.file.at(f), s} <> laid(g, t)
-
 # where a tree is laid: under `.ez/lib`, committed, when the ledger the lock
 # is made from vendors its hash, and under BEND_LIB otherwise
 def place.of(vend: Bool) -> Place:
@@ -536,14 +532,17 @@ def place.of(vend: Bool) -> Place:
     case False{}:
       Cache{}
 
-# a checked tree laid, ahead of what follows
+# a checked tree laid, ahead of what follows: its files with their texts,
+# then the manifest of those texts, which is the manifest whose name the
+# verdict checked (`W.body.laid`)
 def lay.verdict(verdict: W.Verdict, place: Place, +hash: String, rest: List<&2, Effect>) -> List<&2, Effect>:
   match verdict:
     case W.No{_why}:
       rest
-    case W.Ok{+fs, ss}:
-      Lay{place, hash, List.append(&2, W.Source, laid(fs, ss),
-        [W.Source{"manifest", K.manifest_of(fs)}])} <> rest
+    case W.Ok{fs, ss}:
+      +ls = W.laid(fs, ss)
+      Lay{place, hash, List.append(&2, W.Source, ls,
+        [W.Source{"manifest", W.manifest(ls)}])} <> rest
 
 def lay.pick(hit: Bool, verdict: W.Verdict, place: Place, +hash: String, rest: List<&2, Effect>) -> List<&2, Effect>:
   match hit:
@@ -716,6 +715,68 @@ def writes(pl: Plan) -> Bool:
   writes.in(es)
 
 # ---------------------------------------------------------------------------
+# the trees a plan lays, named (EZ-HASH-3). Law vocabulary for `ez lock`,
+# `ez add` and `ez fetch`, which lay trees through the same effect.
+
+# every file of a tree but the last, which a `Lay` writes as the manifest
+def front(fs: List<&2, W.Source>) -> List<&2, W.Source>:
+  match fs:
+    case []:
+      []
+    case h <> t:
+      match t:
+        case []:
+          []
+        case h2 <> t2:
+          h <> front(h2 <> t2)
+
+# a file's text
+def text.of(src: W.Source) -> String:
+  W.Source{_at, text} = src
+  text
+
+# the last file's text, "" for no file
+def last(fs: List<&2, W.Source>) -> String:
+  match fs:
+    case []:
+      ""
+    case h <> t:
+      match t:
+        case []:
+          text.of(h)
+        case h2 <> t2:
+          last(h2 <> t2)
+
+# whether a laid tree is named by the manifest of the texts it lays: its
+# last file is the manifest of the others, each weighed by its own text,
+# and its hash is the `0x` name of that manifest
+def lay.named(+hash: String, +fs: List<&2, W.Source>) -> Bool:
+  +sums = K.files_of(W.weighs(front(fs)))
+  Bool.and(String.eq(hash, K.hash_of(sums)), String.eq(last(fs), K.manifest_of(sums)))
+
+# whether an effect that lays a tree lays a named one
+def lays.one(effect: Effect) -> Bool:
+  match effect:
+    case Lay{_place, hash, fs}:
+      lay.named(hash, fs)
+    case _:
+      True{}
+
+# whether every tree a list of effects lays is named by its manifest
+def lays.named(es: List<&2, Effect>) -> Bool:
+  match es:
+    case []:
+      True{}
+    case h <> t:
+      +rest = lays.named(t)
+      Bool.and(lays.one(h), rest)
+
+# the effects of a plan
+def effects(pl: Plan) -> List<&2, Effect>:
+  Plan{es, _outcome} = pl
+  es
+
+# ---------------------------------------------------------------------------
 # what is still to ask
 
 # an answer as far as `wants` needs it: the texts it may import from, taken
@@ -735,56 +796,74 @@ def scan(rs: List<&2, W.Reply>) -> List<&2, W.Judged>:
     case W.Reply{ask, answer} <> t:
       W.Judged{W.ask.hash(ask), scan.one(answer)} <> scan(t)
 
-# each hash still to ask about, as the question for it
-def asks.of(hs: List<&2, String>, +orgs: List<&2, L.Origin>, +hub: String) -> List<&2, W.Ask>:
+# a package's source as git is to read it: a path anchored at the directory
+# the lock runs in (`Path.anchor`), and a URL or an absolute path as it is. A
+# hub package names no source. The lock records the source as the ledger
+# gives it; only the question carries this.
+def anchor.src(+here: String, src: L.Src) -> L.Src:
+  match src:
+    case L.Hub{}:
+      L.Hub{}
+    case L.Git{url, rev, entry, root, nar, tag}:
+      L.Git{Path.anchor(here, url), rev, entry, root, nar, tag}
+
+# each hash still to ask about, as the question for it, with its source
+# anchored
+def asks.of(hs: List<&2, String>, +here: String, +orgs: List<&2, L.Origin>, +hub: String) -> List<&2, W.Ask>:
   match hs:
     case []:
       []
     case +h <> t:
-      W.Pkg{h, L.origin(orgs, h), hub} <> asks.of(t, orgs, hub)
+      W.Pkg{h, anchor.src(here, L.origin(orgs, h)), hub} <> asks.of(t, here, orgs, hub)
 
 # nothing more is asked once the lock is known to refuse
-def wants.bad(clean: Bool, hs: List<&2, String>, +orgs: List<&2, L.Origin>, +hub: String) -> List<&2, W.Ask>:
+def wants.bad(
+  clean: Bool,
+  hs: List<&2, String>,
+  +here: String,
+  +orgs: List<&2, L.Origin>,
+  +hub: String
+) -> List<&2, W.Ask>:
   match clean:
     case True{}:
-      asks.of(List.reverse(&2, String, hs), orgs, hub)
+      asks.of(List.reverse(&2, String, hs), here, orgs, hub)
     case False{}:
       []
 
-def wants.walk(wk: Walk, +orgs: List<&2, L.Origin>, +hub: String) -> List<&2, W.Ask>:
+def wants.walk(wk: Walk, +here: String, +orgs: List<&2, L.Origin>, +hub: String) -> List<&2, W.Ask>:
   Walk{_queue, _packs, hs, +bad} = wk
-  wants.bad(String.is_empty(bad), hs, orgs, hub)
+  wants.bad(String.is_empty(bad), hs, here, orgs, hub)
 
-def wants.gap(clean: Bool, wk: Walk, +orgs: List<&2, L.Origin>, +hub: String) -> List<&2, W.Ask>:
+def wants.gap(clean: Bool, wk: Walk, +here: String, +orgs: List<&2, L.Origin>, +hub: String) -> List<&2, W.Ask>:
   match clean:
     case True{}:
-      wants.walk(wk, orgs, hub)
+      wants.walk(wk, here, orgs, hub)
     case False{}:
       []
 
-def wants.led(+led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> List<&2, W.Ask>:
-  wants.gap(String.is_empty(need.why(led)), walk.of(led, listing, js),
+def wants.led(+here: String, +led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> List<&2, W.Ask>:
+  wants.gap(String.is_empty(need.why(led)), walk.of(led, listing, js), here,
     L.ledger.read(led), M.hub_of(led))
 
 # nothing is asked about packages while the upgrade refuses or still asks
-def wants.stop(clean: Bool, +led: M.Read, listing: W.Listing, js: List<&2, W.Judged>) -> List<&2, W.Ask>:
+def wants.stop(clean: Bool, +here: String, +led: M.Read, listing: W.Listing, js: List<&2, W.Judged>) -> List<&2, W.Ask>:
   match clean:
     case True{}:
-      wants.led(led, listing, js)
+      wants.led(here, led, listing, js)
     case False{}:
       []
 
 # the package questions still open once the upgrade decided
-def wants.of(+nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> List<&2, W.Ask>:
-  wants.stop(String.is_empty(Up.next.stop(nx)), Up.next.read(nx),
+def wants.of(+here: String, +nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> List<&2, W.Ask>:
+  wants.stop(String.is_empty(Up.next.stop(nx)), here, Up.next.read(nx),
     W.listing.of(nx, listing), scan(W.replies.of(nx, replies)))
 
 # the package questions a World still leaves open: every package the walk
 # reaches that nothing has answered for yet. None once the lock is known to
 # refuse, and none while the upgrade still asks.
 def wants(world: W.World) -> List<&2, W.Ask>:
-  W.World{args, +ledger, listing, replies, ups} = world
-  wants.of(W.next(args, ledger, ups), listing, replies)
+  W.World{+args, +ledger, listing, replies, ups} = world
+  wants.of(W.here.of(args), W.next(args, ledger, ups), listing, replies)
 
 # the upgrade's questions a World still leaves open; none for a plain lock
 def wants.up(world: W.World) -> List<&2, Up.Ask>:
@@ -794,6 +873,14 @@ def wants.up(world: W.World) -> List<&2, Up.Ask>:
 # whether the upgrade has every answer it needs
 def answered(world: W.World) -> Bool:
   List.is_empty(&2, Up.Ask, wants.up(world))
+
+# each of the upgrade's questions, with the question git is asked for it
+def queries(+here: String, as: List<&2, Up.Ask>) -> List<&2, Query>:
+  match as:
+    case []:
+      []
+    case +h <> t:
+      Query{h, Up.anchor(here, h)} <> queries(here, t)
 
 # the package questions still open, or the plan once there are none
 def step.pkgs(asks: List<&2, W.Ask>, +nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> Step:
@@ -805,16 +892,22 @@ def step.pkgs(asks: List<&2, W.Ask>, +nx: Up.Next, listing: W.Listing, replies: 
 
 # the upgrade's questions first, since the packages the lock reads depend on
 # where the pins move
-def step.ups(ups: List<&2, Up.Ask>, +nx: Up.Next, +listing: W.Listing, +replies: List<&2, W.Reply>) -> Step:
+def step.ups(
+  ups: List<&2, Up.Ask>,
+  +here: String,
+  +nx: Up.Next,
+  +listing: W.Listing,
+  +replies: List<&2, W.Reply>
+) -> Step:
   match ups:
     case []:
-      step.pkgs(wants.of(nx, listing, replies), nx, listing, replies)
+      step.pkgs(wants.of(here, nx, listing, replies), nx, listing, replies)
     case h <> t:
-      Asking{[], h <> t}
+      Asking{[], queries(here, h <> t)}
 
 # what the interpreter does next on a World. The upgrade is decided once per
 # round, and every answer of the round is read from that one decision.
 def step(world: W.World) -> Step:
-  W.World{args, +ledger, +listing, +replies, ups} = world
+  W.World{+args, +ledger, +listing, +replies, ups} = world
   +nx = W.next(args, ledger, ups)
-  step.ups(Up.next.asks(nx), nx, listing, replies)
+  step.ups(Up.next.asks(nx), W.here.of(args), nx, listing, replies)

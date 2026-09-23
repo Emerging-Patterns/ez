@@ -7,7 +7,6 @@ import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ../lock/run.bend as Run
 import ../lock/world.bend as W
-import ../pub/pub.bend as Pub
 import ../ez/env.bend as Env
 import ../ez/cap.bend as Cap
 import ../ez/args.bend as Args
@@ -15,6 +14,7 @@ import ../init/run.bend as InitRun
 import ../remove/run.bend as RemoveRun
 import ../add/run.bend as AddRun
 import ../fetch/run.bend as FetchRun
+import ../pub/run.bend as PubRun
 
 # the ledger's path, which is fixed
 def toml() -> String:
@@ -162,18 +162,12 @@ def run(as: List<&2, String>) -> IO(Unit):
     +out : String <- Env.exec(Args.run.line(entry(r), as))
     report(out)
 
-# `ez publish`: the entry the ledger names, sent to the hub the way `ez build`
-# and `ez check` build and check that same entry. The `0x` name reported is the
-# one `pkg/pkg.bend` computed from the file set; what `bend --publish` printed
-# is only checked against it. `pub/pub.bend` holds the whole of it, laws and
-# all, and is handed the project's BEND_LIB the way `git/git.bend` is handed it
-# for a vendoring.
+# `ez publish`, planned by pub/plan.bend: the entry the ledger names, sent to
+# the hub once the tree is clean and git tracks every file of the package,
+# and bend's answer checked against the `0x` name ez computed. A ledger that
+# is missing or does not parse is refused, and nothing is sent.
 def publish() -> IO(Unit):
-  do IO<Unit>:
-    r : M.Read <- load()
-    +at : String <- IO.pure(String, entry(r))
-    lib : String <- Env.lib()
-    Pub.publish(lib, at)
+  PubRun.run()
 
 # `ez lock`, plain or `--upgrade`, is the planner's
 # (lock/plan.bend, lock/up.bend): a plain lock copies every pin as the ledger
@@ -185,7 +179,7 @@ def publish() -> IO(Unit):
 def lock.go(ok: Bool, up: Bool, +name: String) -> IO(Unit):
   match ok:
     case True{}:
-      Run.run(W.Args{up, name})
+      Run.run(up, name)
     case False{}:
       IO.die(Unit, 1, "ez: --package needs --upgrade")
 
