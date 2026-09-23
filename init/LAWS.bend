@@ -1,0 +1,27 @@
+# init: the laws. The human states them; PROOF.bend must prove them. They
+# are stated over the plan `ez init` runs (init/plan.bend), so what they say
+# of the plan is what the command does, the interpreter's faithfulness being
+# EZ-TRUST-2.
+import Base
+import ./plan.bend as IP
+import ../lock/plan.bend as P
+
+# LAW: `ez init` that refuses writes nothing: not ez.toml, not `.gitignore`,
+# and no entry. Its plan has no effect at all; the reason is how it ends.
+# EZ-OUT-2
+law init_refusal_writes_nothing:
+  for +w: IP.World
+  for r: {IP.refuses(w) == True{} : Bool}
+  {P.writes(IP.plan(w)) == False{} : Bool}
+
+# LAW: a ledger already on disk, whatever it holds, leaves `ez init` nothing
+# to write, whatever it was asked for and whatever else is there, so the
+# ledger's dependencies, tools and `bin` survive a second `ez init`
+# EZ-LED-6
+law init_keeps_ledger:
+  for name: String
+  for entry: String
+  for s: String
+  for ignore: Maybe<&2, String>
+  for main: Maybe<&2, String>
+  {P.writes(IP.plan(IP.World{name, entry, Some{s}, ignore, main})) == False{} : Bool}

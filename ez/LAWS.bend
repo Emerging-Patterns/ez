@@ -350,17 +350,6 @@ law ledger_present_parsed:
   for cmd: String
   {Cmd.ledger.of(Some{s}, cmd) == M.parse(s) : M.Read}
 
-# cmd: `ez init` starts a project and never writes over one
-
-# LAW: a ledger already on disk, whatever it holds, leaves `ez init` nothing to
-# write, so its dependencies, tools and `bin` survive a second `ez init`
-# EZ-LED-6
-law init_keeps_ledger:
-  for s: String
-  for name: String
-  for at: String
-  {Cmd.init.plan(Some{s}, name, at) == None{} : Maybe<&2, String>}
-
 # named: what `ez add` records a dependency under. Its source names it, never
 # its entry file; the ledger keeps the name it already gave that source, and
 # refuses to hand a name it gave one source to another.

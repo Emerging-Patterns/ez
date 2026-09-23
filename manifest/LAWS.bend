@@ -165,6 +165,7 @@ law build_is_good:
 
 # LAW: and a document with any problem at all is never read into a ledger. It
 # comes back as the problem, so no command can go on with a half-read file.
+# EZ-LED-1
 law read_refuses_a_problem:
   for +bad: String
   for +ss: List<&2, T.Sect>
@@ -317,12 +318,14 @@ law show_opens_with_package:
 # LAW: a ledger that did not read renders as nothing. `ez add` and `ez remove`
 # write what they render, so a failed read that rendered a guess would
 # overwrite a good file with it.
+# EZ-LED-1
 law render_of_unread_is_blank:
   for why: String
   {R.render(M.Bad{why}) == "" : String}
 
 # LAW: removing a dependency twice is removing it once, which is what makes
 # `ez remove` safe to run on a ledger it already edited.
+# EZ-LED-3
 law remove_idem:
   for m: M.Manifest
   for +name: String
