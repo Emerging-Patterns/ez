@@ -366,8 +366,9 @@ law source_of_vendor:
 # LAW: the vendor bit ez renders reads back as the bit it rendered. The key is
 # written bare, `vendor = true`, which TOML reads as a boolean and ez reads as
 # the same bit it reads from the quoted spelling an older ez wrote; a bit that
-# is not set leaves no key, which reads as not set.
-# EZ-LED-4
+# is not set leaves no key, which reads as not set. EZ-LED-4 needs the round
+# trip for every ledger; this is stated for one fixed ledger around the
+# dependency, so it checks the spelling and carries no requirement.
 law vendor_reads_back:
   for v: Bool
   {M.source.vendor(M.source.dep(M.dep(M.parse(R.show(M.Manifest{"app", "", "",
