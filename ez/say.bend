@@ -54,10 +54,6 @@ def dep.git(+name: String, +url: String) -> String:
 def dep.hub(+name: String) -> String:
   "dep " ++ name ++ ": hub fetch"
 
-# a checkout or a pin that did not move
-def kept(+name: String) -> String:
-  name ++ ": unchanged"
-
 # a binary already built for this commit
 def reused(+name: String) -> String:
   name ++ ": cached"
@@ -68,10 +64,6 @@ def resolving() -> String:
 
 def resolving.at(+name: String) -> String:
   "resolving " ++ name
-
-# one package being fetched at a commit
-def fetching(+label: String, +rev: String) -> String:
-  "fetching " ++ label ++ "@" ++ brief(rev)
 
 def git.fetch(+url: String) -> String:
   "git fetch (" ++ url ++ ")"

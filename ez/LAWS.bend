@@ -12,7 +12,7 @@ import ../ez/target.bend as Tgt
 import ./key.bend as K
 import ../manifest/manifest.bend as M
 import ../ez/pin.bend as Pin
-import ./env.bend as Env
+import ../ez/env.bend as Env
 import ./doctor.bend as Doctor
 import ../pkg/path.bend as P
 import ../ez/named.bend as Named

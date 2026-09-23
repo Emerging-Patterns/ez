@@ -256,9 +256,14 @@ def body(ps: List<&2, String>) -> String:
 def drop.slashes(+text: String) -> String:
   Bool.pick(String, String.starts_with(text, "//"), String.drop(text, 2n), text)
 
+# a URL with no host, `file:///srv/repo`, is on this host, and is cached
+# where `file://localhost/srv/repo` is, rather than at an absolute slug
+def hostless(+text: String) -> String:
+  Bool.pick(String, String.starts_with(text, "/"), "localhost" ++ text, text)
+
 # `scheme://host/path` as a cache directory
 def slug.url(+text: String) -> String:
-  ungit(unslash(drop.slashes(body(String.split(text, ':')))))
+  ungit(unslash(hostless(drop.slashes(body(String.split(text, ':'))))))
 
 # `git@host:path` as a cache directory. The colon is the only separator.
 def slug.scp(+text: String) -> String:

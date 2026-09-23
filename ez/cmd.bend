@@ -8,8 +8,9 @@ import ../manifest/manifest.bend as M
 import ../lock/run.bend as Run
 import ../lock/world.bend as W
 import ../pub/pub.bend as Pub
-import ./env.bend as Env
-import ./cap.bend as Cap
+import ../ez/env.bend as Env
+import ../ez/cap.bend as Cap
+import ../ez/args.bend as Args
 import ../init/run.bend as InitRun
 import ../remove/run.bend as RemoveRun
 import ../add/run.bend as AddRun
@@ -154,11 +155,11 @@ def build(+out: String) -> IO(Unit):
       build.out(out, named(r))])
     report.capped(Cap.why(bin, g), bin)
 
-# the entry run, which checks it first
+# the entry run, which checks it first, with every word after `run`
 def run(as: List<&2, String>) -> IO(Unit):
   do IO<Unit>:
     r : M.Read <- load()
-    +out : String <- Env.exec(List.append(&2, String, ["bend", entry(r)], as))
+    +out : String <- Env.exec(Args.run.line(entry(r), as))
     report(out)
 
 # `ez publish`: the entry the ledger names, sent to the hub the way `ez build`

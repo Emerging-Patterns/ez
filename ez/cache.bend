@@ -5,7 +5,7 @@
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../run/bend.bend as Bend
-import ./env.bend as Env
+import ../ez/env.bend as Env
 
 # the toolchain: bend's version and the C compiler it would hand its C to
 def tool() -> IO(String):

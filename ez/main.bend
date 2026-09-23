@@ -5,13 +5,14 @@
 # would take the flags meant for ez.
 import Base
 import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
-import ./args.bend as Args
+import ../ez/args.bend as Args
 import ./cmd.bend as Cmd
 import ./test.bend as Test
 import ./prove.bend as Prove
 import ./doctor.bend as Doctor
-import ./env.bend as Env
-import ./tool.bend as Tool
+import ../ez/env.bend as Env
+import ../tool/run.bend as ToolRun
+import ../tool/world.bend as TW
 import ../ez/say.bend as Say
 import ../io/file.bend as F
 
@@ -141,15 +142,15 @@ def dispatch(sub: Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Uni
     case CBuild{}:
       Cmd.build(Shake.get(matched, "out"))
     case CRun{}:
-      Cmd.run(Args.rest(as))
+      Cmd.run(as)
     case CToolSync{}:
-      Tool.sync()
+      ToolRun.sync()
     case CToolRun{}:
-      Tool.run(Shake.get(matched, "target"), Args.tool.rest(as))
+      ToolRun.run(TW.Run{Args.tool.rest(as)}, Shake.get(matched, "target"))
     case CToolInstall{}:
-      Tool.install(Shake.get(matched, "target"))
+      ToolRun.run(TW.Install{}, Shake.get(matched, "target"))
     case CToolUpgrade{}:
-      Tool.upgrade(Shake.get(matched, "target"))
+      ToolRun.run(TW.Upgrade{}, Shake.get(matched, "target"))
     case CPublish{}:
       Cmd.publish()
     case CTest{}:

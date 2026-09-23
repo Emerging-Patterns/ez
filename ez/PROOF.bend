@@ -11,7 +11,7 @@ import ./gate.bend as G
 import ../ez/pin.bend as Pin
 import ../ez/target.bend as Tgt
 import ../ez/named.bend as Named
-import ./env.bend as Env
+import ../ez/env.bend as Env
 import ./doctor.bend as Doctor
 import ../pkg/path.bend as P
 import ../manifest/manifest.bend as M

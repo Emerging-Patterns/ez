@@ -12,7 +12,7 @@
 # between.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
-import ./env.bend as Env
+import ../ez/env.bend as Env
 
 # how many seconds a whole run may take. Five minutes is what the gate is held
 # to; a tree that honestly needs longer says so in EZ_DEADLINE, and "0" turns

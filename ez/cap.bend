@@ -8,8 +8,8 @@
 # no binary. The cap is what turns that into a legible exit 137.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
-import ./env.bend as Env
-import ./args.bend as Args
+import ../ez/env.bend as Env
+import ../ez/args.bend as Args
 
 # how many gigabytes one `bend` may have. 8 is what fits beside the rest of
 # this machine; a project whose closure costs more says so in EZ_CAP.

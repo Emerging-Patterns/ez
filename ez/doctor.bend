@@ -8,10 +8,10 @@ import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../run/bend.bend as Bend
 import ../io/file.bend as F
 import ../manifest/manifest.bend as M
-import ./args.bend as Args
+import ../ez/args.bend as Args
 import ./drift.bend as D
 import ./sorted.bend as Sort
-import ./env.bend as Env
+import ../ez/env.bend as Env
 
 # one thing doctor looked at: what to print, and whether it is a problem
 type Note is Data:
