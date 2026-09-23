@@ -6,16 +6,16 @@
 # resolved as a free `owner/repo`, URL or path.
 #
 # A remote is cloned again only when `git ls-remote <url> HEAD` names a
-# different commit than the `rev` file, and the binary is built again only
-# when that commit changed or the binary is not there. A path uses a clean
-# `HEAD`; a dirty worktree, or a directory that is not a checkout, has no
-# commit and is built every time. `run` then starts the binary and takes
-# its status. `install` and `upgrade` do not run it. Both link the built
-# file onto PATH under the package's name: `$EZ_TOOL_BIN` when that is
-# set, otherwise `$XDG_BIN_HOME`, otherwise `~/.local/bin`. `upgrade` reads
-# the commit again, leaves a binary already built from it in place, rebuilds
-# a commit that moved, and writes the link either way. A target, ledger,
-# fetch, build or link that fails exits 1.
+# different commit than the `rev` file, and the binary is built again unless
+# the `key` file names this commit, this built file and this bend, and the
+# binary is there. A path uses a clean `HEAD`; a dirty worktree, or a
+# directory that is not a checkout, has no commit and is built every time.
+# `run` then starts the binary and takes its status. `install` and `upgrade`
+# do not run it. Both link the built file onto PATH under the package's name:
+# `$EZ_TOOL_BIN` when that is set, otherwise `$XDG_BIN_HOME`, otherwise
+# `~/.local/bin`. `upgrade` reads the commit again, leaves a binary already
+# built from it in place, rebuilds a commit that moved, and writes the link
+# either way. A target, ledger, fetch, build or link that fails exits 1.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
@@ -27,6 +27,8 @@ import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ./cap.bend as Cap
 import ./env.bend as Env
 import ./target.bend as Tgt
+import ./key.bend as K
+import ../run/bend.bend as Bend
 import ../ez/say.bend as Say
 
 # what happens once the binary for this commit is in the cache. `Run`
@@ -240,18 +242,13 @@ def place(+out: String, +name: String) -> IO(String):
     +bin : String <- abs.of(out)
     place.at(dir, bin, name)
 
-# the same commit, and a commit at all. An empty rev is a dirty tree or a
-# directory that is not a git checkout, and those are built every time.
-def same(+cached: String, +rev: String) -> Bool:
-  Bool.and(Bool.not(String.is_empty(rev)), String.eq(cached, rev))
-
-# the binary already built for this commit
-def reuse(+cached: String, +rev: String, bin_ok: Bool) -> Bool:
-  Bool.and(bin_ok, same(cached, rev))
+# the binary already built from this commit, file and bend
+def reuse(was: K.Key, now: K.Key, bin_ok: Bool) -> Bool:
+  Bool.and(bin_ok, K.reuse(was, now))
 
 # the checkout is already this commit
 def fresh(src_ok: Bool, +cached: String, +rev: String) -> Bool:
-  Bool.and(src_ok, same(cached, rev))
+  Bool.and(src_ok, K.checkout(cached, rev))
 
 # a write that did not happen is a failure
 def wrote(ok: Bool, +at: String) -> IO(Unit):
@@ -261,12 +258,23 @@ def wrote(ok: Bool, +at: String) -> IO(Unit):
     case False{}:
       IO.die(Unit, 1, "ez: " ++ at ++ " could not be written")
 
-# the rev file, written after a build that used this commit. Empty when the
-# tree was dirty, so the next clean commit cannot reuse a dirty binary.
-def stamp(+at: String, +rev: String) -> IO(Unit):
+# a record written: the checkout's commit once it is cloned, the binary's
+# key once it is built. The key's commit is empty when the tree was dirty, so
+# the next clean commit cannot reuse a dirty binary.
+def stamp(+at: String, +text: String) -> IO(Unit):
   do IO<Unit>:
-    ok : Bool <- F.write(at, rev ++ "\n")
+    ok : Bool <- F.write(at, text)
     wrote(ok, at)
+
+# the bend on the PATH, as its banner's first line. A bend that does not
+# answer is "", and its build fails on its own.
+def bend.said(ok: Bool, +text: String) -> String:
+  Bool.pick(String, ok, line0(String.lines(String.trim(text))), "")
+
+def bend.is() -> IO(String):
+  do IO<String>:
+    +out : String <- Bend.version()
+    return bend.said(R.ok(out), R.text(out))
 
 # a lock that is not there cannot be fetched
 def fetch.gone(+src: String) -> IO(Unit):
@@ -385,14 +393,14 @@ def local.rev(+path: String) -> IO(String):
     return local.sha(R.ok(head), R.ok(st), String.trim(R.text(head)),
       String.trim(R.text(st)))
 
-# fetch, build, record the commit, then start the binary or link it
+# fetch, build, record the key, then start the binary or link it
 def miss(
   +src: String,
   +lib: String,
   +entry: String,
   +out: String,
   +dir: String,
-  +rev: String,
+  now: K.Key,
   +name: String,
   act: Act
 ) -> IO(Unit):
@@ -401,10 +409,10 @@ def miss(
     +s : Say.Spin <- Say.hold(Say.building(name))
     compile(lib, entry, out)
     Say.done(s)
-    stamp(dir ++ "/rev", rev)
+    stamp(dir ++ "/key", K.show(now))
     finish(act, out, name)
 
-# the binary when it is already this commit, otherwise a build
+# the binary when it is already this key, otherwise a build
 def go.hit(
   hit: Bool,
   +src: String,
@@ -412,7 +420,7 @@ def go.hit(
   +entry: String,
   +out: String,
   +dir: String,
-  +rev: String,
+  now: K.Key,
   +name: String,
   act: Act
 ) -> IO(Unit):
@@ -422,9 +430,10 @@ def go.hit(
         IO.print_err(Say.reused(name))
         finish(act, out, name)
     case False{}:
-      miss(src, lib, entry, out, dir, rev, name, act)
+      miss(src, lib, entry, out, dir, now, name, act)
 
-# the package's name and file, then the cached binary
+# the package's name and file, then the cached binary. A key file from
+# before the file and the bend were recorded reads as no key, and builds.
 def go.named(
   +name: String,
   +entry: String,
@@ -436,9 +445,12 @@ def go.named(
 ) -> IO(Unit):
   +out = dir ++ "/bin/" ++ name ++ ".out"
   do IO<Unit>:
-    +cached : String <- text(dir ++ "/rev")
+    +was : String <- text(dir ++ "/key")
+    +bend : String <- bend.is()
     +bin_ok : Bool <- is.exec(out)
-    go.hit(reuse(cached, rev, bin_ok), src, lib, entry, out, dir, rev, name, act)
+    +now : K.Key <- IO.pure(K.Key, K.Key{rev, entry, bend})
+    go.hit(reuse(K.read(was), now, bin_ok), src, lib, entry, out, dir, now,
+      name, act)
 
 # the file a pin names, or the checkout's own file when the pin names none.
 # An empty pin is "", not `main.bend`: that default belongs to the checkout.
@@ -485,20 +497,22 @@ def go(+src: String, +lib: String, +dir: String, +rev: String, act: Act, +over: 
     r : M.Read <- load(src)
     go.read(r, src, lib, dir, rev, act, over)
 
-# a checkout replaced with this commit. The rev file is left alone until the
-# build has written a binary for it.
-def clone(+src: String, +url: String, +rev: String, +label: String) -> IO(Unit):
+# a checkout replaced with this commit, and the rev file that says so. The
+# binary's key is its own file, so a failed build leaves no record claiming
+# a binary for this commit.
+def clone(+src: String, +at: String, +url: String, +rev: String, +label: String) -> IO(Unit):
   do IO<Unit>:
     _rm : String <- R.exec(["rm", "-rf", src])
     Git.clone.say(src, url, rev, Say.fetching(label, rev))
+    stamp(at, rev ++ "\n")
 
 # clone when the checkout is not already this commit
-def freshen(need: Bool, +src: String, +url: String, +rev: String, +label: String) -> IO(Unit):
+def freshen(need: Bool, +src: String, +at: String, +url: String, +rev: String, +label: String) -> IO(Unit):
   match need:
     case False{}:
       IO.print_err(Say.kept(label))
     case True{}:
-      clone(src, url, rev, label)
+      clone(src, at, url, rev, label)
 
 # the checkout and the binary for one remote, once the cache root and the
 # commit are known
@@ -508,7 +522,8 @@ def run.remote.at(+root: String, +url: String, +slug: String, +rev: String, act:
   do IO<Unit>:
     +cached : String <- text(dir ++ "/rev")
     +src_ok : Bool <- is.file(src ++ "/ez.toml")
-    freshen(Bool.not(fresh(src_ok, cached, rev)), src, url, rev, slug)
+    freshen(Bool.not(fresh(src_ok, cached, rev)), src, dir ++ "/rev", url, rev,
+      slug)
     go(src, src ++ "/.ez/lib", dir, rev, act, over)
 
 # a remote: the cache holds the checkout and the binary

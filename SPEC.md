@@ -86,7 +86,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | ID | Requirement | Level | Status | Law |
 | :---- | :---- | :---- | :---- | :---- |
 | EZ-TOOL-1 | The link directory is `$EZ_TOOL_BIN`, else `$XDG_BIN_HOME`, else `$HOME/.local/bin`, an empty value counting as unset. | Proved | pending | |
-| EZ-TOOL-2 | A cached binary is reused only when the recorded commit, built file and bend version all equal the resolved ones, and never when the resolved commit is empty. A cached checkout is reused only when its recorded commit equals the resolved one. | Proved | pending | |
+| EZ-TOOL-2 | A cached binary is reused only when the recorded commit, built file and bend version all equal the resolved ones, and never when the resolved commit is empty. A cached checkout is reused only when its recorded commit equals the resolved one. | Proved | proved | ez/LAWS.bend key_rev_differs, key_file_differs, key_bend_differs, key_no_rev, key_same_reuses, checkout_differs, checkout_same |
 | EZ-TOOL-3 | A local target with uncommitted or untracked changes, or a path that is not a checkout, resolves to no commit and is rebuilt on every run. | Proved | pending | |
 | EZ-TOOL-4 | A target naming a `[tools.*]` pin in ez.toml builds the lock's rev, url, entry and bin. An `owner/repo` or URL target builds `git ls-remote <url> HEAD`. A path builds its clean `HEAD`. | Proved | pending | |
 | EZ-TOOL-5 | `ez tool run` exits with the built program's status; any failure before the program runs exits 1. | Proved | pending | |
