@@ -13,6 +13,7 @@ import ./target.bend as Tgt
 import ../manifest/manifest.bend as M
 import ./pin.bend as Pin
 import ./cmd.bend as Cmd
+import ../pkg/path.bend as P
 import ./named.bend as Named
 
 # a ledger naming two packages, the one the drift laws read
@@ -238,6 +239,20 @@ law expand_home:
   for +home: String
   for +rest: String
   {Tgt.expand(home, "~/" ++ rest) == home ++ ("/" ++ rest) : String}
+
+# LAW: an absolute path is fetched as it is, wherever ez was run
+law anchor_absolute:
+  for here: String
+  for +rest: String
+  {Tgt.anchor(here, "/" ++ rest) == "/" ++ rest : String}
+
+# LAW: a relative path is taken from the directory ez was run in, and not
+# from the work directory git is handed it in
+law anchor_relative:
+  for +here: String
+  for +path: String
+  for e: {False{} == String.starts_with(path, "/") : Bool}
+  {Tgt.anchor(here, path) == P.join(here, path) : String}
 
 # LAW: `bin` is the file that is built
 # toward EZ-TOOL-7

@@ -3,6 +3,7 @@
 # Anything else is a path, and a path written `./…`, `../…`, `/…` or `~/…` is
 # a path even when it would otherwise read as a repository.
 import Base
+import ../pkg/path.bend as P
 
 # where a target names, or why it names nothing
 type Place is Data:
@@ -383,6 +384,19 @@ def expand(+home: String, +path: String) -> String:
   Bool.pick(String, String.eq(path, "~"), home,
     Bool.pick(String, String.starts_with(path, "~/"),
       home ++ String.drop(path, 1n), path))
+
+# an absolute path as it is, or a relative one taken from `here`
+def anchor.at(abs: Bool, +here: String, +path: String) -> String:
+  match abs:
+    case True{}:
+      path
+    case False{}:
+      P.join(here, path)
+
+# a path as the directory `here` reads it. `ez add` is handed a path relative
+# to where it was run, and git reads it from somewhere else.
+def anchor(+here: String, +path: String) -> String:
+  anchor.at(String.starts_with(path, "/"), here, path)
 
 # the entry, or `main.bend` when a ledger names none
 def entry.or(+path: String) -> String:

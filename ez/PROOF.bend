@@ -11,6 +11,7 @@ import ./gate.bend as G
 import ./pin.bend as Pin
 import ./target.bend as Tgt
 import ./named.bend as Named
+import ../pkg/path.bend as P
 import ../manifest/manifest.bend as M
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
@@ -1149,6 +1150,18 @@ def Laws.expand_home(home, rest):
   %Equal.sym(Bool, String.starts_with(rest, ""), True{}, Eq.starts_nil(rest)) :
     {Bool.pick(String, _, home ++ String.drop("~/" ++ rest, 1n), "~/" ++ rest)
       == home ++ ("/" ++ rest) : String}
+  {==}
+
+# `/` in front of anything starts with `/`, which `starts_append` holds, and
+# that picks the arm that keeps the path.
+def Laws.anchor_absolute(here, rest):
+  %Equal.sym(Bool, String.starts_with("/" ++ rest, "/"), True{},
+    Eq.starts_append("/", rest)) :
+    {Tgt.anchor.at(_, here, "/" ++ rest) == "/" ++ rest : String}
+  {==}
+
+def Laws.anchor_relative(here, path, e):
+  %e : {Tgt.anchor.at(_, here, path) == P.join(here, path) : String}
   {==}
 
 def Laws.file_bin():

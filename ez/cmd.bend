@@ -481,11 +481,14 @@ def add.go(ledger: M.Read, fresh: String, +url: String, +ref: String, +entry: St
       +why = Named.why(deps.of(manifest), name, url)
       add.take(String.is_empty(why), why, manifest, name, url, ref, entry)
 
-# a path, with `~` expanded the way `ez tool run` expands it
+# a path, with `~` expanded the way `ez tool run` expands it, and a relative
+# one taken from the directory ez was run in. git is handed it inside a work
+# directory under BEND_LIB, where a relative path would name something else.
 def add.local(+path: String) -> IO(String):
   do IO<String>:
     +home : String <- Env.var("HOME", "")
-    return Tgt.expand(home, path)
+    +here : String <- R.exec(["pwd"])
+    return Tgt.anchor(String.trim(R.text(here)), Tgt.expand(home, path))
 
 # the git url a target names
 def add.url(place: Tgt.Place) -> IO(String):
