@@ -26,6 +26,8 @@ import ../sha/sha.bend as Sha
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
 import ../pkg/PROOF.bend as Pk
+import ../manifest/LAWS.bend as ML
+import ../manifest/PROOF.bend as MP
 import ./LAWS.bend as Laws
 
 # ---------------------------------------------------------------------------
@@ -605,8 +607,10 @@ law named_walk:
 
 def named_walk(k, w, e):
   match k:
-    case K.Walked{_h, _r, _fs, _ss}:
-      %e : {win(AP.outcome.name(_, w)) == False{} : Bool}
+    case K.Walked{+h, +r, _fs, _ss}:
+      %e : {win(AP.outcome.name(_,
+        Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.dep.of(h, r, w))), w))
+        == False{} : Bool}
       {==}
     case K.Asks{_at}:
       {==}
@@ -1286,3 +1290,102 @@ def plan_code(pl):
 
 def Laws.add_exits_as_it_refuses(w):
   plan_code(AP.plan(w))
+
+# ---------------------------------------------------------------------------
+# EZ-LED-4
+
+# LAW: a package's outcome that is a success found the ledger it leaves
+# renderable
+law name_fit:
+  for b: Bool
+  for f: Bool
+  for +w: A.World
+  for s: {win(AP.outcome.name(b, f, w)) == True{} : Bool}
+  {f == True{} : Bool}
+
+def name_fit(b, f, w, s):
+  match b f:
+    case True{} True{}:
+      {==}
+    case True{} False{}:
+      Eq.bit.absurd(&2, {False{} == True{} : Bool}, s)
+    case False{} _:
+      Eq.bit.absurd(&2, {f == True{} : Bool}, s)
+
+# LAW: so is a walk's outcome that is a success, with the entry lookup given
+law entry_fit:
+  for g: Maybe<&2, String>
+  for +h: String
+  for +r: String
+  for fs: List<&2, K.Source>
+  for ss: List<&2, K.File>
+  for +w: A.World
+  for s: {win(AP.outcome.entry(g, K.Walked{h, r, fs, ss}, w)) == True{} : Bool}
+  {Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.dep.of(h, r, w))) == True{} : Bool}
+
+def entry_fit(g, h, r, fs, ss, w, s):
+  match g:
+    case None{}:
+      Eq.bit.absurd(&2, {Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.dep.of(h, r, w)))
+        == True{} : Bool}, s)
+    case Some{_t}:
+      name_fit(String.is_empty(AP.why(w)),
+        Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.dep.of(h, r, w))), w, s)
+
+# LAW: an add whose walk ends in success leaves a renderable ledger
+law fit_k:
+  for k: K.Walked
+  for +w: A.World
+  for s: {AP.outcome.k(k, w) == P.Success{} : P.Outcome}
+  {Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.added.k(k, w))) == True{} : Bool}
+
+def fit_k(k, w, s):
+  match k:
+    case K.Walked{+h, +r, fs, ss}:
+      entry_fit(got(w), h, r, fs, ss, w,
+        Equal.cong(P.Outcome, Bool, o => win(o), AP.outcome.k(K.Walked{h, r, fs, ss}, w),
+          P.Success{}, s))
+    case K.Asks{at}:
+      Eq.bit.absurd(&2, {Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)),
+        AP.added.k(K.Asks{at}, w))) == True{} : Bool},
+        Equal.trans(Bool, False{}, win(AP.outcome.k(K.Asks{at}, w)), True{},
+          Equal.sym(Bool, win(AP.outcome.k(K.Asks{at}, w)), False{},
+            asks_loses(got(w), at, w)),
+          Equal.cong(P.Outcome, Bool, o => win(o), AP.outcome.k(K.Asks{at}, w),
+            P.Success{}, s)))
+    case K.Refused{why}:
+      Eq.bit.absurd(&2, {Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)),
+        AP.added.k(K.Refused{why}, w))) == True{} : Bool},
+        Equal.trans(Bool, False{}, win(AP.outcome.k(K.Refused{why}, w)), True{},
+          Equal.sym(Bool, win(AP.outcome.k(K.Refused{why}, w)), False{},
+            refused_loses(got(w), why, w)),
+          Equal.cong(P.Outcome, Bool, o => win(o), AP.outcome.k(K.Refused{why}, w),
+            P.Success{}, s)))
+
+# what a path was written with. Proof vocabulary.
+def wrote.text(x: P.Wrote) -> String:
+  match x:
+    case P.Kept{}:
+      ""
+    case P.Put{t}:
+      t
+
+# An add that does not refuse writes `Rend.add.keep`'s ledger
+# (`add_edits_ledger`), whose walk ended in success, so the ledger is
+# renderable and the manifest's round trip reads it back.
+def Laws.add_ledger_reads_back(w, m, good, ok, text, put):
+  +fit = Equal.trans(Bool, Rend.renderable(Rend.add.keep(m, AP.added(w))),
+    Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.added(w))), True{},
+    Equal.cong(M.Manifest, Bool, x => Rend.renderable(Rend.add.keep(x, AP.added(w))),
+      m, A.manifest.of(A.read(w)),
+      Equal.sym(M.Manifest, A.manifest.of(A.read(w)), m, good_m(w, m, good))),
+    fit_k(AP.walked(w), w, won(w, ok)))
+  +p = Equal.trans(P.Wrote, P.Put{Rend.show(Rend.add.keep(m, AP.added(w)))},
+    P.put.plan(AP.plan(w), "ez.toml"), P.Put{text},
+    Equal.sym(P.Wrote, P.put.plan(AP.plan(w), "ez.toml"),
+      P.Put{Rend.show(Rend.add.keep(m, AP.added(w)))}, Laws.add_edits_ledger(w, m, good, ok)),
+    put)
+  +t = Equal.cong(P.Wrote, String, x => wrote.text(x),
+    P.Put{Rend.show(Rend.add.keep(m, AP.added(w)))}, P.Put{text}, p)
+  %t : {M.parse(_) == M.Good{Rend.add.keep(m, AP.added(w))} : M.Read}
+  ML.ledger_reads_back(Rend.add.keep(m, AP.added(w)), fit)

@@ -83,6 +83,18 @@ law add_edits_ledger:
   {P.put.plan(AP.plan(w), "ez.toml")
     == P.Put{Rend.show(Rend.add.keep(m, AP.added(w)))} : P.Wrote}
 
+# LAW: and the ledger it writes there reads back as that ledger. A ledger
+# that could not be written so that it reads back is refused, with no effect.
+# EZ-LED-4
+law add_ledger_reads_back:
+  for +w: A.World
+  for +m: M.Manifest
+  for +good: {A.read(w) == M.Good{m} : M.Read}
+  for +ok: {AP.refuses(w) == False{} : Bool}
+  for +text: String
+  for put: {P.put.plan(AP.plan(w), "ez.toml") == P.Put{text} : P.Wrote}
+  {M.parse(text) == M.Good{Rend.add.keep(m, AP.added(w))} : M.Read}
+
 # LAW: and leaves `.gitignore` holding exactly the file `I.sync` derives from
 # the dependencies of that ledger: written when that changes it, kept as it
 # was when it does not. `allowlist_is_the_ledger` and
