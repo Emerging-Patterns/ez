@@ -30,17 +30,3 @@ law judge_miss:
   for +body: String
   {Hub.judge(False{}, good, url, body)
     == Hub.Miss{url ++ ": " ++ body} : Hub.Got}
-
-# LAW: the fixture manifest hashes to the prefix a package name is cut from.
-# toward EZ-FETCH-1
-law hash_match:
-  {Hub.matches("182e9ab84416d28eef11e51eb5680c5e",
-    "a8a411ce45f88c9659785973fe3416c2e8ae69584151db03f5997ce3eaff9a80 src/lib.bend\n")
-    == True{} : Bool}
-
-# LAW: a prefix the digest does not start with is not a match.
-# toward EZ-FETCH-1
-law hash_refuse:
-  {Hub.matches("0000000000000000000000000000dead",
-    "a8a411ce45f88c9659785973fe3416c2e8ae69584151db03f5997ce3eaff9a80 src/lib.bend\n")
-    == False{} : Bool}

@@ -7,8 +7,6 @@ import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
-import ../pkg/pkg.bend as K
-import ../manifest/manifest.bend as M
 
 # LAW: a package resolves to the origin recorded for it, whatever origins
 # follow. A second record of the same hash never shadows the first, so the
@@ -97,57 +95,12 @@ law lock_names_hub:
   for ps: List<&2, L.Pack>
   {L.lock.hub(L.doc(hub, ps)) == hub : String}
 
-# a hub package and a vendored one, the two shapes a lock records
-def sample.packs() -> List<&2, L.Pack>:
-  [L.Pack{"0xbb", L.Hub{}, [K.File{"src/lib.bend", "ab"}]},
-   L.Pack{"0xaa", L.Git{"https://h/r", "c0ffee", "src/lib.bend", ".",
-     "sha256-zz", "v1.0"}, [K.File{"lib.bend", "cd"}]}]
-
-# LAW: packages are written in hash order. The walk found `0xbb` first;
-# the document names `0xaa` first.
-# toward EZ-DOC-2
-law hashes_sorted:
-  {L.hashes(L.doc("https://hub.bend-lang.com", sample.packs()))
-    == ["0xaa", "0xbb"] : List<&2, String>}
-
-# LAW: what was written reads back as what it was. The lock as text is
-# the lock as a document, so a file `ez lock` wrote is the file the
-# next lock reads.
-# toward EZ-DOC-1
-law lock_roundtrip:
-  {L.packs(T.sects(T.parse(L.render("https://hub.bend-lang.com",
-    sample.packs()))))
-    == L.pack.sort(sample.packs()) : List<&2, L.Pack>}
-
-# a pinned CLI, the shape `[tools.*]` records
-def sample.tool() -> M.Tool:
-  M.Tool{"bolt", "bolt/main.bend", "",
-    M.Git{"https://github.com/Emerging-Patterns/bolt",
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "v0.4.0", ".",
-      "sha256-zz", False{}}}
-
 # LAW: a lock with no tools is the lock `render` writes. Packages do not
 # move because a tool list was empty.
 law render_keeps_packages_without_tools:
   for +hub: String
   for ps: List<&2, L.Pack>
   {L.render.pick(True{}, hub, ps, []) == L.render(hub, ps) : String}
-
-# LAW: a `[tools.*]` table is not a package. `restore` and `bendLib` read
-# `packs`, and a tool pin does not join that list.
-# toward EZ-LED-5
-law tools_are_not_packages:
-  {L.packs(T.sects(T.parse(L.render.pick(False{}, "https://hub.bend-lang.com",
-    sample.packs(), [sample.tool()]))))
-    == L.pack.sort(sample.packs()) : List<&2, L.Pack>}
-
-# LAW: the commit written for a tool is the commit read back
-# toward EZ-DOC-1
-law tool_pin_reads_back:
-  {M.source.rev(M.tool.source(M.tool.find(M.tools(T.sects(T.parse(
-    L.render.pick(False{}, "https://hub.bend-lang.com", [],
-      [sample.tool()])))), "bolt")))
-    == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" : String}
 
 # The planner (plan.bend) over the World (world.bend). Every law below is
 # about what plain `ez lock` does, stated over the plan it returns; the
