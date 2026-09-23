@@ -27,10 +27,11 @@ type Row is Data:
 
 # what a vendoring amounts to, which is everything the ledger records: the
 # package's `0x` name, where it came from, the commit pinned, the ref asked
-# for, and the entry the hash was computed from
+# for, the entry the hash was computed from, and the `[package] name` the
+# checkout's own ez.toml gives it, "" when it has none
 type Got is Data:
   Got{hash: String, url: String, rev: String, entry: String, tag: String,
-    root: String, nar: String}
+    root: String, nar: String, pkg: String}
 
 # how two versions compare. A release is greater than its prerelease, and a
 # numeric identifier is less than a word, which is the semver order.
@@ -519,7 +520,15 @@ def said(+hash: String, +entry: String, tag: String, rev: String) -> IO(Unit):
     IO.print("import " ++ hash ++ "/" ++ base ++ " as " ++ title(P.unbend(base)))
 
 # the checkout weighed, walked and laid out, once it is on disk
-def vendor.tree(+lib: String, +work: String, +url: String, +rev: String, +tag: String, +entry: String) -> IO(Got):
+def vendor.tree(
+  +lib: String,
+  +work: String,
+  +url: String,
+  +rev: String,
+  +tag: String,
+  +entry: String,
+  pkg: String
+) -> IO(Got):
   +at = P.join(work, entry)
   do IO<Got>:
     +nh : String <- nar(work)
@@ -531,7 +540,7 @@ def vendor.tree(+lib: String, +work: String, +url: String, +rev: String, +tag: S
     +rt : String <- IO.pure(String, root.rel(at, K.pkg.root(p), entry))
     note(lib, origin(hash, url, rev, entry, rt, nh, tag))
     said(hash, entry, tag, rev)
-    return Got{hash, url, rev, entry, tag, rt, nh}
+    return Got{hash, url, rev, entry, tag, rt, nh, pkg}
 
 # `main.bend` when neither the entry nor the bin was named. That is the file
 # `ez init` writes when it is not told an entry.
@@ -587,6 +596,34 @@ def entry.at(+work: String) -> IO(String):
     m : Maybe<&2, String> <- F.read(work ++ "/ez.toml")
     return entry.maybe(m)
 
+# the package name a parsed document gives, or "" when it did not parse
+def called.sects(ok: Bool, ss: List<&2, T.Sect>) -> String:
+  match ok:
+    case False{}:
+      ""
+    case True{}:
+      M.value(M.pairs_of(ss, "package"), "name")
+
+# the package name a parsed document gives
+def called.doc(toml: T.Toml) -> String:
+  T.Toml{bad, _name, _pairs, sects} = toml
+  called.sects(String.is_empty(bad), sects)
+
+# a checkout with no ez.toml gives no package name
+def called.maybe(got: Maybe<&2, String>) -> String:
+  match got:
+    case None{}:
+      ""
+    case Some{text}:
+      called.doc(T.parse(text))
+
+# the `[package] name` of the checkout's ez.toml, the file its entry is read
+# from, or "" when there is none
+def called.at(+work: String) -> IO(String):
+  do IO<String>:
+    m : Maybe<&2, String> <- F.read(work ++ "/ez.toml")
+    return called.maybe(m)
+
 # the entry a vendoring is taken from. One that was asked for is that one.
 def entry.for(given: Bool, +entry: String, +work: String) -> IO(String):
   match given:
@@ -607,8 +644,9 @@ def vendor.at(+lib: String, +url: String, ref: Ref, +entry: String) -> IO(Got):
     _mk : String <- R.exec(["mkdir", "-p", work])
     clone(work, url, rev)
     +at : String <- entry.for(Bool.not(String.is_empty(entry)), entry, work)
+    pkg : String <- called.at(work)
     _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
-    g : Got <- vendor.tree(lib, work, url, rev, tag, at)
+    g : Got <- vendor.tree(lib, work, url, rev, tag, at, pkg)
     _cl : String <- R.exec(["rm", "-rf", work])
     return g
 

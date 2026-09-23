@@ -169,14 +169,14 @@ def confirmed(ok: Bool, +hub: String, +dep: M.Dep, +hash: String, +rev: String) 
 
 # a checkout of the commit the ledger already pins
 def confirm(+hub: String, +dep: M.Dep, got: Git.Got) -> IO(Done):
-  Git.Got{+hash, _url, +rev, _entry, _tag, +root, +nar} = got
+  Git.Got{+hash, _url, +rev, _entry, _tag, +root, +nar, _pkg} = got
   +src = M.source.dep(dep)
   confirmed(U.agree(M.dep.hash(dep), hash, M.source.nar(src), nar,
     M.source.root(src), root), hub, dep, hash, rev)
 
 # the new pin, the committed tree it replaces, and what a person is told
 def advanced(+hub: String, +dep: M.Dep, got: Git.Got, +branch: String) -> IO(Done):
-  Git.Got{+hash, _url, +rev, _entry, _tag, +root, +nar} = got
+  Git.Got{+hash, _url, +rev, _entry, _tag, +root, +nar, _pkg} = got
   +src = M.source.dep(dep)
   +old = M.dep.hash(dep)
   +drop = swap.of(M.source.vendor(src), old, hash)

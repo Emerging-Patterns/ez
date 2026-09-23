@@ -1377,6 +1377,55 @@ def Laws.leaf_is_last(p, n, e):
   Equal.cong(Named.Seen, String, Named.leaf.of,
     Named.last(p ++ ("/" ++ n)), Named.Seen{True{}, n}, last_after(p, n, e))
 
+def Laws.own_package(pkg, fresh, e):
+  %e : {Bool.pick(String, _, pkg, fresh) == pkg : String}
+  {==}
+
+def Laws.own_invalid(pkg, fresh, e):
+  %e : {Bool.pick(String, _, pkg, fresh) == fresh : String}
+  {==}
+
+# LAW: a step whose rest is false is false, whatever the char was
+law step_false:
+  for ok: Bool
+  for r: Unit -> Bool
+  for e: {r(Unit{}) == False{} : Bool}
+  {Named.bare.step(ok, r) == False{} : Bool}
+
+def step_false(ok, _r, e):
+  match ok:
+    case True{}:
+      e
+    case False{}:
+      {==}
+
+# LAW: past the first char, a dot anywhere ends a bare key
+law rest_no_dot:
+  for +a: String
+  for +b: String
+  {Named.bare.rest(a ++ ("." ++ b)) == False{} : Bool}
+
+def rest_no_dot(a, b):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      step_false(Tgt.plain.at(h), _u => Named.bare.rest(t ++ ("." ++ b)),
+        rest_no_dot(t, b))
+
+def Laws.bare_no_dot(a, b):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      step_false(Tgt.plain.at(h), _u => Named.bare.rest(t ++ ("." ++ b)),
+        rest_no_dot(t, b))
+
+def Laws.name_keeps(n, _h, _en, url, _rev, _tag, _root, _nar, _vend, t, pkg, fresh):
+  %Equal.sym(Bool, String.eq(url, url), True{}, Eq.string_eq_self(url)) :
+    {Named.had.at(_, n, Named.had(t, url, Named.own(pkg, fresh))) == n : String}
+  {==}
+
 def Laws.had_fresh(_url, _fresh):
   {==}
 

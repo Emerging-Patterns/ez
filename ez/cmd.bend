@@ -431,8 +431,13 @@ def add.dep.go(
 
 # what a vendoring answered, as the ledger records it
 def add.dep(name: String, got: Git.Got) -> M.Dep:
-  Git.Got{h, u, v, e, t, r, n} = got
+  Git.Got{h, u, v, e, t, r, n, _p} = got
   add.dep.go(name, h, u, v, e, t, r, n)
+
+# the `[package] name` the vendored checkout gave itself, "" for none
+def add.pkg(got: Git.Got) -> String:
+  Git.Got{_h, _u, _v, _e, _t, _r, _n, p} = got
+  p
 
 # the dependencies of a ledger that was read
 def deps.of(manifest: M.Manifest) -> List<&2, M.Dep>:
@@ -446,40 +451,37 @@ def edit.write(+next: M.Manifest) -> IO(Unit):
     Up.allowlist(deps.of(next))
     report.exit(wrote)
 
-# a name the ledger can take: the dependency vendored, then written into the
-# ledger. A dependency added again keeps the `vendor = true` its entry already
-# had. The vendoring comes first: a ledger naming a package that is not on
-# disk is worse than no entry at all.
-def add.take(
-  ok: Bool,
-  why: String,
-  manifest: M.Manifest,
-  +name: String,
-  +url: String,
-  +ref: String,
-  +entry: String
-) -> IO(Unit):
+# a name the ledger can take, written into it with the dependency. A
+# dependency added again keeps the `vendor = true` its entry already had.
+def add.take(ok: Bool, why: String, manifest: M.Manifest, name: String, got: Git.Got) -> IO(Unit):
   match ok:
     case False{}:
       IO.die(Unit, 1, why)
     case True{}:
-      do IO<Unit>:
-        lib : String <- Env.lib()
-        g : Git.Got <- Git.vendor(lib, url, ref, entry)
-        edit.write(Rend.add.keep(manifest, add.dep(name, g)))
+      edit.write(Rend.add.keep(manifest, add.dep(name, got)))
 
-# a git dependency recorded under the name the ledger already gives its
-# source, or else the one the source gives itself. The ledger is asked before
-# anything is fetched, so one that does not parse, or that gives the name to
-# another source, stops the command with nothing vendored.
+# the vendoring's answer named, by `Named.name`, and refused when the ledger
+# gives that name to another source
+def add.named(+manifest: M.Manifest, +got: Git.Got, +fresh: String, +url: String) -> IO(Unit):
+  +name = Named.name(deps.of(manifest), url, add.pkg(got), fresh)
+  +why = Named.why(deps.of(manifest), name, url)
+  add.take(String.is_empty(why), why, manifest, name, got)
+
+# a git dependency vendored, then recorded in the ledger. The name can turn on
+# the checkout's own ez.toml, so it is decided once the checkout is read; a
+# refusal then leaves the ledger as it was, and only the cache under BEND_LIB
+# holds the tree. A ledger that does not parse is refused before anything is
+# fetched. The vendoring comes before the write: a ledger naming a package
+# that is not on disk is worse than no entry at all.
 def add.go(ledger: M.Read, fresh: String, +url: String, +ref: String, +entry: String) -> IO(Unit):
   match ledger:
     case M.Bad{why}:
       refuse(M.Bad{why})
-    case M.Good{+manifest}:
-      +name = Named.had(deps.of(manifest), url, fresh)
-      +why = Named.why(deps.of(manifest), name, url)
-      add.take(String.is_empty(why), why, manifest, name, url, ref, entry)
+    case M.Good{manifest}:
+      do IO<Unit>:
+        lib : String <- Env.lib()
+        g : Git.Got <- Git.vendor(lib, url, ref, entry)
+        add.named(manifest, g, fresh, url)
 
 # a path, with `~` expanded the way `ez tool run` expands it. A relative path
 # is kept as it was given, relative to the project, so the ledger reads the

@@ -465,6 +465,46 @@ law leaf_is_last:
   for e: {Named.Seen{False{}, n} == Named.last(n) : Named.Seen}
   {Named.leaf(p ++ ("/" ++ n)) == n : String}
 
+# LAW: a package whose own `[package] name` is a TOML bare key is named by it
+law own_package:
+  for +pkg: String
+  for +fresh: String
+  for e: {True{} == Named.bare(pkg) : Bool}
+  {Named.own(pkg, fresh) == pkg : String}
+
+# LAW: a package name that is not a bare key, or none at all, falls through to
+# the name the source gives itself rather than being refused
+law own_invalid:
+  for +pkg: String
+  for +fresh: String
+  for e: {False{} == Named.bare(pkg) : Bool}
+  {Named.own(pkg, fresh) == fresh : String}
+
+# LAW: a name with a dot in it, like `next.js`, is not a bare key, since
+# `[deps.next.js]` would be a table inside a table
+law bare_no_dot:
+  for +a: String
+  for +b: String
+  {Named.bare(a ++ ("." ++ b)) == False{} : Bool}
+
+# LAW: the name the ledger already gives this source beats the package's own
+# name and the source's
+law name_keeps:
+  for n: String
+  for h: String
+  for en: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for +pkg: String
+  for +fresh: String
+  {Named.name(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+    pkg, fresh) == n : String}
+
 # LAW: a ledger that holds no dependency takes the name the source gives
 # itself
 law had_fresh:

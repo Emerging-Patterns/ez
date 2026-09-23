@@ -167,12 +167,16 @@ asking the remote. The tag or branch is recorded as `tag`, which
 `ez lock --upgrade` re-resolves. With no entry, it reads `[package] entry`
 from that revision's `ez.toml`, then `[package] bin` when `entry` is absent,
 then `main.bend`. An entry given on the command line is used as given.
-The dependency is named after its source, not its entry: `owner/repo` or a
-URL by the repository's name (`[deps.repo]`, any `.git` dropped), a path by
-its directory's name. A source the ledger already records keeps the name it
-has there, so adding it again replaces that entry. A name the ledger gives to
-another source stops `ez add` with exit 1 before anything is fetched; remove
-that entry, or add this one by hand under another name.
+The dependency is named the way cargo names one, never after its entry. A
+source the ledger already records keeps the name it has there, so adding it
+again replaces that entry. Otherwise a target that is an ez project is named
+by the `[package] name` of its ez.toml at the fetched rev, when that is a
+TOML bare key (letters, digits, `-`, `_`); a name that is not one falls
+through rather than being refused. Otherwise `owner/repo` or a URL is named
+by the repository (`[deps.repo]`, any `.git` dropped), and a path by its
+directory. A name the ledger gives to another source stops `ez add` with
+exit 1 and leaves the ledger as it was; remove that entry, or add this one by
+hand under another name.
 
 A dependency with no `git` key lives on the hub. `vendor = true` commits that
 dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.

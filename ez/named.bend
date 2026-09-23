@@ -1,9 +1,11 @@
-# ez/named: the name `ez add` records a dependency under. A dependency is
-# named after where it comes from: a repository by its own name, a directory
-# by the directory's. The entry file names nothing, because most packages call
-# theirs `main.bend`, and two of them would share one `[deps.main]`. A source
-# the ledger already holds keeps the name the ledger gave it, and a name the
-# ledger gives to another source is refused rather than written over.
+# ez/named: the name `ez add` records a dependency under, in the order cargo
+# names one. A source the ledger already holds keeps the name the ledger gave
+# it. Otherwise a package that is an ez project is named by its own
+# `[package] name`, when that is a TOML bare key; otherwise a repository by its
+# own name, and a directory by the directory's. The entry file names nothing,
+# because most packages call theirs `main.bend`, and two of them would share
+# one `[deps.main]`. A name the ledger gives to another source is refused
+# rather than written over.
 import Base
 import ../manifest/manifest.bend as M
 import ./target.bend as Tgt
@@ -60,6 +62,32 @@ def called(place: Tgt.Place, +url: String) -> String:
     case Tgt.Remote{_url, slug}:
       leaf(slug)
 
+# one char of a key, with the rest still to be asked about. The rest arrives
+# as a thunk, so a char that ends the key ends the walk.
+def bare.step(ok: Bool, rest: Unit -> Bool) -> Bool:
+  match ok:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      False{}
+
+# the rest of a TOML bare key: letters, digits, `-` and `_`
+def bare.rest(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      bare.step(Tgt.plain.at(h), _u => bare.rest(t))
+
+# a TOML bare key: at least one char, each a letter, a digit, `-` or `_`. Only
+# such a name can stand in `[deps.<name>]` unquoted.
+def bare(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      False{}
+    case SCon{+h, t}:
+      bare.step(Tgt.plain.at(h), _u => bare.rest(t))
+
 # whether a source is this git url
 def from(src: M.Source, +url: String) -> Bool:
   match src:
@@ -86,6 +114,16 @@ def had(ds: List<&2, M.Dep>, +url: String, fresh: String) -> String:
     case h <> t:
       M.Dep{n, _h, _e, s} = h
       had.at(from(s, url), n, had(t, url, fresh))
+
+# the package's own name when it is a bare key, or the name its source gives
+# it. A name that could not stand as a key falls through, not refused.
+def own(+pkg: String, +fresh: String) -> String:
+  Bool.pick(String, bare(pkg), pkg, fresh)
+
+# the name a dependency is recorded under: the ledger's for this source, else
+# the package's own, else its source's
+def name(ds: List<&2, M.Dep>, +url: String, +pkg: String, +fresh: String) -> String:
+  had(ds, url, own(pkg, fresh))
 
 # the first dependency of this name, asked whether it is another source
 def clash.at(hit: Bool, src: M.Source, +url: String, rest: Bool) -> Bool:
