@@ -50,7 +50,10 @@ def spec() -> Shake.Cli:
           Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
             []),
           Shake.pos("ref", "commit, tag or branch", False{}, None{}, []),
-          Shake.pos("entry", "entry file", False{}, None{}, [])
+          Shake.pos("entry", "entry file", False{}, None{}, []),
+          Shake.opt("rename", None{}, Some{"rename"},
+            "record it under this name, ahead of its own (a TOML bare key)",
+            False{}, None{}, [])
         ], []),
       Shake.sub("remove", "drop a package from the ledger",
         [
@@ -126,7 +129,7 @@ def dispatch(sub: Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Uni
       Cmd.init(Shake.get(matched, "name"), Shake.get(matched, "entry"))
     case CAdd{}:
       Cmd.add(Shake.get(matched, "target"), Shake.get(matched, "ref"),
-        Shake.get(matched, "entry"))
+        Shake.get(matched, "entry"), Shake.get(matched, "rename"))
     case CRemove{}:
       Cmd.remove(Shake.get(matched, "name"))
     case CLock{}:
@@ -197,9 +200,13 @@ def fail(+app: Shake.Cli, err: Shake.ParseErr) -> IO(Unit):
     case other:
       fail.err(app, other)
 
-# a successful parse: the command named by the path, then its bindings
+# a successful parse: the directories the command writes into made, then the
+# command named by the path, with its bindings
 def go.done(+as: List<&2, String>, +matched: Shake.Matched) -> IO(Unit):
-  dispatch(command(String.join(Shake.path_of(matched), "/")), matched, as)
+  +path = String.join(Shake.path_of(matched), "/")
+  do IO<Unit>:
+    Env.make(Env.dirs(path, Shake.get(matched, "out")))
+    dispatch(command(path), matched, as)
 
 # the parse result
 def go.parsed(
@@ -219,6 +226,5 @@ def go(+app: Shake.Cli, +as: List<&2, String>) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    Env.make()
     as : List<&2, String> <- Args.all()
     go(spec(), as)

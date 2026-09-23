@@ -18,6 +18,7 @@ import ./target.bend as Tgt
 import ./upgrade.bend as Up
 import ./pin.bend as Pin
 import ./sorted.bend as Sorted
+import ./named.bend as Named
 import ../ez/say.bend as Say
 
 # the ledger's path, which is fixed
@@ -29,6 +30,24 @@ def load() -> IO(M.Read):
   do IO<M.Read>:
     t : Maybe<&2, String> <- F.read(toml())
     return M.parse(F.text_of(t))
+
+# the ledger a command that edits it reads: what the file holds, parsed, or a
+# refusal when there is no file. Only `ez init` makes a ledger; `ez add`,
+# `ez remove` and `ez lock` read one, and one that is missing is not an empty
+# one to write back.
+def ledger.of(got: Maybe<&2, String>, +cmd: String) -> M.Read:
+  match got:
+    case None{}:
+      M.Bad{"no " ++ toml() ++ " here; ez " ++ cmd ++
+        " works on a project's ledger, and ez init makes one"}
+    case Some{text}:
+      M.parse(text)
+
+# the ledger on disk, for a command that edits it
+def load.edit(+cmd: String) -> IO(M.Read):
+  do IO<M.Read>:
+    t : Maybe<&2, String> <- F.read(toml())
+    return ledger.of(t, cmd)
 
 # a failed run must fail the command, or a script around it learns nothing
 def report.exit(ok: Bool) -> IO(Unit):
@@ -259,9 +278,19 @@ def lock.up(up: Bool, +name: String) -> IO(Unit):
         Pin.upgrade(name)
         lock.now()
 
+# a lock is of a ledger, so a missing one stops it before anything is written
+def lock.read(ledger: M.Read, up: Bool, +name: String) -> IO(Unit):
+  match ledger:
+    case M.Bad{why}:
+      refuse(M.Bad{why})
+    case M.Good{_m}:
+      lock.up(up, name)
+
 # `ez lock` and `ez lock --upgrade [--package NAME]`
 def lock(up: Bool, +name: String) -> IO(Unit):
-  lock.up(up, name)
+  do IO<Unit>:
+    r : M.Read <- load.edit("lock")
+    lock.read(r, up, name)
 
 # BEND_LIB filled from the lock, with nothing re-resolved
 def fetch() -> IO(Unit):
@@ -331,8 +360,8 @@ def init.tail(+text: String) -> String:
 def init.ignored(+text: String, ms: List<&2, String>) -> String:
   init.tail(text) ++ "# written by ez\n" ++ String.join(ms, "\n") ++ "\n"
 
-# nothing to add means nothing written, so a second `ez init` leaves the file
-# it read exactly as it found it
+# nothing to add means nothing written, so an `ez init` in a directory whose
+# ignore file already has the rules leaves it exactly as it found it
 def init.ignore.put(ms: List<&2, String>, +text: String) -> IO(Bool):
   match ms:
     case Nil{}:
@@ -359,7 +388,7 @@ def init.entry.put(+at: String) -> IO(Bool):
     _mk : String <- R.exec(["mkdir", "-p", P.dir(at)])
     F.write(at, init.stub())
 
-# an entry that is already there is left alone, so a second `ez init` does not
+# an entry that is already there is left alone, so `ez init` does not
 # overwrite the program
 def init.entry.go(got: Maybe<&2, String>, +at: String) -> IO(Bool):
   match got:
@@ -374,49 +403,69 @@ def init.entry(+at: String) -> IO(Bool):
     g : Maybe<&2, String> <- F.read(at)
     init.entry.go(g, at)
 
+# the ledger a new project starts from, or nothing when there already is one.
+# A ledger on disk holds dependencies, tools and a `bin` that a fresh one would
+# lose, so `ez init` writes over none of it, whatever the file holds.
+def init.plan(got: Maybe<&2, String>, +name: String, +at: String) -> Maybe<&2, String>:
+  match got:
+    case Some{_s}:
+      None{}
+    case None{}:
+      Some{Rend.show(M.Manifest{name, at, "", "", [], []})}
+
+# the ledger written, then the ignore rules for what ez will generate beside
+# it, and the entry itself when the directory does not already hold one. A
+# project that already has a ledger is refused before anything is written.
+def init.go(plan: Maybe<&2, String>, +name: String, +at: String) -> IO(Unit):
+  match plan:
+    case None{}:
+      IO.die(Unit, 1, "ez: " ++ toml() ++
+        " already exists; ez init writes a new project and leaves it alone")
+    case Some{text}:
+      do IO<Unit>:
+        wrote : Bool <- F.write(toml(), text)
+        +kept : Bool <- init.ignore(name)
+        +made : Bool <- init.entry(at)
+        report.exit(Bool.and(wrote, Bool.and(kept, made)))
+
 # a new project: a ledger naming this directory and its entry file, the
-# ignore rules for what ez will generate beside them, and the entry itself
-# when the directory does not already hold one
+# ignore rules and the entry
 def init(+asked: String, +file: String) -> IO(Unit):
   do IO<Unit>:
     +name : String <- IO.pure(String, init.name(asked))
     +at : String <- IO.pure(String, entry.or(file))
-    wrote : Bool <- F.write(toml(),
-      Rend.show(M.Manifest{name, at, "", "", [], []}))
-    +kept : Bool <- init.ignore(name)
-    +made : Bool <- init.entry(at)
-    report.exit(Bool.and(wrote, Bool.and(kept, made)))
+    got : Maybe<&2, String> <- F.read(toml())
+    init.go(init.plan(got, name, at), name, at)
 
-# the last path component
-def add.base(ps: List<&2, String>) -> String:
-  match ps:
-    case []:
-      ""
-    case Con{h, Nil{}}:
-      h
-    case Con{_h, t}:
-      add.base(t)
-
-# a dependency is named after its entry file, the way bend names an import
-def add.alias(+at: String) -> String:
-  +leaf = add.base(String.split(at, '/'))
-  String.take(leaf, Nat.sub(String.length(leaf), 5n))
-
-# a vendoring's answer as a ledger entry. The entry file is read twice, once
-# for the name and once for itself, so it arrives through a parameter.
+# a vendoring's answer as a ledger entry, under the name `ez/named.bend` gave
+# it.
 #
 # `root` and the NAR hash are in the ledger because `ez lock` needs them and a
 # clone, which never sees .ez/origins.toml, would otherwise have to guess. They
 # come straight off the vendoring that computed them: it weighed the tree for
 # the NAR hash and worked the root out from where the entry sat, so asking the
 # cache it just wrote would be reading back our own answer.
-def add.dep.go(hash: String, url: String, rev: String, +at: String, tag: String, root: String, nar: String) -> M.Dep:
-  M.Dep{add.alias(at), hash, at, M.Git{url, rev, tag, root, nar, False{}}}
+def add.dep.go(
+  name: String,
+  hash: String,
+  url: String,
+  rev: String,
+  at: String,
+  tag: String,
+  root: String,
+  nar: String
+) -> M.Dep:
+  M.Dep{name, hash, at, M.Git{url, rev, tag, root, nar, False{}}}
 
 # what a vendoring answered, as the ledger records it
-def add.dep(got: Git.Got) -> M.Dep:
-  Git.Got{h, u, v, e, t, r, n} = got
-  add.dep.go(h, u, v, e, t, r, n)
+def add.dep(name: String, got: Git.Got) -> M.Dep:
+  Git.Got{h, u, v, e, t, r, n, _p} = got
+  add.dep.go(name, h, u, v, e, t, r, n)
+
+# the `[package] name` the vendored checkout gave itself, "" for none
+def add.pkg(got: Git.Got) -> String:
+  Git.Got{_h, _u, _v, _e, _t, _r, _n, p} = got
+  p
 
 # the dependencies of a ledger that was read
 def deps.of(manifest: M.Manifest) -> List<&2, M.Dep>:
@@ -430,26 +479,70 @@ def edit.write(+next: M.Manifest) -> IO(Unit):
     Up.allowlist(deps.of(next))
     report.exit(wrote)
 
-# the ledger with this dependency written into it. A dependency added again
-# keeps the `vendor = true` its entry already had.
-def add.write(ledger: M.Read, dep: M.Dep) -> IO(Unit):
+# a name the ledger can take, written into it with the dependency. A
+# dependency added again keeps the `vendor = true` its entry already had.
+def add.take(ok: Bool, why: String, manifest: M.Manifest, name: String, got: Git.Got) -> IO(Unit):
+  match ok:
+    case False{}:
+      IO.die(Unit, 1, why)
+    case True{}:
+      edit.write(Rend.add.keep(manifest, add.dep(name, got)))
+
+# the vendoring's answer named, by `Named.name`, and refused when the ledger
+# gives that name to another source
+def add.named(
+  +manifest: M.Manifest,
+  +got: Git.Got,
+  +fresh: String,
+  +url: String,
+  +rename: String
+) -> IO(Unit):
+  +name = Named.as(deps.of(manifest), url, rename, add.pkg(got), fresh)
+  +why = Named.why.as(deps.of(manifest), name, url, rename)
+  add.take(String.is_empty(why), why, manifest, name, got)
+
+# a `--rename` that is no key is refused before anything is fetched
+def add.fetch(
+  ok: Bool,
+  +manifest: M.Manifest,
+  +fresh: String,
+  +url: String,
+  +ref: String,
+  +entry: String,
+  +rename: String
+) -> IO(Unit):
+  match ok:
+    case False{}:
+      IO.die(Unit, 1, Named.why.as(deps.of(manifest), rename, url, rename))
+    case True{}:
+      do IO<Unit>:
+        lib : String <- Env.lib()
+        g : Git.Got <- Git.vendor(lib, url, ref, entry)
+        add.named(manifest, g, fresh, url, rename)
+
+# a git dependency vendored, then recorded in the ledger. The name can turn on
+# the checkout's own ez.toml, so it is decided once the checkout is read; a
+# refusal then leaves the ledger as it was, and only the cache under BEND_LIB
+# holds the tree. A ledger that does not parse is refused before anything is
+# fetched. The vendoring comes before the write: a ledger naming a package
+# that is not on disk is worse than no entry at all.
+def add.go(
+  ledger: M.Read,
+  fresh: String,
+  +url: String,
+  +ref: String,
+  +entry: String,
+  +rename: String
+) -> IO(Unit):
   match ledger:
     case M.Bad{why}:
       refuse(M.Bad{why})
-    case M.Good{m}:
-      edit.write(Rend.add.keep(m, dep))
+    case M.Good{manifest}:
+      add.fetch(Named.renamed.ok(rename), manifest, fresh, url, ref, entry, rename)
 
-# a git dependency vendored, and then recorded in the ledger under its own
-# name. The vendoring comes first: a ledger naming a package that is not on
-# disk is worse than no entry at all.
-def add.go(+url: String, +ref: String, +entry: String) -> IO(Unit):
-  do IO<Unit>:
-    lib : String <- Env.lib()
-    g : Git.Got <- Git.vendor(lib, url, ref, entry)
-    r : M.Read <- load()
-    add.write(r, add.dep(g))
-
-# a path, with `~` expanded the way `ez tool run` expands it
+# a path, with `~` expanded the way `ez tool run` expands it. A relative path
+# is kept as it was given, relative to the project, so the ledger reads the
+# same on any clone; git is handed it anchored (`Git.anchored`).
 def add.local(+path: String) -> IO(String):
   do IO<String>:
     +home : String <- Env.var("HOME", "")
@@ -474,14 +567,17 @@ def add.ref.at(given: Bool, +url: String, +ref: String) -> IO(String):
     case False{}:
       Git.default.ref(url)
 
-# `ez add <target> [rev|tag|branch] [entry.bend]`. The target is an
+# `ez add <target> [rev|tag|branch] [entry.bend] [--rename NAME]`. The target is an
 # `owner/repo`, a git url, or a path, the same shapes `ez tool run` takes.
 # A missing ref is resolved, and a missing entry is read from the checkout.
-def add(+target: String, +ref: String, +entry: String) -> IO(Unit):
+def add(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Unit):
+  +place = Tgt.classify(target)
   do IO<Unit>:
-    +url : String <- add.url(Tgt.classify(target))
+    +url : String <- add.url(place)
     +got : String <- add.ref.at(Bool.not(String.is_empty(ref)), url, ref)
-    add.go(url, got, entry)
+    r : M.Read <- load.edit("add")
+    +from : String <- Git.anchored(url)
+    add.go(r, Named.called(place, from), url, got, entry, rename)
 
 # the ledger with a dependency dropped, and its allowlist line with it
 def remove.write(ledger: M.Read, name: String) -> IO(Unit):
@@ -494,5 +590,5 @@ def remove.write(ledger: M.Read, name: String) -> IO(Unit):
 # `ez remove <name>`
 def remove(+name: String) -> IO(Unit):
   do IO<Unit>:
-    r : M.Read <- load()
+    r : M.Read <- load.edit("remove")
     remove.write(r, name)

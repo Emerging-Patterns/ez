@@ -14,6 +14,11 @@ import ./key.bend as K
 import ../manifest/manifest.bend as M
 import ./pin.bend as Pin
 import ./cmd.bend as Cmd
+import ./env.bend as Env
+import ./doctor.bend as Doctor
+import ../pkg/path.bend as P
+import ./named.bend as Named
+import ../manifest/render.bend as Rend
 
 # a ledger naming two packages, the one the drift laws read
 def ledger() -> String:
@@ -239,6 +244,34 @@ law expand_home:
   for +rest: String
   {Tgt.expand(home, "~/" ++ rest) == home ++ ("/" ++ rest) : String}
 
+# LAW: a URL is fetched as it is, wherever ez was run
+# EZ-LED-8
+law anchor_url:
+  for here: String
+  for +a: String
+  for +b: String
+  {P.anchor(here, a ++ ("://" ++ b)) == a ++ ("://" ++ b) : String}
+
+# LAW: an absolute path is fetched as it is, wherever ez was run
+# EZ-LED-8
+law anchor_absolute:
+  for here: String
+  for +rest: String
+  for e: {False{} == String.contains("/" ++ rest, "://") : Bool}
+  {P.anchor(here, "/" ++ rest) == "/" ++ rest : String}
+
+# LAW: a relative path, which the ledger keeps as it was given, is taken from
+# the directory ez runs in, the project's, and not from the work directory or
+# the repository top git would read it from
+# EZ-LED-8
+law anchor_relative:
+  for +here: String
+  for +path: String
+  for eu: {False{} == String.contains(path, "://") : Bool}
+  for ea: {False{} == String.starts_with(path, "/") : Bool}
+  for eg: {False{} == String.starts_with(path, "git@") : Bool}
+  {P.anchor(here, path) == P.join(here, path) : String}
+
 # key: when a cached tool is reused. The checkout is its commit; the binary
 # is its commit, the file bend built and the bend that built it. Each law
 # holds for every key, so no field is ever left out of the comparison.
@@ -355,6 +388,325 @@ law out_name:
 law root_skips_ez:
   for +p: String
   {Cmd.root.keep(".ez/" ++ p) == [] : List<&2, String>}
+
+# doctor: the lock is judged against the ledger it resolves
+
+# LAW: a ledger with no dependencies never makes the lock a problem, whatever
+# the lock names, so `ez doctor` passes a project that has nothing to lock
+law lock_needless:
+  for hs: List<&2, String>
+  {Doctor.lock.wrong(0n, hs) == False{} : Bool}
+
+# LAW: a ledger with dependencies and a lock that names no package is one
+law lock_needed:
+  for n: Nat
+  {Doctor.lock.wrong(1n+n, []) == True{} : Bool}
+
+# LAW: a lock that names a package is never one, however many the ledger has
+law lock_names:
+  for deps: Nat
+  for h: String
+  for t: List<&2, String>
+  {Doctor.lock.wrong(deps, h <> t) == False{} : Bool}
+
+# env: the directories ez makes before a command runs. Only a command that
+# writes into one without making it gets it, so `ez help`, `ez doctor` and a
+# mistyped command leave the directory they ran in as they found it.
+
+# LAW: a command other than `check` and `build` has nothing made for it
+law dirs_other:
+  for +cmd: String
+  for +out: String
+  for ec: {False{} == String.eq(cmd, "check") : Bool}
+  for eb: {False{} == String.eq(cmd, "build") : Bool}
+  {Env.dirs(cmd, out) == [] : List<&2, String>}
+
+# LAW: `check` has `.ez` made, where its JS goes
+law dirs_check:
+  for +cmd: String
+  for +out: String
+  for ec: {True{} == String.eq(cmd, "check") : Bool}
+  {Env.dirs(cmd, out) == [".ez"] : List<&2, String>}
+
+# LAW: `build` told nothing has `bin` made, where its binary goes
+law dirs_build:
+  for +cmd: String
+  for +out: String
+  for ec: {False{} == String.eq(cmd, "check") : Bool}
+  for eb: {True{} == String.eq(cmd, "build") : Bool}
+  for eo: {True{} == String.is_empty(out) : Bool}
+  {Env.dirs(cmd, out) == ["bin"] : List<&2, String>}
+
+# LAW: and `build` told where to write has nothing made in the project
+law dirs_build_out:
+  for +cmd: String
+  for +out: String
+  for ec: {False{} == String.eq(cmd, "check") : Bool}
+  for eb: {True{} == String.eq(cmd, "build") : Bool}
+  for eo: {False{} == String.is_empty(out) : Bool}
+  {Env.dirs(cmd, out) == [] : List<&2, String>}
+
+# cmd: a command that edits the ledger needs one to be there
+
+# LAW: a missing ledger reads, for any command that edits it, as one that did
+# not parse, which renders as nothing, so no edit is ever written in its place
+# EZ-LED-6
+law ledger_missing_unwritten:
+  for +cmd: String
+  {Rend.render(Cmd.ledger.of(None{}, cmd)) == "" : String}
+
+# LAW: a ledger that is there is read as the file says
+law ledger_present_parsed:
+  for s: String
+  for cmd: String
+  {Cmd.ledger.of(Some{s}, cmd) == M.parse(s) : M.Read}
+
+# cmd: `ez init` starts a project and never writes over one
+
+# LAW: a ledger already on disk, whatever it holds, leaves `ez init` nothing to
+# write, so its dependencies, tools and `bin` survive a second `ez init`
+# EZ-LED-6
+law init_keeps_ledger:
+  for s: String
+  for name: String
+  for at: String
+  {Cmd.init.plan(Some{s}, name, at) == None{} : Maybe<&2, String>}
+
+# named: what `ez add` records a dependency under. Its source names it, never
+# its entry file; the ledger keeps the name it already gave that source, and
+# refuses to hand a name it gave one source to another.
+
+# LAW: a source is named by what follows its last slash, whatever comes
+# before. A slug, a url and a resolved directory are all named this way, so
+# two packages whose entry is `main.bend` are named after their repositories.
+# EZ-LED-7
+law leaf_is_last:
+  for p: String
+  for +n: String
+  for e: {Named.Seen{False{}, n} == Named.last(n) : Named.Seen}
+  {Named.leaf(p ++ ("/" ++ n)) == n : String}
+
+# LAW: a package whose own `[package] name` is a TOML bare key is named by it
+# EZ-LED-7
+law own_package:
+  for +pkg: String
+  for +fresh: String
+  for e: {True{} == Named.bare(pkg) : Bool}
+  {Named.own(pkg, fresh) == pkg : String}
+
+# LAW: a package name that is not a bare key, or none at all, falls through to
+# the name the source gives itself rather than being refused
+# EZ-LED-7
+law own_invalid:
+  for +pkg: String
+  for +fresh: String
+  for e: {False{} == Named.bare(pkg) : Bool}
+  {Named.own(pkg, fresh) == fresh : String}
+
+# LAW: a name with a dot in it, like `next.js`, is not a bare key, since
+# `[deps.next.js]` would be a table inside a table
+law bare_no_dot:
+  for +a: String
+  for +b: String
+  {Named.bare(a ++ ("." ++ b)) == False{} : Bool}
+
+# LAW: the name the ledger already gives this source beats the package's own
+# name and the source's
+# EZ-LED-7
+law name_keeps:
+  for n: String
+  for h: String
+  for en: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for +pkg: String
+  for +fresh: String
+  {Named.name(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+    pkg, fresh) == n : String}
+
+# LAW: `--rename`, when given, is the name, ahead of the ledger's, the
+# package's and the source's
+# EZ-LED-7
+law rename_wins:
+  for ds: List<&2, M.Dep>
+  for +url: String
+  for +rename: String
+  for +pkg: String
+  for +fresh: String
+  for e: {False{} == String.is_empty(rename) : Bool}
+  {Named.as(ds, url, rename, pkg, fresh) == rename : String}
+
+# LAW: a `--rename` that is not a bare key, like `a.b`, is refused
+# EZ-LED-7
+law rename_dotted:
+  for +a: String
+  for +b: String
+  {Named.renamed.ok(a ++ ("." ++ b)) == False{} : Bool}
+
+# LAW: a `--rename` of a source the ledger already records under another name
+# is refused, rather than recorded twice or renamed behind the ledger's back
+# EZ-LED-7
+law rename_moved:
+  for +n: String
+  for +h: String
+  for +en: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +t: List<&2, M.Dep>
+  for +rename: String
+  for er: {False{} == String.is_empty(rename) : Bool}
+  for en0: {False{} == String.is_empty(n) : Bool}
+  for nr: {False{} == String.eq(n, rename) : Bool}
+  {Named.moved(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+    rename) == True{} : Bool}
+
+# LAW: and a `--rename` the ledger gives to another source still clashes
+# EZ-LED-7
+law rename_clash:
+  for +r: String
+  for +h: String
+  for +en: String
+  for +u: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +t: List<&2, M.Dep>
+  for +pkg: String
+  for +fresh: String
+  for ne: {False{} == String.eq(u, url) : Bool}
+  for er: {False{} == String.is_empty(r) : Bool}
+  {Named.clash(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t,
+    Named.as(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, url, r,
+      pkg, fresh), url) == True{} : Bool}
+
+# LAW: a ledger that holds no dependency takes the name the source gives
+# itself
+law had_fresh:
+  for url: String
+  for fresh: String
+  {Named.had([], url, fresh) == fresh : String}
+
+# LAW: a ledger that already holds this git source keeps the name it gave it,
+# so adding it again replaces that entry rather than adding a second
+law had_keeps:
+  for n: String
+  for h: String
+  for en: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for fresh: String
+  {Named.had(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+    fresh) == n : String}
+
+# LAW: an entry from another git source does not lend this one its name
+law had_skips_git:
+  for n: String
+  for h: String
+  for en: String
+  for u: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for fresh: String
+  for ne: {False{} == String.eq(u, url) : Bool}
+  {Named.had(M.Dep{n, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, url,
+    fresh) == Named.had(t, url, fresh) : String}
+
+# LAW: nor does a hub entry, which has no git source to be
+law had_skips_hub:
+  for n: String
+  for h: String
+  for en: String
+  for +url: String
+  for t: List<&2, M.Dep>
+  for fresh: String
+  {Named.had(M.Dep{n, h, en, M.Hub{}} <> t, url, fresh)
+    == Named.had(t, url, fresh) : String}
+
+# LAW: an empty ledger clashes with no name
+law clash_none:
+  for name: String
+  for url: String
+  {Named.clash([], name, url) == False{} : Bool}
+
+# LAW: an entry of another name is not a clash, whatever its source
+law clash_skips:
+  for m: String
+  for h: String
+  for en: String
+  for s: M.Source
+  for t: List<&2, M.Dep>
+  for +name: String
+  for +url: String
+  for ne: {False{} == String.eq(m, name) : Bool}
+  {Named.clash(M.Dep{m, h, en, s} <> t, name, url)
+    == Named.clash(t, name, url) : Bool}
+
+# LAW: the name held by this same git source is not a clash: that is a re-add
+# EZ-LED-7
+law clash_same:
+  for +n: String
+  for h: String
+  for en: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  {Named.clash(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n,
+    url) == False{} : Bool}
+
+# LAW: the name held by another git source is a clash, and is refused rather
+# than written over
+# EZ-LED-7
+law clash_other:
+  for +n: String
+  for h: String
+  for en: String
+  for u: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for ne: {False{} == String.eq(u, url) : Bool}
+  {Named.clash(M.Dep{n, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, n,
+    url) == True{} : Bool}
+
+# LAW: and so is the name held by a hub dependency
+# EZ-LED-7
+law clash_hub:
+  for +n: String
+  for h: String
+  for en: String
+  for +url: String
+  for t: List<&2, M.Dep>
+  {Named.clash(M.Dep{n, h, en, M.Hub{}} <> t, n, url) == True{} : Bool}
 
 # pin: a plain `ez lock` copies every `[tools.*]` pin as the ledger has it,
 # and refuses one it would have to fill. Filling is `--upgrade`'s alone.

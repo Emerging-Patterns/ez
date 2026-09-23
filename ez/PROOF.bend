@@ -10,6 +10,11 @@ import ./drift.bend as D
 import ./gate.bend as G
 import ./pin.bend as Pin
 import ./target.bend as Tgt
+import ./named.bend as Named
+import ./env.bend as Env
+import ./doctor.bend as Doctor
+import ../pkg/path.bend as P
+import ../manifest/manifest.bend as M
 import ./key.bend as K
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
@@ -1150,6 +1155,31 @@ def Laws.expand_home(home, rest):
       == home ++ ("/" ++ rest) : String}
   {==}
 
+# `://` is found wherever it is put (`contains_url`), and that picks the arm
+# that keeps a URL.
+def Laws.anchor_url(here, a, b):
+  %Equal.sym(Bool, String.contains(a ++ ("://" ++ b), "://"), True{},
+    contains_url(a, b)) :
+    {P.anchor.at(_, here, a ++ ("://" ++ b)) == a ++ ("://" ++ b) : String}
+  {==}
+
+# `/` in front of anything starts with `/`, which `starts_append` holds, and
+# that picks the arm that keeps the path.
+def Laws.anchor_absolute(here, rest, e):
+  %e : {P.anchor.at(_, here, "/" ++ rest) == "/" ++ rest : String}
+  %Equal.sym(Bool, String.starts_with("/" ++ rest, "/"), True{},
+    Eq.starts_append("/", rest)) :
+    {P.anchor.path(Bool.or(_, String.starts_with("/" ++ rest, "git@")), here,
+      "/" ++ rest) == "/" ++ rest : String}
+  {==}
+
+def Laws.anchor_relative(here, path, eu, ea, eg):
+  %eu : {P.anchor.at(_, here, path) == P.join(here, path) : String}
+  %ea : {P.anchor.path(Bool.or(_, String.starts_with(path, "git@")), here,
+    path) == P.join(here, path) : String}
+  %eg : {P.anchor.path(_, here, path) == P.join(here, path) : String}
+  {==}
+
 def Laws.file_bin():
   {==}
 
@@ -1267,6 +1297,308 @@ def Laws.root_skips_ez(p):
   Equal.cong(Bool, List<&2, String>,
     k => Bool.pick(List<&2, String>, k, [], [".ez/" ++ p]),
     String.starts_with(".ez/" ++ p, ".ez/"), True{}, Eq.starts_append(".ez/", p))
+
+# doctor: the lock's verdict turns on the list first, so the no-dependency law
+# splits on it and the other two are the arm they name.
+
+def Laws.lock_needless(hs):
+  match hs:
+    case []:
+      {==}
+    case _h <> _t:
+      {==}
+
+def Laws.lock_needed(_n):
+  {==}
+
+def Laws.lock_names(_deps, _h, _t):
+  {==}
+
+# env: each premise is rewritten into the test the pick turns on.
+
+def Laws.dirs_other(cmd, out, ec, eb):
+  %ec : {Bool.pick(List<&2, String>, _, [".ez"],
+    Env.dirs.build(String.eq(cmd, "build"), String.is_empty(out)))
+    == [] : List<&2, String>}
+  %eb : {Env.dirs.build(_, String.is_empty(out)) == [] : List<&2, String>}
+  {==}
+
+def Laws.dirs_check(cmd, out, ec):
+  %ec : {Bool.pick(List<&2, String>, _, [".ez"],
+    Env.dirs.build(String.eq(cmd, "build"), String.is_empty(out)))
+    == [".ez"] : List<&2, String>}
+  {==}
+
+def Laws.dirs_build(cmd, out, ec, eb, eo):
+  %ec : {Bool.pick(List<&2, String>, _, [".ez"],
+    Env.dirs.build(String.eq(cmd, "build"), String.is_empty(out)))
+    == ["bin"] : List<&2, String>}
+  %eb : {Env.dirs.build(_, String.is_empty(out)) == ["bin"] : List<&2, String>}
+  %eo : {Bool.pick(List<&2, String>, _, ["bin"], []) == ["bin"]
+    : List<&2, String>}
+  {==}
+
+def Laws.dirs_build_out(cmd, out, ec, eb, eo):
+  %ec : {Bool.pick(List<&2, String>, _, [".ez"],
+    Env.dirs.build(String.eq(cmd, "build"), String.is_empty(out)))
+    == [] : List<&2, String>}
+  %eb : {Env.dirs.build(_, String.is_empty(out)) == [] : List<&2, String>}
+  %eo : {Bool.pick(List<&2, String>, _, ["bin"], []) == [] : List<&2, String>}
+  {==}
+
+# A missing ledger is the `Bad` arm, and a `Bad` read renders as nothing.
+def Laws.ledger_missing_unwritten(_cmd):
+  {==}
+
+def Laws.ledger_present_parsed(_s, _cmd):
+  {==}
+
+# A ledger that is there picks the arm that plans nothing.
+def Laws.init_keeps_ledger(_s, _name, _at):
+  {==}
+
+# named: a walk from the end of a text has passed a slash once it has passed
+# the one in front of `n`, and nothing to its left changes that. The name laws
+# rewrite the one `String.eq` each branch turns on.
+
+# LAW: past the slash in front of a slashless `n`, the walk has seen a slash
+# and kept `n`, whatever is to the left of it
+law last_after:
+  for p: String
+  for +n: String
+  for e: {Named.Seen{False{}, n} == Named.last(n) : Named.Seen}
+  {Named.last(p ++ ("/" ++ n)) == Named.Seen{True{}, n} : Named.Seen}
+
+def last_after(p, n, e):
+  match p:
+    case SNil{}:
+      %e : {Named.last.step('/', _) == Named.Seen{True{}, n} : Named.Seen}
+      {==}
+    case SCon{+h, +t}:
+      %Equal.sym(Named.Seen, Named.last(t ++ ("/" ++ n)), Named.Seen{True{}, n},
+        last_after(t, n, e)) :
+        {Named.last.step(h, _) == Named.Seen{True{}, n} : Named.Seen}
+      {==}
+
+def Laws.leaf_is_last(p, n, e):
+  Equal.cong(Named.Seen, String, Named.leaf.of,
+    Named.last(p ++ ("/" ++ n)), Named.Seen{True{}, n}, last_after(p, n, e))
+
+def Laws.own_package(pkg, fresh, e):
+  %e : {Bool.pick(String, _, pkg, fresh) == pkg : String}
+  {==}
+
+def Laws.own_invalid(pkg, fresh, e):
+  %e : {Bool.pick(String, _, pkg, fresh) == fresh : String}
+  {==}
+
+# LAW: a step whose rest is false is false, whatever the char was
+law step_false:
+  for ok: Bool
+  for r: Unit -> Bool
+  for e: {r(Unit{}) == False{} : Bool}
+  {Named.bare.step(ok, r) == False{} : Bool}
+
+def step_false(ok, _r, e):
+  match ok:
+    case True{}:
+      e
+    case False{}:
+      {==}
+
+# LAW: past the first char, a dot anywhere ends a bare key
+law rest_no_dot:
+  for +a: String
+  for +b: String
+  {Named.bare.rest(a ++ ("." ++ b)) == False{} : Bool}
+
+def rest_no_dot(a, b):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      step_false(Tgt.plain.at(h), _u => Named.bare.rest(t ++ ("." ++ b)),
+        rest_no_dot(t, b))
+
+# LAW: a dot anywhere ends a bare key
+law bare_dot:
+  for +a: String
+  for +b: String
+  {Named.bare(a ++ ("." ++ b)) == False{} : Bool}
+
+def bare_dot(a, b):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      step_false(Tgt.plain.at(h), _u => Named.bare.rest(t ++ ("." ++ b)),
+        rest_no_dot(t, b))
+
+def Laws.bare_no_dot(a, b):
+  bare_dot(a, b)
+
+def Laws.name_keeps(n, _h, _en, url, _rev, _tag, _root, _nar, _vend, t, pkg, fresh):
+  %Equal.sym(Bool, String.eq(url, url), True{}, Eq.string_eq_self(url)) :
+    {Named.had.at(_, n, Named.had(t, url, Named.own(pkg, fresh))) == n : String}
+  {==}
+
+def Laws.had_fresh(_url, _fresh):
+  {==}
+
+# LAW: the ledger's name for a git source it holds first is that name
+law had_first:
+  for n: String
+  for h: String
+  for en: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for fresh: String
+  {Named.had(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+    fresh) == n : String}
+
+def had_first(n, _h, _en, url, _rev, _tag, _root, _nar, _vend, t, fresh):
+  %Equal.sym(Bool, String.eq(url, url), True{}, Eq.string_eq_self(url)) :
+    {Named.had.at(_, n, Named.had(t, url, fresh)) == n : String}
+  {==}
+
+def Laws.had_keeps(n, h, en, url, rev, tag, root, nar, vend, t, fresh):
+  had_first(n, h, en, url, rev, tag, root, nar, vend, t, fresh)
+
+def Laws.had_skips_git(n, _h, _en, _u, url, _rev, _tag, _root, _nar, _vend, t, fresh, ne):
+  %ne : {Named.had.at(_, n, Named.had(t, url, fresh)) == Named.had(t, url, fresh)
+    : String}
+  {==}
+
+def Laws.had_skips_hub(_n, _h, _en, _url, _t, _fresh):
+  {==}
+
+def Laws.clash_none(_name, _url):
+  {==}
+
+def Laws.clash_skips(_m, _h, _en, s, t, name, url, ne):
+  %ne : {Named.clash.at(_, s, url, Named.clash(t, name, url))
+    == Named.clash(t, name, url) : Bool}
+  {==}
+
+def Laws.clash_same(n, _h, _en, url, rev, tag, root, nar, vend, t):
+  %Equal.sym(Bool, String.eq(n, n), True{}, Eq.string_eq_self(n)) :
+    {Named.clash.at(_, M.Git{url, rev, tag, root, nar, vend}, url,
+      Named.clash(t, n, url)) == False{} : Bool}
+  %Equal.sym(Bool, String.eq(url, url), True{}, Eq.string_eq_self(url)) :
+    {Bool.not(_) == False{} : Bool}
+  {==}
+
+# LAW: a name held first by another git source clashes
+law clash_first:
+  for +n: String
+  for h: String
+  for en: String
+  for u: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for ne: {False{} == String.eq(u, url) : Bool}
+  {Named.clash(M.Dep{n, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, n,
+    url) == True{} : Bool}
+
+def clash_first(n, _h, _en, u, url, rev, tag, root, nar, vend, t, ne):
+  %Equal.sym(Bool, String.eq(n, n), True{}, Eq.string_eq_self(n)) :
+    {Named.clash.at(_, M.Git{u, rev, tag, root, nar, vend}, url,
+      Named.clash(t, n, url)) == True{} : Bool}
+  %ne : {Bool.not(_) == True{} : Bool}
+  {==}
+
+def Laws.clash_other(n, h, en, u, url, rev, tag, root, nar, vend, t, ne):
+  clash_first(n, h, en, u, url, rev, tag, root, nar, vend, t, ne)
+
+def Laws.clash_hub(n, _h, _en, url, t):
+  %Equal.sym(Bool, String.eq(n, n), True{}, Eq.string_eq_self(n)) :
+    {Named.clash.at(_, M.Hub{}, url, Named.clash(t, n, url)) == True{} : Bool}
+  {==}
+
+# LAW: a given `--rename` is the name
+law as_rename:
+  for ds: List<&2, M.Dep>
+  for +url: String
+  for +rename: String
+  for +pkg: String
+  for +fresh: String
+  for e: {False{} == String.is_empty(rename) : Bool}
+  {Named.as(ds, url, rename, pkg, fresh) == rename : String}
+
+def as_rename(ds, url, rename, pkg, fresh, e):
+  %e : {Bool.pick(String, _, Named.name(ds, url, pkg, fresh), rename) == rename
+    : String}
+  {==}
+
+def Laws.rename_wins(ds, url, rename, pkg, fresh, e):
+  as_rename(ds, url, rename, pkg, fresh, e)
+
+def Laws.rename_dotted(a, b):
+  %nonempty_app(a, '.', b) :
+    {Bool.or(_, Named.bare(a ++ ("." ++ b))) == False{} : Bool}
+  bare_dot(a, b)
+
+# LAW: a second, different, non-empty name for a recorded source is moved
+law moved_of:
+  for +n: String
+  for +rename: String
+  for er: {False{} == String.is_empty(rename) : Bool}
+  for en0: {False{} == String.is_empty(n) : Bool}
+  for nr: {False{} == String.eq(n, rename) : Bool}
+  {Named.moved.of(n, rename) == True{} : Bool}
+
+def moved_of(n, rename, er, en0, nr):
+  %er : {Bool.and(Bool.not(_), Bool.and(Bool.not(String.is_empty(n)),
+    Bool.not(String.eq(n, rename)))) == True{} : Bool}
+  %en0 : {Bool.and(Bool.not(_), Bool.not(String.eq(n, rename))) == True{}
+    : Bool}
+  %nr : {Bool.not(_) == True{} : Bool}
+  {==}
+
+# The ledger's name for the source is `n` (`had_keeps`), and the premises
+# settle the three tests on it.
+def Laws.rename_moved(n, h, en, url, rev, tag, root, nar, vend, t, rename, er, en0, nr):
+  Equal.trans(Bool,
+    Named.moved(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+      rename),
+    Named.moved.of(n, rename),
+    True{},
+    Equal.cong(String, Bool, o => Named.moved.of(o, rename),
+      Named.had(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+        ""),
+      n,
+      had_first(n, h, en, url, rev, tag, root, nar, vend, t, "")),
+    moved_of(n, rename, er, en0, nr))
+
+# `--rename` is the name (`rename_wins`), and that name is held by another
+# source (`clash_other`).
+def Laws.rename_clash(r, h, en, u, url, rev, tag, root, nar, vend, t, pkg, fresh, ne, er):
+  Equal.trans(Bool,
+    Named.clash(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t,
+      Named.as(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, url, r,
+        pkg, fresh), url),
+    Named.clash(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, r,
+      url),
+    True{},
+    Equal.cong(String, Bool,
+      o => Named.clash(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t,
+        o, url),
+      Named.as(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, url, r,
+        pkg, fresh),
+      r,
+      as_rename(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t,
+        url, r, pkg, fresh, er)),
+    clash_first(r, h, en, u, url, rev, tag, root, nar, vend, t, ne))
 
 # A pin's two emptiness tests are rewritten to the False each premise gives,
 # and what is left is the arm that passes or the reason written out.

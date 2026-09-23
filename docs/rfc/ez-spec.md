@@ -250,8 +250,13 @@ These requirements are new in this revision. The ledger code already has the str
 | EZ-LED-3 | Removing a dependency from a ledger model twice is removing it once. | Proved | pending |
 | EZ-LED-4 | A ledger ez rendered parses back to the model it was rendered from. | Proved | pending |
 | EZ-LED-5 | A `[tools.*]` section is a tool, never a dependency, and needs no `hash`. | Proved | pending |
+| EZ-LED-6 | `ez init` writes nothing when a ledger exists, and `ez add`, `ez remove` and `ez lock`, with or without `--upgrade`, refuse and write nothing when there is none. | Proved | pending |
+| EZ-LED-7 | A dependency's ledger name is `--rename` when given, which must be a TOML bare key; otherwise the name the ledger already records for that source; otherwise the target's `[package] name` when it is a TOML bare key; otherwise the repository's name; otherwise the directory's name. A name the ledger gives a different source is refused, and so is a `--rename` of a source the ledger records under another name. | Proved | pending |
+| EZ-LED-8 | A path target is recorded in the ledger as it was given, and a relative path resolves against the project root wherever git reads it: `ez add`, `ez lock`, `ez fetch` and `ez lock --upgrade`. | Proved | pending |
 
 EZ-LED-1 to EZ-LED-3 have quantified laws today (`read_refuses_a_problem`, `render_of_unread_is_blank`, `add_idem`, `remove_idem`), and are pending only because the laws are untagged and state the model edit, not the command. `ez add` does not call `R.add` on the parsed ledger as it stands: it forces `vendor = false` and re-renders the whole file, so re-adding a dependency drops `vendor = true`. The requirement is over the model edit; the command's use of it is part of converting `ez add` to planner form. EZ-LED-4 has one closed example (`render_parse_roundtrip`).
+
+EZ-LED-6 to EZ-LED-8 come from the decided behavior changes below. Their decisions are pure functions with quantified laws: for EZ-LED-6, `init_keeps_ledger` and `ledger_missing_unwritten`; for EZ-LED-7, `rename_wins`, `rename_dotted`, `rename_moved`, `rename_clash`, `name_keeps`, `own_package`, `own_invalid`, `leaf_is_last`, `clash_same`, `clash_other` and `clash_hub`; for EZ-LED-8, `anchor_url`, `anchor_absolute` and `anchor_relative`. We keep the three requirements pending until `ez add` and `ez remove` are in planner form, because the laws state what the decision functions return and not that the commands act on it. EZ-LED-8 is what keeps EZ-DOC-3 true for path dependencies: the ledger and the lock record the path as the user gave it, so a clone that keeps the project and the path's repository side by side locks to the same bytes.
 
 #### Lock document (EZ-DOC)
 
@@ -341,7 +346,7 @@ EZ-VEN-1 is not true today: only `ez lock --upgrade` writes the allowlist, `ez a
 
 EZ-VEN-2 and EZ-VEN-3 together specify rewriting completely: the first says what changes, the second says nothing else does. The match is exact at column 0, so an indented import (which the package walk accepts) is not rewritten; the requirement states the column-0 rule so that a change to it is a behavior change. Swaps apply one after another, so the law should quantify over swap lists with distinct old and new hashes. The single closed example, `imports_follow_hash`, covers both requirements on one file.
 
-EZ-VEN-4 holds today (`ez/doctor.bend` has no file write) and is only provable because of the planner split, where it becomes a claim that the plan `doctor_plan` returns contains no effect under the project root other than the directories every command creates. Every command runs `Env.make()` first, which creates `.ez`, `bin` and the library directory; that is recorded as accidental in the inventory. EZ-VEN-5 is new; the drift report has six closed laws in `ez/LAWS.bend` (`report_both_ways` and the rest) and no requirement until now.
+EZ-VEN-4 holds today (`ez/doctor.bend` has no file write) and is only provable because of the planner split, where it becomes a claim that the plan `doctor_plan` returns contains no effect under the project root. Every command used to run `Env.make()` first, which created `.ez`, `bin` and the library directory; that was recorded as accidental in the inventory and is fixed, so `ez doctor` creates nothing (`Env.dirs`, law `dirs_other`). EZ-VEN-5 is new; the drift report has six closed laws in `ez/LAWS.bend` (`report_both_ways` and the rest) and no requirement until now.
 
 #### Fetch (EZ-FETCH)
 
@@ -479,7 +484,9 @@ For EZ-PUB-2, nothing changes. bend 2.0.25 cannot report a package's hash withou
 
 For the proof gate, a new `ez prove` command runs `bend` on every PROOF.bend and applies the exact `All terms check.` rule, and `mkProofs` runs it instead of `ez test`.
 
-The inventory also lists behavior that looks accidental and is not a requirement. The fixes worth making, in order: `ez init` overwrites an existing ledger; `ez add` names a dependency after its entry file, so two `main.bend` entries collide, and re-adding a dependency drops `vendor = true`; `ez add` with a relative path fetches relative to the wrong directory; every command, `ez help` included, creates `.ez` and `bin` in the current directory; and `ez doctor` fails a project with no dependencies.
+For EZ-LED-6 to EZ-LED-8, `ez init` refuses a directory that already has a ledger, and `ez add`, `ez remove` and `ez lock` refuse one that has none. `ez add` names a dependency the way cargo does, by the package's own `[package] name` first, with `--rename` to override it, instead of after its entry file, where two `main.bend` entries collided; a name the ledger gives another source is refused, and re-adding a dependency keeps its `vendor = true`. A relative path target is recorded as given and resolved against the project root wherever git reads it, where `ez add` had fetched it relative to a work directory.
+
+The inventory also lists behavior that looks accidental and is not a requirement. The fixes worth making, besides the ledger changes above: every command, `ez help` included, creates `.ez` and `bin` in the current directory; and `ez doctor` fails a project with no dependencies.
 
 ### How we will know it worked
 

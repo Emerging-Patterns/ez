@@ -53,7 +53,8 @@ gives a shell with bend, git, openssl and `BEND_LIB` already set.
 
 ```
 ez init [name] [entry.bend]      scaffold a project: ez.toml, .gitignore, entry
-ez add <target> [ref] [entry.bend]  vendor a git package and record it
+ez add <target> [ref] [entry.bend] [--rename NAME]
+                                 vendor a git package and record it
 ez remove <name>                 drop a package from the ledger
 ez lock [--upgrade] [--package NAME]
                                  resolve every import, write ez.lock.toml
@@ -74,6 +75,12 @@ ez doctor                        report on the toolchain and the project
 
 `ez help` prints that list, and `ez help test` the flags of one command. The
 Bend runtime keeps `--help` for itself.
+
+`ez init` starts a project and never writes over one: in a directory that
+already has an `ez.toml` it exits 1 and writes nothing. It is also the only
+command that makes a ledger: `ez add`, `ez remove` and `ez lock` (with or
+without `--upgrade`) in a directory with no `ez.toml` exit 1 and write
+nothing.
 
 A ledger, and a dependency vendored from a repo that never published:
 
@@ -148,7 +155,12 @@ command runs the binary. `ez tool run` does, and the built program's status
 is the status of the command. A target, ledger, fetch, build or link that
 fails exits 1.
 
-`ez add` takes the same kind of target. With no ref, it pins the greatest
+`ez add` takes the same kind of target. A relative path is recorded as it
+was given, relative to the project, which is the directory ez runs in, since
+every command reads `ez.toml` from there; an absolute one stays absolute.
+`ez add`, `ez lock`, `ez fetch` and `ez lock --upgrade` all read a relative
+`git` from the project, so a project and a sibling repo moved together still
+lock to the same bytes. With no ref, it pins the greatest
 semver-ish release tag on the remote (`v1.9.0` beats `v2.0.0-rc1`); with no
 release, the greatest pre-release; with no semver-ish tag at all, the
 remote's default branch, as its `HEAD` names it. A remote whose `HEAD` names
@@ -159,6 +171,19 @@ asking the remote. The tag or branch is recorded as `tag`, which
 `ez lock --upgrade` re-resolves. With no entry, it reads `[package] entry`
 from that revision's `ez.toml`, then `[package] bin` when `entry` is absent,
 then `main.bend`. An entry given on the command line is used as given.
+The dependency is named the way cargo names one, never after its entry.
+`--rename NAME`, like `cargo add --rename`, records it under `NAME` ahead of
+every rule below; `NAME` must be a TOML bare key, and a source the ledger
+already records under another name is refused rather than recorded twice.
+Otherwise a source the ledger already records keeps the name it has there,
+so adding it again replaces that entry. Otherwise a target that is an ez
+project is named by the `[package] name` of its ez.toml at the fetched rev,
+when that is a TOML bare key (letters, digits, `-`, `_`); a name that is not one falls
+through rather than being refused. Otherwise `owner/repo` or a URL is named
+by the repository (`[deps.repo]`, any `.git` dropped), and a path by its
+directory. A name the ledger gives to another source stops `ez add` with
+exit 1 and leaves the ledger as it was, `--rename` included; remove that
+entry, or add this one with `--rename` under another name.
 
 A dependency with no `git` key lives on the hub. `vendor = true` commits that
 dependency's tree under `.ez/lib/<hash>` and names the hash in `.gitignore`.

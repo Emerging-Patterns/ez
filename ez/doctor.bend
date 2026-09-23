@@ -112,12 +112,39 @@ def locked() -> IO(List<&2, String>):
     +out : String <- R.exec(["grep", "-ohE", "0x[0-9a-f]{32}", lock()])
     return D.uniq(Sort.sort(answered(R.ok(out), R.text(out))))
 
+# whether a ledger with this many dependencies needs a lock that names some
+def lock.needs(deps: Nat) -> Bool:
+  match deps:
+    case 0n:
+      False{}
+    case 1n+_n:
+      True{}
+
+# whether the lock is a problem: it names no package while the ledger has
+# dependencies it should have resolved. A project with no dependencies has
+# nothing to lock, so a lock naming nothing, or no lock at all, is its due.
+def lock.wrong(deps: Nat, hs: List<&2, String>) -> Bool:
+  match hs:
+    case []:
+      lock.needs(deps)
+    case _h <> _t:
+      False{}
+
 # what the lock amounts to
-def lock.note(+hs: List<&2, String>) -> Note:
-  Note{List.is_empty(&2, String, hs),
+def lock.note(deps: Nat, +hs: List<&2, String>) -> Note:
+  +wrong = lock.wrong(deps, hs)
+  Note{wrong,
     lock() ++ ": " ++ plural(List.length(&2, String, hs), "package", "packages") ++
-    Bool.pick(String, List.is_empty(&2, String, hs),
-      " (unreadable, or it names none)", "")}
+    Bool.pick(String, wrong, " (unreadable, or it names none)", "")}
+
+# how many dependencies a ledger names; one that did not parse is its own note
+def deps.count(ledger: M.Read) -> Nat:
+  match ledger:
+    case M.Bad{_why}:
+      0n
+    case M.Good{m}:
+      M.Manifest{_n, _e, _b, _h, ds, _ts} = m
+      List.length(&2, M.Dep, ds)
 
 # the packages BEND_LIB holds, by the directory names under it
 def present(+lib: String) -> IO(List<&2, String>):
@@ -247,4 +274,5 @@ def run() -> IO(Unit):
     +hs : List<&2, String> <- locked()
     nlib : Note <- lib(hs)
     ndrift : Note <- drift(r)
-    say([nbend, ncc, ngit, toml.note(r), lock.note(hs), nlib, ndrift])
+    say([nbend, ncc, ngit, toml.note(r), lock.note(deps.count(r), hs), nlib,
+      ndrift])

@@ -179,3 +179,28 @@ def climb(count: Nat, path: String) -> String:
       norm(path)
     case 1n+q:
       climb(q, dir(path))
+
+# an absolute path, or a `git@` URL, as it is, or a relative path taken from
+# `here`
+def anchor.path(kept: Bool, +here: String, +path: String) -> String:
+  match kept:
+    case True{}:
+      path
+    case False{}:
+      join(here, path)
+
+# a URL as it is, or a path
+def anchor.at(url: Bool, +here: String, +path: String) -> String:
+  match url:
+    case True{}:
+      path
+    case False{}:
+      anchor.path(Bool.or(String.starts_with(path, "/"),
+        String.starts_with(path, "git@")), here, path)
+
+# a source as the directory `here` reads it. The ledger keeps a local path
+# relative to the project, the way it was given, and git reads a relative path
+# from somewhere else, so every git command is handed this instead. A URL is
+# the same wherever it is read from.
+def anchor(+here: String, +path: String) -> String:
+  anchor.at(String.contains(path, "://"), here, path)

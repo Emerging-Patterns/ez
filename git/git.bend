@@ -27,10 +27,11 @@ type Row is Data:
 
 # what a vendoring amounts to, which is everything the ledger records: the
 # package's `0x` name, where it came from, the commit pinned, the ref asked
-# for, and the entry the hash was computed from
+# for, the entry the hash was computed from, and the `[package] name` the
+# checkout's own ez.toml gives it, "" when it has none
 type Got is Data:
   Got{hash: String, url: String, rev: String, entry: String, tag: String,
-    root: String, nar: String}
+    root: String, nar: String, pkg: String}
 
 # how two versions compare. A release is greater than its prerelease, and a
 # numeric identifier is less than a word, which is the semver order.
@@ -71,14 +72,26 @@ def run(what: String, args: List<&2, String>) -> IO(Unit):
     +out : String <- R.exec(args)
     ran(R.ok(out), what, R.text(out))
 
+# a source as git is to read it. A ledger records a local path as it was
+# given, relative to the project, which is the directory ez runs in, so the
+# ledger reads the same on every clone. git reads such a path from somewhere
+# else: a fetch from inside its work directory, and `ls-remote` from the top
+# of any repository around it. Every git command here that is handed a source
+# is handed this instead.
+def anchored(+url: String) -> IO(String):
+  do IO<String>:
+    +here : String <- R.exec(["pwd"])
+    return P.anchor(String.trim(R.text(here)), url)
+
 # the checkout a package is taken from: the pinned commit alone, at the depth
 # of one, so a repo with a long history costs nothing to vendor. The fetch is
 # quiet; the line above it is what a person sees while it runs.
 def clone.say(+work: String, +url: String, +rev: String, +msg: String) -> IO(Unit):
   do IO<Unit>:
     +s : Say.Spin <- Say.hold(msg)
+    +from : String <- anchored(url)
     run("init", ["git", "init", "-q", work])
-    run("fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", url, rev])
+    run("fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", from, rev])
     run("checkout", ["git", "-C", work, "checkout", "-q", rev])
     Say.done(s)
 
@@ -219,7 +232,8 @@ def resolve.said(ok: Bool, +url: String, +ref: String, +text: String) -> IO(Ref)
 # full ref names, and `exact` still reads only the rows named exactly so.
 def resolve.ask(+url: String, +ref: String) -> IO(Ref):
   do IO<Ref>:
-    +out : String <- R.exec(["git", "ls-remote", url, "refs/tags/" ++ ref,
+    +from : String <- anchored(url)
+    +out : String <- R.exec(["git", "ls-remote", from, "refs/tags/" ++ ref,
       "refs/tags/" ++ ref ++ "^{}", "refs/heads/" ++ ref])
     resolve.said(R.ok(out), url, ref, R.text(out))
 
@@ -506,7 +520,15 @@ def said(+hash: String, +entry: String, tag: String, rev: String) -> IO(Unit):
     IO.print("import " ++ hash ++ "/" ++ base ++ " as " ++ title(P.unbend(base)))
 
 # the checkout weighed, walked and laid out, once it is on disk
-def vendor.tree(+lib: String, +work: String, +url: String, +rev: String, +tag: String, +entry: String) -> IO(Got):
+def vendor.tree(
+  +lib: String,
+  +work: String,
+  +url: String,
+  +rev: String,
+  +tag: String,
+  +entry: String,
+  pkg: String
+) -> IO(Got):
   +at = P.join(work, entry)
   do IO<Got>:
     +nh : String <- nar(work)
@@ -518,7 +540,7 @@ def vendor.tree(+lib: String, +work: String, +url: String, +rev: String, +tag: S
     +rt : String <- IO.pure(String, root.rel(at, K.pkg.root(p), entry))
     note(lib, origin(hash, url, rev, entry, rt, nh, tag))
     said(hash, entry, tag, rev)
-    return Got{hash, url, rev, entry, tag, rt, nh}
+    return Got{hash, url, rev, entry, tag, rt, nh, pkg}
 
 # `main.bend` when neither the entry nor the bin was named. That is the file
 # `ez init` writes when it is not told an entry.
@@ -574,6 +596,34 @@ def entry.at(+work: String) -> IO(String):
     m : Maybe<&2, String> <- F.read(work ++ "/ez.toml")
     return entry.maybe(m)
 
+# the package name a parsed document gives, or "" when it did not parse
+def called.sects(ok: Bool, ss: List<&2, T.Sect>) -> String:
+  match ok:
+    case False{}:
+      ""
+    case True{}:
+      M.value(M.pairs_of(ss, "package"), "name")
+
+# the package name a parsed document gives
+def called.doc(toml: T.Toml) -> String:
+  T.Toml{bad, _name, _pairs, sects} = toml
+  called.sects(String.is_empty(bad), sects)
+
+# a checkout with no ez.toml gives no package name
+def called.maybe(got: Maybe<&2, String>) -> String:
+  match got:
+    case None{}:
+      ""
+    case Some{text}:
+      called.doc(T.parse(text))
+
+# the `[package] name` of the checkout's ez.toml, the file its entry is read
+# from, or "" when there is none
+def called.at(+work: String) -> IO(String):
+  do IO<String>:
+    m : Maybe<&2, String> <- F.read(work ++ "/ez.toml")
+    return called.maybe(m)
+
 # the entry a vendoring is taken from. One that was asked for is that one.
 def entry.for(given: Bool, +entry: String, +work: String) -> IO(String):
   match given:
@@ -594,8 +644,9 @@ def vendor.at(+lib: String, +url: String, ref: Ref, +entry: String) -> IO(Got):
     _mk : String <- R.exec(["mkdir", "-p", work])
     clone(work, url, rev)
     +at : String <- entry.for(Bool.not(String.is_empty(entry)), entry, work)
+    pkg : String <- called.at(work)
     _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
-    g : Got <- vendor.tree(lib, work, url, rev, tag, at)
+    g : Got <- vendor.tree(lib, work, url, rev, tag, at, pkg)
     _cl : String <- R.exec(["rm", "-rf", work])
     return g
 
@@ -629,7 +680,8 @@ def remote.said(ok: Bool, +url: String, +text: String) -> IO(Tip):
 # name. `--symref` is what puts the branch on the line in front of the commit.
 def remote(+url: String) -> IO(Tip):
   do IO<Tip>:
-    +out : String <- R.exec(["git", "ls-remote", "--symref", url, "HEAD"])
+    +from : String <- anchored(url)
+    +out : String <- R.exec(["git", "ls-remote", "--symref", from, "HEAD"])
     remote.said(R.ok(out), url, R.text(out))
 
 # a bare clone, blobs left behind. Ancestry only needs the commits. The clone
@@ -637,7 +689,8 @@ def remote(+url: String) -> IO(Tip):
 def clone.bare(+work: String, +url: String) -> IO(Unit):
   do IO<Unit>:
     +s : Say.Spin <- Say.hold(Say.git.fetch(url))
-    run("clone", ["git", "clone", "--bare", "--filter=blob:none", "-q", url, work])
+    +from : String <- anchored(url)
+    run("clone", ["git", "clone", "--bare", "--filter=blob:none", "-q", from, work])
     Say.done(s)
 
 # merge-base answers 0 for a descendant, 1 for anything else, and some other
@@ -1136,7 +1189,8 @@ def tags.said(ok: Bool, +url: String, +text: String) -> IO(List<&2, String>):
 # every tag on the remote
 def tags(+url: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
-    +out : String <- R.exec(["git", "ls-remote", "--tags", url])
+    +from : String <- anchored(url)
+    +out : String <- R.exec(["git", "ls-remote", "--tags", from])
     tags.said(R.ok(out), url, R.text(out))
 
 # a remote whose HEAD names no branch leaves `ez add` nothing to pin
@@ -1159,7 +1213,8 @@ def heads.said(ok: Bool, +url: String, +text: String) -> IO(String):
 # the remote's default branch, as its `HEAD` symref names it
 def heads(+url: String) -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(["git", "ls-remote", "--symref", url, "HEAD"])
+    +from : String <- anchored(url)
+    +out : String <- R.exec(["git", "ls-remote", "--symref", from, "HEAD"])
     heads.said(R.ok(out), url, R.text(out))
 
 def default.go(empty: Bool, +tag: String, +url: String) -> IO(String):
