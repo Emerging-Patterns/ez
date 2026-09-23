@@ -371,14 +371,27 @@ law source_of_vendor:
 # LAW: the vendor bit ez renders reads back as the bit it rendered. The key is
 # written bare, `vendor = true`, which TOML reads as a boolean and ez reads as
 # the same bit it reads from the quoted spelling an older ez wrote; a bit that
-# is not set leaves no key, which reads as not set. EZ-LED-4 needs the round
-# trip for every ledger; this is stated for one fixed ledger around the
-# dependency, so it checks the spelling and carries no requirement.
+# is not set leaves no key, which reads as not set. This is stated for one
+# fixed ledger around the dependency, so it checks the spelling and carries
+# no requirement; `ledger_reads_back` is the round trip for every ledger.
 law vendor_reads_back:
   for v: Bool
   {M.source.vendor(M.source.dep(M.dep(M.parse(R.show(M.Manifest{"app", "", "",
     "", [M.Dep{"dep", "0x1", "", M.Git{"u", "r", "", ".", "n", v}}], []})),
     "dep"))) == v : Bool}
+
+# LAW: a ledger ez can write, rendered, parses back to the model it was
+# rendered from, whole: every field, every dependency and every tool pin in
+# order. This is stated against the pinned eztoml v0.1.0 reader, for every
+# ledger `R.renderable` accepts: no name or value holds `"`, `\` or a
+# newline, every dependency has a hash, and every git source names its repo
+# and its root. Every command that writes ez.toml refuses a ledger that is not
+# renderable, so this holds of every ledger ez writes.
+# EZ-LED-4
+law ledger_reads_back:
+  for +m: M.Manifest
+  for +e: {R.renderable(m) == True{} : Bool}
+  {M.parse(R.show(m)) == M.Good{m} : M.Read}
 
 # LAW: a dependency added again keeps the `vendor = true` the ledger already
 # gave it. `ez add` has no way to say it, so dropping it would drop the tree
