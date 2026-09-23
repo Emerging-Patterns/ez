@@ -3493,7 +3493,7 @@ def head_clear(n, en):
     Str.clear(String.append(n, "/"), '\n'),
     Bool.and(Str.clear(n, '\n'), Str.clear("/", '\n')),
     True{},
-    Str.clear_append(n, "/", '\n'),
+    Str.clear_append_eq(n, "/", '\n'),
     and_tt(Str.clear(n, '\n'), Str.clear("/", '\n'), en, {==}))
 
 # LAW: one line, with whether the move names it given as a parameter: what the
@@ -3516,7 +3516,7 @@ def line_clear.arm(b, l, o, n, el, en):
         Bool.and(Str.clear(U.reimport.head(n), '\n'),
           Str.clear(String.drop(l, String.length(U.reimport.head(o))), '\n')),
         True{},
-        Str.clear_append(U.reimport.head(n),
+        Str.clear_append_eq(U.reimport.head(n),
           String.drop(l, String.length(U.reimport.head(o))), '\n'),
         and_tt(Str.clear(U.reimport.head(n), '\n'),
           Str.clear(String.drop(l, String.length(U.reimport.head(o))), '\n'),

@@ -9,6 +9,7 @@ import ../manifest/upgrade.bend as U
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
+import ../check/toml.bend as Toml
 import ../pkg/pkg.bend as K
 import ../pkg/LAWS.bend as KL
 import ../pkg/PROOF.bend as KP
@@ -1382,161 +1383,2053 @@ def Laws.relock_lays_nothing(w, ok):
       P.refuses(w), False{}, ok),
     fresh.laid(w))
 
-# The lock document's first step. The lemmas are about lists of chars, since
-# eztoml's trim and strip walk a string as one; the list lemmas are
-# check/str.bend's.
-
-# LAW: a trim that has stopped skipping keeps every char, reversed onto what
-# it kept already
-law walk_kept:
-  for +xs: List<&2, Char>
-  for +acc: List<&2, Char>
-  {T.trim.walk(xs, T.Trim{False{}, acc})
-    == T.Trim{False{}, List.reverse.go(&2, Char, xs, acc)} : T.Trim}
-
-def walk_kept(xs, acc):
-  match xs:
-    case []:
-      {==}
-    case +h <> +t:
-      walk_kept(t, h <> acc)
-
-# LAW: the first pass over a quoted value
-law trim_quoted.first:
-  for +v: String
-  {T.trim.pass(String.to_list(T.quote(v)))
-    == '"' <> List.reverse.go(&2, Char, String.to_list(v), ['"'])
-    : List<&2, Char>}
-
-def trim_quoted.first(v):
-  Equal.trans(List<&2, Char>,
-    T.trim.pass(String.to_list(T.quote(v))),
-    List.reverse.go(&2, Char,
-      List.append(&2, Char, String.to_list(v), ['"']), ['"']),
-    '"' <> List.reverse.go(&2, Char, String.to_list(v), ['"']),
-    Equal.trans(List<&2, Char>,
-      T.trim.pass(String.to_list(T.quote(v))),
-      T.trim.out(T.trim.walk(
-        List.append(&2, Char, String.to_list(v), ['"']),
-        T.Trim{False{}, ['"']})),
-      List.reverse.go(&2, Char,
-        List.append(&2, Char, String.to_list(v), ['"']), ['"']),
-      Equal.cong(List<&2, Char>, List<&2, Char>,
-        cs => T.trim.out(T.trim.walk(cs, T.Trim{False{}, ['"']})),
-        String.to_list(String.append(v, "\"")),
-        List.append(&2, Char, String.to_list(v), ['"']),
-        Str.to_list_append(v, "\"")),
-      Equal.cong(T.Trim, List<&2, Char>, st => T.trim.out(st),
-        T.trim.walk(List.append(&2, Char, String.to_list(v), ['"']),
-          T.Trim{False{}, ['"']}),
-        T.Trim{False{}, List.reverse.go(&2, Char,
-          List.append(&2, Char, String.to_list(v), ['"']), ['"'])},
-        walk_kept(List.append(&2, Char, String.to_list(v), ['"']), ['"']))),
-    Str.rev_append(String.to_list(v), ['"'], ['"']))
-
-# LAW: the two passes of a trim over a quoted value, as reversals
-law trim_quoted.passes:
-  for +v: String
-  {T.trim(T.quote(v))
-    == String.from_list(List.reverse.go(&2, Char,
-      List.reverse.go(&2, Char, String.to_list(v), ['"']), ['"'])) : String}
-
-def trim_quoted.passes(v):
-  Equal.trans(String,
-    T.trim(T.quote(v)),
-    String.from_list(T.trim.pass(
-      '"' <> List.reverse.go(&2, Char, String.to_list(v), ['"']))),
-    String.from_list(List.reverse.go(&2, Char,
-      List.reverse.go(&2, Char, String.to_list(v), ['"']), ['"'])),
-    Equal.cong(List<&2, Char>, String,
-      cs => String.from_list(T.trim.pass(cs)),
-      T.trim.pass(String.to_list(T.quote(v))),
-      '"' <> List.reverse.go(&2, Char, String.to_list(v), ['"']),
-      trim_quoted.first(v)),
-    Equal.cong(T.Trim, String, st => String.from_list(T.trim.out(st)),
-      T.trim.walk(List.reverse.go(&2, Char, String.to_list(v), ['"']),
-        T.Trim{False{}, ['"']}),
-      T.Trim{False{}, List.reverse.go(&2, Char,
-        List.reverse.go(&2, Char, String.to_list(v), ['"']), ['"'])},
-      walk_kept(List.reverse.go(&2, Char, String.to_list(v), ['"']), ['"'])))
-
-# The trim of a quoted value, one pass at a time. The first pass keeps the
-# opening quote and so everything after it, reversed; the second keeps the
-# closing quote, now first, and reverses the rest back.
+# The lock document's first step: a quoted value is its own trim, and its
+# quotes strip off. Both are check/toml.bend's, for any value.
 def Laws.trim_quoted(v):
-  Equal.trans(String,
-    T.trim(T.quote(v)),
-    String.from_list(List.reverse.go(&2, Char,
-      List.reverse.go(&2, Char, String.to_list(v), ['"']), ['"'])),
-    T.quote(v),
-    trim_quoted.passes(v),
-    Equal.trans(String,
-      String.from_list(List.reverse.go(&2, Char,
-        List.reverse.go(&2, Char, String.to_list(v), ['"']), ['"'])),
-      String.from_list('"' <> List.append(&2, Char, String.to_list(v), ['"'])),
-      T.quote(v),
-      Equal.cong(List<&2, Char>, String, cs => String.from_list(cs),
-        List.reverse.go(&2, Char,
-          List.reverse.go(&2, Char, String.to_list(v), ['"']), ['"']),
-        '"' <> List.append(&2, Char, String.to_list(v), ['"']),
-        Str.rev_rev(String.to_list(v), ['"'], ['"'])),
-      Equal.cong(String, String, s => SCon{'"', s},
-        String.from_list(List.append(&2, Char, String.to_list(v), ['"'])),
-        String.append(v, "\""),
-        Str.from_to_append(v, ['"']))))
-
-# LAW: the walk that drops a trailing quote, one char behind the list it
-# walks
-law back_go_quote:
-  for +t: List<&2, Char>
-  for +h: Char
-  {T.strip.back.go(List.append(&2, Char, t, ['"']), h, '"') == h <> t
-    : List<&2, Char>}
-
-def back_go_quote(t, h):
-  match t:
-    case []:
-      {==}
-    case +h2 <> +t2:
-      Equal.cong(List<&2, Char>, List<&2, Char>, cs => h <> cs,
-        T.strip.back.go(List.append(&2, Char, t2, ['"']), h2, '"'),
-        h2 <> t2,
-        back_go_quote(t2, h2))
-
-# LAW: a list that ends in a quote, with the quote dropped
-law back_quote:
-  for +xs: List<&2, Char>
-  {T.strip.back(List.append(&2, Char, xs, ['"']), '"') == xs
-    : List<&2, Char>}
-
-def back_quote(xs):
-  match xs:
-    case []:
-      {==}
-    case +h <> +t:
-      back_go_quote(t, h)
+  Toml.trim_ends('"', v, '"', {==}, {==})
 
 def Laws.strip_quoted(v):
-  Equal.trans(String,
-    T.strip(T.quote(v), '"', '"'),
-    String.from_list(T.strip.back(
-      List.append(&2, Char, String.to_list(v), ['"']), '"')),
-    v,
-    Equal.cong(List<&2, Char>, String,
-      cs => String.from_list(T.strip.back(cs, '"')),
-      String.to_list(String.append(v, "\"")),
-      List.append(&2, Char, String.to_list(v), ['"']),
-      Str.to_list_append(v, "\"")),
-    Equal.trans(String,
-      String.from_list(T.strip.back(
-        List.append(&2, Char, String.to_list(v), ['"']), '"')),
-      String.from_list(String.to_list(v)),
-      v,
-      Equal.cong(List<&2, Char>, String, cs => String.from_list(cs),
-        T.strip.back(List.append(&2, Char, String.to_list(v), ['"']), '"'),
-        String.to_list(v),
-        back_quote(String.to_list(v))),
-      Str.from_to(v)))
+  Toml.unquote(v)
+
+# What the lock may hold. A path holding `=` makes its package's `paths.ok`
+# False, and an `and` with a False half is False whichever side it is on.
+
+# LAW: an `and` whose right half is False is False
+law and_false:
+  for a: Bool
+  {Bool.and(a, False{}) == False{} : Bool}
+
+def and_false(a):
+  match a:
+    case False{}:
+      {==}
+    case True{}:
+      {==}
+
+def Laws.path_eq_unlockable(hash, src, at, sum, fs, rest, ts, hub, e):
+  %e : {Bool.and(P.clean(hub), Bool.and(Bool.and(Bool.and(Bool.and(_,
+    P.paths.ok(fs)), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src,
+    K.File{at, sum} <> fs})), Bool.not(L.has(rest, hash)))), P.packs.ok(rest)),
+    P.tools.ok(ts))) == False{} : Bool}
+  and_false(P.clean(hub))
+
+# LAW: a path that holds `=` is not empty
+law eqless_filled:
+  for +at: String
+  for e: {False{} == P.path.eqless(at) : Bool}
+  {False{} == String.is_empty(at) : Bool}
+
+def eqless_filled(at, e):
+  match at:
+    case SNil{}:
+      Eq.bit.absurd(&2, {False{} == String.is_empty(SNil{}) : Bool}, e)
+    case SCon{h, t}:
+      {==}
+
+# the reason a lock that is not lockable gives, from the scan's answer
+def named.why(+why: String) -> String:
+  P.lockable.pick(String.is_empty(why), why)
+
+# The first path the scan finds is the one given, and it is not empty, so
+# the reason is the one that names it.
+def Laws.path_eq_named(hash, _src, at, _sum, fs, rest, e):
+  f = eqless_filled(at, e)
+  %e : {named.why(P.packs.eq.pick(String.is_empty(P.path.eq.pick(_, at,
+    P.path.eq.first(fs))), hash, P.path.eq.pick(_, at, P.path.eq.first(fs)),
+    P.packs.eq(rest))) == P.path.eq.why(hash, at) : String}
+  %f : {named.why(P.packs.eq.pick(_, hash, at, P.packs.eq(rest)))
+    == P.path.eq.why(hash, at) : String}
+  {==}
+
+# The lock document reads back (EZ-DOC-1). check/toml.bend proves that a
+# document of tables the reader can take back parses back as those tables;
+# what is left is the lock's side: that its text is such a document, that
+# `lockable` makes every name and key one the reader takes back, and that
+# ez's readers find what was written.
+
+# LAW: a path the planner lets through holds no `=`
+law eqless_clear:
+  for +s: String
+  for +e: {P.path.eqless(s) == True{} : Bool}
+  {Str.clear(s, '=') == True{} : Bool}
+
+def eqless_clear(s, e):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      and_true(Bool.not(Char.is_eq(h, '=')), Str.clear(t, '='),
+        Eq.and.left(Bool.not(Char.is_eq(h, '=')), P.path.eqless(t), e),
+        eqless_clear(t, Eq.and.right(Bool.not(Char.is_eq(h, '=')), P.path.eqless(t), e)))
+
+# ---------------------------------------------------------------------------
+# the lock's text is the text of its document
+
+# LAW: inserting a package's block among blocks in order is the block list of
+# inserting the package, one step, with how it compares given
+law blocks_ins.step:
+  for +hp: String
+  for +sp: L.Src
+  for +fp: List<&2, K.File>
+  for +hh: String
+  for +sh: L.Src
+  for +fh: List<&2, K.File>
+  for +t: List<&2, L.Pack>
+  for b: Bool
+  for ih: {K.file.ins(L.pack.blocks(t), L.pack.block(L.Pack{hp, sp, fp}))
+    == L.pack.blocks(L.pack.ins(t, L.Pack{hp, sp, fp})) : List<&2, K.File>}
+  {K.file.ins.put(b, L.pack.block(L.Pack{hp, sp, fp}), L.pack.block(L.Pack{hh, sh, fh}),
+    L.pack.blocks(t), K.file.ins(L.pack.blocks(t), L.pack.block(L.Pack{hp, sp, fp})))
+    == L.pack.blocks(L.pack.ins.put(b, L.Pack{hp, sp, fp}, L.Pack{hh, sh, fh}, t,
+      L.pack.ins(t, L.Pack{hp, sp, fp}))) : List<&2, K.File>}
+
+def blocks_ins.step(hp, sp, fp, hh, sh, fh, t, b, ih):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      Equal.cong(List<&2, K.File>, List<&2, K.File>, r => L.pack.block(L.Pack{hh, sh, fh}) <> r,
+        K.file.ins(L.pack.blocks(t), L.pack.block(L.Pack{hp, sp, fp})),
+        L.pack.blocks(L.pack.ins(t, L.Pack{hp, sp, fp})), ih)
+
+# LAW: the packages compared as their blocks are compared by hash
+law blocks_ins.cons:
+  for +h: L.Pack
+  for +t: List<&2, L.Pack>
+  for +p: L.Pack
+  for ih: {K.file.ins(L.pack.blocks(t), L.pack.block(p))
+    == L.pack.blocks(L.pack.ins(t, p)) : List<&2, K.File>}
+  {K.file.ins(L.pack.blocks(h <> t), L.pack.block(p))
+    == L.pack.blocks(L.pack.ins(h <> t, p)) : List<&2, K.File>}
+
+def blocks_ins.cons(h, t, p, ih):
+  match h p:
+    case L.Pack{+hh, +sh, +fh} L.Pack{+hp, +sp, +fp}:
+      blocks_ins.step(hp, sp, fp, hh, sh, fh, t, String.is_le(hp, hh), ih)
+
+# LAW: a package's block inserted among blocks in order is the blocks of the
+# package inserted among packages in order
+law blocks_ins:
+  for +qs: List<&2, L.Pack>
+  for +p: L.Pack
+  {K.file.ins(L.pack.blocks(qs), L.pack.block(p)) == L.pack.blocks(L.pack.ins(qs, p))
+    : List<&2, K.File>}
+
+def blocks_ins(qs, p):
+  match qs:
+    case []:
+      {==}
+    case +h <> +t:
+      blocks_ins.cons(h, t, p, blocks_ins(t, p))
+
+# LAW: the blocks sorted are the blocks of the packages sorted
+law blocks_sort:
+  for +ps: List<&2, L.Pack>
+  {K.file.sort(L.pack.blocks(ps)) == L.pack.blocks(L.pack.sort(ps)) : List<&2, K.File>}
+
+def blocks_sort(ps):
+  match ps:
+    case []:
+      {==}
+    case +h <> +t:
+      ih = Equal.sym(List<&2, K.File>, K.file.sort(L.pack.blocks(t)),
+        L.pack.blocks(L.pack.sort(t)), blocks_sort(t))
+      %ih : {K.file.ins(_, L.pack.block(h)) == L.pack.blocks(L.pack.sort(h <> t))
+        : List<&2, K.File>}
+      blocks_ins(L.pack.sort(t), h)
+
+# LAW: each package's block, joined among what follows, is its two tables
+# joined among it, from nothing
+law blocks_join:
+  for +qs: List<&2, L.Pack>
+  for +rest: List<&2, String>
+  {String.join.go(List.append(&2, String, L.block.texts(L.pack.blocks(qs)), rest), "", "\n")
+    == String.join.go(List.append(&2, String, T.render.all(L.pack.all(qs)), rest), "", "\n")
+    : String}
+
+# one package, taken apart, with the rest's law given
+law blocks_join.cons:
+  for +q: L.Pack
+  for +qs: List<&2, L.Pack>
+  for +rest: List<&2, String>
+  for ih: {String.join.go(List.append(&2, String, L.block.texts(L.pack.blocks(qs)), rest), "", "\n")
+    == String.join.go(List.append(&2, String, T.render.all(L.pack.all(qs)), rest), "", "\n")
+    : String}
+  {String.join.go(List.append(&2, String, L.block.texts(L.pack.blocks(q <> qs)), rest), "", "\n")
+    == String.join.go(List.append(&2, String, T.render.all(L.pack.all(q <> qs)), rest), "", "\n")
+    : String}
+
+def blocks_join.cons(q, qs, rest, ih):
+  match q:
+    case L.Pack{+hash, +src, +files}:
+      +zs = List.append(&2, String, L.block.texts(L.pack.blocks(qs)), rest)
+      +ys = List.append(&2, String, T.render.all(L.pack.all(qs)), rest)
+      +r1 = T.render.sect(T.Sect{"packages." ++ T.quote(hash) ++ ".source", L.src.pairs(src)})
+      +r2 = T.render.sect(T.Sect{"packages." ++ T.quote(hash) ++ ".files",
+        L.file.pairs(K.files_of(files))})
+      f1 = Equal.sym(String, String.join.go(zs, String.append(r1, SCon{'\n', r2}), "\n"),
+        String.append(String.append(r1, SCon{'\n', r2}), String.join.go(zs, "", "\n")),
+        Str.join_fold(zs, String.append(r1, SCon{'\n', r2})))
+      f2 = Equal.sym(String, String.join.go(ys, r2, "\n"),
+        String.append(r2, String.join.go(ys, "", "\n")), Str.join_fold(ys, r2))
+      %f2 : {SCon{'\n', String.join.go(zs, String.append(r1, SCon{'\n', r2}), "\n")}
+        == SCon{'\n', String.append(r1, SCon{'\n', _})} : String}
+      %f1 : {SCon{'\n', _} == SCon{'\n', String.append(r1, SCon{'\n',
+        String.append(r2, String.join.go(ys, "", "\n"))})} : String}
+      %ih : {SCon{'\n', String.append(String.append(r1, SCon{'\n', r2}), String.join.go(zs, "", "\n"))}
+        == SCon{'\n', String.append(r1, SCon{'\n', String.append(r2, _)})} : String}
+      Equal.cong(String, String, x => SCon{'\n', x},
+        String.append(String.append(r1, SCon{'\n', r2}), String.join.go(zs, "", "\n")),
+        String.append(r1, SCon{'\n', String.append(r2, String.join.go(zs, "", "\n"))}),
+        Eq.append_assoc(r1, SCon{'\n', r2}, String.join.go(zs, "", "\n")))
+
+def blocks_join(qs, rest):
+  match qs:
+    case []:
+      {==}
+    case +q <> +t:
+      blocks_join.cons(q, t, rest, blocks_join(t, rest))
+
+def Laws.render_is_doc(ts, hub, ps):
+  b = Equal.sym(List<&2, K.File>, K.file.sort(L.pack.blocks(ps)),
+    L.pack.blocks(L.pack.sort(ps)), blocks_sort(ps))
+  %b : {String.join.go(List.append(&2, String, L.block.texts(_), T.render.all(L.tool.sects(ts))),
+    T.render.sect(L.lock.sect(hub)), "\n") == T.render(Laws.lock.doc(ts, hub, ps)) : String}
+  ra = Equal.sym(List<&2, String>,
+    T.render.all(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts))),
+    List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))),
+    Toml.render_all_append(L.pack.all(L.pack.sort(ps)), L.tool.sects(ts)))
+  %ra : {String.join.go(List.append(&2, String, L.block.texts(L.pack.blocks(L.pack.sort(ps))),
+    T.render.all(L.tool.sects(ts))), T.render.sect(L.lock.sect(hub)), "\n")
+    == String.join.go(_, T.render.sect(L.lock.sect(hub)), "\n") : String}
+  f1 = Equal.sym(String, String.join.go(List.append(&2, String,
+      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))),
+      T.render.sect(L.lock.sect(hub)), "\n"),
+    String.append(T.render.sect(L.lock.sect(hub)), String.join.go(List.append(&2, String,
+      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))), "", "\n")),
+    Str.join_fold(List.append(&2, String, L.block.texts(L.pack.blocks(L.pack.sort(ps))),
+      T.render.all(L.tool.sects(ts))), T.render.sect(L.lock.sect(hub))))
+  %f1 : {_ == String.join.go(List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))),
+    T.render.all(L.tool.sects(ts))), T.render.sect(L.lock.sect(hub)), "\n") : String}
+  f2 = Equal.sym(String, String.join.go(List.append(&2, String,
+      T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))),
+      T.render.sect(L.lock.sect(hub)), "\n"),
+    String.append(T.render.sect(L.lock.sect(hub)), String.join.go(List.append(&2, String,
+      T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))), "", "\n")),
+    Str.join_fold(List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))),
+      T.render.all(L.tool.sects(ts))), T.render.sect(L.lock.sect(hub))))
+  %f2 : {String.append(T.render.sect(L.lock.sect(hub)), String.join.go(List.append(&2, String,
+      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))), "", "\n"))
+    == _ : String}
+  Equal.cong(String, String, x => String.append(T.render.sect(L.lock.sect(hub)), x),
+    String.join.go(List.append(&2, String, L.block.texts(L.pack.blocks(L.pack.sort(ps))),
+      T.render.all(L.tool.sects(ts))), "", "\n"),
+    String.join.go(List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))),
+      T.render.all(L.tool.sects(ts))), "", "\n"),
+    blocks_join(L.pack.sort(ps), T.render.all(L.tool.sects(ts))))
+
+# LAW: and the right half
+law or_right:
+  for a: Bool
+  for b: Bool
+  for e: {Bool.or(a, b) == False{} : Bool}
+  {b == False{} : Bool}
+
+def or_right(a, b, e):
+  match a:
+    case False{}:
+      e
+    case True{}:
+      Eq.bit.absurd2(&2, {b == False{} : Bool}, e)
+
+# LAW: a string the lock can write holds no newline
+law clean_nl:
+  for +s: String
+  for +e: {P.clean(s) == True{} : Bool}
+  {Str.clear(s, '\n') == True{} : Bool}
+
+def clean_nl(s, e):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      and_true(Bool.not(Char.is_eq(h, '\n')), Str.clear(t, '\n'),
+        not_false(Char.is_eq(h, '\n'),
+          or_right(Char.is_eq(h, '\\'), Char.is_eq(h, '\n'),
+            or_right(Char.is_eq(h, '"'), Bool.or(Char.is_eq(h, '\\'), Char.is_eq(h, '\n')),
+              Eq.not.true(P.char.bad(h),
+                Eq.and.left(Bool.not(P.char.bad(h)), P.clean(t), e))))),
+        clean_nl(t, Eq.and.right(Bool.not(P.char.bad(h)), P.clean(t), e)))
+
+# LAW: and no quote
+law clean_quote:
+  for +s: String
+  for +e: {P.clean(s) == True{} : Bool}
+  {Str.clear(s, '"') == True{} : Bool}
+
+def clean_quote(s, e):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      and_true(Bool.not(Char.is_eq(h, '"')), Str.clear(t, '"'),
+        not_false(Char.is_eq(h, '"'),
+          or_left(Char.is_eq(h, '"'), Bool.or(Char.is_eq(h, '\\'), Char.is_eq(h, '\n')),
+            Eq.not.true(P.char.bad(h),
+              Eq.and.left(Bool.not(P.char.bad(h)), P.clean(t), e)))),
+        clean_quote(t, Eq.and.right(Bool.not(P.char.bad(h)), P.clean(t), e)))
+
+# LAW: the strings before a list the lock can write, when the whole can be
+law clean_all_left:
+  for +xs: List<&2, String>
+  for +ys: List<&2, String>
+  for +e: {P.clean.all(List.append(&2, String, xs, ys)) == True{} : Bool}
+  {P.clean.all(xs) == True{} : Bool}
+
+def clean_all_left(xs, ys, e):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      and_true(P.clean(h), P.clean.all(t),
+        Eq.and.left(P.clean(h), P.clean.all(List.append(&2, String, t, ys)), e),
+        clean_all_left(t, ys,
+          Eq.and.right(P.clean(h), P.clean.all(List.append(&2, String, t, ys)), e)))
+
+# LAW: and the strings after them
+law clean_all_right:
+  for +xs: List<&2, String>
+  for +ys: List<&2, String>
+  for +e: {P.clean.all(List.append(&2, String, xs, ys)) == True{} : Bool}
+  {P.clean.all(ys) == True{} : Bool}
+
+def clean_all_right(xs, ys, e):
+  match xs:
+    case []:
+      e
+    case +h <> +t:
+      clean_all_right(t, ys,
+        Eq.and.right(P.clean(h), P.clean.all(List.append(&2, String, t, ys)), e))
+
+# LAW: a pair the lock writes only when its value is not empty reads back
+# with the rest, when it and the rest do
+law kvs_kv:
+  for +k: String
+  for +v: String
+  for +rest: List<&2, T.Kv>
+  for ek: {Toml.kv.ok(T.Kv{k, v}) == True{} : Bool}
+  for er: {Toml.kvs.ok(rest) == True{} : Bool}
+  {Toml.kvs.ok(List.append(&2, T.Kv, L.kv(k, v), rest)) == True{} : Bool}
+
+def kvs_kv(k, v, rest, ek, er):
+  match v:
+    case SNil{}:
+      er
+    case SCon{+h, +t}:
+      and_true(Toml.kv.ok(T.Kv{k, SCon{h, t}}), Toml.kvs.ok(rest), ek, er)
+
+# whether every file of a list reads back as a pair. Proof vocabulary.
+def fok(fs: List<&2, K.File>) -> Bool:
+  Toml.kvs.ok(L.file.pairs(fs))
+
+# LAW: files the planner lets through read back as pairs
+law files_ok:
+  for +fs: List<&2, K.File>
+  for +ep: {P.paths.ok(fs) == True{} : Bool}
+  for +ec: {P.clean.all(P.file.values(fs)) == True{} : Bool}
+  {fok(fs) == True{} : Bool}
+
+def files_ok(fs, ep, ec):
+  match fs:
+    case []:
+      {==}
+    case K.File{+at, +sum} <> +t:
+      and_true(Toml.kv.ok(T.Kv{at, sum}), fok(t),
+        and_true(Str.clear(at, '='), Bool.and(Str.clear(at, '"'),
+          Bool.and(Str.clear(at, '\n'), Str.clear(sum, '\n'))),
+          eqless_clear(at, Eq.and.left(P.path.eqless(at), P.paths.ok(t), ep)),
+          and_true(Str.clear(at, '"'), Bool.and(Str.clear(at, '\n'), Str.clear(sum, '\n')),
+            clean_quote(at, Eq.and.left(P.clean(at),
+              Bool.and(P.clean(sum), P.clean.all(P.file.values(t))), ec)),
+            and_true(Str.clear(at, '\n'), Str.clear(sum, '\n'),
+              clean_nl(at, Eq.and.left(P.clean(at),
+                Bool.and(P.clean(sum), P.clean.all(P.file.values(t))), ec)),
+              clean_nl(sum, Eq.and.left(P.clean(sum), P.clean.all(P.file.values(t)),
+                Eq.and.right(P.clean(at),
+                  Bool.and(P.clean(sum), P.clean.all(P.file.values(t))), ec)))))),
+        files_ok(t, Eq.and.right(P.path.eqless(at), P.paths.ok(t), ep),
+          Eq.and.right(P.clean(sum), P.clean.all(P.file.values(t)),
+            Eq.and.right(P.clean(at),
+              Bool.and(P.clean(sum), P.clean.all(P.file.values(t))), ec))))
+
+# LAW: a file inserted among files that read back, when it reads back, one
+# step, with how it compares given
+law fins_ok.step:
+  for +x: K.File
+  for +h: K.File
+  for +t: List<&2, K.File>
+  for b: Bool
+  for +ex: {fok(h <> t) == True{} : Bool}
+  for +e1: {fok([x]) == True{} : Bool}
+  for ih: {fok(K.file.ins(t, x)) == True{} : Bool}
+  {fok(K.file.ins.put(b, x, h, t, K.file.ins(t, x))) == True{} : Bool}
+
+def fins_ok.step(x, h, t, b, ex, e1, ih):
+  match b:
+    case True{}:
+      and_true(Toml.kv.ok(L.file.pair(x)), fok(h <> t),
+        Eq.and.left(Toml.kv.ok(L.file.pair(x)), True{}, e1), ex)
+    case False{}:
+      and_true(Toml.kv.ok(L.file.pair(h)), fok(K.file.ins(t, x)),
+        Eq.and.left(Toml.kv.ok(L.file.pair(h)), fok(t), ex), ih)
+
+# LAW: a file inserted among files that read back, when it reads back
+law fins_ok:
+  for +xs: List<&2, K.File>
+  for +x: K.File
+  for +ex: {fok(xs) == True{} : Bool}
+  for +e1: {fok([x]) == True{} : Bool}
+  {fok(K.file.ins(xs, x)) == True{} : Bool}
+
+def fins_ok(xs, x, ex, e1):
+  match xs:
+    case []:
+      e1
+    case +h <> +t:
+      fins_ok.step(x, h, t, K.file.le(x, h), ex, e1,
+        fins_ok(t, x, Eq.and.right(Toml.kv.ok(L.file.pair(h)), fok(t), ex), e1))
+
+# LAW: files that read back, sorted, read back
+law fsort_ok:
+  for +fs: List<&2, K.File>
+  for +e: {fok(fs) == True{} : Bool}
+  {fok(K.file.sort(fs)) == True{} : Bool}
+
+def fsort_ok(fs, e):
+  match fs:
+    case []:
+      {==}
+    case +h <> +t:
+      fins_ok(K.file.sort(t), h,
+        fsort_ok(t, Eq.and.right(Toml.kv.ok(L.file.pair(h)), fok(t), e)),
+        and_true(Toml.kv.ok(L.file.pair(h)), True{},
+          Eq.and.left(Toml.kv.ok(L.file.pair(h)), fok(t), e), {==}))
+
+# LAW: a file against deduplicated files that read back, when it reads back,
+# with whether it repeats the next given
+law dedup_ok.pick:
+  for +h: K.File
+  for +b: K.File
+  for +t: List<&2, K.File>
+  for same: Bool
+  for +eh: {Toml.kv.ok(L.file.pair(h)) == True{} : Bool}
+  for +er: {fok(b <> t) == True{} : Bool}
+  {fok(K.dedup.pick(same, h, b <> t)) == True{} : Bool}
+
+def dedup_ok.pick(h, b, t, same, eh, er):
+  match same:
+    case True{}:
+      er
+    case False{}:
+      and_true(Toml.kv.ok(L.file.pair(h)), fok(b <> t), eh, er)
+
+# LAW: and one step of the deduplication
+law dedup_ok.head:
+  for +h: K.File
+  for +r: List<&2, K.File>
+  for +eh: {Toml.kv.ok(L.file.pair(h)) == True{} : Bool}
+  for +er: {fok(r) == True{} : Bool}
+  {fok(K.dedup.head(h, r)) == True{} : Bool}
+
+def dedup_ok.head(h, r, eh, er):
+  match r:
+    case []:
+      and_true(Toml.kv.ok(L.file.pair(h)), True{}, eh, {==})
+    case +b <> +t:
+      dedup_ok.pick(h, b, t, String.eq(K.file.at(h), K.file.at(b)), eh, er)
+
+# LAW: files that read back, deduplicated, read back
+law dedup_ok:
+  for +fs: List<&2, K.File>
+  for +e: {fok(fs) == True{} : Bool}
+  {fok(K.dedup(fs)) == True{} : Bool}
+
+def dedup_ok(fs, e):
+  match fs:
+    case []:
+      {==}
+    case +h <> +t:
+      dedup_ok.head(h, K.dedup(t), Eq.and.left(Toml.kv.ok(L.file.pair(h)), fok(t), e),
+        dedup_ok(t, Eq.and.right(Toml.kv.ok(L.file.pair(h)), fok(t), e)))
+
+# LAW: a package's source table reads back, when its values can be written
+law src_ok:
+  for +src: L.Src
+  for +e: {P.clean.all(P.src.values(src)) == True{} : Bool}
+  {Toml.kvs.ok(L.src.pairs(src)) == True{} : Bool}
+
+def src_ok(src, e):
+  match src:
+    case L.Hub{}:
+      {==}
+    case L.Git{+url, +rev, +entry, +root, +nar, +tag}:
+      +e1 = Eq.and.right(P.clean(url), P.clean.all([rev, entry, root, nar, tag]), e)
+      +e2 = Eq.and.right(P.clean(rev), P.clean.all([entry, root, nar, tag]), e1)
+      +e3 = Eq.and.right(P.clean(entry), P.clean.all([root, nar, tag]), e2)
+      +e4 = Eq.and.right(P.clean(root), P.clean.all([nar, tag]), e3)
+      +e5 = Eq.and.right(P.clean(nar), P.clean.all([tag]), e4)
+      kvs_kv("url", url, List.concat(&2, T.Kv, [L.kv("rev", rev), L.kv("entry", entry),
+          L.kv("root", root), L.kv("narHash", nar), L.kv("tag", tag)]),
+        clean_nl(url, Eq.and.left(P.clean(url), P.clean.all([rev, entry, root, nar, tag]), e)),
+        kvs_kv("rev", rev, List.concat(&2, T.Kv, [L.kv("entry", entry),
+            L.kv("root", root), L.kv("narHash", nar), L.kv("tag", tag)]),
+          clean_nl(rev, Eq.and.left(P.clean(rev), P.clean.all([entry, root, nar, tag]),
+            Eq.and.right(P.clean(url), P.clean.all([rev, entry, root, nar, tag]), e))),
+          kvs_kv("entry", entry, List.concat(&2, T.Kv, [L.kv("root", root),
+              L.kv("narHash", nar), L.kv("tag", tag)]),
+            clean_nl(entry, Eq.and.left(P.clean(entry), P.clean.all([root, nar, tag]),
+              Eq.and.right(P.clean(rev), P.clean.all([entry, root, nar, tag]),
+                Eq.and.right(P.clean(url), P.clean.all([rev, entry, root, nar, tag]), e)))),
+            kvs_kv("root", root, List.concat(&2, T.Kv, [L.kv("narHash", nar), L.kv("tag", tag)]),
+              clean_nl(root, Eq.and.left(P.clean(root), P.clean.all([nar, tag]), e3)),
+              kvs_kv("narHash", nar, List.concat(&2, T.Kv, [L.kv("tag", tag)]),
+                clean_nl(nar, Eq.and.left(P.clean(nar), P.clean.all([tag]), e4)),
+                kvs_kv("tag", tag, [],
+                  clean_nl(tag, Eq.and.left(P.clean(tag), True{}, e5)), {==}))))))
+
+# LAW: a package's two tables read back, when the planner lets it through
+law pack_ok:
+  for +hash: String
+  for +src: L.Src
+  for +fs: List<&2, K.File>
+  for +ep: {P.paths.ok(fs) == True{} : Bool}
+  for +ev: {P.clean.all(hash <> List.append(&2, String, P.src.values(src), P.file.values(fs)))
+    == True{} : Bool}
+  {Toml.sects.ok(L.pack.sects(L.Pack{hash, src, fs})) == True{} : Bool}
+
+def pack_ok(hash, src, fs, ep, ev):
+  +eh = Eq.and.left(P.clean(hash),
+    P.clean.all(List.append(&2, String, P.src.values(src), P.file.values(fs))), ev)
+  +er = Eq.and.right(P.clean(hash),
+    P.clean.all(List.append(&2, String, P.src.values(src), P.file.values(fs))), ev)
+  +hn = clean_nl(hash, eh)
+  and_true(
+    Toml.sect.ok(T.Sect{"packages." ++ T.quote(hash) ++ ".source", L.src.pairs(src)}),
+    Bool.and(Toml.sect.ok(T.Sect{"packages." ++ T.quote(hash) ++ ".files",
+      L.file.pairs(K.files_of(fs))}), True{}),
+    and_true(Str.clear(String.append(String.append(hash, "\""), ".source"), '\n'),
+      Toml.kvs.ok(L.src.pairs(src)),
+      Str.clear_append(String.append(hash, "\""), ".source", '\n',
+        Str.clear_append(hash, "\"", '\n', hn, {==}), {==}),
+      src_ok(src, clean_all_left(P.src.values(src), P.file.values(fs), er))),
+    and_true(Toml.sect.ok(T.Sect{"packages." ++ T.quote(hash) ++ ".files",
+        L.file.pairs(K.files_of(fs))}), True{},
+      and_true(Str.clear(String.append(String.append(hash, "\""), ".files"), '\n'),
+        fok(K.files_of(fs)),
+        Str.clear_append(String.append(hash, "\""), ".files", '\n',
+          Str.clear_append(hash, "\"", '\n', hn, {==}), {==}),
+        dedup_ok(K.file.sort(fs), fsort_ok(fs,
+          files_ok(fs, ep, clean_all_right(P.src.values(src), P.file.values(fs), er))))),
+      {==}))
+
+# LAW: every package the planner lets through writes tables that read back,
+# one package, taken apart
+law packs_ok.cons:
+  for +h: L.Pack
+  for +t: List<&2, L.Pack>
+  for +e: {P.packs.ok(h <> t) == True{} : Bool}
+  for ih: {Toml.sects.ok(L.pack.all(t)) == True{} : Bool}
+  {Toml.sects.ok(L.pack.all(h <> t)) == True{} : Bool}
+
+def packs_ok.cons(h, t, e, ih):
+  match h:
+    case L.Pack{+hash, +src, +fs}:
+      +ok = Eq.and.left(Bool.and(P.paths.ok(fs), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src, fs})),
+          Bool.not(L.has(t, hash)))), P.packs.ok(t), e)
+      Toml.sects_ok_append(L.pack.sects(L.Pack{hash, src, fs}), L.pack.all(t),
+        pack_ok(hash, src, fs,
+          Eq.and.left(P.paths.ok(fs), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src, fs})),
+            Bool.not(L.has(t, hash))), ok),
+          Eq.and.left(P.clean.all(P.pack.values(L.Pack{hash, src, fs})), Bool.not(L.has(t, hash)),
+            Eq.and.right(P.paths.ok(fs), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src, fs})),
+              Bool.not(L.has(t, hash))), ok))),
+        ih)
+
+# LAW: every package the planner lets through writes tables that read back
+law packs_ok:
+  for +ps: List<&2, L.Pack>
+  for +e: {P.packs.ok(ps) == True{} : Bool}
+  {Toml.sects.ok(L.pack.all(ps)) == True{} : Bool}
+
+def packs_ok(ps, e):
+  match ps:
+    case []:
+      {==}
+    case +h <> +t:
+      packs_ok.cons(h, t, e, packs_ok(t, Eq.and.right(
+        Bool.and(P.paths.ok(L.pack.files(h)), Bool.and(P.clean.all(P.pack.values(h)),
+          Bool.not(L.has(t, L.pack.hash(h))))), P.packs.ok(t), e)))
+
+# LAW: a package inserted among packages whose tables read back, when its own
+# do, one step, with how it compares given
+law pins_ok.step:
+  for +p: L.Pack
+  for +h: L.Pack
+  for +t: List<&2, L.Pack>
+  for b: Bool
+  for +eq: {Toml.sects.ok(L.pack.all(h <> t)) == True{} : Bool}
+  for +ep: {Toml.sects.ok(L.pack.sects(p)) == True{} : Bool}
+  for ih: {Toml.sects.ok(L.pack.all(L.pack.ins(t, p))) == True{} : Bool}
+  {Toml.sects.ok(L.pack.all(L.pack.ins.put(b, p, h, t, L.pack.ins(t, p)))) == True{} : Bool}
+
+def pins_ok.step(p, h, t, b, eq, ep, ih):
+  match b:
+    case True{}:
+      Toml.sects_ok_append(L.pack.sects(p), L.pack.all(h <> t), ep, eq)
+    case False{}:
+      Toml.sects_ok_append(L.pack.sects(h), L.pack.all(L.pack.ins(t, p)),
+        Toml.sects_ok_left(L.pack.sects(h), L.pack.all(t), eq), ih)
+
+# LAW: a package inserted among packages whose tables read back, when its own
+# do
+law pins_ok:
+  for +qs: List<&2, L.Pack>
+  for +p: L.Pack
+  for +eq: {Toml.sects.ok(L.pack.all(qs)) == True{} : Bool}
+  for +ep: {Toml.sects.ok(L.pack.sects(p)) == True{} : Bool}
+  {Toml.sects.ok(L.pack.all(L.pack.ins(qs, p))) == True{} : Bool}
+
+def pins_ok(qs, p, eq, ep):
+  match qs:
+    case []:
+      Toml.sects_ok_append(L.pack.sects(p), [], ep, {==})
+    case +h <> +t:
+      pins_ok.step(p, h, t, L.pack.le(p, h), eq, ep,
+        pins_ok(t, p, Toml.sects_ok_right(L.pack.sects(h), L.pack.all(t), eq), ep))
+
+# LAW: packages whose tables read back, sorted, still do
+law psort_ok:
+  for +ps: List<&2, L.Pack>
+  for +e: {Toml.sects.ok(L.pack.all(ps)) == True{} : Bool}
+  {Toml.sects.ok(L.pack.all(L.pack.sort(ps))) == True{} : Bool}
+
+def psort_ok(ps, e):
+  match ps:
+    case []:
+      {==}
+    case +h <> +t:
+      pins_ok(L.pack.sort(t), h,
+        psort_ok(t, Toml.sects_ok_right(L.pack.sects(h), L.pack.all(t), e)),
+        Toml.sects_ok_left(L.pack.sects(h), L.pack.all(t), e))
+
+# LAW: a tool's table reads back, when the planner lets its pin through, with
+# its source taken apart
+law tool_ok.src:
+  for +n: String
+  for +e: String
+  for +b: String
+  for +s: M.Source
+  for +ev: {P.clean.all(P.tool.values(M.Tool{n, e, b, s})) == True{} : Bool}
+  {Toml.sect.ok(L.tool.sect(M.Tool{n, e, b, s})) == True{} : Bool}
+
+def tool_ok.src(n, e, b, s, ev):
+  match s:
+    case M.Hub{}:
+      +e1 = Eq.and.right(P.clean(n), P.clean.all([e, b]), ev)
+      and_true(Str.clear(n, '\n'),
+        Toml.kvs.ok(List.concat(&2, T.Kv, [L.kv("entry", e), L.kv("bin", b)])),
+        clean_nl(n, Eq.and.left(P.clean(n), P.clean.all([e, b]), ev)),
+        kvs_kv("entry", e, List.concat(&2, T.Kv, [L.kv("bin", b)]),
+          clean_nl(e, Eq.and.left(P.clean(e), P.clean.all([b]), e1)),
+          kvs_kv("bin", b, [],
+            clean_nl(b, Eq.and.left(P.clean(b), True{},
+              Eq.and.right(P.clean(e), P.clean.all([b]), e1))), {==})))
+    case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
+      +e1 = Eq.and.right(P.clean(n), P.clean.all([e, b, url, rev, tag, root, nar]), ev)
+      +e2 = Eq.and.right(P.clean(e), P.clean.all([b, url, rev, tag, root, nar]), e1)
+      +e3 = Eq.and.right(P.clean(b), P.clean.all([url, rev, tag, root, nar]), e2)
+      +e4 = Eq.and.right(P.clean(url), P.clean.all([rev, tag, root, nar]), e3)
+      +e5 = Eq.and.right(P.clean(rev), P.clean.all([tag, root, nar]), e4)
+      +e6 = Eq.and.right(P.clean(tag), P.clean.all([root, nar]), e5)
+      +e7 = Eq.and.right(P.clean(root), P.clean.all([nar]), e6)
+      and_true(Str.clear(n, '\n'),
+        Toml.kvs.ok(List.concat(&2, T.Kv, [L.kv("git", url), L.kv("rev", rev), L.kv("tag", tag),
+          L.kv("root", root), L.kv("narHash", nar), L.kv("entry", e), L.kv("bin", b)])),
+        clean_nl(n, Eq.and.left(P.clean(n), P.clean.all([e, b, url, rev, tag, root, nar]), ev)),
+        kvs_kv("git", url, List.concat(&2, T.Kv, [L.kv("rev", rev), L.kv("tag", tag),
+            L.kv("root", root), L.kv("narHash", nar), L.kv("entry", e), L.kv("bin", b)]),
+          clean_nl(url, Eq.and.left(P.clean(url), P.clean.all([rev, tag, root, nar]), e3)),
+        kvs_kv("rev", rev, List.concat(&2, T.Kv, [L.kv("tag", tag),
+            L.kv("root", root), L.kv("narHash", nar), L.kv("entry", e), L.kv("bin", b)]),
+          clean_nl(rev, Eq.and.left(P.clean(rev), P.clean.all([tag, root, nar]), e4)),
+        kvs_kv("tag", tag, List.concat(&2, T.Kv, [L.kv("root", root), L.kv("narHash", nar),
+            L.kv("entry", e), L.kv("bin", b)]),
+          clean_nl(tag, Eq.and.left(P.clean(tag), P.clean.all([root, nar]), e5)),
+        kvs_kv("root", root, List.concat(&2, T.Kv, [L.kv("narHash", nar),
+            L.kv("entry", e), L.kv("bin", b)]),
+          clean_nl(root, Eq.and.left(P.clean(root), P.clean.all([nar]), e6)),
+        kvs_kv("narHash", nar, List.concat(&2, T.Kv, [L.kv("entry", e), L.kv("bin", b)]),
+          clean_nl(nar, Eq.and.left(P.clean(nar), True{}, e7)),
+        kvs_kv("entry", e, List.concat(&2, T.Kv, [L.kv("bin", b)]),
+          clean_nl(e, Eq.and.left(P.clean(e), P.clean.all([b, url, rev, tag, root, nar]), e1)),
+        kvs_kv("bin", b, [],
+          clean_nl(b, Eq.and.left(P.clean(b), P.clean.all([url, rev, tag, root, nar]), e2)),
+          {==}))))))))
+
+# LAW: a tool's table reads back, when the planner lets its pin through
+law tool_ok:
+  for +tool: M.Tool
+  for +ev: {P.clean.all(P.tool.values(tool)) == True{} : Bool}
+  {Toml.sect.ok(L.tool.sect(tool)) == True{} : Bool}
+
+def tool_ok(tool, ev):
+  match tool:
+    case M.Tool{+n, +e, +b, +s}:
+      tool_ok.src(n, e, b, s, ev)
+
+# LAW: every tool's table reads back, when the planner lets every pin through
+law tools_ok:
+  for +ts: List<&2, M.Tool>
+  for +e: {P.tools.ok(ts) == True{} : Bool}
+  {Toml.sects.ok(L.tool.sects(ts)) == True{} : Bool}
+
+def tools_ok(ts, e):
+  match ts:
+    case []:
+      {==}
+    case +h <> +t:
+      and_true(Toml.sect.ok(L.tool.sect(h)), Toml.sects.ok(L.tool.sects(t)),
+        tool_ok(h, Eq.and.left(P.clean.all(P.tool.values(h)), P.tools.ok(t), e)),
+        tools_ok(t, Eq.and.right(P.clean.all(P.tool.values(h)), P.tools.ok(t), e)))
+
+# LAW: the document of a lock the planner lets through reads back
+law doc_ok:
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +e: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {Toml.sects.ok(Laws.lock.doc(ts, hub, ps)) == True{} : Bool}
+
+def doc_ok(ps, ts, hub, e):
+  +er = Eq.and.right(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), e)
+  and_true(Toml.sect.ok(L.lock.sect(hub)),
+    Toml.sects.ok(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts))),
+    and_true(Str.clear(hub, '\n'), True{},
+      clean_nl(hub, Eq.and.left(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), e)),
+      {==}),
+    Toml.sects_ok_append(L.pack.all(L.pack.sort(ps)), L.tool.sects(ts),
+      psort_ok(ps, packs_ok(ps, Eq.and.left(P.packs.ok(ps), P.tools.ok(ts), er))),
+      tools_ok(ts, Eq.and.right(P.packs.ok(ps), P.tools.ok(ts), er))))
+
+def Laws.lock_sections_read_back(ps, ts, hub, ok):
+  r = Equal.sym(String, L.render.tools(ts, hub, ps), T.render(Laws.lock.doc(ts, hub, ps)),
+    Laws.render_is_doc(ts, hub, ps))
+  %r : {T.sects(T.parse(_)) == Laws.lock.doc(ts, hub, ps) : List<&2, T.Sect>}
+  Toml.sections_read(L.lock.sect(hub),
+    List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts)),
+    doc_ok(ps, ts, hub, ok))
+
+# the header of one of a package's tables. Proof vocabulary.
+def pack.name(h: String, x: String) -> String:
+  "packages." ++ T.quote(h) ++ SCon{'.', x}
+
+# LAW: a package table's header is three segments: `packages`, the hash and
+# the table's own name, when the hash holds no quote and the name no quote
+# and no dot
+law seg_pack:
+  for +h: String
+  for +x: String
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  for +eq: {Str.clear(x, '"') == True{} : Bool}
+  for +ed: {Str.clear(x, '.') == True{} : Bool}
+  {T.segments(pack.name(h, x)) == ["packages", h, x] : List<&2, String>}
+
+def seg_pack(h, x, eh, eq, ed):
+  a1 = Equal.sym(List<&2, Char>,
+    String.to_list(String.append(String.append(h, "\""), SCon{'.', x})),
+    List.append(&2, Char, String.to_list(String.append(h, "\"")), '.' <> String.to_list(x)),
+    Str.to_list_append(String.append(h, "\""), SCon{'.', x}))
+  %a1 : {T.seg.fin(T.seg.walk(_, T.Split{True{}, [], ["packages"]})) == ["packages", h, x]
+    : List<&2, String>}
+  a2 = Equal.sym(List<&2, Char>, String.to_list(String.append(h, "\"")),
+    List.append(&2, Char, String.to_list(h), ['"']), Str.to_list_append(h, "\""))
+  %a2 : {T.seg.fin(T.seg.walk(List.append(&2, Char, _, '.' <> String.to_list(x)),
+    T.Split{True{}, [], ["packages"]})) == ["packages", h, x] : List<&2, String>}
+  a3 = Equal.sym(List<&2, Char>,
+    List.append(&2, Char, List.append(&2, Char, String.to_list(h), ['"']), '.' <> String.to_list(x)),
+    List.append(&2, Char, String.to_list(h), '"' <> '.' <> String.to_list(x)),
+    Str.list_append_assoc(Char, String.to_list(h), ['"'], '.' <> String.to_list(x)))
+  %a3 : {T.seg.fin(T.seg.walk(_, T.Split{True{}, [], ["packages"]})) == ["packages", h, x]
+    : List<&2, String>}
+  a4 = Equal.sym(T.Split,
+    T.seg.walk(List.append(&2, Char, String.to_list(h), '"' <> '.' <> String.to_list(x)),
+      T.Split{True{}, [], ["packages"]}),
+    T.seg.walk('"' <> '.' <> String.to_list(x),
+      T.seg.walk(String.to_list(h), T.Split{True{}, [], ["packages"]})),
+    Toml.seg_walk_append(String.to_list(h), '"' <> '.' <> String.to_list(x), T.Split{True{}, [], ["packages"]}))
+  %a4 : {T.seg.fin(_) == ["packages", h, x] : List<&2, String>}
+  a5 = Equal.sym(T.Split, T.seg.walk(String.to_list(h), T.Split{True{}, [], ["packages"]}),
+    T.Split{True{}, List.reverse.go(&2, Char, String.to_list(h), []), ["packages"]},
+    Toml.seg_quoted(h, [], ["packages"], eh))
+  %a5 : {T.seg.fin(T.seg.walk('"' <> '.' <> String.to_list(x), _)) == ["packages", h, x]
+    : List<&2, String>}
+  a6 = Equal.sym(T.Split,
+    T.seg.walk(String.to_list(x), T.Split{False{}, [],
+      [T.seg.done(List.reverse.go(&2, Char, String.to_list(h), [])), "packages"]}),
+    T.Split{False{}, List.reverse.go(&2, Char, String.to_list(x), []),
+      [T.seg.done(List.reverse.go(&2, Char, String.to_list(h), [])), "packages"]},
+    Toml.seg_plain(x, [], [T.seg.done(List.reverse.go(&2, Char, String.to_list(h), [])), "packages"],
+      eq, ed))
+  %a6 : {T.seg.fin(_) == ["packages", h, x] : List<&2, String>}
+  b1 = Equal.sym(String, T.seg.done(List.reverse.go(&2, Char, String.to_list(h), [])), h,
+    Toml.seg_done_rev(h))
+  b2 = Equal.sym(String, T.seg.done(List.reverse.go(&2, Char, String.to_list(x), [])), x,
+    Toml.seg_done_rev(x))
+  %b1 : {["packages", _, T.seg.done(List.reverse.go(&2, Char, String.to_list(x), []))]
+    == ["packages", h, x] : List<&2, String>}
+  %b2 : {["packages", h, _] == ["packages", h, x] : List<&2, String>}
+  {==}
+
+# LAW: the first segment of a walk that had one segment behind it is that one
+law fin_frame:
+  for +st: T.Split
+  for +x: String
+  {K.word(T.seg.fin(Toml.seg.frame(st, [x])), 0n) == x : String}
+
+def fin_frame(st, x):
+  match st:
+    case T.Split{+q, +cur, +o}:
+      r = Equal.sym(List<&2, String>,
+        List.reverse.go(&2, String, List.append(&2, String, o, [x]), [T.seg.done(cur)]),
+        x <> List.reverse.go(&2, String, o, [T.seg.done(cur)]),
+        Str.list_rev_last(String, o, x, [T.seg.done(cur)]))
+      %r : {K.word(_, 0n) == x : String}
+      {==}
+
+# LAW: a tool table's header starts with `tools`, whatever the tool is named
+law seg_tools:
+  for +n: String
+  {K.word(T.segments("tools." ++ n), 0n) == "tools" : String}
+
+def seg_tools(n):
+  f = Equal.sym(T.Split,
+    T.seg.walk(String.to_list(n), Toml.seg.frame(T.Split{False{}, [], []}, ["tools"])),
+    Toml.seg.frame(T.seg.walk(String.to_list(n), T.Split{False{}, [], []}), ["tools"]),
+    Toml.walk_frame(String.to_list(n), T.Split{False{}, [], []}, ["tools"]))
+  %f : {K.word(T.seg.fin(_), 0n) == "tools" : String}
+  fin_frame(T.seg.walk(String.to_list(n), T.Split{False{}, [], []}), "tools")
+
+# ---------------------------------------------------------------------------
+# the values a table's pairs give back
+
+# The values a table's pairs give back. A source or a tool is written as a
+# run of pairs with distinct keys, a pair left out when its value is empty.
+# A lookup reads such a run as it reads the run with every pair written,
+# empty values included, and over that run a lookup for a key the text names
+# computes.
+
+# the run of pairs keys and values are written as, a pair left out when its
+# value is empty. Proof vocabulary.
+def kvs.of(ks: List<&2, String>, vs: List<&2, String>) -> List<&2, T.Kv>:
+  match ks vs:
+    case Nil{} _:
+      []
+    case Con{_k, _kt} Nil{}:
+      []
+    case Con{k, kt} Con{v, vt}:
+      List.append(&2, T.Kv, L.kv(k, v), kvs.of(kt, vt))
+
+# the same run with every pair written
+def full.of(ks: List<&2, String>, vs: List<&2, String>) -> List<&2, T.Kv>:
+  match ks vs:
+    case Nil{} _:
+      []
+    case Con{_k, _kt} Nil{}:
+      []
+    case Con{k, kt} Con{v, vt}:
+      T.Kv{k, v} <> full.of(kt, vt)
+
+# whether a key is none of the keys given
+def keys.fresh(+key: String, ks: List<&2, String>) -> Bool:
+  match ks:
+    case []:
+      True{}
+    case h <> t:
+      rest = keys.fresh(key, t)
+      Bool.and(Bool.not(String.eq(key, h)), rest)
+
+# whether no key is given twice
+def keys.distinct(ks: List<&2, String>) -> Bool:
+  match ks:
+    case []:
+      True{}
+    case +h <> +t:
+      rest = keys.distinct(t)
+      Bool.and(keys.fresh(h, t), rest)
+
+# LAW: a lookup for a key a run does not have finds nothing
+law full_absent:
+  for +key: String
+  for +ks: List<&2, String>
+  for +vs: List<&2, String>
+  for +e: {keys.fresh(key, ks) == True{} : Bool}
+  {T.value(full.of(ks, vs), key) == "" : String}
+
+# by induction on the keys: none is the one looked for
+def full_absent(key, ks, vs, e):
+  match ks vs:
+    case Nil{} _:
+      {==}
+    case Con{_k, _kt} Nil{}:
+      {==}
+    case Con{+k, +kt} Con{+v, +vt}:
+      f = Equal.sym(Bool, String.eq(k, key), False{},
+        Str.eq_flip(key, k, Eq.not.true(String.eq(key, k),
+          Eq.and.left(Bool.not(String.eq(key, k)), keys.fresh(key, kt), e))))
+      %f : {Bool.pick(String, _, v, T.value(full.of(kt, vt), key)) == "" : String}
+      full_absent(key, kt, vt, Eq.and.right(Bool.not(String.eq(key, k)), keys.fresh(key, kt), e))
+
+# LAW: a lookup reads a run with a pair left out when its value is empty as
+# the run with every pair written, one pair, with its value and how its key
+# compares given
+law kvs_full.go:
+  for +k: String
+  for +kt: List<&2, String>
+  for +v: String
+  for +vt: List<&2, String>
+  for +key: String
+  for b: Bool
+  for +eb: {String.eq(k, key) == b : Bool}
+  for +ef: {keys.fresh(k, kt) == True{} : Bool}
+  for ih: {T.value(kvs.of(kt, vt), key) == T.value(full.of(kt, vt), key) : String}
+  {T.value(List.append(&2, T.Kv, L.kv(k, v), kvs.of(kt, vt)), key)
+    == T.value(T.Kv{k, v} <> full.of(kt, vt), key) : String}
+
+# an empty value is left out, which a lookup for another key does not see
+# and a lookup for its own finds nothing where it was
+def kvs_full.go(k, kt, v, vt, key, b, eb, ef, ih):
+  match v b:
+    case SNil{} False{}:
+      f = Equal.sym(Bool, String.eq(k, key), False{}, eb)
+      %f : {T.value(kvs.of(kt, vt), key) == Bool.pick(String, _, "", T.value(full.of(kt, vt), key))
+        : String}
+      ih
+    case SNil{} True{}:
+      f = Equal.sym(Bool, String.eq(k, key), True{}, eb)
+      %f : {T.value(kvs.of(kt, vt), key) == Bool.pick(String, _, "", T.value(full.of(kt, vt), key))
+        : String}
+      Equal.trans(String, T.value(kvs.of(kt, vt), key), T.value(full.of(kt, vt), key), "", ih,
+        Equal.trans(String, T.value(full.of(kt, vt), key), T.value(full.of(kt, vt), k), "",
+          Equal.cong(String, String, x => T.value(full.of(kt, vt), x), key, k,
+            Equal.sym(String, k, key, Str.string_eq_true(k, key, eb))),
+          full_absent(k, kt, vt, ef)))
+    case SCon{+h, +t} _:
+      Equal.cong(String, String, x => Bool.pick(String, String.eq(k, key), SCon{h, t}, x),
+        T.value(kvs.of(kt, vt), key), T.value(full.of(kt, vt), key), ih)
+
+# LAW: a lookup reads a run with a pair left out when its value is empty as
+# the run with every pair written, when no key is given twice
+law kvs_full:
+  for +ks: List<&2, String>
+  for +vs: List<&2, String>
+  for +key: String
+  for +e: {keys.distinct(ks) == True{} : Bool}
+  {T.value(kvs.of(ks, vs), key) == T.value(full.of(ks, vs), key) : String}
+
+# by induction on the keys
+def kvs_full(ks, vs, key, e):
+  match ks vs:
+    case Nil{} _:
+      {==}
+    case Con{_k, _kt} Nil{}:
+      {==}
+    case Con{+k, +kt} Con{+v, +vt}:
+      kvs_full.go(k, kt, v, vt, key, String.eq(k, key), {==},
+        Eq.and.left(keys.fresh(k, kt), keys.distinct(kt), e),
+        kvs_full(kt, vt, key, Eq.and.right(keys.fresh(k, kt), keys.distinct(kt), e)))
+
+# LAW: a package's source reads back from the pairs it is written as, with
+# the source taken apart
+law src_read.git:
+  for +url: String
+  for +rev: String
+  for +entry: String
+  for +root: String
+  for +nar: String
+  for +tag: String
+  {L.src_of(L.src.pairs(L.Git{url, rev, entry, root, nar, tag}))
+    == L.Git{url, rev, entry, root, nar, tag} : L.Src}
+
+# each value, looked up in the run with every pair written, is the value
+def src_read.git(url, rev, entry, root, nar, tag):
+  r0 = Equal.sym(String, T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root,
+      nar, tag]), "url"),
+    T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "url"),
+        kvs_full(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag], "url", {==}))
+  %r0 : {L.Git{_,
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "rev"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "entry"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "root"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "narHash"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "tag")}
+    == L.Git{url, rev, entry, root, nar, tag} : L.Src}
+  r1 = Equal.sym(String, T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root,
+      nar, tag]), "rev"),
+    T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "rev"),
+        kvs_full(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag], "rev", {==}))
+  %r1 : {L.Git{T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]),
+      "url"),
+      _,
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "entry"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "root"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "narHash"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "tag")}
+    == L.Git{url, rev, entry, root, nar, tag} : L.Src}
+  r2 = Equal.sym(String, T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root,
+      nar, tag]), "entry"),
+    T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "entry"),
+        kvs_full(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag], "entry", {==}))
+  %r2 : {L.Git{T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]),
+      "url"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "rev"),
+      _,
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "root"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "narHash"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "tag")}
+    == L.Git{url, rev, entry, root, nar, tag} : L.Src}
+  r3 = Equal.sym(String, T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root,
+      nar, tag]), "root"),
+    T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "root"),
+        kvs_full(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag], "root", {==}))
+  %r3 : {L.Git{T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]),
+      "url"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "rev"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "entry"),
+      _,
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "narHash"),
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "tag")}
+    == L.Git{url, rev, entry, root, nar, tag} : L.Src}
+  r4 = Equal.sym(String, T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root,
+      nar, tag]), "narHash"),
+    T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "narHash"),
+        kvs_full(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag], "narHash", {==}))
+  %r4 : {L.Git{T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]),
+      "url"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "rev"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "entry"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "root"),
+      _,
+      T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "tag")}
+    == L.Git{url, rev, entry, root, nar, tag} : L.Src}
+  r5 = Equal.sym(String, T.value(kvs.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root,
+      nar, tag]), "tag"),
+    T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "tag"),
+        kvs_full(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag], "tag", {==}))
+  %r5 : {L.Git{T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]),
+      "url"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "rev"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "entry"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "root"),
+      T.value(full.of(["url", "rev", "entry", "root", "narHash", "tag"], [url, rev, entry, root, nar, tag]), "narHash"),
+      _}
+    == L.Git{url, rev, entry, root, nar, tag} : L.Src}
+  {==}
+
+# LAW: a package's source reads back from the pairs it is written as
+law src_read:
+  for +src: L.Src
+  {L.src_of(L.src.pairs(src)) == src : L.Src}
+
+def src_read(src):
+  match src:
+    case L.Hub{}:
+      {==}
+    case L.Git{+url, +rev, +entry, +root, +nar, +tag}:
+      src_read.git(url, rev, entry, root, nar, tag)
+
+# LAW: a package's files read back from the pairs they are written as
+law pair_files:
+  for +fs: List<&2, K.File>
+  {L.pair.files(L.file.pairs(fs)) == fs : List<&2, K.File>}
+
+def pair_files(fs):
+  match fs:
+    case []:
+      {==}
+    case K.File{+at, +sum} <> +t:
+      Equal.cong(List<&2, K.File>, List<&2, K.File>, r => K.File{at, sum} <> r,
+        L.pair.files(L.file.pairs(t)), t, pair_files(t))
+
+# LAW: a git tool reads back from the pairs it is written as, as the lock
+# gives it back
+law tool_of.git:
+  for +n: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +e: String
+  for +b: String
+  {M.tool_of("tools." ++ n, kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+      nar, e, b]))
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+
+# the name is what follows `tools.`, and each value is looked up in the run
+# with every pair written, where `vendor` is not
+def tool_of.git(n, url, rev, tag, root, nar, e, b):
+  d = Equal.sym(String, String.drop(n, 0n), n, Str.drop_zero(n))
+  %d : {M.Tool{_, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar,
+      e, b]), "entry"), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+          nar, e, b]), "bin"), M.source_of(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev,
+              tag, root, nar, e, b]))}
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+  t0 = Equal.sym(String, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+      root, nar, e, b]), "entry"),
+    T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]),
+        "entry"), kvs_full(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b],
+            "entry", {==}))
+  %t0 : {M.Tool{n, _, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+      nar, e, b]), "bin"),
+      M.source.go(String.is_empty(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev,
+          tag, root, nar, e, b]), "git")), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"],
+              [url, rev, tag, root, nar, e, b]), "git"), T.value(kvs.of(["git", "rev", "tag", "root", "narHash",
+                  "entry", "bin"], [url, rev, tag, root, nar, e, b]), "rev"), T.value(kvs.of(["git", "rev", "tag",
+                      "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]), "tag"),
+        M.root.or(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar,
+            e, b]), "root")), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+                root, nar, e, b]), "narHash"), M.flag(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry",
+                    "bin"], [url, rev, tag, root, nar, e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+  t1 = Equal.sym(String, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+      root, nar, e, b]), "bin"),
+    T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]),
+        "bin"), kvs_full(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b],
+            "bin", {==}))
+  %t1 : {M.Tool{n, T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+      nar, e, b]), "entry"), _,
+      M.source.go(String.is_empty(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev,
+          tag, root, nar, e, b]), "git")), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"],
+              [url, rev, tag, root, nar, e, b]), "git"), T.value(kvs.of(["git", "rev", "tag", "root", "narHash",
+                  "entry", "bin"], [url, rev, tag, root, nar, e, b]), "rev"), T.value(kvs.of(["git", "rev", "tag",
+                      "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]), "tag"),
+        M.root.or(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar,
+            e, b]), "root")), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+                root, nar, e, b]), "narHash"), M.flag(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry",
+                    "bin"], [url, rev, tag, root, nar, e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+  t2 = Equal.sym(String, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+      root, nar, e, b]), "git"),
+    T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]),
+        "git"), kvs_full(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b],
+            "git", {==}))
+  %t2 : {M.Tool{n, T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+      nar, e, b]), "entry"), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+          root, nar, e, b]), "bin"),
+      M.source.go(String.is_empty(_), _, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"],
+          [url, rev, tag, root, nar, e, b]), "rev"), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry",
+              "bin"], [url, rev, tag, root, nar, e, b]), "tag"),
+        M.root.or(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar,
+            e, b]), "root")), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+                root, nar, e, b]), "narHash"), M.flag(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry",
+                    "bin"], [url, rev, tag, root, nar, e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+  t3 = Equal.sym(String, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+      root, nar, e, b]), "rev"),
+    T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]),
+        "rev"), kvs_full(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b],
+            "rev", {==}))
+  %t3 : {M.Tool{n, T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+      nar, e, b]), "entry"), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+          root, nar, e, b]), "bin"),
+      M.source.go(String.is_empty(T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev,
+          tag, root, nar, e, b]), "git")), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"],
+              [url, rev, tag, root, nar, e, b]), "git"), _, T.value(kvs.of(["git", "rev", "tag", "root", "narHash",
+                  "entry", "bin"], [url, rev, tag, root, nar, e, b]), "tag"),
+        M.root.or(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar,
+            e, b]), "root")), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+                root, nar, e, b]), "narHash"), M.flag(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry",
+                    "bin"], [url, rev, tag, root, nar, e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+  t4 = Equal.sym(String, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+      root, nar, e, b]), "tag"),
+    T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]),
+        "tag"), kvs_full(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b],
+            "tag", {==}))
+  %t4 : {M.Tool{n, T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+      nar, e, b]), "entry"), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+          root, nar, e, b]), "bin"),
+      M.source.go(String.is_empty(T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev,
+          tag, root, nar, e, b]), "git")), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"],
+              [url, rev, tag, root, nar, e, b]), "git"), T.value(full.of(["git", "rev", "tag", "root", "narHash",
+                  "entry", "bin"], [url, rev, tag, root, nar, e, b]), "rev"), _,
+        M.root.or(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar,
+            e, b]), "root")), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+                root, nar, e, b]), "narHash"), M.flag(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry",
+                    "bin"], [url, rev, tag, root, nar, e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+  t5 = Equal.sym(String, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+      root, nar, e, b]), "root"),
+    T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]),
+        "root"), kvs_full(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b],
+            "root", {==}))
+  %t5 : {M.Tool{n, T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+      nar, e, b]), "entry"), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+          root, nar, e, b]), "bin"),
+      M.source.go(String.is_empty(T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev,
+          tag, root, nar, e, b]), "git")), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"],
+              [url, rev, tag, root, nar, e, b]), "git"), T.value(full.of(["git", "rev", "tag", "root", "narHash",
+                  "entry", "bin"], [url, rev, tag, root, nar, e, b]), "rev"), T.value(full.of(["git", "rev", "tag",
+                      "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]), "tag"),
+        M.root.or(_), T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+            nar, e, b]), "narHash"), M.flag(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"],
+                [url, rev, tag, root, nar, e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+  t6 = Equal.sym(String, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+      root, nar, e, b]), "narHash"),
+    T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]),
+        "narHash"), kvs_full(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e,
+            b], "narHash", {==}))
+  %t6 : {M.Tool{n, T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+      nar, e, b]), "entry"), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+          root, nar, e, b]), "bin"),
+      M.source.go(String.is_empty(T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev,
+          tag, root, nar, e, b]), "git")), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"],
+              [url, rev, tag, root, nar, e, b]), "git"), T.value(full.of(["git", "rev", "tag", "root", "narHash",
+                  "entry", "bin"], [url, rev, tag, root, nar, e, b]), "rev"), T.value(full.of(["git", "rev", "tag",
+                      "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]), "tag"),
+        M.root.or(T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar,
+            e, b]), "root")), _, M.flag(T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url,
+                rev, tag, root, nar, e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+  t7 = Equal.sym(String, T.value(kvs.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+      root, nar, e, b]), "vendor"),
+    T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]),
+        "vendor"), kvs_full(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e,
+            b], "vendor", {==}))
+  %t7 : {M.Tool{n, T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root,
+      nar, e, b]), "entry"), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag,
+          root, nar, e, b]), "bin"),
+      M.source.go(String.is_empty(T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev,
+          tag, root, nar, e, b]), "git")), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"],
+              [url, rev, tag, root, nar, e, b]), "git"), T.value(full.of(["git", "rev", "tag", "root", "narHash",
+                  "entry", "bin"], [url, rev, tag, root, nar, e, b]), "rev"), T.value(full.of(["git", "rev", "tag",
+                      "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar, e, b]), "tag"),
+        M.root.or(T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev, tag, root, nar,
+            e, b]), "root")), T.value(full.of(["git", "rev", "tag", "root", "narHash", "entry", "bin"], [url, rev,
+                tag, root, nar, e, b]), "narHash"), M.flag(_))}
+    == M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})} : M.Tool}
+  {==}
+
+# LAW: a hub tool reads back from the pairs it is written as
+law tool_of.hub:
+  for +n: String
+  for +e: String
+  for +b: String
+  {M.tool_of("tools." ++ n, kvs.of(["entry", "bin"], [e, b])) == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+
+# as for a git tool, with no `git` to make it one
+def tool_of.hub(n, e, b):
+  d = Equal.sym(String, String.drop(n, 0n), n, Str.drop_zero(n))
+  %d : {M.Tool{_, T.value(kvs.of(["entry", "bin"], [e, b]), "entry"), T.value(kvs.of(["entry", "bin"], [e, b]),
+      "bin"), M.source_of(kvs.of(["entry", "bin"], [e, b]))}
+    == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+  t0 = Equal.sym(String, T.value(kvs.of(["entry", "bin"], [e, b]), "entry"),
+    T.value(full.of(["entry", "bin"], [e, b]), "entry"), kvs_full(["entry", "bin"], [e, b], "entry", {==}))
+  %t0 : {M.Tool{n, _, T.value(kvs.of(["entry", "bin"], [e, b]), "bin"),
+      M.source.go(String.is_empty(T.value(kvs.of(["entry", "bin"], [e, b]), "git")), T.value(kvs.of(["entry", "bin"],
+          [e, b]), "git"), T.value(kvs.of(["entry", "bin"], [e, b]), "rev"), T.value(kvs.of(["entry", "bin"], [e, b]),
+              "tag"),
+        M.root.or(T.value(kvs.of(["entry", "bin"], [e, b]), "root")), T.value(kvs.of(["entry", "bin"], [e, b]),
+            "narHash"), M.flag(T.value(kvs.of(["entry", "bin"], [e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+  t1 = Equal.sym(String, T.value(kvs.of(["entry", "bin"], [e, b]), "bin"),
+    T.value(full.of(["entry", "bin"], [e, b]), "bin"), kvs_full(["entry", "bin"], [e, b], "bin", {==}))
+  %t1 : {M.Tool{n, T.value(full.of(["entry", "bin"], [e, b]), "entry"), _,
+      M.source.go(String.is_empty(T.value(kvs.of(["entry", "bin"], [e, b]), "git")), T.value(kvs.of(["entry", "bin"],
+          [e, b]), "git"), T.value(kvs.of(["entry", "bin"], [e, b]), "rev"), T.value(kvs.of(["entry", "bin"], [e, b]),
+              "tag"),
+        M.root.or(T.value(kvs.of(["entry", "bin"], [e, b]), "root")), T.value(kvs.of(["entry", "bin"], [e, b]),
+            "narHash"), M.flag(T.value(kvs.of(["entry", "bin"], [e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+  t2 = Equal.sym(String, T.value(kvs.of(["entry", "bin"], [e, b]), "git"),
+    T.value(full.of(["entry", "bin"], [e, b]), "git"), kvs_full(["entry", "bin"], [e, b], "git", {==}))
+  %t2 : {M.Tool{n, T.value(full.of(["entry", "bin"], [e, b]), "entry"), T.value(full.of(["entry", "bin"], [e, b]),
+      "bin"),
+      M.source.go(String.is_empty(_), _, T.value(kvs.of(["entry", "bin"], [e, b]), "rev"), T.value(kvs.of(["entry",
+          "bin"], [e, b]), "tag"),
+        M.root.or(T.value(kvs.of(["entry", "bin"], [e, b]), "root")), T.value(kvs.of(["entry", "bin"], [e, b]),
+            "narHash"), M.flag(T.value(kvs.of(["entry", "bin"], [e, b]), "vendor")))}
+    == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+  {==}
+
+# LAW: a tool's table, read, is the tool as the lock gives it back, with its
+# source taken apart
+law tools_read.src:
+  for +n: String
+  for +e: String
+  for +b: String
+  for +s: M.Source
+  for +rest: List<&2, T.Sect>
+  {M.tools(L.tool.sect(M.Tool{n, e, b, s}) <> rest)
+    == Laws.tool.canon(M.Tool{n, e, b, s}) <> M.tools(rest) : List<&2, M.Tool>}
+
+def tools_read.src(n, e, b, s, rest):
+  match s:
+    case M.Hub{}:
+      f = Equal.sym(Bool, String.starts_with(n, ""), True{}, Eq.starts_nil(n))
+      %f : {M.tools.put(_, L.tool.sect(M.Tool{n, e, b, M.Hub{}}), M.tools(rest))
+        == Laws.tool.canon(M.Tool{n, e, b, M.Hub{}}) <> M.tools(rest) : List<&2, M.Tool>}
+      Equal.cong(M.Tool, List<&2, M.Tool>, x => x <> M.tools(rest),
+        M.tool_of("tools." ++ n, List.concat(&2, T.Kv, [L.kv("entry", e), L.kv("bin", b)])),
+        M.Tool{n, e, b, M.Hub{}}, tool_of.hub(n, e, b))
+    case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
+      f = Equal.sym(Bool, String.starts_with(n, ""), True{}, Eq.starts_nil(n))
+      %f : {M.tools.put(_, L.tool.sect(M.Tool{n, e, b, M.Git{url, rev, tag, root, nar, vend}}), M.tools(rest))
+        == Laws.tool.canon(M.Tool{n, e, b, M.Git{url, rev, tag, root, nar, vend}}) <> M.tools(rest)
+        : List<&2, M.Tool>}
+      Equal.cong(M.Tool, List<&2, M.Tool>, x => x <> M.tools(rest),
+        M.tool_of("tools." ++ n, List.concat(&2, T.Kv, [L.kv("git", url), L.kv("rev", rev),
+          L.kv("tag", tag), L.kv("root", root), L.kv("narHash", nar), L.kv("entry", e),
+          L.kv("bin", b)])),
+        M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})},
+        tool_of.git(n, url, rev, tag, root, nar, e, b))
+
+# LAW: every tool's table, read, is the tool list as the lock gives it back
+law tools_read:
+  for +ts: List<&2, M.Tool>
+  {M.tools(L.tool.sects(ts)) == Laws.tools.canon(ts) : List<&2, M.Tool>}
+
+# one tool, taken apart
+law tools_read.cons:
+  for +h: M.Tool
+  for +t: List<&2, M.Tool>
+  for ih: {M.tools(L.tool.sects(t)) == Laws.tools.canon(t) : List<&2, M.Tool>}
+  {M.tools(L.tool.sects(h <> t)) == Laws.tools.canon(h <> t) : List<&2, M.Tool>}
+
+def tools_read.cons(h, t, ih):
+  match h:
+    case M.Tool{+n, +e, +b, +s}:
+      r = tools_read.src(n, e, b, s, L.tool.sects(t))
+      %ih : {M.tools(L.tool.sects(M.Tool{n, e, b, s} <> t))
+        == Laws.tool.canon(M.Tool{n, e, b, s}) <> _ : List<&2, M.Tool>}
+      r
+
+def tools_read(ts):
+  match ts:
+    case []:
+      {==}
+    case +h <> +t:
+      tools_read.cons(h, t, tools_read(t))
+
+# LAW: a package's tables are no tool's
+law tools_skip_packs:
+  for +qs: List<&2, L.Pack>
+  for +rest: List<&2, T.Sect>
+  {M.tools(List.append(&2, T.Sect, L.pack.all(qs), rest)) == M.tools(rest) : List<&2, M.Tool>}
+
+# one package, taken apart
+law tools_skip_packs.cons:
+  for +q: L.Pack
+  for +qs: List<&2, L.Pack>
+  for +rest: List<&2, T.Sect>
+  for ih: {M.tools(List.append(&2, T.Sect, L.pack.all(qs), rest)) == M.tools(rest)
+    : List<&2, M.Tool>}
+  {M.tools(List.append(&2, T.Sect, L.pack.all(q <> qs), rest)) == M.tools(rest)
+    : List<&2, M.Tool>}
+
+def tools_skip_packs.cons(q, _qs, _rest, ih):
+  match q:
+    case L.Pack{+h, +s, +f}:
+      ih
+
+def tools_skip_packs(qs, rest):
+  match qs:
+    case []:
+      {==}
+    case +q <> +t:
+      tools_skip_packs.cons(q, t, rest, tools_skip_packs(t, rest))
+
+# LAW: the lock `ez lock` renders names the hub it was resolved against
+law lock_hub_read:
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ps: List<&2, L.Pack>
+  {L.lock.hub(Laws.lock.doc(ts, hub, ps)) == hub : String}
+
+def lock_hub_read(_ts, _hub, _ps):
+  {==}
+
+# LAW: and gives back its tool pins, as the lock gives them back
+law lock_tools_read:
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ps: List<&2, L.Pack>
+  {M.tools(Laws.lock.doc(ts, hub, ps)) == Laws.tools.canon(ts) : List<&2, M.Tool>}
+
+def lock_tools_read(ts, _hub, ps):
+  Equal.trans(List<&2, M.Tool>,
+    M.tools(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts))),
+    M.tools(L.tool.sects(ts)), Laws.tools.canon(ts),
+    tools_skip_packs(L.pack.sort(ps), L.tool.sects(ts)), tools_read(ts))
+
+# ---------------------------------------------------------------------------
+# the packages a lock gives back
+
+# whether no package's hash holds a quote. Proof vocabulary.
+def hashes.clean(qs: List<&2, L.Pack>) -> Bool:
+  match qs:
+    case []:
+      True{}
+    case h <> t:
+      Bool.and(Str.clear(L.pack.hash(h), '"'), hashes.clean(t))
+
+# LAW: packages the planner lets through have no quote in any hash
+law hashes_clean_ok:
+  for +ps: List<&2, L.Pack>
+  for +e: {P.packs.ok(ps) == True{} : Bool}
+  {hashes.clean(ps) == True{} : Bool}
+
+# one package, taken apart
+law hashes_clean_ok.cons:
+  for +h: L.Pack
+  for +t: List<&2, L.Pack>
+  for +e: {P.packs.ok(h <> t) == True{} : Bool}
+  for ih: {hashes.clean(t) == True{} : Bool}
+  {hashes.clean(h <> t) == True{} : Bool}
+
+def hashes_clean_ok.cons(h, t, e, ih):
+  match h:
+    case L.Pack{+hash, +src, +fs}:
+      and_true(Str.clear(hash, '"'), hashes.clean(t),
+        clean_quote(hash, Eq.and.left(P.clean(hash),
+          P.clean.all(List.append(&2, String, P.src.values(src), P.file.values(fs))),
+          Eq.and.left(P.clean.all(P.pack.values(L.Pack{hash, src, fs})), Bool.not(L.has(t, hash)),
+            Eq.and.right(P.paths.ok(fs), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src, fs})),
+              Bool.not(L.has(t, hash))),
+              Eq.and.left(Bool.and(P.paths.ok(fs), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src, fs})),
+                Bool.not(L.has(t, hash)))), P.packs.ok(t), e))))),
+        ih)
+
+def hashes_clean_ok(ps, e):
+  match ps:
+    case []:
+      {==}
+    case +h <> +t:
+      hashes_clean_ok.cons(h, t, e, hashes_clean_ok(t, Eq.and.right(
+        Bool.and(P.paths.ok(L.pack.files(h)), Bool.and(P.clean.all(P.pack.values(h)),
+          Bool.not(L.has(t, L.pack.hash(h))))), P.packs.ok(t), e)))
+
+# LAW: a package inserted among packages with clean hashes, when its hash is
+# clean, one step, with how it compares given
+law hclean_ins.step:
+  for +p: L.Pack
+  for +h: L.Pack
+  for +t: List<&2, L.Pack>
+  for b: Bool
+  for +eq: {hashes.clean(h <> t) == True{} : Bool}
+  for +ep: {Str.clear(L.pack.hash(p), '"') == True{} : Bool}
+  for ih: {hashes.clean(L.pack.ins(t, p)) == True{} : Bool}
+  {hashes.clean(L.pack.ins.put(b, p, h, t, L.pack.ins(t, p))) == True{} : Bool}
+
+def hclean_ins.step(p, h, t, b, eq, ep, ih):
+  match b:
+    case True{}:
+      and_true(Str.clear(L.pack.hash(p), '"'), hashes.clean(h <> t), ep, eq)
+    case False{}:
+      and_true(Str.clear(L.pack.hash(h), '"'), hashes.clean(L.pack.ins(t, p)),
+        Eq.and.left(Str.clear(L.pack.hash(h), '"'), hashes.clean(t), eq), ih)
+
+# LAW: and the whole insertion
+law hclean_ins:
+  for +qs: List<&2, L.Pack>
+  for +p: L.Pack
+  for +eq: {hashes.clean(qs) == True{} : Bool}
+  for +ep: {Str.clear(L.pack.hash(p), '"') == True{} : Bool}
+  {hashes.clean(L.pack.ins(qs, p)) == True{} : Bool}
+
+def hclean_ins(qs, p, eq, ep):
+  match qs:
+    case []:
+      and_true(Str.clear(L.pack.hash(p), '"'), True{}, ep, {==})
+    case +h <> +t:
+      hclean_ins.step(p, h, t, L.pack.le(p, h), eq, ep,
+        hclean_ins(t, p, Eq.and.right(Str.clear(L.pack.hash(h), '"'), hashes.clean(t), eq), ep))
+
+# LAW: packages with clean hashes, sorted, have clean hashes
+law hclean_sort:
+  for +ps: List<&2, L.Pack>
+  for +e: {hashes.clean(ps) == True{} : Bool}
+  {hashes.clean(L.pack.sort(ps)) == True{} : Bool}
+
+def hclean_sort(ps, e):
+  match ps:
+    case []:
+      {==}
+    case +h <> +t:
+      hclean_ins(L.pack.sort(t), h,
+        hclean_sort(t, Eq.and.right(Str.clear(L.pack.hash(h), '"'), hashes.clean(t), e)),
+        Eq.and.left(Str.clear(L.pack.hash(h), '"'), hashes.clean(t), e))
+
+# LAW: a hash fresh to packages and unequal to one more is fresh to them with
+# it inserted, one step, with how it compares given
+law fresh_ins.step:
+  for +y: String
+  for +x: L.Pack
+  for +h: L.Pack
+  for +t: List<&2, L.Pack>
+  for b: Bool
+  for +e1: {String.eq(y, L.pack.hash(x)) == False{} : Bool}
+  for +e2: {Laws.hash.fresh(y, h <> t) == True{} : Bool}
+  for ih: {Laws.hash.fresh(y, L.pack.ins(t, x)) == True{} : Bool}
+  {Laws.hash.fresh(y, L.pack.ins.put(b, x, h, t, L.pack.ins(t, x))) == True{} : Bool}
+
+def fresh_ins.step(y, x, h, t, b, e1, e2, ih):
+  match b:
+    case True{}:
+      and_true(Bool.not(String.eq(y, L.pack.hash(x))), Laws.hash.fresh(y, h <> t),
+        not_false(String.eq(y, L.pack.hash(x)), e1), e2)
+    case False{}:
+      and_true(Bool.not(String.eq(y, L.pack.hash(h))), Laws.hash.fresh(y, L.pack.ins(t, x)),
+        Eq.and.left(Bool.not(String.eq(y, L.pack.hash(h))), Laws.hash.fresh(y, t), e2), ih)
+
+# LAW: and the whole insertion
+law fresh_ins:
+  for +y: String
+  for +qs: List<&2, L.Pack>
+  for +x: L.Pack
+  for +e1: {String.eq(y, L.pack.hash(x)) == False{} : Bool}
+  for +e2: {Laws.hash.fresh(y, qs) == True{} : Bool}
+  {Laws.hash.fresh(y, L.pack.ins(qs, x)) == True{} : Bool}
+
+def fresh_ins(y, qs, x, e1, e2):
+  match qs:
+    case []:
+      and_true(Bool.not(String.eq(y, L.pack.hash(x))), True{},
+        not_false(String.eq(y, L.pack.hash(x)), e1), {==})
+    case +h <> +t:
+      fresh_ins.step(y, x, h, t, L.pack.le(x, h), e1, e2,
+        fresh_ins(y, t, x, e1,
+          Eq.and.right(Bool.not(String.eq(y, L.pack.hash(h))), Laws.hash.fresh(y, t), e2)))
+
+# LAW: a hash fresh to packages is fresh to them sorted
+law fresh_sort:
+  for +y: String
+  for +ps: List<&2, L.Pack>
+  for +e: {Laws.hash.fresh(y, ps) == True{} : Bool}
+  {Laws.hash.fresh(y, L.pack.sort(ps)) == True{} : Bool}
+
+def fresh_sort(y, ps, e):
+  match ps:
+    case []:
+      {==}
+    case +h <> +t:
+      fresh_ins(y, L.pack.sort(t), h,
+        Eq.not.true(String.eq(y, L.pack.hash(h)),
+          Eq.and.left(Bool.not(String.eq(y, L.pack.hash(h))), Laws.hash.fresh(y, t), e)),
+        fresh_sort(y, t, Eq.and.right(Bool.not(String.eq(y, L.pack.hash(h))), Laws.hash.fresh(y, t), e)))
+
+# LAW: a package inserted among distinct packages, when its hash is fresh to
+# them, leaves them distinct, one step, with how it compares given
+law distinct_ins.step:
+  for +x: L.Pack
+  for +h: L.Pack
+  for +t: List<&2, L.Pack>
+  for b: Bool
+  for +ef: {Laws.hash.fresh(L.pack.hash(x), h <> t) == True{} : Bool}
+  for +ed: {Laws.distinct(h <> t) == True{} : Bool}
+  for ih: {Laws.distinct(L.pack.ins(t, x)) == True{} : Bool}
+  {Laws.distinct(L.pack.ins.put(b, x, h, t, L.pack.ins(t, x))) == True{} : Bool}
+
+def distinct_ins.step(x, h, t, b, ef, ed, ih):
+  match b:
+    case True{}:
+      and_true(Laws.hash.fresh(L.pack.hash(x), h <> t), Laws.distinct(h <> t), ef, ed)
+    case False{}:
+      and_true(Laws.hash.fresh(L.pack.hash(h), L.pack.ins(t, x)), Laws.distinct(L.pack.ins(t, x)),
+        fresh_ins(L.pack.hash(h), t, x,
+          Str.eq_flip(L.pack.hash(x), L.pack.hash(h),
+            Eq.not.true(String.eq(L.pack.hash(x), L.pack.hash(h)),
+              Eq.and.left(Bool.not(String.eq(L.pack.hash(x), L.pack.hash(h))),
+                Laws.hash.fresh(L.pack.hash(x), t), ef))),
+          Eq.and.left(Laws.hash.fresh(L.pack.hash(h), t), Laws.distinct(t), ed)),
+        ih)
+
+# LAW: and the whole insertion
+law distinct_ins:
+  for +qs: List<&2, L.Pack>
+  for +x: L.Pack
+  for +ef: {Laws.hash.fresh(L.pack.hash(x), qs) == True{} : Bool}
+  for +ed: {Laws.distinct(qs) == True{} : Bool}
+  {Laws.distinct(L.pack.ins(qs, x)) == True{} : Bool}
+
+def distinct_ins(qs, x, ef, ed):
+  match qs:
+    case []:
+      {==}
+    case +h <> +t:
+      distinct_ins.step(x, h, t, L.pack.le(x, h), ef, ed,
+        distinct_ins(t, x,
+          Eq.and.right(Bool.not(String.eq(L.pack.hash(x), L.pack.hash(h))),
+            Laws.hash.fresh(L.pack.hash(x), t), ef),
+          Eq.and.right(Laws.hash.fresh(L.pack.hash(h), t), Laws.distinct(t), ed)))
+
+# LAW: distinct packages, sorted, are distinct
+law distinct_sort:
+  for +ps: List<&2, L.Pack>
+  for +e: {Laws.distinct(ps) == True{} : Bool}
+  {Laws.distinct(L.pack.sort(ps)) == True{} : Bool}
+
+def distinct_sort(ps, e):
+  match ps:
+    case []:
+      {==}
+    case +h <> +t:
+      distinct_ins(L.pack.sort(t), h,
+        fresh_sort(L.pack.hash(h), t,
+          Eq.and.left(Laws.hash.fresh(L.pack.hash(h), t), Laws.distinct(t), e)),
+        distinct_sort(t, Eq.and.right(Laws.hash.fresh(L.pack.hash(h), t), Laws.distinct(t), e)))
+
+# LAW: packages the planner lets through are distinct
+law packs_distinct:
+  for +ps: List<&2, L.Pack>
+  for +e: {P.packs.ok(ps) == True{} : Bool}
+  {Laws.distinct(ps) == True{} : Bool}
+
+def packs_distinct(ps, e):
+  match ps:
+    case []:
+      {==}
+    case +h <> +t:
+      +ok = Eq.and.left(Bool.and(P.paths.ok(L.pack.files(h)), Bool.and(P.clean.all(P.pack.values(h)),
+          Bool.not(L.has(t, L.pack.hash(h))))), P.packs.ok(t), e)
+      and_true(Laws.hash.fresh(L.pack.hash(h), t), Laws.distinct(t),
+        has_fresh(t, L.pack.hash(h), Eq.not.true(L.has(t, L.pack.hash(h)),
+          Eq.and.right(P.clean.all(P.pack.values(h)), Bool.not(L.has(t, L.pack.hash(h))),
+            Eq.and.right(P.paths.ok(L.pack.files(h)), Bool.and(P.clean.all(P.pack.values(h)),
+              Bool.not(L.has(t, L.pack.hash(h)))), ok)))),
+        packs_distinct(t, Eq.and.right(Bool.and(P.paths.ok(L.pack.files(h)),
+          Bool.and(P.clean.all(P.pack.values(h)), Bool.not(L.has(t, L.pack.hash(h))))),
+          P.packs.ok(t), e)))
+
+# every package's hash, in the order given. Proof vocabulary.
+def hash.all(qs: List<&2, L.Pack>) -> List<&2, String>:
+  match qs:
+    case []:
+      []
+    case h <> t:
+      L.pack.hash(h) <> hash.all(t)
+
+# LAW: a package's source table names no hash of its own
+law hput_source:
+  for +h: String
+  for +s: L.Src
+  for +rest: List<&2, String>
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  {L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "source"), L.src.pairs(s)}), "packages", "files"),
+    T.Sect{pack.name(h, "source"), L.src.pairs(s)}, rest) == rest : List<&2, String>}
+
+def hput_source(h, s, rest, eh):
+  g = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
+    seg_pack(h, "source", eh, {==}, {==}))
+  %g : {L.hash.put(L.named3(_, "packages", "files"),
+    T.Sect{pack.name(h, "source"), L.src.pairs(s)}, rest) == rest : List<&2, String>}
+  {==}
+
+# LAW: and its files table names its hash
+law hput_files:
+  for +h: String
+  for +fs: List<&2, K.File>
+  for +rest: List<&2, String>
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  {L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "files"), L.file.pairs(fs)}), "packages", "files"),
+    T.Sect{pack.name(h, "files"), L.file.pairs(fs)}, rest) == h <> rest : List<&2, String>}
+
+def hput_files(h, fs, rest, eh):
+  g = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
+    seg_pack(h, "files", eh, {==}, {==}))
+  %g : {L.hash.put(L.named3(_, "packages", "files"),
+    T.Sect{pack.name(h, "files"), L.file.pairs(fs)}, rest) == h <> rest : List<&2, String>}
+  g2 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
+    seg_pack(h, "files", eh, {==}, {==}))
+  %g2 : {K.word(_, 1n) <> rest == h <> rest : List<&2, String>}
+  {==}
+
+# LAW: the hashes the packages' tables name, then whatever follows names
+law hashes_packs:
+  for +qs: List<&2, L.Pack>
+  for +ys: List<&2, T.Sect>
+  for +e: {hashes.clean(qs) == True{} : Bool}
+  {L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))
+    == List.append(&2, String, hash.all(qs), L.hashes(ys)) : List<&2, String>}
+
+# one package, taken apart
+law hashes_packs.cons:
+  for +q: L.Pack
+  for +qs: List<&2, L.Pack>
+  for +ys: List<&2, T.Sect>
+  for +eh: {Str.clear(L.pack.hash(q), '"') == True{} : Bool}
+  for ih: {L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))
+    == List.append(&2, String, hash.all(qs), L.hashes(ys)) : List<&2, String>}
+  {L.hashes(List.append(&2, T.Sect, L.pack.all(q <> qs), ys))
+    == List.append(&2, String, hash.all(q <> qs), L.hashes(ys)) : List<&2, String>}
+
+def hashes_packs.cons(q, qs, ys, eh, ih):
+  match q:
+    case L.Pack{+h, +s, +f}:
+      Equal.trans(List<&2, String>,
+        L.hashes(List.append(&2, T.Sect, L.pack.all(L.Pack{h, s, f} <> qs), ys)),
+        L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))}),
+          "packages", "files"), T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))},
+          L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))),
+        List.append(&2, String, hash.all(L.Pack{h, s, f} <> qs), L.hashes(ys)),
+        hput_source(h, s, L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "files"),
+          L.file.pairs(K.files_of(f))}), "packages", "files"),
+          T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))},
+          L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))), eh),
+        Equal.trans(List<&2, String>,
+          L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))}),
+            "packages", "files"), T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))},
+            L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))),
+          h <> L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys)),
+          List.append(&2, String, hash.all(L.Pack{h, s, f} <> qs), L.hashes(ys)),
+          hput_files(h, K.files_of(f), L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys)), eh),
+          Equal.cong(List<&2, String>, List<&2, String>, r => h <> r,
+            L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys)),
+            List.append(&2, String, hash.all(qs), L.hashes(ys)), ih)))
+
+def hashes_packs(qs, ys, e):
+  match qs:
+    case []:
+      {==}
+    case +q <> +t:
+      hashes_packs.cons(q, t, ys,
+        Eq.and.left(Str.clear(L.pack.hash(q), '"'), hashes.clean(t), e),
+        hashes_packs(t, ys, Eq.and.right(Str.clear(L.pack.hash(q), '"'), hashes.clean(t), e)))
+
+# LAW: a tool's table names no hash
+law hashes_tools:
+  for +ts: List<&2, M.Tool>
+  {L.hashes(L.tool.sects(ts)) == [] : List<&2, String>}
+
+# one tool, taken apart
+law hashes_tools.cons:
+  for +h: M.Tool
+  for +t: List<&2, M.Tool>
+  for ih: {L.hashes(L.tool.sects(t)) == [] : List<&2, String>}
+  {L.hashes(L.tool.sects(h <> t)) == [] : List<&2, String>}
+
+def hashes_tools.cons(h, t, ih):
+  match h:
+    case M.Tool{+n, +e, +b, +s}:
+      w = Equal.sym(String, K.word(T.segments("tools." ++ n), 0n), "tools", seg_tools(n))
+      %w : {L.hash.put(Bool.and(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 3n),
+        Bool.and(String.eq(_, "packages"), String.eq(K.word(T.segments("tools." ++ n), 2n), "files"))),
+        L.tool.sect(M.Tool{n, e, b, s}), L.hashes(L.tool.sects(t))) == [] : List<&2, String>}
+      a = Equal.sym(Bool, Bool.and(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 3n),
+        False{}), False{}, and_false(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 3n)))
+      %a : {L.hash.put(_, L.tool.sect(M.Tool{n, e, b, s}), L.hashes(L.tool.sects(t))) == []
+        : List<&2, String>}
+      ih
+
+def hashes_tools(ts):
+  match ts:
+    case []:
+      {==}
+    case +h <> +t:
+      hashes_tools.cons(h, t, hashes_tools(t))
+
+# a package's two tables, spelled as the proofs spell them. Proof vocabulary.
+def pk.src(h: String, s: L.Src) -> T.Sect:
+  T.Sect{pack.name(h, "source"), L.src.pairs(s)}
+
+def pk.files(h: String, f: List<&2, K.File>) -> T.Sect:
+  T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))}
+
+# LAW: a lookup for another hash passes over a package's two tables
+law at_skip:
+  for +h: String
+  for +s: L.Src
+  for +f: List<&2, K.File>
+  for +r: List<&2, T.Sect>
+  for +k: String
+  for +x: String
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  for +e: {String.eq(h, k) == False{} : Bool}
+  {L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), r), "packages", k, x)
+    == L.at3(r, "packages", k, x) : List<&2, T.Kv>}
+
+def at_skip(h, s, f, r, k, x, eh, e):
+  g1 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
+    seg_pack(h, "source", eh, {==}, {==}))
+  %g1 : {L.at.pick(L.is3(_, "packages", k, x), pk.src(h, s),
+    L.at.pick(L.is3(L.segs(pk.files(h, f)), "packages", k, x), pk.files(h, f), L.at3(r, "packages", k, x)))
+    == L.at3(r, "packages", k, x) : List<&2, T.Kv>}
+  g2 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
+    seg_pack(h, "files", eh, {==}, {==}))
+  %g2 : {L.at.pick(L.is3(["packages", h, "source"], "packages", k, x), pk.src(h, s),
+    L.at.pick(L.is3(_, "packages", k, x), pk.files(h, f), L.at3(r, "packages", k, x)))
+    == L.at3(r, "packages", k, x) : List<&2, T.Kv>}
+  f1 = Equal.sym(Bool, String.eq(h, k), False{}, e)
+  %f1 : {L.at.pick(Bool.and(_, String.eq("source", x)), pk.src(h, s),
+    L.at.pick(Bool.and(_, String.eq("files", x)), pk.files(h, f), L.at3(r, "packages", k, x)))
+    == L.at3(r, "packages", k, x) : List<&2, T.Kv>}
+  {==}
+
+# LAW: a lookup for a package's own source finds its source table
+law at_hit_src:
+  for +h: String
+  for +s: L.Src
+  for +f: List<&2, K.File>
+  for +r: List<&2, T.Sect>
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  {L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), r), "packages", h, "source")
+    == L.src.pairs(s) : List<&2, T.Kv>}
+
+def at_hit_src(h, s, f, r, eh):
+  g1 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
+    seg_pack(h, "source", eh, {==}, {==}))
+  %g1 : {L.at.pick(L.is3(_, "packages", h, "source"), pk.src(h, s),
+    L.at.pick(L.is3(L.segs(pk.files(h, f)), "packages", h, "source"), pk.files(h, f),
+      L.at3(r, "packages", h, "source"))) == L.src.pairs(s) : List<&2, T.Kv>}
+  q = Equal.sym(Bool, String.eq(h, h), True{}, Eq.string_eq_self(h))
+  %q : {L.at.pick(Bool.and(_, True{}), pk.src(h, s),
+    L.at.pick(L.is3(L.segs(pk.files(h, f)), "packages", h, "source"), pk.files(h, f),
+      L.at3(r, "packages", h, "source"))) == L.src.pairs(s) : List<&2, T.Kv>}
+  {==}
+
+# LAW: and a lookup for its files finds its files table
+law at_hit_files:
+  for +h: String
+  for +s: L.Src
+  for +f: List<&2, K.File>
+  for +r: List<&2, T.Sect>
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  {L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), r), "packages", h, "files")
+    == L.file.pairs(K.files_of(f)) : List<&2, T.Kv>}
+
+def at_hit_files(h, s, f, r, eh):
+  g1 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
+    seg_pack(h, "source", eh, {==}, {==}))
+  %g1 : {L.at.pick(L.is3(_, "packages", h, "files"), pk.src(h, s),
+    L.at.pick(L.is3(L.segs(pk.files(h, f)), "packages", h, "files"), pk.files(h, f),
+      L.at3(r, "packages", h, "files"))) == L.file.pairs(K.files_of(f)) : List<&2, T.Kv>}
+  g2 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
+    seg_pack(h, "files", eh, {==}, {==}))
+  %g2 : {L.at.pick(L.is3(["packages", h, "source"], "packages", h, "files"), pk.src(h, s),
+    L.at.pick(L.is3(_, "packages", h, "files"), pk.files(h, f),
+      L.at3(r, "packages", h, "files"))) == L.file.pairs(K.files_of(f)) : List<&2, T.Kv>}
+  q = Equal.sym(Bool, String.eq(h, h), True{}, Eq.string_eq_self(h))
+  %q : {L.at.pick(Bool.and(_, False{}), pk.src(h, s),
+    L.at.pick(Bool.and(_, True{}), pk.files(h, f),
+      L.at3(r, "packages", h, "files"))) == L.file.pairs(K.files_of(f)) : List<&2, T.Kv>}
+  {==}
+
+# the document from its packages' tables on. Proof vocabulary.
+def doc.at(hub: String, qs: List<&2, L.Pack>, ys: List<&2, T.Sect>) -> List<&2, T.Sect>:
+  L.lock.sect(hub) <> List.append(&2, T.Sect, L.pack.all(qs), ys)
+
+# LAW: the package a lock records under a hash, when it is the first
+# package, is that package as the lock gives it back
+law pack_of_hit:
+  for +hub: String
+  for +h: String
+  for +s: L.Src
+  for +f: List<&2, K.File>
+  for +qs: List<&2, L.Pack>
+  for +ys: List<&2, T.Sect>
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  {L.pack_of(doc.at(hub, L.Pack{h, s, f} <> qs, ys), h) == L.Pack{h, s, K.files_of(f)} : L.Pack}
+
+def pack_of_hit(_hub, h, s, f, qs, ys, eh):
+  a1 = Equal.sym(List<&2, T.Kv>,
+    L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), List.append(&2, T.Sect, L.pack.all(qs), ys)),
+      "packages", h, "source"),
+    L.src.pairs(s), at_hit_src(h, s, f, List.append(&2, T.Sect, L.pack.all(qs), ys), eh))
+  %a1 : {L.Pack{h, L.src_of(_), L.pair.files(L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}),
+    List.append(&2, T.Sect, L.pack.all(qs), ys)), "packages", h, "files"))}
+    == L.Pack{h, s, K.files_of(f)} : L.Pack}
+  a2 = Equal.sym(List<&2, T.Kv>,
+    L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), List.append(&2, T.Sect, L.pack.all(qs), ys)),
+      "packages", h, "files"),
+    L.file.pairs(K.files_of(f)), at_hit_files(h, s, f, List.append(&2, T.Sect, L.pack.all(qs), ys), eh))
+  %a2 : {L.Pack{h, L.src_of(L.src.pairs(s)), L.pair.files(_)} == L.Pack{h, s, K.files_of(f)} : L.Pack}
+  a3 = Equal.sym(L.Src, L.src_of(L.src.pairs(s)), s, src_read(s))
+  %a3 : {L.Pack{h, _, L.pair.files(L.file.pairs(K.files_of(f)))} == L.Pack{h, s, K.files_of(f)} : L.Pack}
+  a4 = Equal.sym(List<&2, K.File>, L.pair.files(L.file.pairs(K.files_of(f))), K.files_of(f),
+    pair_files(K.files_of(f)))
+  %a4 : {L.Pack{h, s, _} == L.Pack{h, s, K.files_of(f)} : L.Pack}
+  {==}
+
+# LAW: a lookup for another hash passes over the first package
+law pack_of_skip:
+  for +hub: String
+  for +h: String
+  for +s: L.Src
+  for +f: List<&2, K.File>
+  for +qs: List<&2, L.Pack>
+  for +ys: List<&2, T.Sect>
+  for +k: String
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  for +e: {String.eq(h, k) == False{} : Bool}
+  {L.pack_of(doc.at(hub, L.Pack{h, s, f} <> qs, ys), k) == L.pack_of(doc.at(hub, qs, ys), k) : L.Pack}
+
+def pack_of_skip(hub, h, s, f, qs, ys, k, eh, e):
+  a1 = Equal.sym(List<&2, T.Kv>,
+    L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), List.append(&2, T.Sect, L.pack.all(qs), ys)),
+      "packages", k, "source"),
+    L.at3(List.append(&2, T.Sect, L.pack.all(qs), ys), "packages", k, "source"),
+    at_skip(h, s, f, List.append(&2, T.Sect, L.pack.all(qs), ys), k, "source", eh, e))
+  %a1 : {L.Pack{k, L.src_of(_), L.pair.files(L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}),
+    List.append(&2, T.Sect, L.pack.all(qs), ys)), "packages", k, "files"))}
+    == L.pack_of(doc.at(hub, qs, ys), k) : L.Pack}
+  a2 = Equal.sym(List<&2, T.Kv>,
+    L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), List.append(&2, T.Sect, L.pack.all(qs), ys)),
+      "packages", k, "files"),
+    L.at3(List.append(&2, T.Sect, L.pack.all(qs), ys), "packages", k, "files"),
+    at_skip(h, s, f, List.append(&2, T.Sect, L.pack.all(qs), ys), k, "files", eh, e))
+  %a2 : {L.Pack{k, L.src_of(L.at3(List.append(&2, T.Sect, L.pack.all(qs), ys), "packages", k, "source")),
+    L.pair.files(_)} == L.pack_of(doc.at(hub, qs, ys), k) : L.Pack}
+  {==}
+
+# LAW: the packages a lock records under hashes the first package's is fresh
+# to are the ones recorded without it
+law packs_at_skip:
+  for +hub: String
+  for +h: String
+  for +s: L.Src
+  for +f: List<&2, K.File>
+  for +qs: List<&2, L.Pack>
+  for +ys: List<&2, T.Sect>
+  for +rs: List<&2, L.Pack>
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  for +ef: {Laws.hash.fresh(h, rs) == True{} : Bool}
+  {L.packs.at(doc.at(hub, L.Pack{h, s, f} <> qs, ys), hash.all(rs))
+    == L.packs.at(doc.at(hub, qs, ys), hash.all(rs)) : List<&2, L.Pack>}
+
+def packs_at_skip(hub, h, s, f, qs, ys, rs, eh, ef):
+  match rs:
+    case []:
+      {==}
+    case +r <> +rt:
+      p1 = Equal.sym(L.Pack, L.pack_of(doc.at(hub, L.Pack{h, s, f} <> qs, ys), L.pack.hash(r)),
+        L.pack_of(doc.at(hub, qs, ys), L.pack.hash(r)),
+        pack_of_skip(hub, h, s, f, qs, ys, L.pack.hash(r), eh,
+          Eq.not.true(String.eq(h, L.pack.hash(r)),
+            Eq.and.left(Bool.not(String.eq(h, L.pack.hash(r))), Laws.hash.fresh(h, rt), ef))))
+      %p1 : {_ <> L.packs.at(doc.at(hub, L.Pack{h, s, f} <> qs, ys), hash.all(rt))
+        == L.pack_of(doc.at(hub, qs, ys), L.pack.hash(r)) <> L.packs.at(doc.at(hub, qs, ys), hash.all(rt))
+        : List<&2, L.Pack>}
+      Equal.cong(List<&2, L.Pack>, List<&2, L.Pack>,
+        x => L.pack_of(doc.at(hub, qs, ys), L.pack.hash(r)) <> x,
+        L.packs.at(doc.at(hub, L.Pack{h, s, f} <> qs, ys), hash.all(rt)),
+        L.packs.at(doc.at(hub, qs, ys), hash.all(rt)),
+        packs_at_skip(hub, h, s, f, qs, ys, rt, eh,
+          Eq.and.right(Bool.not(String.eq(h, L.pack.hash(r))), Laws.hash.fresh(h, rt), ef)))
+
+# LAW: the packages a lock records under its packages' hashes are its
+# packages as it gives them back, one package, taken apart
+law packs_at_all.cons:
+  for +hub: String
+  for +q: L.Pack
+  for +t: List<&2, L.Pack>
+  for +ys: List<&2, T.Sect>
+  for +eh: {Str.clear(L.pack.hash(q), '"') == True{} : Bool}
+  for +ef: {Laws.hash.fresh(L.pack.hash(q), t) == True{} : Bool}
+  for ih: {L.packs.at(doc.at(hub, t, ys), hash.all(t)) == Laws.canon.all(t) : List<&2, L.Pack>}
+  {L.packs.at(doc.at(hub, q <> t, ys), hash.all(q <> t)) == Laws.canon.all(q <> t) : List<&2, L.Pack>}
+
+def packs_at_all.cons(hub, q, t, ys, eh, ef, ih):
+  match q:
+    case L.Pack{+h, +s, +f}:
+      p1 = Equal.sym(L.Pack, L.pack_of(doc.at(hub, L.Pack{h, s, f} <> t, ys), h),
+        L.Pack{h, s, K.files_of(f)}, pack_of_hit(hub, h, s, f, t, ys, eh))
+      %p1 : {_ <> L.packs.at(doc.at(hub, L.Pack{h, s, f} <> t, ys), hash.all(t))
+        == Laws.canon.all(L.Pack{h, s, f} <> t) : List<&2, L.Pack>}
+      p2 = Equal.sym(List<&2, L.Pack>, L.packs.at(doc.at(hub, L.Pack{h, s, f} <> t, ys), hash.all(t)),
+        L.packs.at(doc.at(hub, t, ys), hash.all(t)),
+        packs_at_skip(hub, h, s, f, t, ys, t, eh, ef))
+      %p2 : {L.Pack{h, s, K.files_of(f)} <> _ == Laws.canon.all(L.Pack{h, s, f} <> t) : List<&2, L.Pack>}
+      Equal.cong(List<&2, L.Pack>, List<&2, L.Pack>, x => L.Pack{h, s, K.files_of(f)} <> x,
+        L.packs.at(doc.at(hub, t, ys), hash.all(t)), Laws.canon.all(t), ih)
+
+# LAW: the packages a lock records under its packages' hashes are its
+# packages as it gives them back, when the hashes are distinct and hold no
+# quote
+law packs_at_all:
+  for +hub: String
+  for +qs: List<&2, L.Pack>
+  for +ys: List<&2, T.Sect>
+  for +ed: {Laws.distinct(qs) == True{} : Bool}
+  for +ec: {hashes.clean(qs) == True{} : Bool}
+  {L.packs.at(doc.at(hub, qs, ys), hash.all(qs)) == Laws.canon.all(qs) : List<&2, L.Pack>}
+
+def packs_at_all(hub, qs, ys, ed, ec):
+  match qs:
+    case []:
+      {==}
+    case +q <> +t:
+      packs_at_all.cons(hub, q, t, ys,
+        Eq.and.left(Str.clear(L.pack.hash(q), '"'), hashes.clean(t), ec),
+        Eq.and.left(Laws.hash.fresh(L.pack.hash(q), t), Laws.distinct(t), ed),
+        packs_at_all(hub, t, ys,
+          Eq.and.right(Laws.hash.fresh(L.pack.hash(q), t), Laws.distinct(t), ed),
+          Eq.and.right(Str.clear(L.pack.hash(q), '"'), hashes.clean(t), ec)))
+
+# LAW: the hashes a lock's document names are its packages', in hash order
+law hashes_doc:
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ps: List<&2, L.Pack>
+  for +e: {hashes.clean(L.pack.sort(ps)) == True{} : Bool}
+  {L.hashes(Laws.lock.doc(ts, hub, ps)) == hash.all(L.pack.sort(ps)) : List<&2, String>}
+
+def hashes_doc(ts, _hub, ps, e):
+  h1 = Equal.sym(List<&2, String>,
+    L.hashes(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts))),
+    List.append(&2, String, hash.all(L.pack.sort(ps)), L.hashes(L.tool.sects(ts))),
+    hashes_packs(L.pack.sort(ps), L.tool.sects(ts), e))
+  %h1 : {_ == hash.all(L.pack.sort(ps)) : List<&2, String>}
+  h2 = Equal.sym(List<&2, String>, L.hashes(L.tool.sects(ts)), [], hashes_tools(ts))
+  %h2 : {List.append(&2, String, hash.all(L.pack.sort(ps)), _) == hash.all(L.pack.sort(ps))
+    : List<&2, String>}
+  Str.list_append_nil(String, hash.all(L.pack.sort(ps)))
+
+# LAW: the packages a lockable lock's document gives back are its packages
+# as the lock gives them back
+law lock_packs_read:
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ps: List<&2, L.Pack>
+  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {L.packs(Laws.lock.doc(ts, hub, ps)) == Laws.canon(ps) : List<&2, L.Pack>}
+
+def lock_packs_read(ts, hub, ps, ok):
+  +pk = Eq.and.left(P.packs.ok(ps), P.tools.ok(ts),
+    Eq.and.right(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), ok))
+  +hc = hclean_sort(ps, hashes_clean_ok(ps, pk))
+  h = Equal.sym(List<&2, String>, L.hashes(Laws.lock.doc(ts, hub, ps)), hash.all(L.pack.sort(ps)),
+    hashes_doc(ts, hub, ps, hc))
+  %h : {L.packs.at(Laws.lock.doc(ts, hub, ps), _) == Laws.canon(ps) : List<&2, L.Pack>}
+  packs_at_all(hub, L.pack.sort(ps), L.tool.sects(ts), distinct_sort(ps, packs_distinct(ps, pk)), hc)
+
+def Laws.lock_reads_back(ps, ts, hub, ok):
+  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.tools(ts, hub, ps))),
+    Laws.lock.doc(ts, hub, ps), Laws.lock_sections_read_back(ps, ts, hub, ok))
+  %s : {L.packs(_) == Laws.canon(ps) : List<&2, L.Pack>}
+  lock_packs_read(ts, hub, ps, ok)
+
+def Laws.lock_hub_reads_back(ps, ts, hub, ok):
+  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.tools(ts, hub, ps))),
+    Laws.lock.doc(ts, hub, ps), Laws.lock_sections_read_back(ps, ts, hub, ok))
+  %s : {L.lock.hub(_) == hub : String}
+  lock_hub_read(ts, hub, ps)
+
+def Laws.lock_tools_read_back(ps, ts, hub, ok):
+  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.tools(ts, hub, ps))),
+    Laws.lock.doc(ts, hub, ps), Laws.lock_sections_read_back(ps, ts, hub, ok))
+  %s : {M.tools(_) == Laws.tools.canon(ts) : List<&2, M.Tool>}
+  lock_tools_read(ts, hub, ps)
 
 # The upgrade's decisions: what it keeps (EZ-RES-4, EZ-RES-6) and what it
 # asks (EZ-RES-6). The upgrade walks the ledger's dependencies and tools one
@@ -4548,3 +6441,3082 @@ def Laws.upgrade_vends_the_ledger(w, text, put, miss):
         W.judged.of(W.next(args, ledger, ups), replies),
         text, put, miss, Laws.ignore.said(Up.text.said(ups, Up.Ignore{})),
         ok_world(args, ledger, ups))
+# The upgrade's moves (EZ-RES-5, EZ-RES-8). Each law is one fact about one
+# dependency's fate (`Up.dep.one`), carried through the walk over the ledger's
+# dependencies (`Up.deps.walk`) to the ledger model the upgrade renders
+# (`Up.next.model`). A fate is proved sound once for any remote tip, since a
+# tag's and the default branch's are read the same way from there on
+# (`Up.dep.tip`).
+
+# a pin from a repository, with its fields spelled out
+def mv.git(
+  +hn: String,
+  +hh: String,
+  +he: String,
+  +url: String,
+  +rev: String,
+  +tag: String,
+  +root: String,
+  +nar: String,
+  +vend: Bool
+) -> M.Dep:
+  M.Dep{hn, hh, he, M.Git{url, rev, tag, root, nar, vend}}
+
+# a fate is sound against a tip when the pin it leaves is kept or moved
+# along its history, as `moved.ok` reads the remote
+def mv.ok(fate: Up.Fate, +t: Up.Tip, +rs: List<&2, Up.Reply>, +old: M.Dep) -> Bool:
+  match fate:
+    case Up.Became{d, _o, _n, _p, _m, _s, _t}:
+      Laws.moved.ok(t, rs, old, d)
+    case Up.Waits{_asks}:
+      True{}
+    case Up.Halts{_why}:
+      True{}
+
+# what every fate keeps: the name of the dependency it leaves, and at least
+# one question when it waits
+def mv.fine(fate: Up.Fate, +name: String) -> String & Bool:
+  match fate:
+    case Up.Became{d, _o, _n, _p, _m, _s, _t}:
+      (M.dep.name(d), True{})
+    case Up.Waits{asks}:
+      (name, Bool.not(List.is_empty(&2, Up.Ask, asks)))
+    case Up.Halts{_why}:
+      (name, True{})
+
+# whether a fate refuses
+def mv.halts(fate: Up.Fate) -> Bool:
+  match fate:
+    case Up.Became{_d, _o, _n, _p, _m, _s, _t}:
+      False{}
+    case Up.Waits{_asks}:
+      False{}
+    case Up.Halts{_why}:
+      True{}
+
+# the walk is sound for the dependency named `n`: it refuses, or still asks,
+# or the dependency it leaves under that name is sound against `old`
+def mv.walk(+t: Up.Tip, +rs: List<&2, Up.Reply>, dd: Up.Deps, +old: M.Dep, +n: String) -> Bool:
+  Up.Deps{ds, _ss, _es, _m, _sy, _tr, asks, bad} = dd
+  Bool.or(Bool.not(String.is_empty(bad)),
+    Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)), Laws.moved.ok(t, rs, old, M.find(ds, n))))
+
+# the walk's refusal, "" for none
+def mv.bad(dd: Up.Deps) -> String:
+  Up.Deps{_ds, _ss, _es, _m, _sy, _tr, _asks, bad} = dd
+  bad
+
+# whether an upgrade refuses
+def mv.stops(nx: Up.Next) -> Bool:
+  Bool.not(String.is_empty(Up.next.stop(nx)))
+
+# the dependency named `n` in the ledger model an upgrade renders
+def mv.dep(nx: Up.Next, +n: String) -> M.Dep:
+  M.dep(Up.next.model(nx), n)
+
+def mv.fst(p: String & Bool) -> String:
+  (a, _b) = p
+  a
+
+def mv.snd(p: String & Bool) -> Bool:
+  (_a, b) = p
+  b
+
+# LAW: an `or` whose right half answered True
+law mv.or_r:
+  for a: Bool
+  for b: Bool
+  for e: {b == True{} : Bool}
+  {Bool.or(a, b) == True{} : Bool}
+
+def mv.or_r(a, _b, e):
+  match a:
+    case True{}:
+      {==}
+    case False{}:
+      e
+
+# LAW: an `or` whose left half answered True
+law mv.or_l:
+  for a: Bool
+  for +b: Bool
+  for e: {a == True{} : Bool}
+  {Bool.or(a, b) == True{} : Bool}
+
+def mv.or_l(a, b, e):
+  Equal.cong(Bool, Bool, x => Bool.or(x, b), a, True{}, e)
+
+# LAW: a refusal's reason is never empty
+law mv.halt_ne:
+  for why: String
+  {String.is_empty(Up.halt.why(why)) == False{} : Bool}
+
+def mv.halt_ne(why):
+  match why:
+    case SNil{}:
+      {==}
+    case SCon{_h, _t}:
+      {==}
+
+# LAW: and so it reads as a refusal
+law mv.halt_not:
+  for why: String
+  {Bool.not(String.is_empty(Up.halt.why(why))) == True{} : Bool}
+
+def mv.halt_not(why):
+  match why:
+    case SNil{}:
+      {==}
+    case SCon{_h, _t}:
+      {==}
+
+# LAW: a pin kept as it was is sound against any tip
+law mv.self:
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  {Laws.moved.ok(t, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend),
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.self(t, rs, _hn, _hh, _he, url, rev, tag, _root, _nar, _vend):
+  Equal.trans(Bool,
+    Bool.and(String.eq(tag, tag),
+      Bool.or(String.eq(rev, rev), Laws.moved.to(t, rs, url, rev, rev))),
+    Bool.or(String.eq(rev, rev), Laws.moved.to(t, rs, url, rev, rev)),
+    True{},
+    Equal.cong(Bool, Bool,
+      x => Bool.and(x, Bool.or(String.eq(rev, rev), Laws.moved.to(t, rs, url, rev, rev))),
+      String.eq(tag, tag), True{}, Eq.string_eq_self(tag)),
+    Equal.cong(Bool, Bool, x => Bool.or(x, Laws.moved.to(t, rs, url, rev, rev)),
+      String.eq(rev, rev), True{}, Eq.string_eq_self(rev)))
+
+# LAW: and so is any pin from a repository
+law mv.self_dep:
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +d: M.Dep
+  for g: {M.source.is_git(M.source.dep(d)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, d, d) == True{} : Bool}
+
+def mv.self_dep(t, rs, d, g):
+  match d:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          g
+        case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
+          mv.self(t, rs, hn, hh, he, url, rev, tag, root, nar, vend)
+
+# LAW: a pin by its commit alone is from a repository
+law mv.bare_git:
+  for +d: M.Dep
+  for bare: {Laws.rev_only(d) == True{} : Bool}
+  {M.source.is_git(M.source.dep(d)) == True{} : Bool}
+
+def mv.bare_git(d, bare):
+  match d:
+    case M.Dep{_hn, _hh, _he, src}:
+      match src:
+        case M.Hub{}:
+          bare
+        case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+          {==}
+
+# LAW: and so is one through a tag
+law mv.named_git:
+  for +d: M.Dep
+  for named: {Laws.tagged(d) == True{} : Bool}
+  {M.source.is_git(M.source.dep(d)) == True{} : Bool}
+
+def mv.named_git(d, named):
+  match d:
+    case M.Dep{_hn, _hh, _he, src}:
+      match src:
+        case M.Hub{}:
+          named
+        case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+          {==}
+
+# One pin's fate is sound against the tip it was moved by. The pin is
+# checked out when the tip is its own commit, and kept only when the checkout
+# agrees; it is moved only to a tip the remote says descends from it, once
+# the tip's checkout and the hub's word are in.
+
+# LAW: a pin moved to the tip, once the hub has not objected
+law mv.ok_hub:
+  for hb: Up.Hubbed
+  for +rs: List<&2, Up.Reply>
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +hash: String
+  for +r: String
+  for +tg: String
+  for +br: String
+  for +root2: String
+  for +nar2: String
+  for +man: String
+  for srcs: List<&2, String>
+  for e: {Up.onward(rs, Up.Above{url, rev, r}) == Up.Asc{True{}} : Up.Asc}
+  {mv.ok(Up.dep.hub(hb, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), hash, r, root2,
+    nar2, man, srcs, br), Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend))
+    == True{} : Bool}
+
+def mv.ok_hub(
+  hb,
+  rs,
+  _hn,
+  _hh,
+  _he,
+  url,
+  rev,
+  tag,
+  _root,
+  _nar,
+  _vend,
+  _hash,
+  r,
+  _tg,
+  _br,
+  _root2,
+  _nar2,
+  _man,
+  _srcs,
+  e
+):
+  match hb:
+    case Up.Clear{}:
+      Equal.trans(Bool,
+        Bool.and(String.eq(tag, tag), Bool.or(String.eq(r, rev),
+          Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))))),
+        Bool.or(String.eq(r, rev),
+          Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r})))),
+        True{},
+        Equal.cong(Bool, Bool, x => Bool.and(x, Bool.or(String.eq(r, rev),
+          Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))))),
+          String.eq(tag, tag), True{}, Eq.string_eq_self(tag)),
+        mv.or_r(String.eq(r, rev),
+          Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))),
+          Equal.trans(Bool,
+            Bool.and(String.eq(r, r), Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))),
+            Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r})),
+            True{},
+            Equal.cong(Bool, Bool,
+              x => Bool.and(x, Laws.onward.yes(Up.onward(rs, Up.Above{url, rev, r}))),
+              String.eq(r, r), True{}, Eq.string_eq_self(r)),
+            Equal.cong(Up.Asc, Bool, a => Laws.onward.yes(a),
+              Up.onward(rs, Up.Above{url, rev, r}), Up.Asc{True{}}, e))))
+    case Up.Clash{}:
+      {==}
+    case Up.HubWait{_ask}:
+      {==}
+    case Up.HubNo{_why}:
+      {==}
+
+# LAW: a pin moved to the tip, once its checkout is in
+law mv.ok_adv:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  for e: {Up.onward(rs, Up.Above{url, rev, r}) == Up.Asc{True{}} : Up.Asc}
+  {mv.ok(Up.dep.advance(co, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, br),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_adv(co, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br, e):
+  match co:
+    case Up.Co{nar2, root2, +man, srcs}:
+      mv.ok_hub(Up.hubbed(rs, Up.HubHas{hub, Up.hash.of(man)}), rs, hn, hh, he, url, rev, tag,
+        root, nar, vend, Up.hash.of(man), r, tg, br, root2, nar2, man, srcs, e)
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: a tip that is another commit, once the remote said whether it
+# descends from the pin
+law mv.ok_onward:
+  for a: Up.Asc
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  for e: {Up.onward(rs, Up.Above{url, rev, r}) == a : Up.Asc}
+  {mv.ok(Up.dep.onward(a, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, tg, br),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_onward(a, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br, e):
+  match a:
+    case Up.Asc{yes}:
+      match yes:
+        case True{}:
+          mv.ok_adv(Up.checkout(rs, Up.Tree{url, r, he}), rs, hub, hn, hh, he, url, rev, tag,
+            root, nar, vend, r, tg, br, e)
+        case False{}:
+          {==}
+    case Up.AscWait{_ask}:
+      {==}
+    case Up.AscNo{_why}:
+      {==}
+
+# LAW: the pin's own commit, judged by whether its checkout agrees
+law mv.ok_agree:
+  for g: Bool
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  for +seen: String
+  {mv.ok(Up.dep.verdict(U.judge(True{}, True{}, g, r, tg), rs, hub,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, "", seen),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_agree(g, rs, _hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br, _seen):
+  match g:
+    case True{}:
+      mv.self(Up.At{r, tg, br}, rs, hn, hh, he, url, rev, tag, root, nar, vend)
+    case False{}:
+      {==}
+
+# LAW: the pin's own commit, once its checkout is in
+law mv.ok_kept:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  {mv.ok(Up.dep.kept(co, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, tg),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_kept(co, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br):
+  match co:
+    case Up.Co{nar2, root2, +man, _srcs}:
+      mv.ok_agree(U.agree(hh, Up.hash.of(man), nar, nar2, root, root2), rs, hub, hn, hh, he,
+        url, rev, tag, root, nar, vend, r, tg, br, Up.hash.of(man))
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: the tip against the pin: its own commit, or another
+law mv.ok_same:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +r: String
+  for +tg: String
+  for +br: String
+  {mv.ok(Up.dep.same(s, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), r, tg, br),
+    Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_same(s, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br):
+  match s:
+    case True{}:
+      mv.ok_kept(Up.checkout(rs, Up.Tree{url, rev, he}), rs, hub, hn, hh, he, url, rev, tag,
+        root, nar, vend, r, tg, br)
+    case False{}:
+      mv.ok_onward(Up.onward(rs, Up.Above{url, rev, r}), rs, hub, hn, hh, he, url, rev, tag,
+        root, nar, vend, r, tg, br, {==})
+
+# LAW: a pin is sound against whatever tip the remote named
+law mv.ok_tip:
+  for t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  {mv.ok(Up.dep.tip(t, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)), t, rs,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.ok_tip(t, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend):
+  match t:
+    case Up.At{+r, +tg, +br}:
+      mv.ok_same(String.eq(rev, r), rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br)
+    case Up.TipWait{_ask}:
+      {==}
+    case Up.TipNo{_why}:
+      {==}
+
+# Every fate keeps its dependency's name, and waits only with a question. The
+# walk reads the name to find a dependency again, and a question to tell a
+# walk that waits from one that is done.
+
+# LAW: a pin moved, once the hub has had its word
+law mv.fine_hub:
+  for hb: Up.Hubbed
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for src: M.Source
+  for +hash: String
+  for +r: String
+  for +root2: String
+  for +nar2: String
+  for +man: String
+  for srcs: List<&2, String>
+  for +br: String
+  {mv.fine(Up.dep.hub(hb, M.Dep{hn, hh, he, src}, hash, r, root2, nar2, man, srcs, br), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_hub(hb, _hn, _hh, _he, src, _hash, _r, _root2, _nar2, _man, _srcs, _br):
+  match hb:
+    case Up.Clear{}:
+      match src:
+        case M.Hub{}:
+          {==}
+        case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+          {==}
+    case Up.Clash{}:
+      {==}
+    case Up.HubWait{_ask}:
+      {==}
+    case Up.HubNo{_why}:
+      {==}
+
+# LAW: a pin moved, once its checkout is in
+law mv.fine_adv:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +r: String
+  for +br: String
+  {mv.fine(Up.dep.advance(co, rs, hub, M.Dep{hn, hh, he, src}, r, br), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_adv(co, rs, hub, hn, hh, he, src, r, br):
+  match co:
+    case Up.Co{nar2, root2, +man, srcs}:
+      mv.fine_hub(Up.hubbed(rs, Up.HubHas{hub, Up.hash.of(man)}), hn, hh, he, src,
+        Up.hash.of(man), r, root2, nar2, man, srcs, br)
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: any verdict
+law mv.fine_verdict:
+  for v: U.Verdict
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tip: String
+  for +br: String
+  for +seen: String
+  {mv.fine(Up.dep.verdict(v, rs, hub, M.Dep{hn, hh, he, src}, tip, br, seen), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_verdict(v, rs, hub, hn, hh, he, src, _tip, br, _seen):
+  match v:
+    case U.Keep{}:
+      {==}
+    case U.Drift{}:
+      {==}
+    case U.Off{}:
+      {==}
+    case U.Advance{+rv, _tg}:
+      mv.fine_adv(Up.checkout(rs, Up.Tree{M.source.url(src), rv, he}), rs, hub, hn, hh, he, src,
+        rv, br)
+
+# LAW: the pin's own commit, once its checkout is in
+law mv.fine_kept:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tip: String
+  for +tg: String
+  {mv.fine(Up.dep.kept(co, rs, hub, M.Dep{hn, hh, he, src}, tip, tg), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_kept(co, rs, hub, hn, hh, he, src, tip, tg):
+  match co:
+    case Up.Co{nar2, root2, +man, _srcs}:
+      mv.fine_verdict(U.judge(True{}, True{}, U.agree(hh, Up.hash.of(man), M.source.nar(src),
+        nar2, M.source.root(src), root2), tip, tg), rs, hub, hn, hh, he, src, tip, "",
+        Up.hash.of(man))
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: another commit, once ancestry is in
+law mv.fine_onward:
+  for a: Up.Asc
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tip: String
+  for +tg: String
+  for +br: String
+  {mv.fine(Up.dep.onward(a, rs, hub, M.Dep{hn, hh, he, src}, tip, tg, br), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_onward(a, rs, hub, hn, hh, he, src, tip, tg, br):
+  match a:
+    case Up.Asc{yes}:
+      mv.fine_verdict(U.judge(False{}, yes, False{}, tip, tg), rs, hub, hn, hh, he, src, tip, br, "")
+    case Up.AscWait{_ask}:
+      {==}
+    case Up.AscNo{_why}:
+      {==}
+
+# LAW: the tip against the pin
+law mv.fine_same:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tip: String
+  for +tg: String
+  for +br: String
+  {mv.fine(Up.dep.same(s, rs, hub, M.Dep{hn, hh, he, src}, tip, tg, br), hn)
+    == (hn, True{}) : String & Bool}
+
+def mv.fine_same(s, rs, hub, hn, hh, he, src, tip, tg, br):
+  match s:
+    case True{}:
+      mv.fine_kept(Up.checkout(rs, Up.Tree{M.source.url(src), M.source.rev(src), he}), rs, hub,
+        hn, hh, he, src, tip, tg)
+    case False{}:
+      mv.fine_onward(Up.onward(rs, Up.Above{M.source.url(src), M.source.rev(src), tip}), rs, hub,
+        hn, hh, he, src, tip, tg, br)
+
+# LAW: whatever tip the remote named
+law mv.fine_tip:
+  for t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  {mv.fine(Up.dep.tip(t, rs, hub, M.Dep{hn, hh, he, src}), hn) == (hn, True{}) : String & Bool}
+
+def mv.fine_tip(t, rs, hub, hn, hh, he, src):
+  match t:
+    case Up.At{+tip, +tg, +br}:
+      mv.fine_same(String.eq(M.source.rev(src), tip), rs, hub, hn, hh, he, src, tip, tg, br)
+    case Up.TipWait{_ask}:
+      {==}
+    case Up.TipNo{_why}:
+      {==}
+
+# LAW: every dependency's fate, whatever it was asked
+law mv.fine_one:
+  for am: U.Aim
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  {mv.fine(Up.dep.one(am, rs, only, hub, h), M.dep.name(h))
+    == (M.dep.name(h), True{}) : String & Bool}
+
+def mv.fine_one(am, rs, _only, hub, h):
+  match am h:
+    case U.Hold{} M.Dep{_hn, _hh, _he, _src}:
+      {==}
+    case U.Follow{+ref} M.Dep{+hn, +hh, +he, +src}:
+      mv.fine_tip(Up.follow(rs, M.source.url(src), ref), rs, hub, hn, hh, he, src)
+    case U.Forward{} M.Dep{+hn, +hh, +he, +src}:
+      mv.fine_tip(Up.forward(rs, M.source.url(src)), rs, hub, hn, hh, he, src)
+
+# One pin's fate from what it was asked. A pin by its commit alone follows the
+# default branch when it is asked about, and one through a tag its tag; one
+# that is not asked about is held.
+
+# LAW: a pin by its commit alone, asked about or not
+law mv.fwd_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  {mv.ok(Up.dep.one(U.aim(s, M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, "", root, nar, vend)), Up.forward(rs, url), rs,
+    mv.git(hn, hh, he, url, rev, "", root, nar, vend)) == True{} : Bool}
+
+def mv.fwd_sel(s, rs, _only, hub, hn, hh, he, url, rev, root, nar, vend):
+  match s:
+    case False{}:
+      mv.self(Up.forward(rs, url), rs, hn, hh, he, url, rev, "", root, nar, vend)
+    case True{}:
+      mv.ok_tip(Up.forward(rs, url), rs, hub, hn, hh, he, url, rev, "", root, nar, vend)
+
+# LAW: a pin by its commit alone moves only along the default branch
+law mv.fwd_one:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for bare: {Laws.rev_only(h) == True{} : Bool}
+  {mv.ok(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h),
+    Up.forward(rs, M.source.url(M.source.dep(h))), rs, h) == True{} : Bool}
+
+def mv.fwd_one(rs, only, hub, h, bare):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}}), Up.forward(rs, ""), rs, M.Dep{hn, hh, he, M.Hub{}})
+            == True{} : Bool}, bare)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              mv.fwd_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, root, nar, vend)
+            case SCon{+c, +ct}:
+              Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), Up.forward(rs, url), rs,
+                mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}, bare)
+
+# LAW: a pin through a tag, asked about or not
+law mv.fol_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +c: Char
+  for +ct: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  {mv.ok(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), Up.follow(rs, url, SCon{c, ct}),
+    rs, mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}
+
+def mv.fol_sel(s, rs, _only, hub, hn, hh, he, url, rev, c, ct, root, nar, vend):
+  match s:
+    case False{}:
+      mv.self(Up.follow(rs, url, SCon{c, ct}), rs, hn, hh, he, url, rev, SCon{c, ct}, root, nar,
+        vend)
+    case True{}:
+      mv.ok_tip(Up.follow(rs, url, SCon{c, ct}), rs, hub, hn, hh, he, url, rev, SCon{c, ct},
+        root, nar, vend)
+
+# LAW: a pin through a tag moves only to what the tag names, along its history
+law mv.fol_one:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for named: {Laws.tagged(h) == True{} : Bool}
+  {mv.ok(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h),
+    Up.follow(rs, M.source.url(M.source.dep(h)), M.source.tag(M.source.dep(h))), rs, h)
+    == True{} : Bool}
+
+def mv.fol_one(rs, only, hub, h, named):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}}), Up.follow(rs, "", ""), rs, M.Dep{hn, hh, he, M.Hub{}})
+            == True{} : Bool}, named)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend)), Up.follow(rs, url, ""), rs,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend)) == True{} : Bool}, named)
+            case SCon{+c, +ct}:
+              mv.fol_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root, nar,
+                vend)
+
+# The walk over the ledger's dependencies. `M.find` answers the first
+# dependency of a name, and every fate keeps its name, so the walk leaves the
+# named dependency where the ledger had it, unless it refused or still asks.
+
+# LAW: a walk over no dependencies: the blank pin `M.find` answers is never
+# sound, so neither side holds
+law mv.walk_nil:
+  for s: Bool
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for pre: {mv.ok(Up.dep.one(U.aim(s, M.Hub{}), rs, only, hub, M.Dep{"", "", "", M.Hub{}}), t, rs,
+    M.Dep{"", "", "", M.Hub{}}) == True{} : Bool}
+  {mv.walk(t, rs, Up.deps.walk(rs, only, hub, []), M.Dep{"", "", "", M.Hub{}}, n) == True{} : Bool}
+
+def mv.walk_nil(s, _t, _rs, _only, _hub, _n, pre):
+  match s:
+    case True{}:
+      pre
+    case False{}:
+      pre
+
+# LAW: the named dependency's fate in front of the rest
+law mv.join_hit:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for e: {String.eq(hn, n) == True{} : Bool}
+  for ok: {mv.ok(f, t, rs, M.Dep{hn, hh, he, src}) == True{} : Bool}
+  for fn: {mv.fine(f, hn) == (hn, True{}) : String & Bool}
+  {mv.walk(t, rs, Up.deps.join(f, rest), M.Dep{hn, hh, he, src}, n) == True{} : Bool}
+
+def mv.join_hit(f, rest, t, rs, n, hn, hh, he, src, e, ok, fn):
+  match f rest:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _, _, _, _, _, _} Up.Deps{+ds, _, _, _, _, _, +asks, +bad}:
+      Equal.trans(Bool,
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+            M.find.pick(String.eq(dn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+            M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+        True{},
+        Equal.cong(String, Bool,
+          x => Bool.or(Bool.not(String.is_empty(bad)),
+            Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+                M.find.pick(String.eq(x, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+          dn, hn, Equal.cong(String & Bool, String, p => mv.fst(p), (dn, True{}), (hn, True{}), fn)),
+        Equal.trans(Bool,
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+              M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.Dep{dn, dh, de, dsrc}))),
+          True{},
+          Equal.cong(Bool, Bool,
+            y => Bool.or(Bool.not(String.is_empty(bad)),
+              Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+                Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src},
+                  M.find.pick(y, M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+            String.eq(hn, n), True{}, e),
+          mv.or_r(Bool.not(String.is_empty(bad)),
+            Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.Dep{dn, dh, de, dsrc})),
+            mv.or_r(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.Dep{dn, dh, de, dsrc}), ok))))
+    case Up.Waits{[]} Up.Deps{+ds, _ss, _es, _any, _sy, _tr, +asks, +bad}:
+      Eq.bit.absurd(&2, {Bool.or(Bool.not(String.is_empty(bad)),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.find(ds, n)))) == True{} : Bool},
+        Equal.cong(String & Bool, Bool, p => mv.snd(p), (hn, False{}), (hn, True{}), fn))
+    case Up.Waits{_m <> _ms} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, +bad}:
+      mv.or_r(Bool.not(String.is_empty(bad)), True{}, {==})
+    case Up.Halts{+why} Up.Deps{+ds, _ss, _es, _any, _sy, _tr, +asks, _bad}:
+      mv.or_l(Bool.not(String.is_empty(Up.halt.why(why))),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, M.Dep{hn, hh, he, src}, M.find(ds, n))),
+        mv.halt_not(why))
+
+# LAW: another dependency's fate in front of the rest
+law mv.join_miss:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +hn: String
+  for +old: M.Dep
+  for e: {String.eq(hn, n) == False{} : Bool}
+  for fn: {mv.fine(f, hn) == (hn, True{}) : String & Bool}
+  for ih: {mv.walk(t, rs, rest, old, n) == True{} : Bool}
+  {mv.walk(t, rs, Up.deps.join(f, rest), old, n) == True{} : Bool}
+
+def mv.join_miss(f, rest, t, rs, n, hn, old, e, fn, ih):
+  match f rest:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _, _, _, _, _, _} Up.Deps{+ds, _, _, _, _, _, +asks, +bad}:
+      Equal.trans(Bool,
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, old,
+            M.find.pick(String.eq(dn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, old,
+            M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+        True{},
+        Equal.cong(String, Bool,
+          x => Bool.or(Bool.not(String.is_empty(bad)),
+            Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Laws.moved.ok(t, rs, old,
+                M.find.pick(String.eq(x, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+          dn, hn, Equal.cong(String & Bool, String, p => mv.fst(p), (dn, True{}), (hn, True{}), fn)),
+        Equal.trans(Bool,
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Laws.moved.ok(t, rs, old,
+              M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Laws.moved.ok(t, rs, old, M.find(ds, n)))),
+          True{},
+          Equal.cong(Bool, Bool,
+            y => Bool.or(Bool.not(String.is_empty(bad)),
+              Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+                Laws.moved.ok(t, rs, old, M.find.pick(y, M.Dep{dn, dh, de, dsrc}, M.find(ds, n))))),
+            String.eq(hn, n), False{}, e),
+          ih))
+    case Up.Waits{[]} Up.Deps{+ds, _ss, _es, _any, _sy, _tr, +asks, +bad}:
+      Eq.bit.absurd(&2, {Bool.or(Bool.not(String.is_empty(bad)),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Laws.moved.ok(t, rs, old, M.find(ds, n)))) == True{} : Bool},
+        Equal.cong(String & Bool, Bool, p => mv.snd(p), (hn, False{}), (hn, True{}), fn))
+    case Up.Waits{_m <> _ms} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, +bad}:
+      mv.or_r(Bool.not(String.is_empty(bad)), True{}, {==})
+    case Up.Halts{+why} Up.Deps{+ds, _ss, _es, _any, _sy, _tr, +asks, _bad}:
+      mv.or_l(Bool.not(String.is_empty(Up.halt.why(why))),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)), Laws.moved.ok(t, rs, old, M.find(ds, n))),
+        mv.halt_not(why))
+
+# LAW: one step of the walk, whether or not its head is the named dependency
+law mv.walk_step:
+  for b: Bool
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tl: List<&2, M.Dep>
+  for e: {String.eq(hn, n) == b : Bool}
+  for pre: {mv.ok(Up.dep.one(U.aim(U.chosen(only,
+    M.dep.name(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))),
+    M.source.dep(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))), rs, only, hub,
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))), t, rs,
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))) == True{} : Bool}
+  for ih: {mv.ok(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(tl, n))),
+    M.source.dep(M.find(tl, n))), rs, only, hub, M.find(tl, n)), t, rs, M.find(tl, n))
+    == True{} : Bool}
+    -> {mv.walk(t, rs, Up.deps.walk(rs, only, hub, tl), M.find(tl, n), n) == True{} : Bool}
+  {mv.walk(t, rs, Up.deps.join(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub,
+    M.Dep{hn, hh, he, src}), Up.deps.walk(rs, only, hub, tl)),
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)), n) == True{} : Bool}
+
+def mv.walk_step(b, t, rs, only, hub, n, hn, hh, he, src, tl, e, pre, ih):
+  match b:
+    case True{}:
+      mv.join_hit(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), t, rs, n, hn, hh, he, src, e, pre,
+        mv.fine_one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}))
+    case False{}:
+      mv.join_miss(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), t, rs, n, hn, M.find(tl, n), e,
+        mv.fine_one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}), ih(pre))
+
+# LAW: the walk is sound for the named dependency when its fate is
+law mv.walk_ok:
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +ds: List<&2, M.Dep>
+  for pre: {mv.ok(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(ds, n))),
+    M.source.dep(M.find(ds, n))), rs, only, hub, M.find(ds, n)), t, rs, M.find(ds, n))
+    == True{} : Bool}
+  {mv.walk(t, rs, Up.deps.walk(rs, only, hub, ds), M.find(ds, n), n) == True{} : Bool}
+
+def mv.walk_ok(t, rs, only, hub, n, ds, pre):
+  match ds:
+    case []:
+      mv.walk_nil(U.chosen(only, ""), t, rs, only, hub, n, pre)
+    case +h <> +tl:
+      match h:
+        case M.Dep{+hn, +hh, +he, +src}:
+          mv.walk_step(String.eq(hn, n), t, rs, only, hub, n, hn, hh, he, src, tl, {==}, pre,
+            p => mv.walk_ok(t, rs, only, hub, n, tl, p))
+
+# The ledger model the upgrade renders. Every way the upgrade can end leaves
+# ez.toml's model as it was, except the one where every pin was answered and
+# one moved, which leaves the dependencies the walk left.
+
+# LAW: the model, once it is known whether a pin moved
+law mv.model_moved:
+  for moved: Bool
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +dds: List<&2, M.Dep>
+  for +tts: List<&2, M.Tool>
+  for wk: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), M.dep(Up.model.next(moved,
+    M.Manifest{name, entry, bin, hub, dds, tts}, M.Manifest{name, entry, bin, hub, ds, ts}), n))
+    == True{} : Bool}
+
+def mv.model_moved(moved, _t, _rs, _n, _name, _entry, _bin, _hub, _ds, _ts, _dds, _tts, wk, self):
+  match moved:
+    case True{}:
+      wk
+    case False{}:
+      self
+
+# LAW: the model, once the sources are known
+law mv.model_srcs:
+  for srcs: Up.Srcs
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +dds: List<&2, M.Dep>
+  for +ss: List<&2, U.Swap>
+  for +es: List<&2, U.Swap>
+  for +dm: Bool
+  for +dsy: List<&2, String>
+  for +dtr: List<&2, Up.Laid>
+  for +tts: List<&2, M.Tool>
+  for +tm: Bool
+  for +tsy: List<&2, String>
+  for +ig: String
+  for wk: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+    Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), n))
+    == True{} : Bool}
+
+def mv.model_srcs(
+  srcs,
+  t,
+  rs,
+  n,
+  name,
+  entry,
+  bin,
+  hub,
+  ds,
+  ts,
+  dds,
+  _ss,
+  _es,
+  dm,
+  _dsy,
+  _dtr,
+  tts,
+  tm,
+  _tsy,
+  _ig,
+  wk,
+  self
+):
+  match srcs:
+    case Up.Srcs{_fs}:
+      mv.model_moved(Bool.or(dm, tm), t, rs, n, name, entry, bin, hub, ds, ts, dds, tts, wk, self)
+    case Up.SrcsWait{_ask}:
+      self
+    case Up.SrcsNo{_why}:
+      self
+
+# LAW: the model, once `.gitignore` is known
+law mv.model_ignore:
+  for said: Up.Said
+  for +srcs: Up.Srcs
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +dds: List<&2, M.Dep>
+  for +ss: List<&2, U.Swap>
+  for +es: List<&2, U.Swap>
+  for +dm: Bool
+  for +dsy: List<&2, String>
+  for +dtr: List<&2, Up.Laid>
+  for +tts: List<&2, M.Tool>
+  for +tm: Bool
+  for +tsy: List<&2, String>
+  for wk: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.got.ignore(said, srcs,
+    M.Manifest{name, entry, bin, hub, ds, ts},
+    Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), n))
+    == True{} : Bool}
+
+def mv.model_ignore(
+  said,
+  srcs,
+  t,
+  rs,
+  n,
+  name,
+  entry,
+  bin,
+  hub,
+  ds,
+  ts,
+  dds,
+  ss,
+  es,
+  dm,
+  dsy,
+  dtr,
+  tts,
+  tm,
+  tsy,
+  wk,
+  self
+):
+  match said:
+    case Up.Said{+ig}:
+      mv.model_srcs(srcs, t, rs, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts,
+        tm, tsy, ig, wk, self)
+    case Up.Unsaid{_why}:
+      self
+    case Up.Unasked{_ask}:
+      self
+
+# LAW: the model, once the pins are answered or refused
+law mv.model_pins:
+  for dd: Up.Deps
+  for tt: Up.Tools
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wk: {mv.walk(t, rs, dd, M.find(ds, n), n) == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.pins(dd, tt, rs,
+    M.Manifest{name, entry, bin, hub, ds, ts}), n)) == True{} : Bool}
+
+def mv.model_pins(dd, tt, t, rs, n, name, entry, bin, hub, ds, ts, wk, self):
+  match dd tt:
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SCon{_c, _cs}} Up.Tools{_tts, _tm, _tsy, _tasks, _tbad}:
+      self
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SNil{}} Up.Tools{_tts, _tm, _tsy, _tasks, SCon{_c, _cs}}:
+      self
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _a <> _as, SNil{}} Up.Tools{_tts, _tm, _tsy, _tasks, SNil{}}:
+      self
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, [], SNil{}} Up.Tools{_tts, _tm, _tsy, _a <> _as, SNil{}}:
+      self
+    case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, [], SNil{}} Up.Tools{+tts, +tm, +tsy, [], SNil{}}:
+      mv.model_ignore(Up.text.said(rs, Up.Ignore{}),
+        Up.ask.srcs(List.is_empty(&2, U.Swap, es), rs), t, rs, n, name, entry,
+        bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm, tsy, wk, self)
+
+# LAW: the model, once `--package` is known to name something
+law mv.model_known:
+  for k: Bool
+  for +t: Up.Tip
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wk: {mv.walk(t, rs, Up.deps.walk(rs, only, M.hub.or(hub), ds), M.find(ds, n), n)
+    == True{} : Bool}
+  for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
+  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.known(k, only, rs,
+    M.Manifest{name, entry, bin, hub, ds, ts}), n)) == True{} : Bool}
+
+def mv.model_known(k, t, rs, only, n, name, entry, bin, hub, ds, ts, wk, self):
+  match k:
+    case False{}:
+      self
+    case True{}:
+      mv.model_pins(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), t, rs,
+        n, name, entry, bin, hub, ds, ts, wk, self)
+
+# LAW: a pin by its commit alone, in any ledger an upgrade reads
+law mv.fwd_top:
+  for r: M.Read
+  for +only: String
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +bare: {Laws.rev_only(M.dep(r, n)) == True{} : Bool}
+  {Laws.moved.ok(Up.forward(rs, M.source.url(M.source.dep(M.dep(r, n)))), rs, M.dep(r, n),
+    mv.dep(Up.next(only, r, rs), n)) == True{} : Bool}
+
+def mv.fwd_top(r, only, rs, n, bare):
+  match r:
+    case M.Bad{_why}:
+      bare
+    case M.Good{m}:
+      match m:
+        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+          mv.model_known(Bool.or(U.known(only, ds), M.tool.known(only, ts)),
+            Up.forward(rs, M.source.url(M.source.dep(M.find(ds, n)))), rs, only, n, name, entry,
+            bin, hub, ds, ts,
+            mv.walk_ok(Up.forward(rs, M.source.url(M.source.dep(M.find(ds, n)))), rs, only,
+              M.hub.or(hub), n, ds, mv.fwd_one(rs, only, M.hub.or(hub), M.find(ds, n), bare)),
+            mv.self_dep(Up.forward(rs, M.source.url(M.source.dep(M.find(ds, n)))), rs,
+              M.find(ds, n), mv.bare_git(M.find(ds, n), bare)))
+
+# LAW: a pin through a tag, in any ledger an upgrade reads
+law mv.fol_top:
+  for r: M.Read
+  for +only: String
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +named: {Laws.tagged(M.dep(r, n)) == True{} : Bool}
+  {Laws.moved.ok(Up.follow(rs, M.source.url(M.source.dep(M.dep(r, n))),
+    M.source.tag(M.source.dep(M.dep(r, n)))), rs, M.dep(r, n),
+    mv.dep(Up.next(only, r, rs), n)) == True{} : Bool}
+
+def mv.fol_top(r, only, rs, n, named):
+  match r:
+    case M.Bad{_why}:
+      named
+    case M.Good{m}:
+      match m:
+        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+          mv.model_known(Bool.or(U.known(only, ds), M.tool.known(only, ts)),
+            Up.follow(rs, M.source.url(M.source.dep(M.find(ds, n))),
+              M.source.tag(M.source.dep(M.find(ds, n)))), rs, only, n, name, entry, bin, hub, ds, ts,
+            mv.walk_ok(Up.follow(rs, M.source.url(M.source.dep(M.find(ds, n))),
+              M.source.tag(M.source.dep(M.find(ds, n)))), rs, only, M.hub.or(hub), n, ds,
+              mv.fol_one(rs, only, M.hub.or(hub), M.find(ds, n), named)),
+            mv.self_dep(Up.follow(rs, M.source.url(M.source.dep(M.find(ds, n))),
+              M.source.tag(M.source.dep(M.find(ds, n)))), rs, M.find(ds, n),
+              mv.named_git(M.find(ds, n), named)))
+
+# A plain lock leaves ez.toml's model as it is; an upgrade leaves what the
+# walk decided, which is sound for the named dependency.
+def Laws.upgrade_forward_moves_onward(w, n, bare):
+  match w:
+    case W.World{args, +ledger, _listing, _replies, +ups}:
+      match args:
+        case W.Args{up, +only}:
+          match up:
+            case False{}:
+              mv.self_dep(Up.forward(ups, M.source.url(M.source.dep(M.dep(W.parsed(ledger), n)))),
+                ups, M.dep(W.parsed(ledger), n), mv.bare_git(M.dep(W.parsed(ledger), n), bare))
+            case True{}:
+              mv.fwd_top(W.parsed(ledger), only, ups, n, bare)
+
+def Laws.upgrade_tag_follows(w, n, named):
+  match w:
+    case W.World{args, +ledger, _listing, _replies, +ups}:
+      match args:
+        case W.Args{up, +only}:
+          match up:
+            case False{}:
+              mv.self_dep(Up.follow(ups, M.source.url(M.source.dep(M.dep(W.parsed(ledger), n))),
+                M.source.tag(M.source.dep(M.dep(W.parsed(ledger), n)))),
+                ups, M.dep(W.parsed(ledger), n), mv.named_git(M.dep(W.parsed(ledger), n), named))
+            case True{}:
+              mv.fol_top(W.parsed(ledger), only, ups, n, named)
+
+# The upgrade's refusals. A pin whose fate refuses makes the walk refuse,
+# since a refusal ahead of the rest wins and its reason is never empty
+# (`Up.halt.why`), and a walk that refuses stops the upgrade, which stops the
+# lock.
+
+# LAW: the dependency `M.find` answers from a repository has the name asked for
+law mv.find_pick_named:
+  for b: Bool
+  for +n: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tl: List<&2, M.Dep>
+  for e: {String.eq(hn, n) == b : Bool}
+  for g: {M.source.is_git(M.source.dep(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))))
+    == True{} : Bool}
+  for ih: {M.source.is_git(M.source.dep(M.find(tl, n))) == True{} : Bool}
+    -> {M.dep.name(M.find(tl, n)) == n : String}
+  {M.dep.name(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))) == n : String}
+
+def mv.find_pick_named(b, n, hn, _hh, _he, _src, _tl, e, g, ih):
+  match b:
+    case True{}:
+      Str.string_eq_true(hn, n, e)
+    case False{}:
+      ih(g)
+
+law mv.find_named:
+  for +ds: List<&2, M.Dep>
+  for +n: String
+  for g: {M.source.is_git(M.source.dep(M.find(ds, n))) == True{} : Bool}
+  {M.dep.name(M.find(ds, n)) == n : String}
+
+def mv.find_named(ds, n, g):
+  match ds:
+    case []:
+      Eq.bit.absurd(&2, {"" == n : String}, g)
+    case +h <> +tl:
+      match h:
+        case M.Dep{+hn, +hh, +he, +src}:
+          mv.find_pick_named(String.eq(hn, n), n, hn, hh, he, src, tl, {==}, g,
+            p => mv.find_named(tl, n, p))
+
+# LAW: and so does the one a ledger that was read answers
+law mv.dep_named:
+  for r: M.Read
+  for +n: String
+  for g: {M.source.is_git(M.source.dep(M.dep(r, n))) == True{} : Bool}
+  {M.dep.name(M.dep(r, n)) == n : String}
+
+def mv.dep_named(r, n, g):
+  match r:
+    case M.Bad{_why}:
+      Eq.bit.absurd(&2, {"" == n : String}, g)
+    case M.Good{m}:
+      match m:
+        case M.Manifest{_name, _entry, _bin, _hub, +ds, _ts}:
+          mv.find_named(ds, n, g)
+
+# LAW: a tip that is another commit, which the remote says does not descend
+# from the pin, is refused
+law mv.tip_off:
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for moved: {String.eq(rev, tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{url, rev, tip}) == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend))) == True{} : Bool}
+
+def mv.tip_off(rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, tg, br, moved, off):
+  Equal.trans(Bool,
+    mv.halts(Up.dep.same(String.eq(rev, tip), rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+    mv.halts(Up.dep.same(False{}, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+    True{},
+    Equal.cong(Bool, Bool, s => mv.halts(Up.dep.same(s, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+      String.eq(rev, tip), False{}, moved),
+    Equal.cong(Up.Asc, Bool, a => mv.halts(Up.dep.onward(a, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+      Up.onward(rs, Up.Above{url, rev, tip}), Up.Asc{False{}}, off))
+
+# LAW: the pin's own commit, whose checkout no longer agrees with the pin, is
+# refused
+law mv.tip_drift:
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for +nar2: String
+  for +root2: String
+  for +man: String
+  for +srcs: List<&2, String>
+  for same: {String.eq(rev, tip) == True{} : Bool}
+  for co: {Up.checkout(rs, Up.Tree{url, rev, he}) == Up.Co{nar2, root2, man, srcs} : Up.Co}
+  for drift: {U.agree(hh, Up.hash.of(man), nar, nar2, root, root2) == False{} : Bool}
+  {mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend))) == True{} : Bool}
+
+def mv.tip_drift(
+  rs,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  tag,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  nar2,
+  root2,
+  man,
+  srcs,
+  same,
+  co,
+  drift
+):
+  Equal.trans(Bool,
+    mv.halts(Up.dep.same(String.eq(rev, tip), rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+    mv.halts(Up.dep.same(True{}, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+    True{},
+    Equal.cong(Bool, Bool, s => mv.halts(Up.dep.same(s, rs, hub,
+      mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br)),
+      String.eq(rev, tip), True{}, same),
+    Equal.trans(Bool,
+      mv.halts(Up.dep.kept(Up.checkout(rs, Up.Tree{url, rev, he}), rs, hub,
+        mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg)),
+      mv.halts(Up.dep.kept(Up.Co{nar2, root2, man, srcs}, rs, hub,
+        mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg)),
+      True{},
+      Equal.cong(Up.Co, Bool, c => mv.halts(Up.dep.kept(c, rs, hub,
+        mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg)),
+        Up.checkout(rs, Up.Tree{url, rev, he}), Up.Co{nar2, root2, man, srcs}, co),
+      Equal.cong(Bool, Bool, g => mv.halts(Up.dep.verdict(U.judge(True{}, True{}, g, tip, tg), rs,
+        hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, "", Up.hash.of(man))),
+        U.agree(hh, Up.hash.of(man), nar, nar2, root, root2), False{}, drift)))
+
+# LAW: a pin by its commit alone that is asked about, whose default branch
+# tip is another commit not descended from it, is refused
+law mv.fwd_off_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for sel: {s == True{} : Bool}
+  for head: {Up.forward(rs, url) == Up.At{tip, tg, br} : Up.Tip}
+  for moved: {String.eq(rev, tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{url, rev, tip}) == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, "", root, nar, vend))) == True{} : Bool}
+
+def mv.fwd_off_sel(
+  s,
+  rs,
+  _only,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  sel,
+  head,
+  moved,
+  off
+):
+  match s:
+    case False{}:
+      sel
+    case True{}:
+      Equal.trans(Bool,
+        mv.halts(Up.dep.tip(Up.forward(rs, url), rs, hub,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend))),
+        mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend))),
+        True{},
+        Equal.cong(Up.Tip, Bool, x => mv.halts(Up.dep.tip(x, rs, hub,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend))),
+          Up.forward(rs, url), Up.At{tip, tg, br}, head),
+        mv.tip_off(rs, hub, hn, hh, he, url, rev, "", root, nar, vend, tip, tg, br, moved, off))
+
+law mv.fwd_off:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for bare: {Laws.rev_only(h) == True{} : Bool}
+  for sel: {U.chosen(only, M.dep.name(h)) == True{} : Bool}
+  for head: {Up.forward(rs, M.source.url(M.source.dep(h))) == Up.At{tip, tg, br} : Up.Tip}
+  for moved: {String.eq(M.source.rev(M.source.dep(h)), tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{M.source.url(M.source.dep(h)), M.source.rev(M.source.dep(h)), tip})
+    == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h))
+    == True{} : Bool}
+
+def mv.fwd_off(rs, only, hub, h, tip, tg, br, bare, sel, head, moved, off):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}})) == True{} : Bool}, bare)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              mv.fwd_off_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, root, nar,
+                vend, tip, tg, br, sel, head, moved, off)
+            case SCon{+c, +ct}:
+              Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}, bare)
+
+# LAW: a pin through a tag that is asked about, whose tag now names another
+# commit not descended from it, is refused
+law mv.fol_off_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +c: Char
+  for +ct: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for sel: {s == True{} : Bool}
+  for refs: {Up.follow(rs, url, SCon{c, ct}) == Up.At{tip, tg, br} : Up.Tip}
+  for moved: {String.eq(rev, tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{url, rev, tip}) == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}
+
+def mv.fol_off_sel(
+  s,
+  rs,
+  _only,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  c,
+  ct,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  sel,
+  refs,
+  moved,
+  off
+):
+  match s:
+    case False{}:
+      sel
+    case True{}:
+      Equal.trans(Bool,
+        mv.halts(Up.dep.tip(Up.follow(rs, url, SCon{c, ct}), rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+        mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+        True{},
+        Equal.cong(Up.Tip, Bool, x => mv.halts(Up.dep.tip(x, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+          Up.follow(rs, url, SCon{c, ct}), Up.At{tip, tg, br}, refs),
+        mv.tip_off(rs, hub, hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend, tip, tg, br, moved,
+          off))
+
+law mv.fol_off:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for named: {Laws.tagged(h) == True{} : Bool}
+  for sel: {U.chosen(only, M.dep.name(h)) == True{} : Bool}
+  for refs: {Up.follow(rs, M.source.url(M.source.dep(h)), M.source.tag(M.source.dep(h)))
+    == Up.At{tip, tg, br} : Up.Tip}
+  for moved: {String.eq(M.source.rev(M.source.dep(h)), tip) == False{} : Bool}
+  for off: {Up.onward(rs, Up.Above{M.source.url(M.source.dep(h)), M.source.rev(M.source.dep(h)), tip})
+    == Up.Asc{False{}} : Up.Asc}
+  {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h))
+    == True{} : Bool}
+
+def mv.fol_off(rs, only, hub, h, tip, tg, br, named, sel, refs, moved, off):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}})) == True{} : Bool}, named)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend))) == True{} : Bool}, named)
+            case SCon{+c, +ct}:
+              mv.fol_off_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root,
+                nar, vend, tip, tg, br, sel, refs, moved, off)
+
+# LAW: a pin through a tag that is asked about, whose tag still names its
+# commit but whose checkout no longer agrees with it, is refused
+law mv.fol_drift_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +c: Char
+  for +ct: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for +nar2: String
+  for +root2: String
+  for +man: String
+  for +srcs: List<&2, String>
+  for sel: {s == True{} : Bool}
+  for refs: {Up.follow(rs, url, SCon{c, ct}) == Up.At{tip, tg, br} : Up.Tip}
+  for same: {String.eq(rev, tip) == True{} : Bool}
+  for co: {Up.checkout(rs, Up.Tree{url, rev, he}) == Up.Co{nar2, root2, man, srcs} : Up.Co}
+  for drift: {U.agree(hh, Up.hash.of(man), nar, nar2, root, root2) == False{} : Bool}
+  {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}
+
+def mv.fol_drift_sel(
+  s,
+  rs,
+  _only,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  c,
+  ct,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  nar2,
+  root2,
+  man,
+  srcs,
+  sel,
+  refs,
+  same,
+  co,
+  drift
+):
+  match s:
+    case False{}:
+      sel
+    case True{}:
+      Equal.trans(Bool,
+        mv.halts(Up.dep.tip(Up.follow(rs, url, SCon{c, ct}), rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+        mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+        True{},
+        Equal.cong(Up.Tip, Bool, x => mv.halts(Up.dep.tip(x, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))),
+          Up.follow(rs, url, SCon{c, ct}), Up.At{tip, tg, br}, refs),
+        mv.tip_drift(rs, hub, hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend, tip, tg, br, nar2,
+          root2, man, srcs, same, co, drift))
+
+law mv.fol_drift:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for +nar2: String
+  for +root2: String
+  for +man: String
+  for +srcs: List<&2, String>
+  for named: {Laws.tagged(h) == True{} : Bool}
+  for sel: {U.chosen(only, M.dep.name(h)) == True{} : Bool}
+  for refs: {Up.follow(rs, M.source.url(M.source.dep(h)), M.source.tag(M.source.dep(h)))
+    == Up.At{tip, tg, br} : Up.Tip}
+  for same: {String.eq(M.source.rev(M.source.dep(h)), tip) == True{} : Bool}
+  for co: {Up.checkout(rs, Up.Tree{M.source.url(M.source.dep(h)), M.source.rev(M.source.dep(h)),
+    M.dep.entry(h)}) == Up.Co{nar2, root2, man, srcs} : Up.Co}
+  for drift: {U.agree(M.dep.hash(h), Up.hash.of(man), M.source.nar(M.source.dep(h)), nar2,
+    M.source.root(M.source.dep(h)), root2) == False{} : Bool}
+  {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h))
+    == True{} : Bool}
+
+def mv.fol_drift(
+  rs,
+  only,
+  hub,
+  h,
+  tip,
+  tg,
+  br,
+  nar2,
+  root2,
+  man,
+  srcs,
+  named,
+  sel,
+  refs,
+  same,
+  co,
+  drift
+):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}})) == True{} : Bool}, named)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend))) == True{} : Bool}, named)
+            case SCon{+c, +ct}:
+              mv.fol_drift_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root,
+                nar, vend, tip, tg, br, nar2, root2, man, srcs, sel, refs, same, co, drift)
+
+# LAW: a walk with no dependencies has no refusal to carry, so none of them
+# refused
+law mv.halts_nil:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for hl: {mv.halts(Up.dep.one(U.aim(s, M.Hub{}), rs, only, hub, M.Dep{"", "", "", M.Hub{}}))
+    == True{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.walk(rs, only, hub, []))) == False{} : Bool}
+
+def mv.halts_nil(s, _rs, _only, _hub, hl):
+  match s:
+    case True{}:
+      Eq.bit.absurd(&2, {True{} == False{} : Bool}, hl)
+    case False{}:
+      Eq.bit.absurd(&2, {True{} == False{} : Bool}, hl)
+
+# LAW: a fate that refuses, in front of the rest, makes the walk refuse
+law mv.join_bad:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for hl: {mv.halts(f) == True{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.join(f, rest))) == False{} : Bool}
+
+def mv.join_bad(f, rest, hl):
+  match f rest:
+    case Up.Became{_d, _, _, _, _, _, _} Up.Deps{_ds, _ss, _es, _any, _sy2, _tr2, _asks, bad}:
+      Eq.bit.absurd(&2, {String.is_empty(bad) == False{} : Bool}, hl)
+    case Up.Waits{_more} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, bad}:
+      Eq.bit.absurd(&2, {String.is_empty(bad) == False{} : Bool}, hl)
+    case Up.Halts{why} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, _bad}:
+      mv.halt_ne(why)
+
+# LAW: and a walk that refused behind any fate still refuses
+law mv.join_keeps:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for ih: {String.is_empty(mv.bad(rest)) == False{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.join(f, rest))) == False{} : Bool}
+
+def mv.join_keeps(f, rest, ih):
+  match f rest:
+    case Up.Became{_d, _, _, _, _, _, _} Up.Deps{_ds, _ss, _es, _any, _sy2, _tr2, _asks, _bad}:
+      ih
+    case Up.Waits{_more} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, _bad}:
+      ih
+    case Up.Halts{why} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, _bad}:
+      mv.halt_ne(why)
+
+# LAW: one step of the walk
+law mv.halts_step:
+  for b: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tl: List<&2, M.Dep>
+  for hl: {mv.halts(Up.dep.one(U.aim(U.chosen(only,
+    M.dep.name(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))),
+    M.source.dep(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))), rs, only, hub,
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))) == True{} : Bool}
+  for ih: {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(tl, n))),
+    M.source.dep(M.find(tl, n))), rs, only, hub, M.find(tl, n))) == True{} : Bool}
+    -> {String.is_empty(mv.bad(Up.deps.walk(rs, only, hub, tl))) == False{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.join(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub,
+    M.Dep{hn, hh, he, src}), Up.deps.walk(rs, only, hub, tl)))) == False{} : Bool}
+
+def mv.halts_step(b, rs, only, hub, _n, hn, hh, he, src, tl, hl, ih):
+  match b:
+    case True{}:
+      mv.join_bad(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), hl)
+    case False{}:
+      mv.join_keeps(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), ih(hl))
+
+# LAW: the walk refuses when the named dependency's fate does
+law mv.walk_halts:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +ds: List<&2, M.Dep>
+  for hl: {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(ds, n))),
+    M.source.dep(M.find(ds, n))), rs, only, hub, M.find(ds, n))) == True{} : Bool}
+  {String.is_empty(mv.bad(Up.deps.walk(rs, only, hub, ds))) == False{} : Bool}
+
+def mv.walk_halts(rs, only, hub, n, ds, hl):
+  match ds:
+    case []:
+      mv.halts_nil(U.chosen(only, ""), rs, only, hub, hl)
+    case +h <> +tl:
+      match h:
+        case M.Dep{+hn, +hh, +he, +src}:
+          mv.halts_step(String.eq(hn, n), rs, only, hub, n, hn, hh, he, src, tl, hl,
+            p => mv.walk_halts(rs, only, hub, n, tl, p))
+
+# LAW: a walk that refuses stops the upgrade
+law mv.pins_stop:
+  for dd: Up.Deps
+  for tt: Up.Tools
+  for +rs: List<&2, Up.Reply>
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wb: {String.is_empty(mv.bad(dd)) == False{} : Bool}
+  {mv.stops(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds, ts})) == True{} : Bool}
+
+def mv.pins_stop(dd, tt, rs, name, entry, bin, hub, ds, ts, wb):
+  match dd tt:
+    case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, +dasks, SNil{}} Up.Tools{+tts, +tm, +tsy, +tasks, +tbad}:
+      Eq.bit.absurd2(&2, {mv.stops(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, ""},
+        Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, ds, ts}))
+        == True{} : Bool}, wb)
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SCon{_c, _cs}} Up.Tools{_tts, _tm, _tsy, _tasks, _tbad}:
+      {==}
+
+# LAW: and so does a `--package` that names nothing
+law mv.known_stop:
+  for k: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wb: {String.is_empty(mv.bad(Up.deps.walk(rs, only, M.hub.or(hub), ds))) == False{} : Bool}
+  {mv.stops(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds, ts})) == True{} : Bool}
+
+def mv.known_stop(k, rs, only, name, entry, bin, hub, ds, ts, wb):
+  match k:
+    case False{}:
+      {==}
+    case True{}:
+      mv.pins_stop(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), rs, name,
+        entry, bin, hub, ds, ts, wb)
+
+# LAW: an upgrade that stops is a lock that refuses
+law mv.refuses_of:
+  for nx: Up.Next
+  for +listing: W.Listing
+  for +replies: List<&2, W.Reply>
+  for st: {mv.stops(nx) == True{} : Bool}
+  {P.refuses.doc(P.decide(W.inputs.of(nx, listing, replies))) == True{} : Bool}
+
+def mv.refuses_of(nx, listing, replies, st):
+  match nx:
+    case Up.Next{+model, +read, SNil{}, +asks, +trees, +vends, +says, +edits, +found, +drops, +swaps}:
+      Eq.bit.absurd(&2, {P.refuses.doc(P.decide(W.inputs.of(Up.Next{model, read, "", asks, trees,
+        vends, says, edits, found, drops, swaps}, listing, replies))) == True{} : Bool}, st)
+    case Up.Next{_model, _read, SCon{_c, _cs}, _asks, _trees, _vends, _says, _edits, _found, _drops, _swaps}:
+      {==}
+
+# LAW: a lock refuses when the named dependency's fate under `--upgrade` does
+law mv.refuses_top:
+  for r: M.Read
+  for +only: String
+  for +rs: List<&2, Up.Reply>
+  for +listing: W.Listing
+  for +replies: List<&2, W.Reply>
+  for +n: String
+  for g: {M.source.is_git(M.source.dep(M.dep(r, n))) == True{} : Bool}
+  for hl: {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.dep(r, n))),
+    M.source.dep(M.dep(r, n))), rs, only, M.hub_of(r), M.dep(r, n))) == True{} : Bool}
+  {P.refuses.doc(P.decide(W.inputs.of(Up.next(only, r, rs), listing, replies))) == True{} : Bool}
+
+def mv.refuses_top(r, only, rs, listing, replies, n, g, hl):
+  match r:
+    case M.Bad{+why}:
+      Eq.bit.absurd(&2, {P.refuses.doc(P.decide(W.inputs.of(Up.next(only, M.Bad{why}, rs), listing,
+        replies))) == True{} : Bool}, g)
+    case M.Good{m}:
+      match m:
+        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+          mv.refuses_of(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, ds, ts}}, rs), listing,
+            replies, mv.known_stop(Bool.or(U.known(only, ds), M.tool.known(only, ts)), rs, only,
+              name, entry, bin, hub, ds, ts, mv.walk_halts(rs, only, M.hub.or(hub), n, ds, hl)))
+
+# `--package` names the dependency, so it is the one asked about
+def Laws.upgrade_forward_refuses_off(w, n, tip, tag, branch, up, bare, sel, head, moved, off):
+  match w:
+    case W.World{args, +ledger, +listing, +replies, +ups}:
+      match args:
+        case W.Args{u, +only}:
+          match u:
+            case False{}:
+              Eq.bit.absurd(&2, {P.refuses(W.World{W.Args{False{}, only}, ledger, listing, replies,
+                ups}) == True{} : Bool}, up)
+            case True{}:
+              mv.refuses_top(W.parsed(ledger), only, ups, listing, replies, n,
+                mv.bare_git(M.dep(W.parsed(ledger), n), bare),
+                mv.fwd_off(ups, only, M.hub_of(W.parsed(ledger)), M.dep(W.parsed(ledger), n), tip,
+                  tag, branch, bare,
+                  Equal.trans(Bool, U.chosen(only, M.dep.name(M.dep(W.parsed(ledger), n))),
+                    U.chosen(only, n), True{},
+                    Equal.cong(String, Bool, x => U.chosen(only, x),
+                      M.dep.name(M.dep(W.parsed(ledger), n)), n,
+                      mv.dep_named(W.parsed(ledger), n, mv.bare_git(M.dep(W.parsed(ledger), n), bare))),
+                    sel),
+                  head, moved, off))
+
+def Laws.upgrade_tag_refuses_off(w, n, tip, tag, branch, up, named, sel, refs, moved, off):
+  match w:
+    case W.World{args, +ledger, +listing, +replies, +ups}:
+      match args:
+        case W.Args{u, +only}:
+          match u:
+            case False{}:
+              Eq.bit.absurd(&2, {P.refuses(W.World{W.Args{False{}, only}, ledger, listing, replies,
+                ups}) == True{} : Bool}, up)
+            case True{}:
+              mv.refuses_top(W.parsed(ledger), only, ups, listing, replies, n,
+                mv.named_git(M.dep(W.parsed(ledger), n), named),
+                mv.fol_off(ups, only, M.hub_of(W.parsed(ledger)), M.dep(W.parsed(ledger), n), tip,
+                  tag, branch, named,
+                  Equal.trans(Bool, U.chosen(only, M.dep.name(M.dep(W.parsed(ledger), n))),
+                    U.chosen(only, n), True{},
+                    Equal.cong(String, Bool, x => U.chosen(only, x),
+                      M.dep.name(M.dep(W.parsed(ledger), n)), n,
+                      mv.dep_named(W.parsed(ledger), n, mv.named_git(M.dep(W.parsed(ledger), n), named))),
+                    sel),
+                  refs, moved, off))
+
+def Laws.upgrade_tag_refuses_drift(
+  w,
+  n,
+  tip,
+  tag,
+  branch,
+  nar,
+  root,
+  manifest,
+  srcs,
+  up,
+  named,
+  sel,
+  refs,
+  same,
+  co,
+  drift
+):
+  match w:
+    case W.World{args, +ledger, +listing, +replies, +ups}:
+      match args:
+        case W.Args{u, +only}:
+          match u:
+            case False{}:
+              Eq.bit.absurd(&2, {P.refuses(W.World{W.Args{False{}, only}, ledger, listing, replies,
+                ups}) == True{} : Bool}, up)
+            case True{}:
+              mv.refuses_top(W.parsed(ledger), only, ups, listing, replies, n,
+                mv.named_git(M.dep(W.parsed(ledger), n), named),
+                mv.fol_drift(ups, only, M.hub_of(W.parsed(ledger)), M.dep(W.parsed(ledger), n), tip,
+                  tag, branch, nar, root, manifest, srcs, named,
+                  Equal.trans(Bool, U.chosen(only, M.dep.name(M.dep(W.parsed(ledger), n))),
+                    U.chosen(only, n), True{},
+                    Equal.cong(String, Bool, x => U.chosen(only, x),
+                      M.dep.name(M.dep(W.parsed(ledger), n)), n,
+                      mv.dep_named(W.parsed(ledger), n, mv.named_git(M.dep(W.parsed(ledger), n), named))),
+                    sel),
+                  refs, same, co, drift))
+
+# The upgrade reaches the tip. When the lock does not refuse, every pin it
+# asked about is at the commit the remote named: moved there, which marks the
+# upgrade as having moved a pin, so the ledger it writes is the walk's; or
+# there already.
+
+# a fate reaches `tip`: the pin it leaves is at it, and either the fate
+# moved it or the old pin was at it already
+def mv.live(fate: Up.Fate, +tip: String, +old: M.Dep) -> Bool:
+  match fate:
+    case Up.Became{d, _o, _n, _p, m, _s, _t}:
+      Bool.and(String.eq(M.source.rev(M.source.dep(d)), tip),
+        Bool.or(m, String.eq(M.source.rev(M.source.dep(old)), tip)))
+    case Up.Waits{_asks}:
+      True{}
+    case Up.Halts{_why}:
+      True{}
+
+# the walk reaches `tip` for the dependency named `n`: it refuses, or still
+# asks, or the dependency it leaves under that name is at `tip`, and either a
+# pin moved or the old pin was at `tip` already
+def mv.walk_live(+tip: String, dd: Up.Deps, +old: M.Dep, +n: String) -> Bool:
+  Up.Deps{ds, _ss, _es, m, _sy, _tr, asks, bad} = dd
+  Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+    Bool.and(String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip),
+      Bool.or(m, String.eq(M.source.rev(M.source.dep(old)), tip)))))
+
+# LAW: a fate that reaches the tip, in front of the rest, still does
+law mv.live_or:
+  for x: Bool
+  for m: Bool
+  for +any: Bool
+  for +c: Bool
+  for lv: {Bool.and(x, Bool.or(m, c)) == True{} : Bool}
+  {Bool.and(x, Bool.or(Bool.or(m, any), c)) == True{} : Bool}
+
+def mv.live_or(x, m, any, c, lv):
+  match x m:
+    case False{} _:
+      lv
+    case True{} True{}:
+      {==}
+    case True{} False{}:
+      mv.or_r(any, c, lv)
+
+# LAW: and one behind another pin that moved or not
+law mv.live_keep:
+  for a: Bool
+  for b: Bool
+  for x: Bool
+  for m: Bool
+  for +any: Bool
+  for +c: Bool
+  for ih: {Bool.or(a, Bool.or(b, Bool.and(x, Bool.or(any, c)))) == True{} : Bool}
+  {Bool.or(a, Bool.or(b, Bool.and(x, Bool.or(Bool.or(m, any), c)))) == True{} : Bool}
+
+def mv.live_keep(a, b, x, m, _any, _c, ih):
+  match a b x m:
+    case True{} _ _ _:
+      {==}
+    case False{} True{} _ _:
+      {==}
+    case False{} False{} False{} _:
+      ih
+    case False{} False{} True{} True{}:
+      {==}
+    case False{} False{} True{} False{}:
+      ih
+
+# LAW: a pin moved to the tip, once the hub has not objected
+law mv.live_hub:
+  for hb: Up.Hubbed
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +hash: String
+  for +tip: String
+  for +br: String
+  for +root2: String
+  for +nar2: String
+  for +man: String
+  for srcs: List<&2, String>
+  {mv.live(Up.dep.hub(hb, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), hash, tip, root2,
+    nar2, man, srcs, br), tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.live_hub(
+  hb,
+  _hn,
+  _hh,
+  _he,
+  _url,
+  _rev,
+  _tag,
+  _root,
+  _nar,
+  _vend,
+  _hash,
+  tip,
+  _br,
+  _root2,
+  _nar2,
+  _man,
+  _srcs
+):
+  match hb:
+    case Up.Clear{}:
+      Equal.cong(Bool, Bool, x => Bool.and(x, True{}), String.eq(tip, tip), True{},
+        Eq.string_eq_self(tip))
+    case Up.Clash{}:
+      {==}
+    case Up.HubWait{_ask}:
+      {==}
+    case Up.HubNo{_why}:
+      {==}
+
+# LAW: a pin moved to the tip, once its checkout is in
+law mv.live_adv:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +br: String
+  {mv.live(Up.dep.advance(co, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, br),
+    tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.live_adv(co, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, br):
+  match co:
+    case Up.Co{nar2, root2, +man, srcs}:
+      mv.live_hub(Up.hubbed(rs, Up.HubHas{hub, Up.hash.of(man)}), hn, hh, he, url, rev, tag, root,
+        nar, vend, Up.hash.of(man), tip, br, root2, nar2, man, srcs)
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: a tip that is another commit, once ancestry is in
+law mv.live_onward:
+  for a: Up.Asc
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  {mv.live(Up.dep.onward(a, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br),
+    tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.live_onward(a, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, _tg, br):
+  match a:
+    case Up.Asc{yes}:
+      match yes:
+        case True{}:
+          mv.live_adv(Up.checkout(rs, Up.Tree{url, tip, he}), rs, hub, hn, hh, he, url, rev, tag,
+            root, nar, vend, tip, br)
+        case False{}:
+          {==}
+    case Up.AscWait{_ask}:
+      {==}
+    case Up.AscNo{_why}:
+      {==}
+
+# LAW: the pin's own commit, kept when its checkout agrees
+law mv.live_agree:
+  for g: Bool
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +seen: String
+  for e: {String.eq(rev, tip) == True{} : Bool}
+  {mv.live(Up.dep.verdict(U.judge(True{}, True{}, g, tip, tg), rs, hub,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, "", seen),
+    tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.live_agree(
+  g,
+  _rs,
+  _hub,
+  _hn,
+  _hh,
+  _he,
+  _url,
+  rev,
+  _tag,
+  _root,
+  _nar,
+  _vend,
+  tip,
+  _tg,
+  _seen,
+  e
+):
+  match g:
+    case True{}:
+      Equal.cong(Bool, Bool, x => Bool.and(x, x), String.eq(rev, tip), True{}, e)
+    case False{}:
+      {==}
+
+# LAW: the pin's own commit, once its checkout is in
+law mv.live_kept:
+  for co: Up.Co
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for e: {String.eq(rev, tip) == True{} : Bool}
+  {mv.live(Up.dep.kept(co, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg),
+    tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.live_kept(co, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, tg, e):
+  match co:
+    case Up.Co{nar2, root2, +man, _srcs}:
+      mv.live_agree(U.agree(hh, Up.hash.of(man), nar, nar2, root, root2), rs, hub, hn, hh, he, url,
+        rev, tag, root, nar, vend, tip, tg, Up.hash.of(man), e)
+    case Up.CoWait{_ask}:
+      {==}
+    case Up.CoNo{_why}:
+      {==}
+
+# LAW: the tip against the pin
+law mv.live_same:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for e: {String.eq(rev, tip) == s : Bool}
+  {mv.live(Up.dep.same(s, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg, br),
+    tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.live_same(s, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, tg, br, e):
+  match s:
+    case True{}:
+      mv.live_kept(Up.checkout(rs, Up.Tree{url, rev, he}), rs, hub, hn, hh, he, url, rev, tag, root,
+        nar, vend, tip, tg, e)
+    case False{}:
+      mv.live_onward(Up.onward(rs, Up.Above{url, rev, tip}), rs, hub, hn, hh, he, url, rev, tag,
+        root, nar, vend, tip, tg, br)
+
+# LAW: a pin reaches the tip the remote named
+law mv.live_tip:
+  for +rs: List<&2, Up.Reply>
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  {mv.live(Up.dep.tip(Up.At{tip, tg, br}, rs, hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)),
+    tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+
+def mv.live_tip(rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, tg, br):
+  mv.live_same(String.eq(rev, tip), rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, tg,
+    br, {==})
+
+# LAW: a pin by its commit alone that is asked about reaches its default
+# branch tip
+law mv.fwd_live_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for sel: {s == True{} : Bool}
+  for head: {Up.forward(rs, url) == Up.At{tip, tg, br} : Up.Tip}
+  {mv.live(Up.dep.one(U.aim(s, M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, "", root, nar, vend)), tip,
+    mv.git(hn, hh, he, url, rev, "", root, nar, vend)) == True{} : Bool}
+
+def mv.fwd_live_sel(s, rs, only, hub, hn, hh, he, url, rev, root, nar, vend, tip, tg, br, sel, head):
+  match s:
+    case False{}:
+      Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(False{}, M.Git{url, rev, "", root, nar, vend}), rs,
+        only, hub, mv.git(hn, hh, he, url, rev, "", root, nar, vend)), tip,
+        mv.git(hn, hh, he, url, rev, "", root, nar, vend)) == True{} : Bool}, sel)
+    case True{}:
+      Equal.trans(Bool,
+        mv.live(Up.dep.tip(Up.forward(rs, url), rs, hub,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend)), tip,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend)),
+        mv.live(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend)), tip,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend)),
+        True{},
+        Equal.cong(Up.Tip, Bool, x => mv.live(Up.dep.tip(x, rs, hub,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend)), tip,
+          mv.git(hn, hh, he, url, rev, "", root, nar, vend)),
+          Up.forward(rs, url), Up.At{tip, tg, br}, head),
+        mv.live_tip(rs, hub, hn, hh, he, url, rev, "", root, nar, vend, tip, tg, br))
+
+law mv.fwd_live:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for bare: {Laws.rev_only(h) == True{} : Bool}
+  for sel: {U.chosen(only, M.dep.name(h)) == True{} : Bool}
+  for head: {Up.forward(rs, M.source.url(M.source.dep(h))) == Up.At{tip, tg, br} : Up.Tip}
+  {mv.live(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h),
+    tip, h) == True{} : Bool}
+
+def mv.fwd_live(rs, only, hub, h, tip, tg, br, bare, sel, head):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}}), tip, M.Dep{hn, hh, he, M.Hub{}}) == True{} : Bool}, bare)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              mv.fwd_live_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, root, nar,
+                vend, tip, tg, br, sel, head)
+            case SCon{+c, +ct}:
+              Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), tip,
+                mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}, bare)
+
+# LAW: a pin through a tag that is asked about reaches what its tag names
+law mv.fol_live_sel:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +url: String
+  for +rev: String
+  for +c: Char
+  for +ct: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for sel: {s == True{} : Bool}
+  for refs: {Up.follow(rs, url, SCon{c, ct}) == Up.At{tip, tg, br} : Up.Tip}
+  {mv.live(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
+    mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), tip,
+    mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}
+
+def mv.fol_live_sel(
+  s,
+  rs,
+  only,
+  hub,
+  hn,
+  hh,
+  he,
+  url,
+  rev,
+  c,
+  ct,
+  root,
+  nar,
+  vend,
+  tip,
+  tg,
+  br,
+  sel,
+  refs
+):
+  match s:
+    case False{}:
+      Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(False{}, M.Git{url, rev, SCon{c, ct}, root, nar,
+        vend}), rs, only, hub, mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), tip,
+        mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}, sel)
+    case True{}:
+      Equal.trans(Bool,
+        mv.live(Up.dep.tip(Up.follow(rs, url, SCon{c, ct}), rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), tip,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)),
+        mv.live(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), tip,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)),
+        True{},
+        Equal.cong(Up.Tip, Bool, x => mv.live(Up.dep.tip(x, rs, hub,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), tip,
+          mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)),
+          Up.follow(rs, url, SCon{c, ct}), Up.At{tip, tg, br}, refs),
+        mv.live_tip(rs, hub, hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend, tip, tg, br))
+
+law mv.fol_live:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +h: M.Dep
+  for +tip: String
+  for +tg: String
+  for +br: String
+  for named: {Laws.tagged(h) == True{} : Bool}
+  for sel: {U.chosen(only, M.dep.name(h)) == True{} : Bool}
+  for refs: {Up.follow(rs, M.source.url(M.source.dep(h)), M.source.tag(M.source.dep(h)))
+    == Up.At{tip, tg, br} : Up.Tip}
+  {mv.live(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h),
+    tip, h) == True{} : Bool}
+
+def mv.fol_live(rs, only, hub, h, tip, tg, br, named, sel, refs):
+  match h:
+    case M.Dep{+hn, +hh, +he, src}:
+      match src:
+        case M.Hub{}:
+          Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{}}), tip, M.Dep{hn, hh, he, M.Hub{}}) == True{} : Bool}, named)
+        case M.Git{+url, +rev, tag, +root, +nar, +vend}:
+          match tag:
+            case SNil{}:
+              Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn),
+                M.Git{url, rev, "", root, nar, vend}), rs, only, hub,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend)), tip,
+                mv.git(hn, hh, he, url, rev, "", root, nar, vend)) == True{} : Bool}, named)
+            case SCon{+c, +ct}:
+              mv.fol_live_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root,
+                nar, vend, tip, tg, br, sel, refs)
+
+# LAW: a walk over no dependencies reaches the tip exactly when the blank pin
+# does
+law mv.live_nil:
+  for s: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +tip: String
+  for lv: {mv.live(Up.dep.one(U.aim(s, M.Hub{}), rs, only, hub, M.Dep{"", "", "", M.Hub{}}), tip,
+    M.Dep{"", "", "", M.Hub{}}) == True{} : Bool}
+  {mv.walk_live(tip, Up.deps.walk(rs, only, hub, []), M.Dep{"", "", "", M.Hub{}}, n) == True{} : Bool}
+
+def mv.live_nil(s, _rs, _only, _hub, _n, _tip, lv):
+  match s:
+    case True{}:
+      lv
+    case False{}:
+      lv
+
+# LAW: the named dependency's fate in front of the rest
+law mv.live_hit:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for +n: String
+  for +tip: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for e: {String.eq(hn, n) == True{} : Bool}
+  for lv: {mv.live(f, tip, M.Dep{hn, hh, he, src}) == True{} : Bool}
+  for fn: {mv.fine(f, hn) == (hn, True{}) : String & Bool}
+  {mv.walk_live(tip, Up.deps.join(f, rest), M.Dep{hn, hh, he, src}, n) == True{} : Bool}
+
+def mv.live_hit(f, rest, n, tip, hn, _hh, _he, src, e, lv, fn):
+  match f rest:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _, _, _, +m, _, _} Up.Deps{+ds, _, _, +any, _, _, +asks, +bad}:
+      Equal.trans(Bool,
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Bool.and(String.eq(M.source.rev(M.source.dep(
+            M.find.pick(String.eq(dn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+            Bool.or(Bool.or(m, any), String.eq(M.source.rev(src), tip))))),
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Bool.and(String.eq(M.source.rev(M.source.dep(
+            M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+            Bool.or(Bool.or(m, any), String.eq(M.source.rev(src), tip))))),
+        True{},
+        Equal.cong(String, Bool,
+          x => Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Bool.and(String.eq(M.source.rev(M.source.dep(
+              M.find.pick(String.eq(x, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+              Bool.or(Bool.or(m, any), String.eq(M.source.rev(src), tip))))),
+          dn, hn, Equal.cong(String & Bool, String, p => mv.fst(p), (dn, True{}), (hn, True{}), fn)),
+        Equal.trans(Bool,
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Bool.and(String.eq(M.source.rev(M.source.dep(
+              M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+              Bool.or(Bool.or(m, any), String.eq(M.source.rev(src), tip))))),
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Bool.and(String.eq(M.source.rev(dsrc), tip),
+              Bool.or(Bool.or(m, any), String.eq(M.source.rev(src), tip))))),
+          True{},
+          Equal.cong(Bool, Bool,
+            y => Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Bool.and(String.eq(M.source.rev(M.source.dep(
+                M.find.pick(y, M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+                Bool.or(Bool.or(m, any), String.eq(M.source.rev(src), tip))))),
+            String.eq(hn, n), True{}, e),
+          mv.or_r(Bool.not(String.is_empty(bad)),
+            Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Bool.and(String.eq(M.source.rev(dsrc), tip),
+                Bool.or(Bool.or(m, any), String.eq(M.source.rev(src), tip)))),
+            mv.or_r(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Bool.and(String.eq(M.source.rev(dsrc), tip),
+                Bool.or(Bool.or(m, any), String.eq(M.source.rev(src), tip))),
+              mv.live_or(String.eq(M.source.rev(dsrc), tip), m, any,
+                String.eq(M.source.rev(src), tip), lv)))))
+    case Up.Waits{[]} Up.Deps{+ds, _ss, _es, +any, _sy, _tr, +asks, +bad}:
+      Eq.bit.absurd(&2, {Bool.or(Bool.not(String.is_empty(bad)),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Bool.and(String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip),
+            Bool.or(any, String.eq(M.source.rev(src), tip))))) == True{} : Bool},
+        Equal.cong(String & Bool, Bool, p => mv.snd(p), (hn, False{}), (hn, True{}), fn))
+    case Up.Waits{_m <> _ms} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, +bad}:
+      mv.or_r(Bool.not(String.is_empty(bad)), True{}, {==})
+    case Up.Halts{+why} Up.Deps{+ds, _ss, _es, +any, _sy, _tr, +asks, _bad}:
+      mv.or_l(Bool.not(String.is_empty(Up.halt.why(why))),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Bool.and(String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip),
+            Bool.or(any, String.eq(M.source.rev(src), tip)))),
+        mv.halt_not(why))
+
+# LAW: another dependency's fate in front of the rest
+law mv.live_miss:
+  for f: Up.Fate
+  for rest: Up.Deps
+  for +n: String
+  for +tip: String
+  for +hn: String
+  for +old: M.Dep
+  for e: {String.eq(hn, n) == False{} : Bool}
+  for fn: {mv.fine(f, hn) == (hn, True{}) : String & Bool}
+  for ih: {mv.walk_live(tip, rest, old, n) == True{} : Bool}
+  {mv.walk_live(tip, Up.deps.join(f, rest), old, n) == True{} : Bool}
+
+def mv.live_miss(f, rest, n, tip, hn, old, e, fn, ih):
+  match f rest:
+    case Up.Became{M.Dep{+dn, +dh, +de, +dsrc}, _, _, _, +m, _, _} Up.Deps{+ds, _, _, +any, _, _, +asks, +bad}:
+      Equal.trans(Bool,
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Bool.and(String.eq(M.source.rev(M.source.dep(
+            M.find.pick(String.eq(dn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+            Bool.or(Bool.or(m, any), String.eq(M.source.rev(M.source.dep(old)), tip))))),
+        Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Bool.and(String.eq(M.source.rev(M.source.dep(
+            M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+            Bool.or(Bool.or(m, any), String.eq(M.source.rev(M.source.dep(old)), tip))))),
+        True{},
+        Equal.cong(String, Bool,
+          x => Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Bool.and(String.eq(M.source.rev(M.source.dep(
+              M.find.pick(String.eq(x, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+              Bool.or(Bool.or(m, any), String.eq(M.source.rev(M.source.dep(old)), tip))))),
+          dn, hn, Equal.cong(String & Bool, String, p => mv.fst(p), (dn, True{}), (hn, True{}), fn)),
+        Equal.trans(Bool,
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Bool.and(String.eq(M.source.rev(M.source.dep(
+              M.find.pick(String.eq(hn, n), M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+              Bool.or(Bool.or(m, any), String.eq(M.source.rev(M.source.dep(old)), tip))))),
+          Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            Bool.and(String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip),
+              Bool.or(Bool.or(m, any), String.eq(M.source.rev(M.source.dep(old)), tip))))),
+          True{},
+          Equal.cong(Bool, Bool,
+            y => Bool.or(Bool.not(String.is_empty(bad)), Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+              Bool.and(String.eq(M.source.rev(M.source.dep(
+                M.find.pick(y, M.Dep{dn, dh, de, dsrc}, M.find(ds, n)))), tip),
+                Bool.or(Bool.or(m, any), String.eq(M.source.rev(M.source.dep(old)), tip))))),
+            String.eq(hn, n), False{}, e),
+          mv.live_keep(Bool.not(String.is_empty(bad)), Bool.not(List.is_empty(&2, Up.Ask, asks)),
+            String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip), m, any,
+            String.eq(M.source.rev(M.source.dep(old)), tip), ih)))
+    case Up.Waits{[]} Up.Deps{+ds, _ss, _es, +any, _sy, _tr, +asks, +bad}:
+      Eq.bit.absurd(&2, {Bool.or(Bool.not(String.is_empty(bad)),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Bool.and(String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip),
+            Bool.or(any, String.eq(M.source.rev(M.source.dep(old)), tip))))) == True{} : Bool},
+        Equal.cong(String & Bool, Bool, p => mv.snd(p), (hn, False{}), (hn, True{}), fn))
+    case Up.Waits{_m <> _ms} Up.Deps{_ds, _ss, _es, _any, _sy, _tr, _asks, +bad}:
+      mv.or_r(Bool.not(String.is_empty(bad)), True{}, {==})
+    case Up.Halts{+why} Up.Deps{+ds, _ss, _es, +any, _sy, _tr, +asks, _bad}:
+      mv.or_l(Bool.not(String.is_empty(Up.halt.why(why))),
+        Bool.or(Bool.not(List.is_empty(&2, Up.Ask, asks)),
+          Bool.and(String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip),
+            Bool.or(any, String.eq(M.source.rev(M.source.dep(old)), tip)))),
+        mv.halt_not(why))
+
+# LAW: one step of the walk
+law mv.live_step:
+  for b: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +tip: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +src: M.Source
+  for +tl: List<&2, M.Dep>
+  for e: {String.eq(hn, n) == b : Bool}
+  for lv: {mv.live(Up.dep.one(U.aim(U.chosen(only,
+    M.dep.name(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))),
+    M.source.dep(M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)))), rs, only, hub,
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))), tip,
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n))) == True{} : Bool}
+  for ih: {mv.live(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(tl, n))),
+    M.source.dep(M.find(tl, n))), rs, only, hub, M.find(tl, n)), tip, M.find(tl, n))
+    == True{} : Bool}
+    -> {mv.walk_live(tip, Up.deps.walk(rs, only, hub, tl), M.find(tl, n), n) == True{} : Bool}
+  {mv.walk_live(tip, Up.deps.join(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub,
+    M.Dep{hn, hh, he, src}), Up.deps.walk(rs, only, hub, tl)),
+    M.find.pick(b, M.Dep{hn, hh, he, src}, M.find(tl, n)), n) == True{} : Bool}
+
+def mv.live_step(b, rs, only, hub, n, tip, hn, hh, he, src, tl, e, lv, ih):
+  match b:
+    case True{}:
+      mv.live_hit(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), n, tip, hn, hh, he, src, e, lv,
+        mv.fine_one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}))
+    case False{}:
+      mv.live_miss(Up.dep.one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}),
+        Up.deps.walk(rs, only, hub, tl), n, tip, hn, M.find(tl, n), e,
+        mv.fine_one(U.aim(U.chosen(only, hn), src), rs, only, hub, M.Dep{hn, hh, he, src}), ih(lv))
+
+# LAW: the walk reaches the tip when the named dependency's fate does
+law mv.walk_reaches:
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +n: String
+  for +tip: String
+  for +ds: List<&2, M.Dep>
+  for lv: {mv.live(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.find(ds, n))),
+    M.source.dep(M.find(ds, n))), rs, only, hub, M.find(ds, n)), tip, M.find(ds, n))
+    == True{} : Bool}
+  {mv.walk_live(tip, Up.deps.walk(rs, only, hub, ds), M.find(ds, n), n) == True{} : Bool}
+
+def mv.walk_reaches(rs, only, hub, n, tip, ds, lv):
+  match ds:
+    case []:
+      mv.live_nil(U.chosen(only, ""), rs, only, hub, n, tip, lv)
+    case +h <> +tl:
+      match h:
+        case M.Dep{+hn, +hh, +he, +src}:
+          mv.live_step(String.eq(hn, n), rs, only, hub, n, tip, hn, hh, he, src, tl, {==}, lv,
+            p => mv.walk_reaches(rs, only, hub, n, tip, tl, p))
+
+# LAW: a reason that is refused is not empty, so an upgrade that stops with
+# it is not one whose stop is empty
+law mv.halt_clash:
+  for why: String
+  for se: {String.is_empty(Up.halt.why(why)) == True{} : Bool}
+  {False{} == True{} : Bool}
+
+def mv.halt_clash(why, se):
+  Equal.trans(Bool, False{}, String.is_empty(Up.halt.why(why)), True{},
+    Equal.sym(Bool, String.is_empty(Up.halt.why(why)), False{}, mv.halt_ne(why)), se)
+
+# LAW: the model, once it is known whether any pin moved
+law mv.reach_moved:
+  for dm: Bool
+  for tm: Bool
+  for +tip: String
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +dds: List<&2, M.Dep>
+  for +tts: List<&2, M.Tool>
+  for wk: {Bool.and(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
+    Bool.or(dm, String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip))) == True{} : Bool}
+  {String.eq(M.source.rev(M.source.dep(M.dep(Up.model.next(Bool.or(dm, tm),
+    M.Manifest{name, entry, bin, hub, dds, tts}, M.Manifest{name, entry, bin, hub, ds, ts}), n))),
+    tip) == True{} : Bool}
+
+def mv.reach_moved(dm, tm, tip, n, _name, _entry, _bin, _hub, ds, _ts, dds, _tts, wk):
+  match dm tm:
+    case True{} _:
+      Eq.and.left(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip), True{}, wk)
+    case False{} True{}:
+      Eq.and.left(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
+        String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip), wk)
+    case False{} False{}:
+      Eq.and.right(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
+        String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip), wk)
+
+# LAW: the model, once the sources are known
+law mv.reach_srcs:
+  for srcs: Up.Srcs
+  for +tip: String
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +dds: List<&2, M.Dep>
+  for +ss: List<&2, U.Swap>
+  for +es: List<&2, U.Swap>
+  for +dm: Bool
+  for +dsy: List<&2, String>
+  for +dtr: List<&2, Up.Laid>
+  for +tts: List<&2, M.Tool>
+  for +tm: Bool
+  for +tsy: List<&2, String>
+  for +ig: String
+  for wk: {Bool.and(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
+    Bool.or(dm, String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip))) == True{} : Bool}
+  for se: {String.is_empty(Up.next.stop(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+    Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig))) == True{} : Bool}
+  {String.eq(M.source.rev(M.source.dep(mv.dep(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+    Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), n))), tip)
+    == True{} : Bool}
+
+def mv.reach_srcs(
+  srcs,
+  tip,
+  n,
+  name,
+  entry,
+  bin,
+  hub,
+  ds,
+  ts,
+  dds,
+  _ss,
+  _es,
+  dm,
+  _dsy,
+  _dtr,
+  tts,
+  tm,
+  _tsy,
+  _ig,
+  wk,
+  se
+):
+  match srcs:
+    case Up.Srcs{_fs}:
+      mv.reach_moved(dm, tm, tip, n, name, entry, bin, hub, ds, ts, dds, tts, wk)
+    case Up.SrcsWait{_ask}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool},
+        se)
+    case Up.SrcsNo{+why}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool},
+        mv.halt_clash(why, se))
+
+# LAW: the model, once `.gitignore` is known
+law mv.reach_ignore:
+  for said: Up.Said
+  for +srcs: Up.Srcs
+  for +tip: String
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +dds: List<&2, M.Dep>
+  for +ss: List<&2, U.Swap>
+  for +es: List<&2, U.Swap>
+  for +dm: Bool
+  for +dsy: List<&2, String>
+  for +dtr: List<&2, Up.Laid>
+  for +tts: List<&2, M.Tool>
+  for +tm: Bool
+  for +tsy: List<&2, String>
+  for wk: {Bool.and(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
+    Bool.or(dm, String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip))) == True{} : Bool}
+  for se: {String.is_empty(Up.next.stop(Up.got.ignore(said, srcs,
+    M.Manifest{name, entry, bin, hub, ds, ts},
+    Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}))) == True{} : Bool}
+  {String.eq(M.source.rev(M.source.dep(mv.dep(Up.got.ignore(said, srcs,
+    M.Manifest{name, entry, bin, hub, ds, ts},
+    Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), n))), tip)
+    == True{} : Bool}
+
+def mv.reach_ignore(
+  said,
+  srcs,
+  tip,
+  n,
+  name,
+  entry,
+  bin,
+  hub,
+  ds,
+  ts,
+  dds,
+  ss,
+  es,
+  dm,
+  dsy,
+  dtr,
+  tts,
+  tm,
+  tsy,
+  wk,
+  se
+):
+  match said:
+    case Up.Said{+ig}:
+      mv.reach_srcs(srcs, tip, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm,
+        tsy, ig, wk, se)
+    case Up.Unsaid{+why}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool},
+        mv.halt_clash(why, se))
+    case Up.Unasked{_ask}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool},
+        se)
+
+# LAW: the model, once the pins are answered or refused
+law mv.reach_pins:
+  for dd: Up.Deps
+  for tt: Up.Tools
+  for +rs: List<&2, Up.Reply>
+  for +tip: String
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wk: {mv.walk_live(tip, dd, M.find(ds, n), n) == True{} : Bool}
+  for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds, ts})))
+    == True{} : Bool}
+  {String.eq(M.source.rev(M.source.dep(mv.dep(Up.pins(dd, tt, rs,
+    M.Manifest{name, entry, bin, hub, ds, ts}), n))), tip) == True{} : Bool}
+
+def mv.reach_pins(dd, tt, rs, tip, n, name, entry, bin, hub, ds, ts, wk, se):
+  match dd tt:
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SCon{_c, _cs}} Up.Tools{_tts, _tm, _tsy, _tasks, _tbad}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool}, se)
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SNil{}} Up.Tools{_tts, _tm, _tsy, _tasks, SCon{_c, _cs}}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool}, se)
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _a <> _as, SNil{}} Up.Tools{_tts, _tm, _tsy, _tasks, SNil{}}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool}, se)
+    case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, [], SNil{}} Up.Tools{_tts, _tm, _tsy, _a <> _as, SNil{}}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool}, se)
+    case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, [], SNil{}} Up.Tools{+tts, +tm, +tsy, [], SNil{}}:
+      mv.reach_ignore(Up.text.said(rs, Up.Ignore{}),
+        Up.ask.srcs(List.is_empty(&2, U.Swap, es), rs), tip, n, name, entry,
+        bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm, tsy, wk, se)
+
+# LAW: the model, once `--package` is known to name something
+law mv.reach_known:
+  for k: Bool
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +tip: String
+  for +n: String
+  for +name: String
+  for +entry: String
+  for +bin: String
+  for +hub: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for wk: {mv.walk_live(tip, Up.deps.walk(rs, only, M.hub.or(hub), ds), M.find(ds, n), n)
+    == True{} : Bool}
+  for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds, ts})))
+    == True{} : Bool}
+  {String.eq(M.source.rev(M.source.dep(mv.dep(Up.known(k, only, rs,
+    M.Manifest{name, entry, bin, hub, ds, ts}), n))), tip) == True{} : Bool}
+
+def mv.reach_known(k, rs, only, tip, n, name, entry, bin, hub, ds, ts, wk, se):
+  match k:
+    case False{}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool}, se)
+    case True{}:
+      mv.reach_pins(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), rs, tip,
+        n, name, entry, bin, hub, ds, ts, wk, se)
+
+# LAW: a lock that does not refuse has an upgrade that did not stop
+law mv.stop_empty:
+  for nx: Up.Next
+  for +listing: W.Listing
+  for +replies: List<&2, W.Reply>
+  for ok: {P.refuses.doc(P.decide(W.inputs.of(nx, listing, replies))) == False{} : Bool}
+  {String.is_empty(Up.next.stop(nx)) == True{} : Bool}
+
+def mv.stop_empty(nx, _listing, _replies, ok):
+  match nx:
+    case Up.Next{_model, _read, SNil{}, _asks, _trees, _vends, _says, _edits, _found, _drops, _swaps}:
+      {==}
+    case Up.Next{_model, _read, SCon{_c, _cs}, _asks, _trees, _vends, _says, _edits, _found, _drops, _swaps}:
+      Eq.bit.absurd2(&2, {False{} == True{} : Bool}, ok)
+
+# LAW: in any ledger an upgrade reads, a pin whose fate reaches the tip is at
+# it in the model, when the upgrade does not stop
+law mv.reach_top:
+  for r: M.Read
+  for +only: String
+  for +rs: List<&2, Up.Reply>
+  for +n: String
+  for +tip: String
+  for g: {M.source.is_git(M.source.dep(M.dep(r, n))) == True{} : Bool}
+  for lv: {mv.live(Up.dep.one(U.aim(U.chosen(only, M.dep.name(M.dep(r, n))),
+    M.source.dep(M.dep(r, n))), rs, only, M.hub_of(r), M.dep(r, n)), tip, M.dep(r, n))
+    == True{} : Bool}
+  for se: {String.is_empty(Up.next.stop(Up.next(only, r, rs))) == True{} : Bool}
+  {String.eq(M.source.rev(M.source.dep(mv.dep(Up.next(only, r, rs), n))), tip) == True{} : Bool}
+
+def mv.reach_top(r, only, rs, n, tip, g, lv, se):
+  match r:
+    case M.Bad{+why}:
+      Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(mv.dep(Up.next(only, M.Bad{why}, rs), n))),
+        tip) == True{} : Bool}, g)
+    case M.Good{m}:
+      match m:
+        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+          mv.reach_known(Bool.or(U.known(only, ds), M.tool.known(only, ts)), rs, only, tip, n, name,
+            entry, bin, hub, ds, ts, mv.walk_reaches(rs, only, M.hub.or(hub), n, tip, ds, lv), se)
+
+def Laws.upgrade_forward_reaches_tip(w, n, tip, tag, branch, up, bare, sel, head, ok):
+  match w:
+    case W.World{args, +ledger, +listing, +replies, +ups}:
+      match args:
+        case W.Args{u, +only}:
+          match u:
+            case False{}:
+              Eq.bit.absurd(&2, {M.source.rev(M.source.dep(M.dep(P.ledger.next(W.World{
+                W.Args{False{}, only}, ledger, listing, replies, ups}), n))) == tip : String}, up)
+            case True{}:
+              Str.string_eq_true(M.source.rev(M.source.dep(mv.dep(Up.next(only, W.parsed(ledger), ups),
+                n))), tip,
+                mv.reach_top(W.parsed(ledger), only, ups, n, tip,
+                  mv.bare_git(M.dep(W.parsed(ledger), n), bare),
+                  mv.fwd_live(ups, only, M.hub_of(W.parsed(ledger)), M.dep(W.parsed(ledger), n), tip,
+                    tag, branch, bare,
+                    Equal.trans(Bool, U.chosen(only, M.dep.name(M.dep(W.parsed(ledger), n))),
+                      U.chosen(only, n), True{},
+                      Equal.cong(String, Bool, x => U.chosen(only, x),
+                        M.dep.name(M.dep(W.parsed(ledger), n)), n,
+                        mv.dep_named(W.parsed(ledger), n, mv.bare_git(M.dep(W.parsed(ledger), n), bare))),
+                      sel),
+                    head),
+                  mv.stop_empty(Up.next(only, W.parsed(ledger), ups), listing, replies, ok)))
+
+def Laws.upgrade_tag_resolves(w, n, tip, tag, branch, up, named, sel, refs, ok):
+  match w:
+    case W.World{args, +ledger, +listing, +replies, +ups}:
+      match args:
+        case W.Args{u, +only}:
+          match u:
+            case False{}:
+              Eq.bit.absurd(&2, {M.source.rev(M.source.dep(M.dep(P.ledger.next(W.World{
+                W.Args{False{}, only}, ledger, listing, replies, ups}), n))) == tip : String}, up)
+            case True{}:
+              Str.string_eq_true(M.source.rev(M.source.dep(mv.dep(Up.next(only, W.parsed(ledger), ups),
+                n))), tip,
+                mv.reach_top(W.parsed(ledger), only, ups, n, tip,
+                  mv.named_git(M.dep(W.parsed(ledger), n), named),
+                  mv.fol_live(ups, only, M.hub_of(W.parsed(ledger)), M.dep(W.parsed(ledger), n), tip,
+                    tag, branch, named,
+                    Equal.trans(Bool, U.chosen(only, M.dep.name(M.dep(W.parsed(ledger), n))),
+                      U.chosen(only, n), True{},
+                      Equal.cong(String, Bool, x => U.chosen(only, x),
+                        M.dep.name(M.dep(W.parsed(ledger), n)), n,
+                        mv.dep_named(W.parsed(ledger), n, mv.named_git(M.dep(W.parsed(ledger), n), named))),
+                      sel),
+                    refs),
+                  mv.stop_empty(Up.next(only, W.parsed(ledger), ups), listing, replies, ok)))

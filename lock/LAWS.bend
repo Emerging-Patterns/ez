@@ -7,6 +7,7 @@ import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
 import ./up.bend as Up
+import ../manifest/upgrade.bend as U
 import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../pkg/pkg.bend as K
@@ -181,6 +182,40 @@ law render_keeps_packages_without_tools:
   for +hub: String
   for ps: List<&2, L.Pack>
   {L.render.pick(True{}, hub, ps, []) == L.render(hub, ps) : String}
+
+# What the lock may hold. The pinned eztoml reader cuts a pair line at its
+# first `=`, even inside a quoted key
+# (https://github.com/Emerging-Patterns/eztoml/issues/24), so a file path
+# holding one would read back as another path. The planner refuses such a
+# lock rather than write one that does not read back.
+
+# LAW: a package list with a file whose path holds `=` is not lockable,
+# whatever else it holds
+law path_eq_unlockable:
+  for +hash: String
+  for +src: L.Src
+  for +at: String
+  for +sum: String
+  for +fs: List<&2, K.File>
+  for +rest: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for e: {False{} == P.path.eqless(at) : Bool}
+  {P.lockable(L.Pack{hash, src, K.File{at, sum} <> fs} <> rest, ts, hub) == False{}
+    : Bool}
+
+# LAW: and the refusal names the package and the path, so the author knows
+# which file to rename
+law path_eq_named:
+  for +hash: String
+  for +src: L.Src
+  for +at: String
+  for +sum: String
+  for +fs: List<&2, K.File>
+  for +rest: List<&2, L.Pack>
+  for +e: {False{} == P.path.eqless(at) : Bool}
+  {P.lockable.why(L.Pack{hash, src, K.File{at, sum} <> fs} <> rest)
+    == P.path.eq.why(hash, at) : String}
 
 # The planner (plan.bend) over the World (world.bend). Every law below is
 # about what `ez lock` does, stated over the plan it returns; one with a
@@ -581,9 +616,11 @@ law relock_lays_nothing:
   for ok: {P.refuses(w) == False{} : Bool}
   {fresh(after(w)) == [] : List<&2, String>}
 
-# The lock document. EZ-DOC-1 is a round trip through eztoml's reader, and
-# the reader trims every line and strips the quotes off every value. These two
-# laws are its first step: a quoted value survives both, whatever it holds.
+# The lock document reads back. EZ-DOC-1 is a round trip through the pinned
+# eztoml reader: the text `ez lock` writes, parsed, gives back the packages,
+# the hub and the tool pins it was written from. The reader trims every line
+# and strips the quotes off every value; these two laws are the first step: a
+# quoted value survives both, whatever it holds.
 
 # LAW: a quoted value is already trimmed. Its first and last characters are
 # quotes, so no space it holds is at an end.
@@ -798,3 +835,318 @@ law upgrade_writes_only_hits:
   for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
   for none: {ML.names.none.all(swaps(w), String.lines(text)) == True{} : Bool}
   {P.put(w, at) == P.Kept{} : P.Wrote}
+# The rest is proved in two steps, as the design laid out. The first is about
+# tables: the lock's text is eztoml's text for a document of tables
+# (`render_is_doc`), and parsing it gives the tables back
+# (`lock_sections_read_back`), which check/toml.bend proves for any document
+# whose names and keys the reader can take back. `lockable` is what makes the
+# lock's document one of those, and the planner refuses a lock that is not
+# lockable, so the premise holds of every lock ez writes. The second is about
+# what ez reads out of the tables: `L.packs`, `L.lock.hub` and `M.tools` find
+# what was written. What they give back is not always the list given: the
+# packages come back in hash order with their files in path order and each
+# once, which is `canon`, and the lock does not write a tool's `vendor`,
+# which is `tools.canon`. Law vocabulary: ez never calls these.
+
+# the document a lock renders: the `[lock]` table, every package's two tables
+# in hash order, then every tool's table. Law vocabulary.
+def lock.doc(ts: List<&2, M.Tool>, hub: String, ps: List<&2, L.Pack>) -> List<&2, T.Sect>:
+  List.append(&2, T.Sect, L.doc(hub, ps), L.tool.sects(ts))
+
+# a tool's source as the lock gives it back: the lock does not write
+# `vendor`, and eztoml reads a git source with no root as rooted at `.` and
+# one with no url as the hub. Law vocabulary.
+def source.canon(source: M.Source) -> M.Source:
+  match source:
+    case M.Hub{}:
+      M.Hub{}
+    case M.Git{url, rev, tag, root, nar, _vend}:
+      +u = url
+      M.source.go(String.is_empty(u), u, rev, tag, M.root.or(root), nar, False{})
+
+# a tool pin as the lock gives it back
+def tool.canon(pin: M.Tool) -> M.Tool:
+  M.Tool{n, e, b, s} = pin
+  M.Tool{n, e, b, source.canon(s)}
+
+# every tool pin, so
+def tools.canon(ts: List<&2, M.Tool>) -> List<&2, M.Tool>:
+  match ts:
+    case []:
+      []
+    case h <> t:
+      tool.canon(h) <> tools.canon(t)
+
+# a package as a lock gives it back: its files in path order, each once. Law
+# vocabulary.
+def canon.one(pack: L.Pack) -> L.Pack:
+  L.Pack{h, s, f} = pack
+  L.Pack{h, s, K.files_of(f)}
+
+# every package, so
+def canon.all(ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
+  match ps:
+    case []:
+      []
+    case h <> t:
+      canon.one(h) <> canon.all(t)
+
+# the packages a lock gives back: in hash order, each with its files in path
+# order and each once
+def canon(ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
+  canon.all(L.pack.sort(ps))
+
+# LAW: the lock's text is eztoml's text for its document. The lock writes
+# each package as a block of text and sorts the blocks; that is the text of
+# the packages sorted, one table after another.
+law render_is_doc:
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ps: List<&2, L.Pack>
+  {L.render.tools(ts, hub, ps) == T.render(lock.doc(ts, hub, ps)) : String}
+
+# LAW: parsing the lock `ez lock` renders gives back the tables it rendered:
+# the `[lock]` table, every package's two tables in hash order, and every
+# tool's table
+law lock_sections_read_back:
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {T.sects(T.parse(L.render.tools(ts, hub, ps))) == lock.doc(ts, hub, ps)
+    : List<&2, T.Sect>}
+
+# LAW: parsing the lock `ez lock` renders gives back its packages, in hash
+# order with their files in path order, whatever order they were given in
+# EZ-DOC-1
+law lock_reads_back:
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {L.packs(T.sects(T.parse(L.render.tools(ts, hub, ps)))) == canon(ps) : List<&2, L.Pack>}
+
+# LAW: and the hub it was resolved against
+# EZ-DOC-1
+law lock_hub_reads_back:
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {L.lock.hub(T.sects(T.parse(L.render.tools(ts, hub, ps)))) == hub : String}
+
+# LAW: and its tool pins, as the lock gives them back
+# EZ-DOC-1
+law lock_tools_read_back:
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
+  {M.tools(T.sects(T.parse(L.render.tools(ts, hub, ps)))) == tools.canon(ts) : List<&2, M.Tool>}
+
+# The upgrade's moves. `ez lock --upgrade` asks the remote about each selected
+# pin with a commit: one with a tag re-resolves the tag (a `Refs` answer, read
+# by `Up.follow`), and one with only a commit follows the default branch (a
+# `Head` answer, read by `Up.forward`). Either moves only to a commit the
+# remote says descends from the pin (an `Above` answer, read by `Up.onward`).
+# The laws are stated over `P.ledger.next`, the ledger model the upgrade
+# renders into ez.toml, which is ez.toml as it was when the upgrade refuses,
+# so they hold of the file's bytes relative to EZ-LED-4. That the remote's
+# answers are true of the repository is EZ-RES-7. Law vocabulary: ez never
+# calls it.
+
+# the answers to the upgrade's questions a World holds
+def ups(world: W.World) -> List<&2, Up.Reply>:
+  W.World{_args, _ledger, _listing, _replies, ups} = world
+  ups
+
+# the source ez.toml records for the dependency named `n`
+def pin(world: W.World, name: String) -> M.Source:
+  M.source.dep(W.dep(world, name))
+
+# whether a source is pinned by its commit alone, with no tag
+def rev_only.src(src: M.Source) -> Bool:
+  match src:
+    case M.Hub{}:
+      False{}
+    case M.Git{_url, _rev, tag, _root, _nar, _vend}:
+      String.is_empty(tag)
+
+# whether a dependency is pinned by its commit alone
+def rev_only(dep: M.Dep) -> Bool:
+  rev_only.src(M.source.dep(dep))
+
+# whether a source is pinned through a tag
+def tagged.src(src: M.Source) -> Bool:
+  match src:
+    case M.Hub{}:
+      False{}
+    case M.Git{_url, _rev, tag, _root, _nar, _vend}:
+      Bool.not(String.is_empty(tag))
+
+# whether a dependency is pinned through a tag
+def tagged(dep: M.Dep) -> Bool:
+  tagged.src(M.source.dep(dep))
+
+# whether the remote said a commit descends from the pin
+def onward.yes(asc: Up.Asc) -> Bool:
+  match asc:
+    case Up.Asc{yes}:
+      yes
+    case Up.AscWait{_ask}:
+      False{}
+    case Up.AscNo{_why}:
+      False{}
+
+# whether `rev` is the commit the remote named, and the remote said that
+# commit descends from `pin`
+def moved.to(tip: Up.Tip, +rs: List<&2, Up.Reply>, +url: String, +pin: String, +rev: String) -> Bool:
+  match tip:
+    case Up.At{+to, _tag, _branch}:
+      Bool.and(String.eq(rev, to), onward.yes(Up.onward(rs, Up.Above{url, pin, to})))
+    case Up.TipWait{_ask}:
+      False{}
+    case Up.TipNo{_why}:
+      False{}
+
+# whether `new` is `old` kept or moved along its history: a pin from a
+# repository still, with the tag `old` had, at `old`'s commit or at the commit
+# `tip` names when the remote said it descends from `old`'s
+def moved.ok(tip: Up.Tip, +rs: List<&2, Up.Reply>, +old: M.Dep, +new: M.Dep) -> Bool:
+  Bool.and(Bool.and(M.source.is_git(M.source.dep(new)),
+      String.eq(M.source.tag(M.source.dep(new)), M.source.tag(M.source.dep(old)))),
+    Bool.or(String.eq(M.source.rev(M.source.dep(new)), M.source.rev(M.source.dep(old))),
+      moved.to(tip, rs, M.source.url(M.source.dep(old)), M.source.rev(M.source.dep(old)),
+        M.source.rev(M.source.dep(new)))))
+
+# the pin the upgrade leaves for the dependency named `n`, against the one
+# ez.toml records and the default branch tip the remote named for it
+def forward.ok(+world: W.World, +name: String) -> Bool:
+  moved.ok(Up.forward(ups(world), M.source.url(pin(world, name))), ups(world),
+    W.dep(world, name), M.dep(P.ledger.next(world), name))
+
+# and against the commit the remote named for its tag
+def follow.ok(+world: W.World, +name: String) -> Bool:
+  moved.ok(Up.follow(ups(world), M.source.url(pin(world, name)), M.source.tag(pin(world, name))),
+    ups(world), W.dep(world, name), M.dep(P.ledger.next(world), name))
+
+# LAW: a dependency pinned by its commit alone moves, if it moves at all, to
+# the default branch tip the remote named, and only when the remote said that
+# tip descends from the pin; and it stays a commit pin, since it keeps the tag
+# it had, which is none. Whatever else the upgrade does, and whether or not it
+# refuses.
+# EZ-RES-5
+law upgrade_forward_moves_onward:
+  for +w: W.World
+  for +n: String
+  for bare: {rev_only(W.dep(w, n)) == True{} : Bool}
+  {forward.ok(w, n) == True{} : Bool}
+
+# LAW: and when `ez lock --upgrade` asks about it, and the tip the remote
+# names is another commit that the remote says does not descend from the pin,
+# the upgrade refuses, so it writes nothing and exits 1 (EZ-OUT-2)
+# EZ-RES-5
+law upgrade_forward_refuses_off:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +bare: {rev_only(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for head: {Up.forward(ups(w), M.source.url(pin(w, n))) == Up.At{tip, tag, branch} : Up.Tip}
+  for moved: {String.eq(M.source.rev(pin(w, n)), tip) == False{} : Bool}
+  for off: {Up.onward(ups(w), Up.Above{M.source.url(pin(w, n)), M.source.rev(pin(w, n)), tip})
+    == Up.Asc{False{}} : Up.Asc}
+  {P.refuses(w) == True{} : Bool}
+
+# LAW: and when `ez lock --upgrade` asks about it and does not refuse, it is
+# at the default branch tip the remote named: moved there, or there already
+# EZ-RES-5
+law upgrade_forward_reaches_tip:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +bare: {rev_only(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for head: {Up.forward(ups(w), M.source.url(pin(w, n))) == Up.At{tip, tag, branch} : Up.Tip}
+  for ok: {P.refuses(w) == False{} : Bool}
+  {M.source.rev(M.source.dep(M.dep(P.ledger.next(w), n))) == tip : String}
+
+# LAW: a dependency pinned through a tag keeps its tag and moves, if it moves
+# at all, to the commit the remote names for that tag, and only when the
+# remote said that commit descends from the pin
+# EZ-RES-8
+law upgrade_tag_follows:
+  for +w: W.World
+  for +n: String
+  for named: {tagged(W.dep(w, n)) == True{} : Bool}
+  {follow.ok(w, n) == True{} : Bool}
+
+# LAW: and when `ez lock --upgrade` asks about it, and the tag now names
+# another commit that the remote says does not descend from the pin, the
+# upgrade refuses
+# EZ-RES-8
+law upgrade_tag_refuses_off:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +named: {tagged(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for refs: {Up.follow(ups(w), M.source.url(pin(w, n)), M.source.tag(pin(w, n)))
+    == Up.At{tip, tag, branch} : Up.Tip}
+  for moved: {String.eq(M.source.rev(pin(w, n)), tip) == False{} : Bool}
+  for off: {Up.onward(ups(w), Up.Above{M.source.url(pin(w, n)), M.source.rev(pin(w, n)), tip})
+    == Up.Asc{False{}} : Up.Asc}
+  {P.refuses(w) == True{} : Bool}
+
+# LAW: and when the tag still names the pinned commit, but that commit's
+# checkout no longer agrees with the pin, in its hash, its NAR hash or its
+# root, the upgrade refuses: the pin drifted
+# EZ-RES-8
+law upgrade_tag_refuses_drift:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for +nar: String
+  for +root: String
+  for +manifest: String
+  for +srcs: List<&2, String>
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +named: {tagged(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for refs: {Up.follow(ups(w), M.source.url(pin(w, n)), M.source.tag(pin(w, n)))
+    == Up.At{tip, tag, branch} : Up.Tip}
+  for same: {String.eq(M.source.rev(pin(w, n)), tip) == True{} : Bool}
+  for co: {Up.checkout(ups(w), Up.Tree{M.source.url(pin(w, n)), M.source.rev(pin(w, n)),
+    M.dep.entry(W.dep(w, n))}) == Up.Co{nar, root, manifest, srcs} : Up.Co}
+  for drift: {U.agree(M.dep.hash(W.dep(w, n)), Up.hash.of(manifest), M.source.nar(pin(w, n)),
+    nar, M.source.root(pin(w, n)), root) == False{} : Bool}
+  {P.refuses(w) == True{} : Bool}
+
+# LAW: and a pin through a tag that `ez lock --upgrade` asks about, when it
+# does not refuse, is at the commit the remote names for its tag: the tag is
+# re-resolved, not only allowed to be
+# EZ-RES-8
+law upgrade_tag_resolves:
+  for +w: W.World
+  for +n: String
+  for +tip: String
+  for +tag: String
+  for +branch: String
+  for up: {W.args.upgrade(w) == True{} : Bool}
+  for +named: {tagged(W.dep(w, n)) == True{} : Bool}
+  for sel: {U.chosen(W.args.only(w), n) == True{} : Bool}
+  for refs: {Up.follow(ups(w), M.source.url(pin(w, n)), M.source.tag(pin(w, n)))
+    == Up.At{tip, tag, branch} : Up.Tip}
+  for ok: {P.refuses(w) == False{} : Bool}
+  {M.source.rev(M.source.dep(M.dep(P.ledger.next(w), n))) == tip : String}
