@@ -773,21 +773,32 @@ def set(tool: M.Tool, +rev: String, +tag: String, +nar: String) -> M.Tool:
   M.Tool{n, e, b, s} = tool
   set.go(n, e, b, s, rev, tag, nar)
 
+# a commit and its NAR hash written into the pin. A pin with either one empty
+# is short, and an upgrade that wrote one would fill it again on the next run,
+# so a weighing that names no commit or no NAR hash pins nothing.
+def tool.pin(short: Bool, +tool: M.Tool, +rev: String, +tag: String, +nar: String, says: List<&2, String>) -> Pinned:
+  match short:
+    case True{}:
+      PinHalt{"ez: tools." ++ M.tool.name(tool) ++ ": weighing " ++ rev ++ " gave no narHash"}
+    case False{}:
+      Pinned{set(tool, rev, tag, nar), True{}, says}
+
 # a commit weighed, then written into the pin
 def tool.weighed(wd: Wd, +tool: M.Tool, +rev: String, +tag: String, says: List<&2, String>) -> Pinned:
   match wd:
-    case Wd{nar}:
-      Pinned{set(tool, rev, tag, nar), True{}, says}
+    case Wd{+nar}:
+      tool.pin(Bool.or(String.is_empty(rev), String.is_empty(nar)), tool, rev, tag, nar, says)
     case WdWait{ask}:
       PinWait{[ask]}
     case WdNo{why}:
       PinHalt{why}
 
-# the commit a ref named, weighed
-def tool.resolved(tip: Tip, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
+# the commit a ref named, weighed. The pin records the ref as its tag, even
+# one that names a commit, so the next upgrade asks about the same ref.
+def tool.resolved(tip: Tip, +rs: List<&2, Reply>, +tool: M.Tool, +ref: String) -> Pinned:
   match tip:
-    case At{+rev, tag, _branch}:
-      tool.weighed(weighed(rs, Weigh{M.source.url(M.tool.source(tool)), rev}), tool, rev, tag, [])
+    case At{+rev, _tag, _branch}:
+      tool.weighed(weighed(rs, Weigh{M.source.url(M.tool.source(tool)), rev}), tool, rev, ref, [])
     case TipWait{ask}:
       PinWait{[ask]}
     case TipNo{why}:
@@ -848,27 +859,16 @@ def tool.ref(no_tag: Bool, +rs: List<&2, Reply>, +url: String, +tag: String) -> 
 
 def tool.named(named: Named, +rs: List<&2, Reply>, +tool: M.Tool, +url: String) -> Pinned:
   match named:
-    case Named{ref}:
-      tool.resolved(follow(rs, url, ref), rs, tool)
+    case Named{+ref}:
+      tool.resolved(follow(rs, url, ref), rs, tool, ref)
     case NamedWait{ask}:
       PinWait{[ask]}
     case NamedNo{why}:
       PinHalt{why}
 
-# a pin with no commit is resolved from its tag, or the default ref, then
-# weighed; one with a commit and no NAR hash is weighed at that commit
-def tool.fill(no_rev: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
-  match no_rev:
-    case True{}:
-      +src = M.tool.source(tool)
-      +url = M.source.url(src)
-      tool.named(tool.ref(String.is_empty(M.source.tag(src)), rs, url,
-        M.source.tag(src)), rs, tool, url)
-    case False{}:
-      +src = M.tool.source(tool)
-      tool.weighed(weighed(rs, Weigh{M.source.url(src), M.source.rev(src)}), tool, M.source.rev(src), "", [])
-
-# the verdict on a full pin
+# the verdict on a full pin. A pin that moves keeps its own tag, as a
+# dependency does: the tip was named by that tag, or by the default branch
+# for a pin with none.
 def tool.verdict(verdict: U.Verdict, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +branch: String) -> Pinned:
   match verdict:
     case U.Keep{}:
@@ -881,18 +881,26 @@ def tool.verdict(verdict: U.Verdict, +rs: List<&2, Reply>, +tool: M.Tool, +tip: 
       +src = M.tool.source(tool)
       PinHalt{off.why(M.tool.name(tool), M.source.tag(src), M.source.rev(src),
         tip.of(branch, tip))}
-    case U.Advance{+rev, tag}:
+    case U.Advance{+rev, _tag}:
       +src = M.tool.source(tool)
-      tool.weighed(weighed(rs, Weigh{M.source.url(src), rev}), tool, rev, tag,
+      tool.weighed(weighed(rs, Weigh{M.source.url(src), rev}), tool, rev, "",
         [say.move(M.tool.name(tool), M.source.rev(src), rev, branch)])
 
-# the pinned commit weighed again, judged with whether its NAR hash is the
-# one the pin records
+# the pinned commit weighed: its NAR hash written in when the pin has none,
+# else judged with whether it is the one the pin records
+def tool.kept.nar(fill: Bool, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +tag: String, +nar: String) -> Pinned:
+  match fill:
+    case True{}:
+      tool.pin(Bool.or(String.is_empty(tip), String.is_empty(nar)), tool, tip, "", nar, [])
+    case False{}:
+      tool.verdict(U.judge(True{}, True{},
+        String.eq(M.source.nar(M.tool.source(tool)), nar), tip, tag), rs, tool, tip, "")
+
+# the pinned commit weighed again
 def tool.kept(wd: Wd, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +tag: String) -> Pinned:
   match wd:
     case Wd{+nar}:
-      tool.verdict(U.judge(True{}, True{},
-        String.eq(M.source.nar(M.tool.source(tool)), nar), tip, tag), rs, tool, tip, "")
+      tool.kept.nar(String.is_empty(M.source.nar(M.tool.source(tool))), rs, tool, tip, tag, nar)
     case WdWait{ask}:
       PinWait{[ask]}
     case WdNo{why}:
@@ -935,6 +943,21 @@ def tool.aim(aim: U.Aim, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
       tool.tip(follow(rs, M.source.url(M.tool.source(tool)), ref), rs, tool)
     case U.Forward{}:
       tool.tip(forward(rs, M.source.url(M.tool.source(tool))), rs, tool)
+
+# a pin with no commit is resolved from its tag, or the default ref, then
+# weighed. One with a commit and no NAR hash is upgraded as a full pin is,
+# and its NAR hash is written in wherever it lands: filled at its own commit
+# only, it would move on the next upgrade, which follows its tag or the
+# default branch.
+def tool.fill(no_rev: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
+  match no_rev:
+    case True{}:
+      +src = M.tool.source(tool)
+      +url = M.source.url(src)
+      tool.named(tool.ref(String.is_empty(M.source.tag(src)), rs, url,
+        M.source.tag(src)), rs, tool, url)
+    case False{}:
+      tool.aim(U.aim(True{}, M.tool.source(tool)), rs, tool)
 
 # a selected pin with no commit or no NAR hash is filled; a full one is asked
 # whether it moved

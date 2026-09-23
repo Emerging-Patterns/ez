@@ -550,10 +550,101 @@ def after.pick(refused: Bool, world: W.World) -> W.World:
     case False{}:
       after.laid(world)
 
-# the World a plain lock leaves, for the next lock to read. Law vocabulary: ez
-# never calls it.
+# What `ez lock --upgrade` leaves besides. An upgrade that succeeds writes
+# ez.toml when a pin moved, `.gitignore` when its allowlist changed, and every
+# source whose imports name a moved hash, and lays each tree it moved to, under
+# `.ez/lib` when the ledger it leaves vendors it and under BEND_LIB otherwise.
+# The next lock reads that ledger, the committed sources as the upgrade
+# rewrote them (`W.listing.of`, the sources the lock itself was made from),
+# and each tree it laid from BEND_LIB with the bytes laid. A vendored tree is
+# read from there when BEND_LIB is `.ez/lib`, which is its default; with
+# BEND_LIB elsewhere it is cloned again, which `clone_reproduces` says locks
+# the same. That the files `find` rewrote are the files the listing holds is
+# the interpreter's side (EZ-TRUST-2).
+#
+# The remote is taken not to change between the two runs: every question the
+# second upgrade asks a remote (refs, the default branch, tags, ancestry, a
+# checkout at a rev, a weighing, the hub's word on a hash) is answered as the
+# first run's answers say, so its answers are the first run's list. Only the
+# local file it reads, `.gitignore`, has a new answer, which comes first, so
+# it is the one the next upgrade reads. It asks for the sources only when a
+# hash moves.
+
+# the text the upgrade's edits leave at ez.toml: the first edit there, or the
+# ledger as it was when there is none. An upgrade edits ez.toml once at most.
+def ledger.pick(hit: Bool, text: String, rest: Maybe<&2, String>) -> Maybe<&2, String>:
+  match hit:
+    case True{}:
+      Some{text}
+    case False{}:
+      rest
+
+def ledger.left(es: List<&2, Up.Edit>, ledger: Maybe<&2, String>) -> Maybe<&2, String>:
+  match es:
+    case []:
+      ledger
+    case Up.Edit{at, text} <> t:
+      ledger.pick(String.eq(at, "ez.toml"), text, ledger.left(t, ledger))
+
+# and at `.gitignore`: the first edit there, or the text the upgrade read
+def ig.pick(hit: Bool, text: String, rest: String) -> String:
+  match hit:
+    case True{}:
+      text
+    case False{}:
+      rest
+
+def ig.left(es: List<&2, Up.Edit>, now: String) -> String:
+  match es:
+    case []:
+      now
+    case Up.Edit{at, text} <> t:
+      ig.pick(String.eq(at, ".gitignore"), text, ig.left(t, now))
+
+# the `.gitignore` an upgrade read, "" when it read none (`ignore.said`
+# below, which reads a World)
+def ig.said(said: Up.Said) -> String:
+  match said:
+    case Up.Said{text}:
+      text
+    case Up.Unsaid{_why}:
+      ""
+    case Up.Unasked{_ask}:
+      ""
+
+def ig.read(+ups: List<&2, Up.Reply>) -> String:
+  ig.said(Up.text.said(ups, Up.Ignore{}))
+
+# the World after an upgrade that succeeded: the same flags; the ledger it
+# wrote; the committed sources as it rewrote them; every tree the lock read,
+# including the ones the upgrade checked out, read from BEND_LIB when it was
+# laid; and the same remote answers, behind `.gitignore` as it left it
+def after.up.laid(world: W.World) -> W.World:
+  W.World{+args, +ledger, listing, replies, +ups} = world
+  +nx = W.next(args, ledger, ups)
+  W.World{args, ledger.left(Up.next.edits(nx), ledger), W.listing.of(nx, listing),
+    after.all(W.next.origins(nx), W.next.hub(nx), W.replies.of(nx, replies)),
+    Up.Reply{Up.Ignore{}, Up.Text{ig.left(Up.next.edits(nx), ig.read(ups))}} <> ups}
+
+# a refused upgrade writes and lays nothing, so it leaves the World it read
+def after.up.pick(refused: Bool, world: W.World) -> W.World:
+  match refused:
+    case True{}:
+      world
+    case False{}:
+      after.up.laid(world)
+
+def after.mode(up: Bool, +world: W.World) -> W.World:
+  match up:
+    case False{}:
+      after.pick(P.refuses(world), world)
+    case True{}:
+      after.up.pick(P.refuses(world), world)
+
+# the World `ez lock` leaves, plain or `--upgrade`, for the next lock to read.
+# Law vocabulary: ez never calls it.
 def after(+world: W.World) -> W.World:
-  after.pick(P.refuses(world), world)
+  after.mode(W.args.upgrade(world), world)
 
 # the hash of an answer a clone gave that passed every check: a tree the next
 # plan would lay
@@ -605,6 +696,7 @@ def fresh(world: W.World) -> List<&2, String>:
 # EZ-DOC-4
 law lock_idempotent:
   for +w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
   {P.put(after(w), "ez.lock.toml") == P.put(w, "ez.lock.toml") : P.Wrote}
 
 # LAW: and it lays nothing new. On the World a lock that succeeded leaves, no
@@ -613,6 +705,7 @@ law lock_idempotent:
 # EZ-DOC-4
 law relock_lays_nothing:
   for +w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
   for ok: {P.refuses(w) == False{} : Bool}
   {fresh(after(w)) == [] : List<&2, String>}
 
@@ -1150,6 +1243,72 @@ law upgrade_tag_resolves:
     == Up.At{tip, tag, branch} : Up.Tip}
   for ok: {P.refuses(w) == False{} : Bool}
   {M.source.rev(M.source.dep(M.dep(P.ledger.next(w), n))) == tip : String}
+
+# `ez lock --upgrade` is idempotent too. Run again on the World it leaves,
+# against a remote that did not change, every pin is at its own tip: the
+# second run asks each selected pin's remote the question the first asked,
+# gets the tip it moved to, finds the pin at it, and checks the tree out
+# again, which agrees with the hash, narHash and root the first run wrote, so
+# it keeps the pin. Nothing moves, so it writes no ez.toml, no source and no
+# tree, and the lock it writes is the one the first run wrote.
+#
+# The second run reads ez.toml's bytes, so these laws take as a premise that
+# the ledger the first run wrote reads back as the model it rendered: EZ-LED-4
+# for that model, which is `P.ledger.next`. An upgrade that moved nothing
+# wrote no ledger, and the premise holds of it as it is. The upgrade laws of
+# EZ-RES-4 to 8 are stated over the same model.
+
+# LAW: `ez lock --upgrade`, run again on the World it leaves, writes the same
+# bytes to ez.lock.toml, or, when it refused, refuses again and writes none
+# EZ-DOC-4
+law upgrade_idempotent:
+  for +w: W.World
+  for u: {W.args.upgrade(w) == True{} : Bool}
+  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
+  {P.put(after(w), "ez.lock.toml") == P.put(w, "ez.lock.toml") : P.Wrote}
+
+# LAW: and it moves nothing: the ledger model it renders is the one the first
+# run rendered
+# EZ-DOC-4
+law reupgrade_moves_nothing:
+  for +w: W.World
+  for u: {W.args.upgrade(w) == True{} : Bool}
+  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
+  {P.ledger.next(after(w)) == P.ledger.next(w) : M.Read}
+
+# LAW: so, after one that succeeded, it does not write ez.toml
+# EZ-DOC-4
+law upgrade_settles:
+  for +w: W.World
+  for u: {W.args.upgrade(w) == True{} : Bool}
+  for +ok: {P.refuses(w) == False{} : Bool}
+  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
+  {P.put(after(w), "ez.toml") == P.Kept{} : P.Wrote}
+
+# LAW: and it lays nothing new: every tree the first run laid is read from
+# BEND_LIB, and no tree arrives by a clone that passes
+# EZ-DOC-4
+law reupgrade_lays_nothing:
+  for +w: W.World
+  for u: {W.args.upgrade(w) == True{} : Bool}
+  for +ok: {P.refuses(w) == False{} : Bool}
+  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
+  {fresh(after(w)) == [] : List<&2, String>}
+
+# LAW: and it writes no path but the lock: no ez.toml, no source and no
+# `.gitignore`, since the `.gitignore` the first run left is already in sync
+# with the ledger it left (`ML.sync_idempotent`), for a ledger whose vendored
+# hashes hold no newline, as a `0x` name never does
+# EZ-DOC-4
+law reupgrade_writes_only_lock:
+  for +w: W.World
+  for +p: String
+  for u: {W.args.upgrade(w) == True{} : Bool}
+  for +ok: {P.refuses(w) == False{} : Bool}
+  for +rb: {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
+  for ev: {Str.clear.all(I.vended(ledger.deps(P.ledger.next(w))), '\n') == True{} : Bool}
+  for ne: {String.eq("ez.lock.toml", p) == False{} : Bool}
+  {P.put(after(w), p) == P.Kept{} : P.Wrote}
 
 # LAW: with no ez.toml, `ez lock` refuses, plain or `--upgrade`, whatever
 # else the World holds, so with `lock_refusal_writes_nothing` it writes
