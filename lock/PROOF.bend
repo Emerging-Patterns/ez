@@ -14460,3 +14460,14 @@ def Laws.lock_refuses_unread(up, only, _s, listing, rs, us, _why, bad):
       %bad : {P.refuses.doc(P.decide(W.inputs.of(Up.plain(_), listing, rs))) == True{}
         : Bool}
       {==}
+
+# EZ-LED-5: the origins are read off the parsed ledger's dependencies, so
+# the ledger is rewritten into the model the premise names and the tools are
+# never looked at.
+def Laws.lock_origins_skip_tools(_s, _n, _e, _b, _h, ds, _ts, g):
+  %g : {L.ledger.read(_) == L.ledger.origins(ds) : List<&2, L.Origin>}
+  {==}
+
+def Laws.upgrade_origins_skip_tools(_nx, _n, _e, _b, _h, ds, _ts, g):
+  %g : {L.ledger.read(_) == L.ledger.origins(ds) : List<&2, L.Origin>}
+  {==}

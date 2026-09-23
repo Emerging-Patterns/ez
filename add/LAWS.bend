@@ -224,3 +224,22 @@ law add_pins_head_rev:
   for b: {String.is_empty(Git.tip.branch(AP.rows(w, AP.QHead{}))) == False{} : Bool}
   for ok: {AP.refuses(w) == False{} : Bool}
   {M.source.rev(M.source.dep(AP.added(w))) == Git.tip.rev(AP.rows(w, AP.QHead{})) : String}
+
+# LAW: `ez add` records the dependency among the dependencies and keeps the
+# ledger's `[tools.*]` pins as they were: the ledger it writes has the tools
+# it read, and its dependencies are the ones it read with the one added
+# EZ-LED-5
+law add_keeps_tools:
+  for +w: A.World
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for good: {A.read(w) == M.Good{M.Manifest{n, e, b, h, ds, ts}} : M.Read}
+  for +ok: {AP.refuses(w) == False{} : Bool}
+  {P.put.plan(AP.plan(w), "ez.toml")
+    == P.Put{Rend.show(M.Manifest{n, e, b, h,
+      List.append(&2, M.Dep, Rend.without(ds, M.dep.name(Rend.readd(ds, AP.added(w)))),
+        [Rend.readd(ds, AP.added(w))]), ts})} : P.Wrote}
