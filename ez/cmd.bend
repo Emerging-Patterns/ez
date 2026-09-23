@@ -11,7 +11,6 @@ import ../lock/world.bend as W
 import ../lock/restore.bend as Restore
 import ../git/git.bend as Git
 import ../pub/pub.bend as Pub
-import ../pkg/path.bend as P
 import ./args.bend as Args
 import ./env.bend as Env
 import ./cap.bend as Cap
@@ -19,6 +18,8 @@ import ./target.bend as Tgt
 import ../manifest/ignore.bend as Ig
 import ./named.bend as Named
 import ../ez/say.bend as Say
+import ../init/run.bend as InitRun
+import ../remove/run.bend as RemoveRun
 
 # the ledger's path, which is fixed
 def toml() -> String:
@@ -223,146 +224,9 @@ def lock(+up: Bool, +name: String) -> IO(Unit):
 def fetch() -> IO(Unit):
   Restore.restore(lockfile())
 
-# the name a new ledger takes: what was asked for, or `app`
-def init.name(+at: String) -> String:
-  Bool.pick(String, String.is_empty(at), "app", at)
-
-# where the ignore rules go
-def ignore() -> String:
-  ".gitignore"
-
-# everything ez writes into a project that is not the project's: the vendored
-# packages, the test gate's shadow and its cache all live under one `.ez/`, and
-# `ez build` drops a binary in `bin/<name>.out` unless it is told otherwise. A
-# project whose first `ez check` leaves untracked output is a project whose
-# owner has to work out for themselves which of it was theirs.
-#
-# `.ez/` is ignored as its contents rather than as a directory, and
-# `.ez/lib` is let back in only to have its contents ignored again. That is
-# what lets a `!.ez/lib/<hash>` line keep a vendored tree: git cannot
-# re-include a file under a directory it has excluded, so under a bare
-# `.ez/` every such line would be inert.
-def init.rules(+name: String) -> List<&2, String>:
-  [".ez/*", "!.ez/lib", ".ez/lib/*", build.named(name)]
-
-# one step of a scan that is looking for one hit, with the head's answer in
-# hand. `Bool.or` is an ordinary function and reduces both of its sides, so a
-# scan written with it reads the whole list even when the first line answers.
-# The rest of the scan arrives as a thunk and only the arm that wants it
-# applies it.
-def stated.step(here: Bool, rest: Unit -> Bool) -> Bool:
-  match here:
-    case True{}:
-      True{}
-    case False{}:
-      rest(Unit{})
-
-# whether a file already states this rule, on a line of its own. A rule buried
-# in a longer line is not the rule, so the comparison is against whole lines.
-def stated(ls: List<&2, String>, +rule: String) -> Bool:
-  match ls:
-    case Nil{}:
-      False{}
-    case Con{+h, t}:
-      stated.step(String.eq(String.trim(h), rule), _u => stated(t, rule))
-
-# the rules a file does not already state, in order
-def init.missing(rs: List<&2, String>, +ls: List<&2, String>) -> List<&2, String>:
-  match rs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, t}:
-      +more = init.missing(t, ls)
-      Bool.pick(List<&2, String>, stated(ls, h), more, h <> more)
-
-# a file's text with a newline on the end, so what is appended to it starts on
-# a line of its own. An empty file gets none, or the append would open with a
-# blank line.
-def init.tail(+text: String) -> String:
-  Bool.pick(String, Bool.or(String.is_empty(text), String.ends_with(text, "\n")),
-    text, text ++ "\n")
-
-# the ignore file with the rules it lacks added under a line saying whose they
-# are. What is already there is kept: the file is the project's, not ez's.
-def init.ignored(+text: String, ms: List<&2, String>) -> String:
-  init.tail(text) ++ "# written by ez\n" ++ String.join(ms, "\n") ++ "\n"
-
-# nothing to add means nothing written, so an `ez init` in a directory whose
-# ignore file already has the rules leaves it exactly as it found it
-def init.ignore.put(ms: List<&2, String>, +text: String) -> IO(Bool):
-  match ms:
-    case Nil{}:
-      IO.pure(Bool, True{})
-    case Con{h, t}:
-      F.write(ignore(), init.ignored(text, h <> t))
-
-# the project's ignore file, made or added to
-def init.ignore(+name: String) -> IO(Bool):
-  do IO<Bool>:
-    g : Maybe<&2, String> <- F.read(ignore())
-    +text : String <- IO.pure(String, F.text_of(g))
-    init.ignore.put(init.missing(init.rules(name), String.lines(text)), text)
-
-# the entry of a new project: a program that checks and runs
-def init.stub() -> String:
-  "import Base\n\ndef main() -> IO(Unit):\n  IO.print(\"hello\")\n"
-
-# the entry written, with every directory above it made first. Base has no
-# mkdir, so this is the same coreutils call every other write that needs a
-# directory already uses.
-def init.entry.put(+at: String) -> IO(Bool):
-  do IO<Bool>:
-    _mk : String <- R.exec(["mkdir", "-p", P.dir(at)])
-    F.write(at, init.stub())
-
-# an entry that is already there is left alone, so `ez init` does not
-# overwrite the program
-def init.entry.go(got: Maybe<&2, String>, +at: String) -> IO(Bool):
-  match got:
-    case Some{_s}:
-      IO.pure(Bool, True{})
-    case None{}:
-      init.entry.put(at)
-
-# the project's entry file, made when the directory does not already hold one
-def init.entry(+at: String) -> IO(Bool):
-  do IO<Bool>:
-    g : Maybe<&2, String> <- F.read(at)
-    init.entry.go(g, at)
-
-# the ledger a new project starts from, or nothing when there already is one.
-# A ledger on disk holds dependencies, tools and a `bin` that a fresh one would
-# lose, so `ez init` writes over none of it, whatever the file holds.
-def init.plan(got: Maybe<&2, String>, +name: String, +at: String) -> Maybe<&2, String>:
-  match got:
-    case Some{_s}:
-      None{}
-    case None{}:
-      Some{Rend.show(M.Manifest{name, at, "", "", [], []})}
-
-# the ledger written, then the ignore rules for what ez will generate beside
-# it, and the entry itself when the directory does not already hold one. A
-# project that already has a ledger is refused before anything is written.
-def init.go(plan: Maybe<&2, String>, +name: String, +at: String) -> IO(Unit):
-  match plan:
-    case None{}:
-      IO.die(Unit, 1, "ez: " ++ toml() ++
-        " already exists; ez init writes a new project and leaves it alone")
-    case Some{text}:
-      do IO<Unit>:
-        wrote : Bool <- F.write(toml(), text)
-        +kept : Bool <- init.ignore(name)
-        +made : Bool <- init.entry(at)
-        report.exit(Bool.and(wrote, Bool.and(kept, made)))
-
-# a new project: a ledger naming this directory and its entry file, the
-# ignore rules and the entry
+# `ez init [name] [entry.bend]`: a new project, planned by init/plan.bend
 def init(+asked: String, +file: String) -> IO(Unit):
-  do IO<Unit>:
-    +name : String <- IO.pure(String, init.name(asked))
-    +at : String <- IO.pure(String, entry.or(file))
-    got : Maybe<&2, String> <- F.read(toml())
-    init.go(init.plan(got, name, at), name, at)
+  InitRun.run(asked, file)
 
 # a vendoring's answer as a ledger entry, under the name `ez/named.bend` gave
 # it.
@@ -425,9 +289,9 @@ def allowlist.text(ds: List<&2, M.Dep>, +text: String) -> IO(Unit):
   allowlist.put(String.eq(next, text), next)
 
 # the gitignore allowlist, derived from the ledger's dependencies: exactly
-# the hashes marked `vendor = true`, with every other line kept. `ez add` and
-# `ez remove` call this with the ledger they just wrote; `ez lock --upgrade`
-# plans the same `Ig.sync`. A missing file reads as empty, and stays missing
+# the hashes marked `vendor = true`, with every other line kept. `ez add`
+# calls this with the ledger it just wrote; `ez remove` and `ez lock --upgrade`
+# plan the same `Ig.sync`. A missing file reads as empty, and stays missing
 # when the ledger vendors nothing.
 def allowlist(ds: List<&2, M.Dep>) -> IO(Unit):
   do IO<Unit>:
@@ -541,16 +405,6 @@ def add(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Un
     +from : String <- Git.anchored(url)
     add.go(r, Named.called(place, from), url, got, entry, rename)
 
-# the ledger with a dependency dropped, and its allowlist line with it
-def remove.write(ledger: M.Read, name: String) -> IO(Unit):
-  match ledger:
-    case M.Bad{why}:
-      refuse(M.Bad{why})
-    case M.Good{m}:
-      edit.write(Rend.remove(m, name))
-
-# `ez remove <name>`
+# `ez remove <name>`, planned by remove/plan.bend
 def remove(+name: String) -> IO(Unit):
-  do IO<Unit>:
-    r : M.Read <- load.edit("remove")
-    remove.write(r, name)
+  RemoveRun.run(name)
