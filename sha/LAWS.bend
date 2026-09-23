@@ -31,3 +31,23 @@ law nar_dir_order_free:
   for +es: List<&2, K.File>
   for +dis: {PL.distinct(es) == True{} : Bool}
   {Nar.dir(PL.perm(ns, es)) == Nar.dir(es) : String}
+
+# LAW: a field of the listing the NAR walk reads is cut exactly where its NUL
+# is, and nowhere else. A name or a link target holds no NUL, so it comes back
+# as `find` printed it: a space at either end is kept and a newline inside it
+# stays inside it.
+# EZ-HASH-7
+law nar_field_verbatim:
+  for x: String
+  for +rest: String
+  for +c: {Nar.clean(x) == True{} : Bool}
+  {Nar.cut(String.append(x, SCon{Nar.nul(), rest})) == x <> Nar.cut(rest)
+    : List<&2, String>}
+
+# LAW: so a whole listing is read back as the fields it was printed from,
+# each of them as it was
+# EZ-HASH-7
+law nar_listing_verbatim:
+  for fs: List<&2, String>
+  for +c: {Nar.clean.all(fs) == True{} : Bool}
+  {Nar.cut(Nar.joined(fs)) == fs : List<&2, String>}

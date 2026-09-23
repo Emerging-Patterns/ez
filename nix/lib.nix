@@ -87,12 +87,14 @@ let
     if bin != "" then bin else if entry != "" then entry else null;
 
   # The checkout `fetchgit` rebuilds from the pin. `root` is the directory
-  # inside it the tool's paths are written from.
+  # inside it the tool's paths are written from. Submodules are not fetched,
+  # since ez weighs the checkout without them.
   toolSrc = pin:
     let
       fetched = pkgs.fetchgit {
         url = pin.git;
         rev = pin.rev;
+        fetchSubmodules = false;
         hash = pin.narHash;
       };
       root = pin.root or ".";
