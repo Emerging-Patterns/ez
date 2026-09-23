@@ -9,7 +9,7 @@ import ../ez/args.bend as Args
 import ./cmd.bend as Cmd
 import ./test.bend as Test
 import ./prove.bend as Prove
-import ./doctor.bend as Doctor
+import ../doctor/run.bend as DoctorRun
 import ../ez/env.bend as Env
 import ../tool/run.bend as ToolRun
 import ../tool/world.bend as TW
@@ -158,7 +158,7 @@ def dispatch(sub: Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Uni
     case CProve{}:
       Prove.run()
     case CDoctor{}:
-      Doctor.run()
+      DoctorRun.run()
     case CHelp{}:
       IO.write(Shake.help(spec(), []))
 

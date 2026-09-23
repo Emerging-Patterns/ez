@@ -6,13 +6,11 @@
 # string or list, so they reduce to the same value and the proof is the
 # computation itself.
 import Base
-import ./drift.bend as D
 import ./gate.bend as G
 import ../ez/pin.bend as Pin
 import ../ez/target.bend as Tgt
 import ../ez/named.bend as Named
 import ../ez/env.bend as Env
-import ./doctor.bend as Doctor
 import ../pkg/path.bend as P
 import ../manifest/manifest.bend as M
 import ./key.bend as K
@@ -80,11 +78,6 @@ def Laws.want_keeps(rest, t):
     Equal.cong(String, List<&2, String>, x => x <> G.want(t),
       String.drop(String.append("#|", rest), 2n), rest,
       drop_hash_bar(rest)))
-
-def Laws.hash_of_local(s, e):
-  %e : {Bool.pick(String, _,
-    D.head(String.split(String.drop(s, 7n), '/')), "") == "" : String}
-  {==}
 
 # The clock's pure half: a non-empty deadline is rewritten into the
 # pick that keeps it.
@@ -1239,22 +1232,6 @@ def Laws.checkout_differs(_was, now, e):
 def Laws.checkout_same(r, e):
   %e : {Bool.and(Bool.not(_), String.eq(r, r)) == True{} : Bool}
   Eq.string_eq_self(r)
-
-# doctor: the lock's verdict turns on the list first, so the no-dependency law
-# splits on it and the other two are the arm they name.
-
-def Laws.lock_needless(hs):
-  match hs:
-    case []:
-      {==}
-    case _h <> _t:
-      {==}
-
-def Laws.lock_needed(_n):
-  {==}
-
-def Laws.lock_names(_deps, _h, _t):
-  {==}
 
 # env: each premise is rewritten into the test the pick turns on.
 

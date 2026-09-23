@@ -1,11 +1,9 @@
 # ez: the laws. The human states them; PROOF.bend must prove them. The string
-# facts a test run turns on live here: what bend's own chatter is, what a `#|`
-# trailer asks for, and which `0x` name an import line wrote. The clock's
-# by.effect deadline lives here too.
+# facts a test run turns on live here: what bend's own chatter is and what a
+# `#|` trailer asks for. The clock's by.effect deadline lives here too.
 # The OS half of the clock is not among them.
 import Base
 import ./quiet.bend as Q
-import ./drift.bend as D
 import ./gate.bend as G
 import ./clock.bend as Clock
 import ../ez/target.bend as Tgt
@@ -13,7 +11,6 @@ import ./key.bend as K
 import ../manifest/manifest.bend as M
 import ../ez/pin.bend as Pin
 import ../ez/env.bend as Env
-import ./doctor.bend as Doctor
 import ../pkg/path.bend as P
 import ../ez/named.bend as Named
 
@@ -58,14 +55,6 @@ law want_keeps:
   for +rest: String
   for +t: List<&2, String>
   {G.want(("#|" ++ rest) <> t) == rest <> G.want(t) : List<&2, String>}
-
-# drift: the ledger against the import lines
-
-# LAW: a line that is not a hub import names no package
-law hash_of_local:
-  for +s: String
-  for e: {False{} == String.starts_with(s, "import 0x") : Bool}
-  {D.hash_of(s) == "" : String}
 
 # clock: the deadline the run effect holds. `date` and `test` are not
 # among them.
@@ -275,26 +264,6 @@ law checkout_same:
   for +r: String
   for e: {False{} == String.is_empty(r) : Bool}
   {K.checkout(r, r) == True{} : Bool}
-
-# doctor: the lock is judged against the ledger it resolves
-
-# LAW: a ledger with no dependencies never makes the lock a problem, whatever
-# the lock names, so `ez doctor` passes a project that has nothing to lock
-law lock_needless:
-  for hs: List<&2, String>
-  {Doctor.lock.wrong(0n, hs) == False{} : Bool}
-
-# LAW: a ledger with dependencies and a lock that names no package is one
-law lock_needed:
-  for n: Nat
-  {Doctor.lock.wrong(1n+n, []) == True{} : Bool}
-
-# LAW: a lock that names a package is never one, however many the ledger has
-law lock_names:
-  for deps: Nat
-  for h: String
-  for t: List<&2, String>
-  {Doctor.lock.wrong(deps, h <> t) == False{} : Bool}
 
 # env: the directories ez makes before a command runs. Only a command that
 # writes into one without making it gets it, so `ez help`, `ez doctor` and a
