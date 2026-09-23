@@ -29,6 +29,7 @@ Items for review:
 - [x] <!-- REVIEW (resolved): The thirteen refactor-equivalence laws, and the `old.*` definitions they compare against, are deleted in the first rollout phase. -->
 - [x] <!-- REVIEW (resolved): Guarantees proved in a pinned dependency are Trusted from ez's side, with the dependency and pin as the reason. -->
 - [x] <!-- REVIEW (resolved): Closed laws are deleted, not kept as examples. -->
+- [x] <!-- REVIEW (resolved): The phase-three design, [ez-lock-planner.md](ez-lock-planner.md), is accepted with every recommendation it made. It rewords EZ-DOC-5 and EZ-RES-6, adds EZ-OUT-2, adds five behavior changes to "Decided behavior changes", and proves the phase-three upgrade laws relative to EZ-LED-4. -->
 - [x] <!-- REVIEW (resolved): None of the accidental behavior in the inventory becomes a requirement. The fixes worth making are listed under "Decided behavior changes". The doctor drift report and argument forwarding, which had only closed laws, become EZ-VEN-5 and EZ-TOOL-9 instead of losing their only record. -->
 
 ---
@@ -265,7 +266,7 @@ EZ-LED-6 to EZ-LED-8 come from the decided behavior changes below. Their decisio
 | EZ-DOC-2 | Packages are written in hash order and each package's files in path order, so the lock's text does not depend on the order the walk found them in. | Proved | pending |
 | EZ-DOC-3 | `ez lock` output is a function of the ledger and the committed tree. A fresh clone reproduces the lock byte for byte. | Proved | pending |
 | EZ-DOC-4 | `ez lock` is idempotent: run on the world it just produced, it writes the same bytes. | Proved | pending |
-| EZ-DOC-5 | `ez lock` without `--upgrade` never changes a dependency's pinned rev, and changes a tool's only when the ledger left it empty. | Proved | pending |
+| EZ-DOC-5 | `ez lock` without `--upgrade` never writes ez.toml, and records every dependency's and tool's pin exactly as ez.toml has it. | Proved | pending |
 
 EZ-DOC-2 replaces the draft's "rendering a parsed lock reproduces the original bytes". No code path re-renders a parsed lock, and the TOML renderer does no escaping, so that statement was about a function ez does not have. What the lock does guarantee is canonical order: `pack.sort` and `K.files_of` sort before rendering, and `pack_ins_le` already states one step of it.
 
@@ -309,13 +310,13 @@ The inventory's table lists every input with its source line.
 | EZ-RES-3 | A target containing `://` or starting `git@` is a git URL. A target starting `/`, `./`, `../` or `~/` is a path. A target of exactly two segments of letters, digits, `-`, `_` and `.`, neither of them `.` or `..`, is `https://github.com/<target>`, unless its second segment ends in `.bend`, which makes it a path. Anything else is a path, except the empty word, which is refused. | Proved | pending |
 | EZ-RES-4 | `ez lock --upgrade` never moves a hub dependency. | Proved | pending |
 | EZ-RES-5 | An upgraded rev-only dependency moves to the default branch tip only when its pin is an ancestor of that tip, and stays a commit pin. Otherwise the upgrade refuses with exit 1. | Proved | pending |
-| EZ-RES-6 | `--package NAME` asks the remote only for the named dependency or tool, and every other ledger entry keeps its rev, tag and hash. | Proved | pending |
+| EZ-RES-6 | `--package NAME` asks the remote to resolve only the named dependency or tool, and every other ledger entry keeps its rev, tag and hash. Resolving is asking for refs, the default branch, ancestry, or a checkout at a new rev. | Proved | pending |
 | EZ-RES-7 | Tags, refs, and ancestry reported by git are accurate. | Trusted | |
 | EZ-RES-8 | An upgraded tagged dependency re-resolves its tag. A tag that now names a commit the pin does not descend to, or a pinned commit whose tree no longer hashes to the pin, stops the upgrade with exit 1. | Proved | pending |
 
 "Semver-ish" in EZ-RES-1 is what `git/git.bend` accepts: an optional `v` or `V`, one or more dot-separated numeric parts, an optional pre-release after `-`, and anything after `+` ignored. The comparator pads missing parts with zero. Three parts of EZ-RES-1 are decided changes: today a pre-release can beat an older release (`v2.0.0-rc1` over `v1.9.0`), the default branch is guessed as `main` then `master`, and names resolve with a tail-matching `ls-remote`, so `main` can resolve to `refs/heads/feature/main`. EZ-RES-1 and EZ-RES-2 are precedence rules, and each becomes a law over every list of tags or every manifest. Today they have no law at all, and `Git.latest` and `Git.default.ref` mix the choice with the `ls-remote` calls.
 
-EZ-RES-6 is narrowed from the draft's "every other lock entry is unchanged". The final step of an upgrade recomputes the whole lock from the current world, so other entries are unchanged only when nothing else changed, which is EZ-DOC-3's job. What `--package` itself guarantees is about the ledger:
+EZ-RES-6 is narrowed from the draft's "every other lock entry is unchanged", and says "resolve" because the lock that follows an upgrade still fetches every non-vendored git tree missing from BEND_LIB at its ledger rev, which asks the remote for a tree but resolves nothing. The final step of an upgrade recomputes the whole lock from the current world, so other entries are unchanged only when nothing else changed, which is EZ-DOC-3's job. What `--package` itself guarantees is about the ledger:
 
 ```
 # EZ-RES-6
@@ -393,6 +394,9 @@ Much of the brittleness in today's closed laws comes from pinning whole outputs.
 | ID | Requirement | Level | Status |
 | :---- | :---- | :---- | :---- |
 | EZ-OUT-1 | Every command exits 0 on success and 1 on any failure ez detects, except `ez tool run`, which exits with the program's status. | Proved | pending |
+| EZ-OUT-2 | A command that refuses writes nothing: every file it would otherwise write or remove is left as it found it. | Proved | pending |
+
+EZ-OUT-2 is new, decided with the phase-three design. In planner form a command computes its whole plan before any effect runs, so a refusal is a plan with no write, lay or remove effect in it. Today it does not hold: `ez lock --upgrade` writes ez.toml, `.gitignore`, sources and trees in stages, and a failure in a later stage leaves the earlier writes in place. A write the interpreter attempts and the system rejects is not a refusal; that failure is EZ-OUT-1's, and what it leaves behind is covered by EZ-TRUST-2. Each command meets EZ-OUT-2 when it is converted to planner form.
 
 This replaces the draft's `ez: <area>:` prefix requirement, which the code does not implement. The 19 closed laws that pin progress and error wording (`hub_404_teaches`, `drift_names_the_tag`, `installed_names_the_link` and the rest) point toward no requirement and are deleted in the first rollout phase.
 
@@ -466,6 +470,8 @@ Checking the draft against the code turned up places where the code and the inte
 
 For EZ-DOC-3, `ez lock` stops reading anything outside `inputs`. It fetches each non-vendored git dependency at its ledger rev and checks it against `narHash`, refusing on failure instead of writing an empty `files` table. It stops reading `.ez/origins.toml`. It walks `git ls-files '*.bend'` instead of `find`. It takes the hub from a `hub` key in the ledger's `[package]` table, with a constant default, instead of `BEND_HUB`. It drops `[lock] bend` from the lock. And it fills an incomplete tool pin only under `--upgrade`, refusing otherwise.
 
+The phase-three design ([ez-lock-planner.md](ez-lock-planner.md)) adds five more for `ez lock`. It takes the hub imports of every tracked `.bend` file and follows no local import, so an untracked file a tracked one imports never reaches the lock. It checks every package's manifest against its `0x` name, a tree already under `BEND_LIB` included, and judges such a tree as the same bytes cloned at the ledger rev and weighed to the ledger's `narHash`. It refuses to write a lock that is not `lockable`, one with a key or value holding `"`, `\` or a newline, since the TOML renderer does no escaping. `ez lock --upgrade` stops writing `.ez/origins.toml`, which nothing reads. And an upgrade lays a moved vendored dependency's tree under `.ez/lib`, where it is committed, and any other moved tree under `$BEND_LIB`, as a cache fill.
+
 For EZ-RES-1, a release tag beats any pre-release, the default branch is the remote's `HEAD` symref rather than a guess of `main` then `master`, and a named ref resolves exactly, as `refs/tags/<ref>` and then `refs/heads/<ref>`.
 
 For EZ-RES-3, `owner/repo` allows `.` in both segments, and a second segment ending in `.bend` makes the target a path, so `vercel/next.js` is GitHub and `src/main.bend` is a path.
@@ -532,7 +538,7 @@ The first phase writes `SPEC.md` from this RFC, with the proved and pending stat
 
 The second phase enables the traceability check in bolt, reading `SPEC.md`. Pending requirements are reported but do not fail it, so it can go on at once. `quantify` is already on at `error`, which keeps the closed laws from coming back; `law` returns to `error` when the commands it grades are in planner form.
 
-The third phase introduces the World model and converts `ez lock` to planner form, then proves EZ-DOC-1 through EZ-DOC-5, EZ-RES-4 through EZ-RES-6 and EZ-RES-8, EZ-VEN-1 through EZ-VEN-3, and EZ-HASH-2, deleting the closed laws each one subsumes. EZ-DOC-3 is proved once the lock input changes have landed. `ez lock` goes first because its guarantees are the most important.
+The third phase introduces the World model and converts `ez lock` to planner form, then proves EZ-DOC-1 through EZ-DOC-5, EZ-RES-4 through EZ-RES-6 and EZ-RES-8, EZ-VEN-1 through EZ-VEN-3, and EZ-HASH-2, deleting the closed laws each one subsumes. EZ-DOC-3 is proved once the lock input changes have landed. `ez lock` goes first because its guarantees are the most important. The design for this phase, with its World, its laws and its work packages, is in [ez-lock-planner.md](ez-lock-planner.md). The phase's upgrade laws (EZ-RES-4 to EZ-RES-6, EZ-RES-8 and the upgrade half of EZ-VEN-1) are stated over the ledger model the plan renders into ez.toml, so they hold of the file's bytes only relative to EZ-LED-4, which is not in this phase; `SPEC.md` records that dependency under "Left to prove".
 
 Later phases convert `ez add`, `ez fetch`, `ez publish`, `ez doctor` and the tool commands in the same way, one command per phase, each ending with its requirements proved and its closed laws gone.
 
