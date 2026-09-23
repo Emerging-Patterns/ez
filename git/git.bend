@@ -71,14 +71,26 @@ def run(what: String, args: List<&2, String>) -> IO(Unit):
     +out : String <- R.exec(args)
     ran(R.ok(out), what, R.text(out))
 
+# a source as git is to read it. A ledger records a local path as it was
+# given, relative to the project, which is the directory ez runs in, so the
+# ledger reads the same on every clone. git reads such a path from somewhere
+# else: a fetch from inside its work directory, and `ls-remote` from the top
+# of any repository around it. Every git command here that is handed a source
+# is handed this instead.
+def anchored(+url: String) -> IO(String):
+  do IO<String>:
+    +here : String <- R.exec(["pwd"])
+    return P.anchor(String.trim(R.text(here)), url)
+
 # the checkout a package is taken from: the pinned commit alone, at the depth
 # of one, so a repo with a long history costs nothing to vendor. The fetch is
 # quiet; the line above it is what a person sees while it runs.
 def clone.say(+work: String, +url: String, +rev: String, +msg: String) -> IO(Unit):
   do IO<Unit>:
     +s : Say.Spin <- Say.hold(msg)
+    +from : String <- anchored(url)
     run("init", ["git", "init", "-q", work])
-    run("fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", url, rev])
+    run("fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", from, rev])
     run("checkout", ["git", "-C", work, "checkout", "-q", rev])
     Say.done(s)
 
@@ -219,7 +231,8 @@ def resolve.said(ok: Bool, +url: String, +ref: String, +text: String) -> IO(Ref)
 # full ref names, and `exact` still reads only the rows named exactly so.
 def resolve.ask(+url: String, +ref: String) -> IO(Ref):
   do IO<Ref>:
-    +out : String <- R.exec(["git", "ls-remote", url, "refs/tags/" ++ ref,
+    +from : String <- anchored(url)
+    +out : String <- R.exec(["git", "ls-remote", from, "refs/tags/" ++ ref,
       "refs/tags/" ++ ref ++ "^{}", "refs/heads/" ++ ref])
     resolve.said(R.ok(out), url, ref, R.text(out))
 
@@ -629,7 +642,8 @@ def remote.said(ok: Bool, +url: String, +text: String) -> IO(Tip):
 # name. `--symref` is what puts the branch on the line in front of the commit.
 def remote(+url: String) -> IO(Tip):
   do IO<Tip>:
-    +out : String <- R.exec(["git", "ls-remote", "--symref", url, "HEAD"])
+    +from : String <- anchored(url)
+    +out : String <- R.exec(["git", "ls-remote", "--symref", from, "HEAD"])
     remote.said(R.ok(out), url, R.text(out))
 
 # a bare clone, blobs left behind. Ancestry only needs the commits. The clone
@@ -637,7 +651,8 @@ def remote(+url: String) -> IO(Tip):
 def clone.bare(+work: String, +url: String) -> IO(Unit):
   do IO<Unit>:
     +s : Say.Spin <- Say.hold(Say.git.fetch(url))
-    run("clone", ["git", "clone", "--bare", "--filter=blob:none", "-q", url, work])
+    +from : String <- anchored(url)
+    run("clone", ["git", "clone", "--bare", "--filter=blob:none", "-q", from, work])
     Say.done(s)
 
 # merge-base answers 0 for a descendant, 1 for anything else, and some other
@@ -1136,7 +1151,8 @@ def tags.said(ok: Bool, +url: String, +text: String) -> IO(List<&2, String>):
 # every tag on the remote
 def tags(+url: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
-    +out : String <- R.exec(["git", "ls-remote", "--tags", url])
+    +from : String <- anchored(url)
+    +out : String <- R.exec(["git", "ls-remote", "--tags", from])
     tags.said(R.ok(out), url, R.text(out))
 
 # a remote whose HEAD names no branch leaves `ez add` nothing to pin
@@ -1159,7 +1175,8 @@ def heads.said(ok: Bool, +url: String, +text: String) -> IO(String):
 # the remote's default branch, as its `HEAD` symref names it
 def heads(+url: String) -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(["git", "ls-remote", "--symref", url, "HEAD"])
+    +from : String <- anchored(url)
+    +out : String <- R.exec(["git", "ls-remote", "--symref", from, "HEAD"])
     heads.said(R.ok(out), url, R.text(out))
 
 def default.go(empty: Bool, +tag: String, +url: String) -> IO(String):

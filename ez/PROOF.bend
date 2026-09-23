@@ -1155,16 +1155,29 @@ def Laws.expand_home(home, rest):
       == home ++ ("/" ++ rest) : String}
   {==}
 
-# `/` in front of anything starts with `/`, which `starts_append` holds, and
-# that picks the arm that keeps the path.
-def Laws.anchor_absolute(here, rest):
-  %Equal.sym(Bool, String.starts_with("/" ++ rest, "/"), True{},
-    Eq.starts_append("/", rest)) :
-    {Tgt.anchor.at(_, here, "/" ++ rest) == "/" ++ rest : String}
+# `://` is found wherever it is put (`contains_url`), and that picks the arm
+# that keeps a URL.
+def Laws.anchor_url(here, a, b):
+  %Equal.sym(Bool, String.contains(a ++ ("://" ++ b), "://"), True{},
+    contains_url(a, b)) :
+    {P.anchor.at(_, here, a ++ ("://" ++ b)) == a ++ ("://" ++ b) : String}
   {==}
 
-def Laws.anchor_relative(here, path, e):
-  %e : {Tgt.anchor.at(_, here, path) == P.join(here, path) : String}
+# `/` in front of anything starts with `/`, which `starts_append` holds, and
+# that picks the arm that keeps the path.
+def Laws.anchor_absolute(here, rest, e):
+  %e : {P.anchor.at(_, here, "/" ++ rest) == "/" ++ rest : String}
+  %Equal.sym(Bool, String.starts_with("/" ++ rest, "/"), True{},
+    Eq.starts_append("/", rest)) :
+    {P.anchor.path(Bool.or(_, String.starts_with("/" ++ rest, "git@")), here,
+      "/" ++ rest) == "/" ++ rest : String}
+  {==}
+
+def Laws.anchor_relative(here, path, eu, ea, eg):
+  %eu : {P.anchor.at(_, here, path) == P.join(here, path) : String}
+  %ea : {P.anchor.path(Bool.or(_, String.starts_with(path, "git@")), here,
+    path) == P.join(here, path) : String}
+  %eg : {P.anchor.path(_, here, path) == P.join(here, path) : String}
   {==}
 
 def Laws.file_bin():

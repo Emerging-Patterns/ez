@@ -151,10 +151,12 @@ command runs the binary. `ez tool run` does, and the built program's status
 is the status of the command. A target, ledger, fetch, build or link that
 fails exits 1.
 
-`ez add` takes the same kind of target. A relative path is taken from the
-directory `ez add` runs in, which is the project's, since every command reads
-`ez.toml` from there; the ledger records the absolute path it names. With no
-ref, it pins the greatest
+`ez add` takes the same kind of target. A relative path is recorded as it
+was given, relative to the project, which is the directory ez runs in, since
+every command reads `ez.toml` from there; an absolute one stays absolute.
+`ez add`, `ez lock`, `ez fetch` and `ez lock --upgrade` all read a relative
+`git` from the project, so a project and a sibling repo moved together still
+lock to the same bytes. With no ref, it pins the greatest
 semver-ish release tag on the remote (`v1.9.0` beats `v2.0.0-rc1`); with no
 release, the greatest pre-release; with no semver-ish tag at all, the
 remote's default branch, as its `HEAD` names it. A remote whose `HEAD` names

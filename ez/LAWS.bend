@@ -243,19 +243,30 @@ law expand_home:
   for +rest: String
   {Tgt.expand(home, "~/" ++ rest) == home ++ ("/" ++ rest) : String}
 
+# LAW: a URL is fetched as it is, wherever ez was run
+law anchor_url:
+  for here: String
+  for +a: String
+  for +b: String
+  {P.anchor(here, a ++ ("://" ++ b)) == a ++ ("://" ++ b) : String}
+
 # LAW: an absolute path is fetched as it is, wherever ez was run
 law anchor_absolute:
   for here: String
   for +rest: String
-  {Tgt.anchor(here, "/" ++ rest) == "/" ++ rest : String}
+  for e: {False{} == String.contains("/" ++ rest, "://") : Bool}
+  {P.anchor(here, "/" ++ rest) == "/" ++ rest : String}
 
-# LAW: a relative path is taken from the directory ez was run in, and not
-# from the work directory git is handed it in
+# LAW: a relative path, which the ledger keeps as it was given, is taken from
+# the directory ez runs in, the project's, and not from the work directory or
+# the repository top git would read it from
 law anchor_relative:
   for +here: String
   for +path: String
-  for e: {False{} == String.starts_with(path, "/") : Bool}
-  {Tgt.anchor(here, path) == P.join(here, path) : String}
+  for eu: {False{} == String.contains(path, "://") : Bool}
+  for ea: {False{} == String.starts_with(path, "/") : Bool}
+  for eg: {False{} == String.starts_with(path, "git@") : Bool}
+  {P.anchor(here, path) == P.join(here, path) : String}
 
 # key: when a cached tool is reused. The checkout is its commit; the binary
 # is its commit, the file bend built and the bend that built it. Each law

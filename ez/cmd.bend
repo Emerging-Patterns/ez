@@ -481,14 +481,13 @@ def add.go(ledger: M.Read, fresh: String, +url: String, +ref: String, +entry: St
       +why = Named.why(deps.of(manifest), name, url)
       add.take(String.is_empty(why), why, manifest, name, url, ref, entry)
 
-# a path, with `~` expanded the way `ez tool run` expands it, and a relative
-# one taken from the directory ez was run in. git is handed it inside a work
-# directory under BEND_LIB, where a relative path would name something else.
+# a path, with `~` expanded the way `ez tool run` expands it. A relative path
+# is kept as it was given, relative to the project, so the ledger reads the
+# same on any clone; git is handed it anchored (`Git.anchored`).
 def add.local(+path: String) -> IO(String):
   do IO<String>:
     +home : String <- Env.var("HOME", "")
-    +here : String <- R.exec(["pwd"])
-    return Tgt.anchor(String.trim(R.text(here)), Tgt.expand(home, path))
+    return Tgt.expand(home, path)
 
 # the git url a target names
 def add.url(place: Tgt.Place) -> IO(String):
@@ -518,7 +517,8 @@ def add(+target: String, +ref: String, +entry: String) -> IO(Unit):
     +url : String <- add.url(place)
     +got : String <- add.ref.at(Bool.not(String.is_empty(ref)), url, ref)
     r : M.Read <- load()
-    add.go(r, Named.called(place, url), url, got, entry)
+    +from : String <- Git.anchored(url)
+    add.go(r, Named.called(place, from), url, got, entry)
 
 # the ledger with a dependency dropped, and its allowlist line with it
 def remove.write(ledger: M.Read, name: String) -> IO(Unit):
