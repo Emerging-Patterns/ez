@@ -42,6 +42,12 @@ What ez proves today, in one paragraph: the 0x hash of a package's file set is i
 | sri_empty_digest | C | refl | `Nar.sri.hex` of the empty digest is its base64 SRI. | EZ-HASH-5 |
 | sri_empty_dir | C | refl | The NAR SRI of an empty directory matches what `nix hash path --sri` prints. | EZ-HASH-5 |
 
+**Update:** WP8 of [ez-lock-planner.md](ez-lock-planner.md) adds `nar_dir_order_free`, tagged `# EZ-HASH-2`:
+
+| Law | Kind | Proof | Claim | Points toward |
+| :---- | :---- | :---- | :---- | :---- |
+| nar_dir_order_free | Q | struct | `Nar.dir` of a Lehmer-permuted entry list with distinct names is `Nar.dir` of the list. An entry is a `K.File` holding a name and its node's serial, and the proof is `pkg/sort_perm` carried under `Nar.directory`. | EZ-HASH-2 (this is the law) |
+
 ### hub/LAWS.bend
 
 | Law | Kind | Proof | Claim | Points toward |
@@ -360,7 +366,7 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | Requirement | Quantified laws | Closed laws | Status today |
 | :---- | :---- | :---- | :---- |
 | EZ-HASH-1 | sort_perm, manifest_perm, hash_perm, dedup_dup, dedup_keeps, hash_is_prefix | none | Proved, over file lists with distinct paths. The law is over the file set the import walk produces, not a directory tree. |
-| EZ-HASH-2 | none | none (sri_empty_dir only fixes the empty tree) | No law. |
+| EZ-HASH-2 | none | none (sri_empty_dir only fixes the empty tree) | No law. **Update:** proved by `sha/nar_dir_order_free` (WP8). |
 | EZ-HASH-3 | spec_hash (the read side only) | none | Not stated. Nothing relates a vendored tree's directory name to its hash. |
 | EZ-HASH-4 | path and header-scan lemmas (supporting) | none | Trusted, as the RFC says. |
 | EZ-HASH-5 | none | sri_empty_digest, sri_empty_dir | Trusted, two examples. |
@@ -412,7 +418,7 @@ This section checks each requirement in the RFC draft against what the code does
 | ID | Verdict | Evidence |
 | :---- | :---- | :---- |
 | EZ-HASH-1 | holds, proved | `pkg/pkg.bend:484` hashes `dedup(file.sort(fs))`, so order cannot matter. `pkg/hash_perm` proves it for file lists with distinct paths. The input is the import closure of an entry (`pkg_of`, `pkg/pkg.bend:556`), not a directory tree. With a repeated path and different sums, `dedup` keeps the last of a run and the result depends on order (`pkg/LAWS.bend:52-55` says so). |
-| EZ-HASH-2 | holds, not stated | `sha/nar.bend:286-291` lists a directory with `find -printf %f\n` and sorts the names by insertion sort on `String.is_le` (codepoint order, which equals nix's byte order for valid UTF-8). No law states it. |
+| EZ-HASH-2 | holds, not stated | `sha/nar.bend:286-291` lists a directory with `find -printf %f\n` and sorts the names by insertion sort on `String.is_le` (codepoint order, which equals nix's byte order for valid UTF-8). No law states it. **Update:** holds, proved. The serialization is now pure over loaded entries: `sha/nar.bend` loads a directory's children in the order `find` lists them, as `K.File{name, serial}`, and `Nar.dir` sorts them with `K.file.sort` before `Nar.directory` writes them. Every directory's serial goes through `Nar.dir`, and `sha/nar_dir_order_free` proves it independent of the listing order for distinct names. The narHash of every package and tool in ez.lock.toml was recomputed with the new code and matches the recorded one. |
 | EZ-HASH-3 | partly | `Git.lay` (`git/git.bend:375-380`) writes `lib/<hash>` where `hash` is ez's own `K.pkg.hash(K.pkg_of(entry))`, and writes the manifest from the same file list, so it holds when written. `place` ignores `cp` failures (`git/git.bend:349-355`). Nothing re-checks a tree later: `read.git` checks files against the on-disk manifest but never the manifest against the directory name, and `restore` accepts a cached tree whose manifest text matches without re-reading files (`lock/restore.bend:121-132`). |
 | EZ-HASH-4 | as trusted | `ez publish` compares its hash to `bend --publish`'s answer (`pub/pub.bend:220-251`), but only after bend has uploaded. bend 2.0.25 has no way to report the hash without uploading (`cli_publish` hashes, mines and posts in one step), so this ordering stays. |
 | EZ-HASH-5 | as trusted | `Nar.path` (`sha/nar.bend:447`). Known divergences: the exec bit comes from `test -x` (an access check, not the mode bit); the whole `find` output and each symlink target are trimmed, so leading or trailing whitespace in a name or target is lost; a name containing a newline splits in two; submodules are not fetched by ez, while nixpkgs `fetchgit` (used by `nix/lib.nix`) may fetch them. |

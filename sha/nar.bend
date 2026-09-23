@@ -9,22 +9,25 @@
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
-import ./sha.bend as Sha
+import ../pkg/pkg.bend as K
+import ../sha/sha.bend as Sha
 
-# one directory child: its name, and the NAR serial of its node
-type Ent is Data:
-  Ent{name: String, node: String}
+# A directory child is a `K.File`: its name in `at` and the NAR serial of its
+# node in `sum`. That is a package file's shape, a name and the text that
+# stands for it, so the walk sorts children with the same `K.file.sort` a
+# package sorts its files with, and what is proved of that sort is proved of
+# the NAR.
 
 # what to do with a node's serial once it is known
 type After is Data:
   Done{}
-  ChildOf{dir: String, name: String, rest: List<&2, String>,
-    acc: List<&2, Ent>, parent: After}
+  ChildOf{here: String, name: String, rest: List<&2, String>,
+    acc: List<&2, K.File>, parent: After}
 
 # one step of the walk
 type Goal is Data:
   Load{at: String, k: After}
-  FinishDir{kids: List<&2, Ent>, k: After}
+  FinishDir{kids: List<&2, K.File>, k: After}
 
 # one byte as a character. NAR is a byte stream held in a Bend string.
 def byte(+code: U32) -> Char:
@@ -78,22 +81,30 @@ def symlink(+target: String) -> String:
     ++ str(Sha.utf8(target)) ++ str(")")
 
 # one directory entry: its name and its node
-def entry(+ent: Ent) -> String:
-  Ent{name, node} = ent
+def entry(+ent: K.File) -> String:
+  K.File{name, node} = ent
   str("entry") ++ str("(") ++ str("name") ++ str(Sha.utf8(name))
     ++ str("node") ++ node ++ str(")")
 
 # a directory's entries, in the order given
-def entries(es: List<&2, Ent>) -> String:
+def entries(es: List<&2, K.File>) -> String:
   match es:
     case []:
       ""
     case h <> t:
       entry(h) ++ entries(t)
 
-# a directory's node
-def directory(es: List<&2, Ent>) -> String:
+# a directory's node, its entries in the order given
+def directory(es: List<&2, K.File>) -> String:
   str("(") ++ str("type") ++ str("directory") ++ entries(es) ++ str(")")
+
+# a directory's node as NAR writes it: its entries sorted by name, whatever
+# order they were listed in. `String.is_le` is codepoint order, which is nix's
+# byte order for the UTF-8 of valid names. Every directory the walk serializes
+# goes through here, so the order `find` printed its names in never reaches
+# the NAR.
+def dir(es: List<&2, K.File>) -> String:
+  directory(K.file.sort(es))
 
 # a whole NAR: the magic, then the root node
 def archive(+node: String) -> String:
@@ -204,7 +215,7 @@ def sri(+bytes: String) -> String:
 
 # the node of an empty directory
 def empty() -> String:
-  directory([])
+  dir([])
 
 # a command's output, trimmed, or the walk stopped with why it failed
 def said(ok: Bool, +why: String, +text: String) -> IO(String):
@@ -223,43 +234,14 @@ def nonblank(ss: List<&2, String>) -> List<&2, String>:
       +more = nonblank(t)
       Bool.pick(List<&2, String>, String.is_empty(h), more, h <> more)
 
-# where one name belongs in a list already sorted. Insertion keeps the
-# termination check happy; Base's List.sort does not.
-def sort.ins.put(
-  le: Bool,
-  +item: String,
-  head: String,
-  tail: List<&2, String>,
-  rest: List<&2, String>
-) -> List<&2, String>:
-  match le:
-    case True{}:
-      item <> (head <> tail)
-    case False{}:
-      head <> rest
-
-def sort.ins(+item: String, ss: List<&2, String>) -> List<&2, String>:
-  match ss:
-    case []:
-      [item]
-    case +h <> +t:
-      sort.ins.put(String.is_le(item, h), item, h, t, sort.ins(item, t))
-
-# directory entry names in lexicographic order, the order NAR walks them
-def sort(ss: List<&2, String>) -> List<&2, String>:
-  match ss:
-    case []:
-      []
-    case +h <> t:
-      sort.ins(h, sort(t))
-
-# the names in a directory, sorted, without `.` and `..`
+# the names in a directory, in the order `find` lists them, without `.` and
+# `..`. `dir` puts them in NAR order once they are loaded.
 def names(+path: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     +out : String <- R.exec(["find", path, "-mindepth", "1", "-maxdepth", "1",
       "-printf", "%f\\n"])
     text : String <- said(R.ok(out), path ++ ": ", R.text(out))
-    return sort(nonblank(String.lines(text)))
+    return nonblank(String.lines(text))
 
 def link.of(+path: String) -> IO(String):
   do IO<String>:
@@ -283,51 +265,41 @@ def exec.of(+path: String) -> IO(Bool):
     +out : String <- R.exec(["test", "-x", path])
     return R.ok(out)
 
-def ents.rev.go(es: List<&2, Ent>, acc: List<&2, Ent>) -> List<&2, Ent>:
-  match es:
-    case []:
-      acc
-    case h <> t:
-      ents.rev.go(t, h <> acc)
-
-def ents.rev(es: List<&2, Ent>) -> List<&2, Ent>:
-  ents.rev.go(es, [])
-
 # apply a finished serial to its continuation; uses `go` at most once
 def cont.next(
-  +dir: String,
+  +here: String,
   rest: List<&2, String>,
-  acc: List<&2, Ent>,
+  acc: List<&2, K.File>,
   parent: After,
   go: Goal -> IO(String)
 ) -> IO(String):
   match rest:
     case []:
-      go(FinishDir{ents.rev(acc), parent})
+      go(FinishDir{acc, parent})
     case +h <> t:
-      go(Load{dir ++ "/" ++ h, ChildOf{dir, h, t, acc, parent}})
+      go(Load{here ++ "/" ++ h, ChildOf{here, h, t, acc, parent}})
 
 def cont.rest(
   empty: Bool,
-  +dir: String,
+  +here: String,
   rest: List<&2, String>,
-  +acc: List<&2, Ent>,
+  +acc: List<&2, K.File>,
   parent: After,
   go: Goal -> IO(String)
 ) -> IO(String):
   match empty:
     case True{}:
-      go(FinishDir{ents.rev(acc), parent})
+      go(FinishDir{acc, parent})
     case False{}:
-      cont.next(dir, rest, acc, parent, go)
+      cont.next(here, rest, acc, parent, go)
 
 def cont.apply(+ser: String, after: After, go: Goal -> IO(String)) -> IO(String):
   match after:
     case Done{}:
       IO.pure(String, ser)
-    case ChildOf{+dir, +name, +rest, acc, parent}:
-      cont.rest(List.is_empty(&2, String, rest), dir, rest,
-        Ent{name, ser} <> acc, parent, go)
+    case ChildOf{+here, +name, +rest, acc, parent}:
+      cont.rest(List.is_empty(&2, String, rest), here, rest,
+        K.File{name, ser} <> acc, parent, go)
 
 # an empty directory under a continuation
 def load.dir.empty(after: After, go: Goal -> IO(String)) -> IO(String):
@@ -395,9 +367,10 @@ def load.at(+path: String, after: After, go: Goal -> IO(String)) -> IO(String):
     +r : String <- R.exec(["test", "-f", path])
     load.kind(R.ok(l), R.ok(d), R.ok(r), path, after, go)
 
-# FinishDir: directory serial under its continuation
-def load.finish(kids: List<&2, Ent>, after: After, go: Goal -> IO(String)) -> IO(String):
-  cont.apply(directory(kids), after, go)
+# FinishDir: the directory's serial, its loaded children sorted, under its
+# continuation
+def load.finish(kids: List<&2, K.File>, after: After, go: Goal -> IO(String)) -> IO(String):
+  cont.apply(dir(kids), after, go)
 
 # one step; `go` continues with decreased fuel
 def load.step(goal: Goal, go: Goal -> IO(String)) -> IO(String):
