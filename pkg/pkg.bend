@@ -56,6 +56,104 @@ def words.keep(ws: List<&2, String>) -> List<&2, String>:
 def words(line: String) -> List<&2, String>:
   words.keep(String.split(line, ' '))
 
+# a character bend's loader reads as white space in an import line. The
+# loader trims each line of a file's header and splits an import on `\s+`,
+# JavaScript's white space: tab, line feed, vertical tab, form feed, carriage
+# return and space, the no-break space, and the Unicode space separators, the
+# line and paragraph separators and the byte order mark. A zero-width space
+# or a next-line character is not one, and bend refuses an import it holds.
+def blank(+ch: Char) -> Bool:
+  match ch:
+    case Chr{+x}:
+      Bool.or(Bool.or(U32.is_eq(x, 32), Bool.and(U32.is_ge(x, 9), U32.is_le(x, 13))),
+        Bool.or(Bool.or(U32.is_eq(x, 160), U32.is_eq(x, 5760)),
+          Bool.or(Bool.and(U32.is_ge(x, 8192), U32.is_le(x, 8202)),
+            Bool.or(Bool.or(U32.is_eq(x, 8232), U32.is_eq(x, 8233)),
+              Bool.or(Bool.or(U32.is_eq(x, 8239), U32.is_eq(x, 8287)),
+                Bool.or(U32.is_eq(x, 12288), U32.is_eq(x, 65279)))))))
+
+# the front of a line, past one character that may be blank
+def trim.front.at(skip: Bool, head: Char, tail: String, rest: Unit -> String) -> String:
+  match skip:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      SCon{head, tail}
+
+# a line with its leading blanks dropped
+def trim.front(line: String) -> String:
+  match line:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, +t}:
+      trim.front.at(blank(h), h, t, _u => trim.front(t))
+
+# a character kept before the rest of a line with its trailing blanks
+# dropped. The character goes too when it is blank and nothing follows it.
+def trim.back.at(gone: Bool, head: Char, rest: String) -> String:
+  match gone:
+    case True{}:
+      SNil{}
+    case False{}:
+      SCon{head, rest}
+
+# a line with its trailing blanks dropped, read from the front, so that the
+# trim of a line is a walk over it rather than over its reverse
+def trim.back(line: String) -> String:
+  match line:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, t}:
+      +rest = trim.back(t)
+      trim.back.at(Bool.and(blank(h), String.is_empty(rest)), h, rest)
+
+# a line with the blanks at either end dropped, as bend's loader trims it
+def trim(line: String) -> String:
+  trim.back(trim.front(line))
+
+# the fields of a line read so far: the field under way, and the fields after
+# it
+type Cut is Data:
+  Cut{field: String, after: List<&2, String>}
+
+# a field put before the fields after it, unless it is empty
+def cut.put(field: String, after: List<&2, String>) -> List<&2, String>:
+  match field:
+    case SNil{}:
+      after
+    case SCon{h, t}:
+      SCon{h, t} <> after
+
+# one character before the fields read so far: a blank ends the field under
+# way, and anything else extends it
+def cut.at(gap: Bool, head: Char, sofar: Cut) -> Cut:
+  match gap:
+    case True{}:
+      Cut{field, after} = sofar
+      Cut{"", cut.put(field, after)}
+    case False{}:
+      Cut{field, after} = sofar
+      Cut{SCon{head, field}, after}
+
+# a line cut at its blanks, read from the back
+def cut(line: String) -> Cut:
+  match line:
+    case SNil{}:
+      Cut{"", []}
+    case SCon{+h, t}:
+      cut.at(blank(h), h, cut(t))
+
+# a line's fields once it is cut: the one under way before the rest
+def cut.all(sofar: Cut) -> List<&2, String>:
+  Cut{field, after} = sofar
+  cut.put(field, after)
+
+# the fields of an import line: what is left between its runs of blanks, as
+# bend's loader splits it. `words` splits on spaces alone, which is how a
+# manifest line is split.
+def fields(line: String) -> List<&2, String>:
+  cut.all(cut(line))
+
 # the nth word, or "" when the line is shorter than that. Both the list and the
 # count are scrutinised together, so the walk needs no helper to branch through.
 def word(ws: List<&2, String>, index: Nat) -> String:
@@ -96,10 +194,12 @@ def base_of.step(prelude: Bool, ws: List<&2, String>) -> Stmt:
     case False{}:
       mod_of(ws)
 
-# `import Base` brings in the prelude, which is no part of any package
+# `import Base` brings in the prelude, which is no part of any package. bend
+# lets a comment follow it, and a comment names no module.
 def base_of(+ws: List<&2, String>) -> Stmt:
   base_of.step(
-    Bool.and(Nat.is_eq(List.length(&2, String, ws), 2n),
+    Bool.and(Bool.or(Nat.is_eq(List.length(&2, String, ws), 2n),
+        String.starts_with(word(ws, 2n), "#")),
       Bool.and(String.eq(word(ws, 0n), "import"), String.eq(word(ws, 1n), "Base"))),
     ws)
 
@@ -107,8 +207,8 @@ def base_of(+ws: List<&2, String>) -> Stmt:
 def quiet(+line: String) -> Bool:
   Bool.or(String.is_empty(line), String.starts_with(line, "#"))
 
-# a line that says nothing about the header, decided. `words` is a
-# `String.split` and a filter over its result, and this is the arm it hangs
+# a line that says nothing about the header, decided. `fields` is a walk
+# over the line that cuts it at its blanks, and this is the arm it hangs
 # from: every blank line and every comment line of every `.bend` file of the
 # project and of every package it resolves used to be split into words and
 # classified, which is most of the lines ez ever reads.
@@ -117,7 +217,34 @@ def stmt_of.quiet(skip: Bool, +line: String) -> Stmt:
     case True{}:
       SNone{}
     case False{}:
-      base_of(words(line))
+      base_of(fields(line))
+
+# the rest of a line, past one character that may be skipped
+def foreign.gap.at(skip: Bool, head: Char, tail: String, rest: Unit -> String) -> String:
+  match skip:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      SCon{head, tail}
+
+# a line past its `import`, with the spaces, tabs and carriage returns bend's
+# parser skips between the word and the path dropped
+def foreign.gap(line: String) -> String:
+  match line:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, +t}:
+      foreign.gap.at(Bool.or(Char.is_eq(h, ' '), Bool.or(Char.is_eq(h, '\t'),
+        Char.is_eq(h, '\r'))), h, t, _u => foreign.gap(t))
+
+# the quoted path of a foreign import, once its `import` and the gap after
+# it are gone
+def foreign.path(+rest: String) -> String:
+  String.take(String.drop(rest, 1n), Nat.sub(String.length(rest), 2n))
+
+# whether what follows a line's `import` is a quoted path
+def foreign.quoted(+rest: String) -> Bool:
+  Bool.and(String.starts_with(rest, "\""), String.ends_with(rest, "\""))
 
 # the foreign import decided. The rest of the cascade hangs off the False arm
 # rather than sitting in an argument, so a line that is a foreign import pays
@@ -125,15 +252,17 @@ def stmt_of.quiet(skip: Bool, +line: String) -> Stmt:
 def stmt_of.foreign(here: Bool, +line: String) -> Stmt:
   match here:
     case True{}:
-      SForeign{String.take(String.drop(line, 8n), Nat.sub(String.length(line), 9n))}
+      SForeign{foreign.path(foreign.gap(String.drop(line, 6n)))}
     case False{}:
       stmt_of.quiet(quiet(line), line)
 
 # a trimmed line classified. A foreign import is tested first: it lives in a
-# def's body, long after the header has ended.
+# def's body, long after the header has ended. bend's parser reads the word
+# `import`, skips spaces, tabs and carriage returns, and reads a quoted path.
 def stmt_of(+line: String) -> Stmt:
   stmt_of.foreign(
-    Bool.and(String.starts_with(line, "import \""), String.ends_with(line, "\"")), line)
+    Bool.and(String.starts_with(line, "import"),
+      foreign.quoted(foreign.gap(String.drop(line, 6n)))), line)
 
 # a module named after the header has ended is not part of the header, so the
 # line is ignored rather than followed
@@ -159,7 +288,7 @@ def scan.go(st: Head, stmt: Stmt) -> Head:
 
 # one line of a source file against the state
 def scan.step(st: Head, raw: String) -> Head:
-  scan.go(st, stmt_of(String.trim(raw)))
+  scan.go(st, stmt_of(trim(raw)))
 
 # what a finished scan gathered, in source order
 def scan.fin(st: Head) -> Scan:
