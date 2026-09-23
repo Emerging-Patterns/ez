@@ -548,6 +548,21 @@ What the README's reproducibility sentence ("`ez lock` never has to consult anyt
 
 The demand loop's cost, measured in WP1 on this repository's own lock with every tree already under BEND_LIB (five git packages, all imported directly, so two rounds of `wants` and one `plan`): 0.21 s for the binary before WP1 and 0.53 s after, median of seven runs each. Every round of `wants` scans every tracked source for imports again, since the World holds texts and not scans, and `plan` scans once more and checks every package's SHA-256 once. With every tree to clone (an empty BEND_LIB) the clones dominate: 7.3 s before and 7.4 s after. The design's first risk is real but small; if WP2 makes it matter, the World can carry each source's scanned imports instead of its text.
 
+### Add and remove progress
+
+The design for converting `ez add` and `ez remove`, [ez-add-planner.md](ez-add-planner.md), is accepted with every recommendation. It decides seven behavior changes: a refused `ez add` lays nothing; `ez add` stops writing `.ez/origins.toml`; a re-added vendored dependency is laid under `.ez/lib` and its old committed tree dropped; `ez remove` drops a vendored dependency's committed tree unless another dependency names the same hash; `ez remove` of a name the ledger does not have refuses; a package whose imports climb out of its checkout is refused; and `vendor = true` is written as a bare boolean. EZ-LED-8 now says a leading `~/` is expanded when the path is recorded. Its spike, `pkg/tree/`, makes the package walk a pure function of a checkout's files, computes the same hash as `K.pkg_of` on five entries of this repository, and proves three untagged laws toward EZ-RES-2 and EZ-HASH-3.
+
+| WP | State | Scope |
+| :---- | :---- | :---- |
+| A0 | open | Shared plan types in `plan/plan.bend`, git questions in `git/ask.bend`, the pure walk promoted and `K.pkg_of` rewritten over it. |
+| A1 | open | `ez remove` in planner form. |
+| A2 | open | `ez add` in planner form. |
+| A3 | open | Bare `vendor = true`. |
+| A4 | open | `ez init` in planner form. |
+| A5 | open | EZ-RES-1: the release chosen is the greatest. |
+| A6 | open | EZ-LED-2 over `Rend.add.keep`. |
+| A7 | open | Flip the rows whose halves have all landed. |
+
 ## Missing behavior
 
 ### Behavior the code guarantees that the RFC does not mention
