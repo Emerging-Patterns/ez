@@ -32,7 +32,8 @@ def loop.step(st: AP.Step, +lib: String, world: A.World, go: A.World -> IO(Unit)
       Run.exec.plan(lib, pl)
 
 # the loop, under fuel. Every round adds an answer, since the planner never
-# asks what the World answers already, and it asks at most three rounds.
+# asks what the World answers already, and it asks at most three rounds, so
+# the fuel is only a guard.
 def loop(fuel: Nat, +lib: String, +world: A.World) -> IO(Unit):
   match fuel:
     case 0n:
@@ -48,5 +49,5 @@ def run(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Un
     h : Result<&1, &1, U32 & String, String> <- IO.get_env("HOME")
     led : Maybe<&2, String> <- F.read(A.toml())
     ig : Maybe<&2, String> <- F.read(A.ignore.file())
-    loop(10n, lib, A.World{A.Args{target, ref, entry, rename}, String.trim(R.text(pwd)),
+    loop(U32.to_nat(100), lib, A.World{A.Args{target, ref, entry, rename}, String.trim(R.text(pwd)),
       Run.env.text(h), led, F.text_of(ig), []})

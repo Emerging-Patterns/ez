@@ -9553,7 +9553,7 @@ def Laws.lock_needs_ledger(up, _only, _listing, _rs, _us):
       {==}
 
 # The same once the read is rewritten to the `Bad` the premise gives.
-def Laws.lock_refuses_unread(up, only, s, listing, rs, us, _why, bad):
+def Laws.lock_refuses_unread(up, only, _s, listing, rs, us, _why, bad):
   match up:
     case True{}:
       %bad : {P.refuses.doc(P.decide(W.inputs.of(Up.next(only, _, us), listing, rs))) == True{}

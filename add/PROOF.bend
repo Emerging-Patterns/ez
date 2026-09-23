@@ -103,12 +103,13 @@ law seal_success:
   for ok: {AP.refuses.plan(AP.seal(es, o)) == False{} : Bool}
   {AP.seal(es, o) == P.Plan{es, P.Success{}} : P.Plan}
 
-def seal_success(es, o, ok):
+def seal_success(_es, o, ok):
   match o:
     case P.Success{}:
       {==}
     case P.Refused{why}:
-      Eq.bit.absurd2(&2, {AP.seal(es, P.Refused{why}) == P.Plan{es, P.Success{}} : P.Plan}, ok)
+      Eq.bit.absurd2(&2, {AP.seal(_es, P.Refused{why}) == P.Plan{_es, P.Success{}} : P.Plan},
+        ok)
 
 # LAW: and its outcome is a success
 law seal_outcome:
@@ -117,7 +118,7 @@ law seal_outcome:
   for ok: {AP.refuses.plan(AP.seal(es, o)) == False{} : Bool}
   {o == P.Success{} : P.Outcome}
 
-def seal_outcome(es, o, ok):
+def seal_outcome(_es, o, ok):
   match o:
     case P.Success{}:
       {==}
@@ -265,7 +266,8 @@ def Laws.add_records_as_given(w, ok):
 
 # The target's place is rewritten to the path the premise gives.
 def Laws.add_path_as_given(w, p, e):
-  %Equal.sym(Tgt.Place, Tgt.classify(A.target(w)), Tgt.Local{p}, e) : {A.url.of(_, A.home(w)) == Tgt.expand(A.home(w), p) : String}
+  %Equal.sym(Tgt.Place, Tgt.classify(A.target(w)), Tgt.Local{p}, e)
+    : {A.url.of(_, A.home(w)) == Tgt.expand(A.home(w), p) : String}
   {==}
 
 # LAW: with no ref, the tag recorded is the default one
@@ -466,8 +468,11 @@ def eff(+w: A.World) -> List<&2, P.Effect>:
     A.manifest.of(A.read(w)), w)
 
 # the manifest of a ledger that read, as the premise gives it
-def good_m(+w: A.World, +m: M.Manifest, good: {A.read(w) == M.Good{m} : M.Read})
-    -> {A.manifest.of(A.read(w)) == m : M.Manifest}:
+def good_m(
+  +w: A.World,
+  +m: M.Manifest,
+  good: {A.read(w) == M.Good{m} : M.Read}
+) -> {A.manifest.of(A.read(w)) == m : M.Manifest}:
   Equal.cong(M.Read, M.Manifest, r => A.manifest.of(r), A.read(w), M.Good{m}, good)
 
 def Laws.add_edits_ledger(w, m, good, ok):
@@ -582,8 +587,10 @@ def lose_v(v, w, e):
       {==}
 
 # The lookup is rewritten to the None the premise gives, which is refused.
-def entry_loses(+w: A.World, miss: {None{} == got(w) : Maybe<&2, String>})
-    -> {win(AP.outcome.k(AP.walked(w), w)) == False{} : Bool}:
+def entry_loses(
+  +w: A.World,
+  miss: {None{} == got(w) : Maybe<&2, String>}
+) -> {win(AP.outcome.k(AP.walked(w), w)) == False{} : Bool}:
   %miss : {win(AP.outcome.entry(_, AP.walked(w), w)) == False{} : Bool}
   {==}
 
@@ -1052,7 +1059,7 @@ law lays_seal:
   for e: {AP.lays.named(es) == True{} : Bool}
   {AP.lays.named(AP.effects(AP.seal(es, o))) == True{} : Bool}
 
-def lays_seal(es, o, e):
+def lays_seal(_es, o, e):
   match o:
     case P.Success{}:
       e

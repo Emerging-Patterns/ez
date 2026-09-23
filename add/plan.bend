@@ -60,8 +60,8 @@ type Q is Data:
   QClone{rev: String}
 
 # a question about a source
-def ask.of(q: Q, +from: String) -> Up.Ask:
-  match q:
+def ask.of(question: Q, +from: String) -> Up.Ask:
+  match question:
     case QTags{}:
       Up.Tags{from}
     case QHead{}:
@@ -80,12 +80,12 @@ def asks.of(qs: List<&2, Q>, +from: String) -> List<&2, Up.Ask>:
       ask.of(h, from) <> asks.of(t, from)
 
 # what git printed for a question about the World's source
-def said(+world: A.World, q: Q) -> Up.Said:
-  Up.printed(A.replies(world), ask.of(q, A.from(world)), "ls-remote " ++ A.url(world))
+def said(+world: A.World, question: Q) -> Up.Said:
+  Up.printed(A.replies(world), ask.of(question, A.from(world)), "ls-remote " ++ A.url(world))
 
 # what was printed, "" when nothing was
-def said.text(s: Up.Said) -> String:
-  match s:
+def said.text(printed: Up.Said) -> String:
+  match printed:
     case Up.Said{text}:
       text
     case Up.Unsaid{_why}:
@@ -94,8 +94,8 @@ def said.text(s: Up.Said) -> String:
       ""
 
 # the rows git printed for a question, none when nothing was
-def rows(+world: A.World, q: Q) -> List<&2, Git.Row>:
-  Git.rows(String.lines(said.text(said(world, q))))
+def rows(+world: A.World, question: Q) -> List<&2, Git.Row>:
+  Git.rows(String.lines(said.text(said(world, question))))
 
 # ---------------------------------------------------------------------------
 # what the ref names
@@ -132,8 +132,8 @@ def tip.found(+rev: String, why: String) -> Tip:
 
 # a named ref, read exactly as `refs/tags/<ref>`, its peeled commit first,
 # then `refs/heads/<ref>`
-def tip.refs(s: Up.Said, +world: A.World) -> Tip:
-  match s:
+def tip.refs(printed: Up.Said, +world: A.World) -> Tip:
+  match printed:
     case Up.Said{text}:
       tip.found(Git.exact(Git.rows(String.lines(text)), A.ref(world)),
         "ez: " ++ A.url(world) ++ " has no ref named " ++ A.ref(world))
@@ -150,8 +150,8 @@ def tip.head.rows(+rows: List<&2, Git.Row>, +world: A.World) -> Tip:
       " has no semver-ish tag and its HEAD names no branch; name a ref to pin"},
     tip.found(Git.tip.rev(rows), "ez: " ++ A.url(world) ++ " has no HEAD"))
 
-def tip.head(s: Up.Said, +world: A.World) -> Tip:
-  match s:
+def tip.head(printed: Up.Said, +world: A.World) -> Tip:
+  match printed:
     case Up.Said{text}:
       tip.head.rows(Git.rows(String.lines(text)), world)
     case Up.Unsaid{why}:
@@ -172,8 +172,8 @@ def tip.tags.rows(+rows: List<&2, Git.Row>, +world: A.World) -> Tip:
   +chosen = Git.choose(Git.tag.names(rows))
   tip.chosen(String.is_empty(chosen), chosen, rows, world)
 
-def tip.tags(s: Up.Said, +world: A.World) -> Tip:
-  match s:
+def tip.tags(printed: Up.Said, +world: A.World) -> Tip:
+  match printed:
     case Up.Said{text}:
       tip.tags.rows(Git.rows(String.lines(text)), world)
     case Up.Unsaid{why}:
@@ -201,8 +201,8 @@ def tip.of(rev: Bool, empty: Bool, +world: A.World) -> Tip:
 def tip(+world: A.World) -> Tip:
   tip.of(Git.is_rev(A.ref(world)), String.is_empty(A.ref(world)), world)
 
-def tip.rev(t: Tip) -> String:
-  match t:
+def tip.rev(tip: Tip) -> String:
+  match tip:
     case At{rev}:
       rev
     case TipAsk{_q}:
@@ -248,8 +248,8 @@ def co.at(+world: A.World, +rev: String) -> Co:
 def co(+world: A.World) -> Co:
   co.at(world, rev(world))
 
-def co.files(c: Co) -> List<&2, K.Source>:
-  match c:
+def co.files(checkout: Co) -> List<&2, K.Source>:
+  match checkout:
     case Co{_nar, fs}:
       fs
     case CoWait{}:
@@ -257,8 +257,8 @@ def co.files(c: Co) -> List<&2, K.Source>:
     case CoNo{_why}:
       []
 
-def co.nar(c: Co) -> String:
-  match c:
+def co.nar(checkout: Co) -> String:
+  match checkout:
     case Co{nar, _fs}:
       nar
     case CoWait{}:
@@ -340,8 +340,8 @@ type Verdict is Data:
   Stop{why: String}
 
 # the checkout answered, still to ask, or not to be had
-def decide.co(c: Co, +rev: String) -> Verdict:
-  match c:
+def decide.co(checkout: Co, +rev: String) -> Verdict:
+  match checkout:
     case Co{_nar, _fs}:
       Go{}
     case CoWait{}:
@@ -350,8 +350,8 @@ def decide.co(c: Co, +rev: String) -> Verdict:
       Stop{why}
 
 # what the ref names, then the checkout at it
-def decide.tip(t: Tip, +world: A.World) -> Verdict:
-  match t:
+def decide.tip(tip: Tip, +world: A.World) -> Verdict:
+  match tip:
     case At{+rev}:
       decide.co(co.at(world, rev), rev)
     case TipAsk{q}:
@@ -368,8 +368,8 @@ def decide.early(ok: Bool, +why: String, +world: A.World) -> Verdict:
       Stop{why}
 
 # a target that names nothing is refused before anything is asked
-def decide.place(p: Tgt.Place, +world: A.World) -> Verdict:
-  match p:
+def decide.place(place: Tgt.Place, +world: A.World) -> Verdict:
+  match place:
     case Tgt.Bad{why}:
       Stop{"ez: " ++ why}
     case Tgt.Local{_path}:
@@ -381,8 +381,8 @@ def decide.place(p: Tgt.Place, +world: A.World) -> Verdict:
 
 # no ledger, or one that does not parse, is refused before anything else,
 # with the reason every command that edits a ledger gives
-def decide.read(r: M.Read, +world: A.World) -> Verdict:
-  match r:
+def decide.read(read: M.Read, +world: A.World) -> Verdict:
+  match read:
     case M.Bad{why}:
       Stop{"ez: " ++ M.show(M.Bad{why})}
     case M.Good{_m}:
@@ -404,8 +404,8 @@ def outcome.name(ok: Bool, +world: A.World) -> P.Outcome:
       P.Refused{why(world)}
 
 # the walk's verdict: a package, or why there is none
-def outcome.walk(k: K.Walked, +world: A.World) -> P.Outcome:
-  match k:
+def outcome.walk(walk: K.Walked, +world: A.World) -> P.Outcome:
+  match walk:
     case K.Walked{_h, _root, _fs, _ss}:
       outcome.name(String.is_empty(why(world)), world)
     case K.Asks{at}:
@@ -414,17 +414,17 @@ def outcome.walk(k: K.Walked, +world: A.World) -> P.Outcome:
       P.Refused{why}
 
 # the entry has to be in the checkout for there to be a package to walk
-def outcome.entry(got: Maybe<&2, String>, k: K.Walked, +world: A.World) -> P.Outcome:
+def outcome.entry(got: Maybe<&2, String>, walk: K.Walked, +world: A.World) -> P.Outcome:
   match got:
     case None{}:
       P.Refused{"ez: " ++ entry(world) ++ " is not in " ++ A.url(world) ++ " at " ++
         rev(world)}
     case Some{_text}:
-      outcome.walk(k, world)
+      outcome.walk(walk, world)
 
-# how an add over an answered World ends, with `k` its walk
-def outcome.k(k: K.Walked, +world: A.World) -> P.Outcome:
-  outcome.entry(K.look(files(world), Path.norm(entry(world))), k, world)
+# how an add over an answered World ends, given its walk
+def outcome.k(walk: K.Walked, +world: A.World) -> P.Outcome:
+  outcome.entry(K.look(files(world), Path.norm(entry(world))), walk, world)
 
 # ---------------------------------------------------------------------------
 # the effects
@@ -436,8 +436,8 @@ def dep.of(+hash: String, +root: String, +world: A.World) -> M.Dep:
 
 # the dependency the plan records: the one `dep.of` makes from the walk, or
 # an empty one when the walk made none, which no plan writes
-def added.k(k: K.Walked, +world: A.World) -> M.Dep:
-  match k:
+def added.k(walk: K.Walked, +world: A.World) -> M.Dep:
+  match walk:
     case K.Walked{h, root, _fs, _ss}:
       dep.of(h, root, world)
     case K.Asks{_at}:
@@ -526,11 +526,12 @@ def ignore.put(same: Bool, +next: String, rest: List<&2, P.Effect>) -> List<&2, 
     case False{}:
       P.Write{A.ignore.file(), next} <> rest
 
-# the lines a person is told: the commit a tag or branch turned out to be,
-# and the import line the package is now reachable by
+# the import line a package is reachable by, from its entry file's name
 def import.line(+hash: String, +base: String) -> String:
   "import " ++ hash ++ "/" ++ base ++ " as " ++ Git.title(Path.unbend(base))
 
+# the lines a person is told: the commit a tag or branch turned out to be,
+# and the import line the package is now reachable by
 def says(+hash: String, +world: A.World) -> List<&2, P.Effect>:
   +line = import.line(hash, Path.base(entry(world)))
   Bool.pick(List<&2, P.Effect>, String.is_empty(tag(world)), [P.Say{line}],
@@ -539,19 +540,26 @@ def says(+hash: String, +world: A.World) -> List<&2, P.Effect>:
 # what an add that walked a package does: the tree laid, ez.toml written,
 # `.gitignore` when the allowlist changes, the old committed tree removed, and
 # what a person is told
-def effects.of(+d: M.Dep, +hash: String, fs: List<&2, K.Source>, ss: List<&2, K.File>, +m: M.Manifest, +world: A.World) -> List<&2, P.Effect>:
-  +old = M.find(A.deps.of(m), M.dep.name(d))
-  +left = A.deps.of(Rend.add.keep(m, d))
+def effects.of(
+  +dep: M.Dep,
+  +hash: String,
+  fs: List<&2, K.Source>,
+  ss: List<&2, K.File>,
+  +manifest: M.Manifest,
+  +world: A.World
+) -> List<&2, P.Effect>:
+  +old = M.find(A.deps.of(manifest), M.dep.name(dep))
+  +left = A.deps.of(Rend.add.keep(manifest, dep))
   +next = I.sync(left, A.ignore(world))
   P.Lay{place.of(M.source.vendor(M.source.dep(old))), hash,
     List.append(&2, W.Source, srcs(fs), [W.Source{"manifest", K.manifest_of(ss)}])} <>
-    (P.Write{A.toml(), Rend.show(Rend.add.keep(m, d))} <>
+    (P.Write{A.toml(), Rend.show(Rend.add.keep(manifest, dep))} <>
       ignore.put(String.eq(next, A.ignore(world)), next,
         P.drops.of(gone(old, hash, left), says(hash, world))))
 
 # the effects of an add whose walk made a package; none otherwise
-def effects.k(k: K.Walked, +world: A.World) -> List<&2, P.Effect>:
-  match k:
+def effects.k(walk: K.Walked, +world: A.World) -> List<&2, P.Effect>:
+  match walk:
     case K.Walked{+h, root, fs, ss}:
       effects.of(dep.of(h, root, world), h, fs, ss, A.manifest.of(A.read(world)), world)
     case K.Asks{_at}:
@@ -572,13 +580,13 @@ def seal(es: List<&2, P.Effect>, outcome: P.Outcome) -> P.Plan:
 
 # the plan once every answer is in, with `k` the walk. The walk is made once
 # and read by both halves.
-def made(+k: K.Walked, +world: A.World) -> P.Plan:
-  seal(effects.k(k, world), outcome.k(k, world))
+def made(+walk: K.Walked, +world: A.World) -> P.Plan:
+  seal(effects.k(walk, world), outcome.k(walk, world))
 
 # the plan for where the World stands. One that still asks is a World the
 # interpreter did not finish, and is refused rather than guessed at.
-def plan.v(v: Verdict, +world: A.World) -> P.Plan:
-  match v:
+def plan.v(verdict: Verdict, +world: A.World) -> P.Plan:
+  match verdict:
     case Go{}:
       made(walked(world), world)
     case Wait{_qs}:
@@ -605,8 +613,8 @@ def refuses(+world: A.World) -> Bool:
   refuses.plan(plan(world))
 
 # the questions still open where the World stands
-def qs.v(v: Verdict) -> List<&2, Q>:
-  match v:
+def qs.v(verdict: Verdict) -> List<&2, Q>:
+  match verdict:
     case Go{}:
       []
     case Wait{qs}:
@@ -627,8 +635,8 @@ type Step is Data:
   Asking{asks: List<&2, Up.Ask>}
   Run{plan: P.Plan}
 
-def step.v(v: Verdict, +world: A.World) -> Step:
-  match v:
+def step.v(verdict: Verdict, +world: A.World) -> Step:
+  match verdict:
     case Go{}:
       Run{plan.v(Go{}, world)}
     case Wait{qs}:
@@ -722,6 +730,7 @@ def weigh(src: W.Source) -> K.File:
   W.Source{at, +text} = src
   K.File{at, Sha.hex(text)}
 
+# every laid file weighed by its own text
 def weighs(fs: List<&2, W.Source>) -> List<&2, K.File>:
   match fs:
     case []:
@@ -737,8 +746,8 @@ def lay.named(+hash: String, +fs: List<&2, W.Source>) -> Bool:
   Bool.and(String.eq(hash, K.hash_of(sums)), String.eq(last(fs), K.manifest_of(sums)))
 
 # whether an effect that lays a tree lays a named one
-def lays.one(e: P.Effect) -> Bool:
-  match e:
+def lays.one(effect: P.Effect) -> Bool:
+  match effect:
     case P.Lay{_place, hash, fs}:
       lay.named(hash, fs)
     case _:

@@ -35,54 +35,63 @@ def toml() -> String:
 def ignore.file() -> String:
   ".gitignore"
 
+# the arguments
 def args(world: World) -> Args:
   World{a, _here, _home, _ledger, _ignore, _replies} = world
   a
 
-def args.target(a: Args) -> String:
-  Args{t, _ref, _entry, _rename} = a
+def args.target(given: Args) -> String:
+  Args{t, _ref, _entry, _rename} = given
   t
 
-def args.ref(a: Args) -> String:
-  Args{_t, r, _entry, _rename} = a
+def args.ref(given: Args) -> String:
+  Args{_t, r, _entry, _rename} = given
   r
 
-def args.entry(a: Args) -> String:
-  Args{_t, _ref, e, _rename} = a
+def args.entry(given: Args) -> String:
+  Args{_t, _ref, e, _rename} = given
   e
 
-def args.rename(a: Args) -> String:
-  Args{_t, _ref, _entry, r} = a
+def args.rename(given: Args) -> String:
+  Args{_t, _ref, _entry, r} = given
   r
 
+# the target asked for
 def target(world: World) -> String:
   args.target(args(world))
 
+# the ref asked for, "" for none
 def ref(world: World) -> String:
   args.ref(args(world))
 
 def entry.arg(world: World) -> String:
   args.entry(args(world))
 
+# the `--rename` asked for, "" for none
 def rename(world: World) -> String:
   args.rename(args(world))
 
+# the directory ez runs in, which is the project root
 def here(world: World) -> String:
   World{_args, h, _home, _ledger, _ignore, _replies} = world
   h
 
+# HOME, which a `~/` target is expanded against
 def home(world: World) -> String:
   World{_args, _here, h, _ledger, _ignore, _replies} = world
   h
 
+# the ledger's text, None when there is no ez.toml
 def ledger(world: World) -> Maybe<&2, String>:
   World{_args, _here, _home, l, _ignore, _replies} = world
   l
 
+# `.gitignore`'s text, "" when there is none
 def ignore(world: World) -> String:
   World{_args, _here, _home, _ledger, i, _replies} = world
   i
 
+# every question answered so far
 def replies(world: World) -> List<&2, Up.Reply>:
   World{_args, _here, _home, _ledger, _ignore, rs} = world
   rs
