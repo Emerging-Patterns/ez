@@ -1413,13 +1413,22 @@ def rest_no_dot(a, b):
       step_false(Tgt.plain.at(h), _u => Named.bare.rest(t ++ ("." ++ b)),
         rest_no_dot(t, b))
 
-def Laws.bare_no_dot(a, b):
+# LAW: a dot anywhere ends a bare key
+law bare_dot:
+  for +a: String
+  for +b: String
+  {Named.bare(a ++ ("." ++ b)) == False{} : Bool}
+
+def bare_dot(a, b):
   match a:
     case SNil{}:
       {==}
     case SCon{+h, +t}:
       step_false(Tgt.plain.at(h), _u => Named.bare.rest(t ++ ("." ++ b)),
         rest_no_dot(t, b))
+
+def Laws.bare_no_dot(a, b):
+  bare_dot(a, b)
 
 def Laws.name_keeps(n, _h, _en, url, _rev, _tag, _root, _nar, _vend, t, pkg, fresh):
   %Equal.sym(Bool, String.eq(url, url), True{}, Eq.string_eq_self(url)) :
@@ -1429,10 +1438,29 @@ def Laws.name_keeps(n, _h, _en, url, _rev, _tag, _root, _nar, _vend, t, pkg, fre
 def Laws.had_fresh(_url, _fresh):
   {==}
 
-def Laws.had_keeps(n, _h, _en, url, _rev, _tag, _root, _nar, _vend, t, fresh):
+# LAW: the ledger's name for a git source it holds first is that name
+law had_first:
+  for n: String
+  for h: String
+  for en: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for fresh: String
+  {Named.had(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+    fresh) == n : String}
+
+def had_first(n, _h, _en, url, _rev, _tag, _root, _nar, _vend, t, fresh):
   %Equal.sym(Bool, String.eq(url, url), True{}, Eq.string_eq_self(url)) :
     {Named.had.at(_, n, Named.had(t, url, fresh)) == n : String}
   {==}
+
+def Laws.had_keeps(n, h, en, url, rev, tag, root, nar, vend, t, fresh):
+  had_first(n, h, en, url, rev, tag, root, nar, vend, t, fresh)
 
 def Laws.had_skips_git(n, _h, _en, _u, url, _rev, _tag, _root, _nar, _vend, t, fresh, ne):
   %ne : {Named.had.at(_, n, Named.had(t, url, fresh)) == Named.had(t, url, fresh)
@@ -1458,17 +1486,112 @@ def Laws.clash_same(n, _h, _en, url, rev, tag, root, nar, vend, t):
     {Bool.not(_) == False{} : Bool}
   {==}
 
-def Laws.clash_other(n, _h, _en, u, url, rev, tag, root, nar, vend, t, ne):
+# LAW: a name held first by another git source clashes
+law clash_first:
+  for +n: String
+  for h: String
+  for en: String
+  for u: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for ne: {False{} == String.eq(u, url) : Bool}
+  {Named.clash(M.Dep{n, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, n,
+    url) == True{} : Bool}
+
+def clash_first(n, _h, _en, u, url, rev, tag, root, nar, vend, t, ne):
   %Equal.sym(Bool, String.eq(n, n), True{}, Eq.string_eq_self(n)) :
     {Named.clash.at(_, M.Git{u, rev, tag, root, nar, vend}, url,
       Named.clash(t, n, url)) == True{} : Bool}
   %ne : {Bool.not(_) == True{} : Bool}
   {==}
 
+def Laws.clash_other(n, h, en, u, url, rev, tag, root, nar, vend, t, ne):
+  clash_first(n, h, en, u, url, rev, tag, root, nar, vend, t, ne)
+
 def Laws.clash_hub(n, _h, _en, url, t):
   %Equal.sym(Bool, String.eq(n, n), True{}, Eq.string_eq_self(n)) :
     {Named.clash.at(_, M.Hub{}, url, Named.clash(t, n, url)) == True{} : Bool}
   {==}
+
+# LAW: a given `--rename` is the name
+law as_rename:
+  for ds: List<&2, M.Dep>
+  for +url: String
+  for +rename: String
+  for +pkg: String
+  for +fresh: String
+  for e: {False{} == String.is_empty(rename) : Bool}
+  {Named.as(ds, url, rename, pkg, fresh) == rename : String}
+
+def as_rename(ds, url, rename, pkg, fresh, e):
+  %e : {Bool.pick(String, _, Named.name(ds, url, pkg, fresh), rename) == rename
+    : String}
+  {==}
+
+def Laws.rename_wins(ds, url, rename, pkg, fresh, e):
+  as_rename(ds, url, rename, pkg, fresh, e)
+
+def Laws.rename_dotted(a, b):
+  %nonempty_app(a, '.', b) :
+    {Bool.or(_, Named.bare(a ++ ("." ++ b))) == False{} : Bool}
+  bare_dot(a, b)
+
+# LAW: a second, different, non-empty name for a recorded source is moved
+law moved_of:
+  for +n: String
+  for +rename: String
+  for er: {False{} == String.is_empty(rename) : Bool}
+  for en0: {False{} == String.is_empty(n) : Bool}
+  for nr: {False{} == String.eq(n, rename) : Bool}
+  {Named.moved.of(n, rename) == True{} : Bool}
+
+def moved_of(n, rename, er, en0, nr):
+  %er : {Bool.and(Bool.not(_), Bool.and(Bool.not(String.is_empty(n)),
+    Bool.not(String.eq(n, rename)))) == True{} : Bool}
+  %en0 : {Bool.and(Bool.not(_), Bool.not(String.eq(n, rename))) == True{}
+    : Bool}
+  %nr : {Bool.not(_) == True{} : Bool}
+  {==}
+
+# The ledger's name for the source is `n` (`had_keeps`), and the premises
+# settle the three tests on it.
+def Laws.rename_moved(n, h, en, url, rev, tag, root, nar, vend, t, rename, er, en0, nr):
+  Equal.trans(Bool,
+    Named.moved(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+      rename),
+    Named.moved.of(n, rename),
+    True{},
+    Equal.cong(String, Bool, o => Named.moved.of(o, rename),
+      Named.had(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+        ""),
+      n,
+      had_first(n, h, en, url, rev, tag, root, nar, vend, t, "")),
+    moved_of(n, rename, er, en0, nr))
+
+# `--rename` is the name (`rename_wins`), and that name is held by another
+# source (`clash_other`).
+def Laws.rename_clash(r, h, en, u, url, rev, tag, root, nar, vend, t, pkg, fresh, ne, er):
+  Equal.trans(Bool,
+    Named.clash(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t,
+      Named.as(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, url, r,
+        pkg, fresh), url),
+    Named.clash(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, r,
+      url),
+    True{},
+    Equal.cong(String, Bool,
+      o => Named.clash(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t,
+        o, url),
+      Named.as(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, url, r,
+        pkg, fresh),
+      r,
+      as_rename(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t,
+        url, r, pkg, fresh, er)),
+    clash_first(r, h, en, u, url, rev, tag, root, nar, vend, t, ne))
 
 # A pin's two emptiness tests are rewritten to the False each premise gives,
 # and what is left is the arm that passes or the reason written out.

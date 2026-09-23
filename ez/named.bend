@@ -149,5 +149,39 @@ def why(ds: List<&2, M.Dep>, +name: String, +url: String) -> String:
     "ez: " ++ url ++ " has no name to record it under",
     Bool.pick(String, clash(ds, name, url),
       "ez: ez.toml already has a deps." ++ name ++ " from another source; " ++
-        "remove it first, or add this one by hand under another name",
+        "remove it first, or add this one with --rename",
       ""))
+
+# `--rename`, the way `cargo add --rename` works: when it is given, it is the
+# name, ahead of every rule above
+def as(ds: List<&2, M.Dep>, +url: String, +rename: String, +pkg: String, +fresh: String) -> String:
+  +named = name(ds, url, pkg, fresh)
+  Bool.pick(String, String.is_empty(rename), named, rename)
+
+# a `--rename` that can stand as a key, or none at all
+def renamed.ok(+rename: String) -> Bool:
+  Bool.or(String.is_empty(rename), bare(rename))
+
+# whether a `--rename` gives a second name to a source the ledger already
+# records as `old`, "" when it records none
+def moved.of(+old: String, +rename: String) -> Bool:
+  Bool.and(Bool.not(String.is_empty(rename)),
+    Bool.and(Bool.not(String.is_empty(old)), Bool.not(String.eq(old, rename))))
+
+# whether a `--rename` would record a source the ledger already names under a
+# second name. That is refused rather than duplicated or silently renamed.
+def moved(ds: List<&2, M.Dep>, +url: String, +rename: String) -> Bool:
+  moved.of(had(ds, url, ""), rename)
+
+# why a name cannot be recorded when `--rename` may have been given, or
+# nothing when it can
+def why.as(+ds: List<&2, M.Dep>, +name: String, +url: String, +rename: String) -> String:
+  +old = had(ds, url, "")
+  +other = why(ds, name, url)
+  Bool.pick(String, renamed.ok(rename),
+    Bool.pick(String, moved(ds, url, rename),
+      "ez: " ++ url ++ " is already recorded as deps." ++ old ++
+        "; remove it first to record it as " ++ rename,
+      other),
+    "ez: --rename " ++ rename ++ " is not a TOML bare key " ++
+      "(letters, digits, `-` and `_`)")

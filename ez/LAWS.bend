@@ -505,6 +505,64 @@ law name_keeps:
   {Named.name(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
     pkg, fresh) == n : String}
 
+# LAW: `--rename`, when given, is the name, ahead of the ledger's, the
+# package's and the source's
+law rename_wins:
+  for ds: List<&2, M.Dep>
+  for +url: String
+  for +rename: String
+  for +pkg: String
+  for +fresh: String
+  for e: {False{} == String.is_empty(rename) : Bool}
+  {Named.as(ds, url, rename, pkg, fresh) == rename : String}
+
+# LAW: a `--rename` that is not a bare key, like `a.b`, is refused
+law rename_dotted:
+  for +a: String
+  for +b: String
+  {Named.renamed.ok(a ++ ("." ++ b)) == False{} : Bool}
+
+# LAW: a `--rename` of a source the ledger already records under another name
+# is refused, rather than recorded twice or renamed behind the ledger's back
+law rename_moved:
+  for +n: String
+  for +h: String
+  for +en: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +t: List<&2, M.Dep>
+  for +rename: String
+  for er: {False{} == String.is_empty(rename) : Bool}
+  for en0: {False{} == String.is_empty(n) : Bool}
+  for nr: {False{} == String.eq(n, rename) : Bool}
+  {Named.moved(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, url,
+    rename) == True{} : Bool}
+
+# LAW: and a `--rename` the ledger gives to another source still clashes
+law rename_clash:
+  for +r: String
+  for +h: String
+  for +en: String
+  for +u: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for +vend: Bool
+  for +t: List<&2, M.Dep>
+  for +pkg: String
+  for +fresh: String
+  for ne: {False{} == String.eq(u, url) : Bool}
+  for er: {False{} == String.is_empty(r) : Bool}
+  {Named.clash(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t,
+    Named.as(M.Dep{r, h, en, M.Git{u, rev, tag, root, nar, vend}} <> t, url, r,
+      pkg, fresh), url) == True{} : Bool}
+
 # LAW: a ledger that holds no dependency takes the name the source gives
 # itself
 law had_fresh:

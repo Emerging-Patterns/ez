@@ -462,10 +462,35 @@ def add.take(ok: Bool, why: String, manifest: M.Manifest, name: String, got: Git
 
 # the vendoring's answer named, by `Named.name`, and refused when the ledger
 # gives that name to another source
-def add.named(+manifest: M.Manifest, +got: Git.Got, +fresh: String, +url: String) -> IO(Unit):
-  +name = Named.name(deps.of(manifest), url, add.pkg(got), fresh)
-  +why = Named.why(deps.of(manifest), name, url)
+def add.named(
+  +manifest: M.Manifest,
+  +got: Git.Got,
+  +fresh: String,
+  +url: String,
+  +rename: String
+) -> IO(Unit):
+  +name = Named.as(deps.of(manifest), url, rename, add.pkg(got), fresh)
+  +why = Named.why.as(deps.of(manifest), name, url, rename)
   add.take(String.is_empty(why), why, manifest, name, got)
+
+# a `--rename` that is no key is refused before anything is fetched
+def add.fetch(
+  ok: Bool,
+  +manifest: M.Manifest,
+  +fresh: String,
+  +url: String,
+  +ref: String,
+  +entry: String,
+  +rename: String
+) -> IO(Unit):
+  match ok:
+    case False{}:
+      IO.die(Unit, 1, Named.why.as(deps.of(manifest), rename, url, rename))
+    case True{}:
+      do IO<Unit>:
+        lib : String <- Env.lib()
+        g : Git.Got <- Git.vendor(lib, url, ref, entry)
+        add.named(manifest, g, fresh, url, rename)
 
 # a git dependency vendored, then recorded in the ledger. The name can turn on
 # the checkout's own ez.toml, so it is decided once the checkout is read; a
@@ -473,15 +498,19 @@ def add.named(+manifest: M.Manifest, +got: Git.Got, +fresh: String, +url: String
 # holds the tree. A ledger that does not parse is refused before anything is
 # fetched. The vendoring comes before the write: a ledger naming a package
 # that is not on disk is worse than no entry at all.
-def add.go(ledger: M.Read, fresh: String, +url: String, +ref: String, +entry: String) -> IO(Unit):
+def add.go(
+  ledger: M.Read,
+  fresh: String,
+  +url: String,
+  +ref: String,
+  +entry: String,
+  +rename: String
+) -> IO(Unit):
   match ledger:
     case M.Bad{why}:
       refuse(M.Bad{why})
     case M.Good{manifest}:
-      do IO<Unit>:
-        lib : String <- Env.lib()
-        g : Git.Got <- Git.vendor(lib, url, ref, entry)
-        add.named(manifest, g, fresh, url)
+      add.fetch(Named.renamed.ok(rename), manifest, fresh, url, ref, entry, rename)
 
 # a path, with `~` expanded the way `ez tool run` expands it. A relative path
 # is kept as it was given, relative to the project, so the ledger reads the
@@ -510,17 +539,17 @@ def add.ref.at(given: Bool, +url: String, +ref: String) -> IO(String):
     case False{}:
       Git.default.ref(url)
 
-# `ez add <target> [rev|tag|branch] [entry.bend]`. The target is an
+# `ez add <target> [rev|tag|branch] [entry.bend] [--rename NAME]`. The target is an
 # `owner/repo`, a git url, or a path, the same shapes `ez tool run` takes.
 # A missing ref is resolved, and a missing entry is read from the checkout.
-def add(+target: String, +ref: String, +entry: String) -> IO(Unit):
+def add(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Unit):
   +place = Tgt.classify(target)
   do IO<Unit>:
     +url : String <- add.url(place)
     +got : String <- add.ref.at(Bool.not(String.is_empty(ref)), url, ref)
     r : M.Read <- load()
     +from : String <- Git.anchored(url)
-    add.go(r, Named.called(place, from), url, got, entry)
+    add.go(r, Named.called(place, from), url, got, entry, rename)
 
 # the ledger with a dependency dropped, and its allowlist line with it
 def remove.write(ledger: M.Read, name: String) -> IO(Unit):

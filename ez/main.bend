@@ -50,7 +50,10 @@ def spec() -> Shake.Cli:
           Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
             []),
           Shake.pos("ref", "commit, tag or branch", False{}, None{}, []),
-          Shake.pos("entry", "entry file", False{}, None{}, [])
+          Shake.pos("entry", "entry file", False{}, None{}, []),
+          Shake.opt("rename", None{}, Some{"rename"},
+            "record it under this name, ahead of its own (a TOML bare key)",
+            False{}, None{}, [])
         ], []),
       Shake.sub("remove", "drop a package from the ledger",
         [
@@ -126,7 +129,7 @@ def dispatch(sub: Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Uni
       Cmd.init(Shake.get(matched, "name"), Shake.get(matched, "entry"))
     case CAdd{}:
       Cmd.add(Shake.get(matched, "target"), Shake.get(matched, "ref"),
-        Shake.get(matched, "entry"))
+        Shake.get(matched, "entry"), Shake.get(matched, "rename"))
     case CRemove{}:
       Cmd.remove(Shake.get(matched, "name"))
     case CLock{}:
