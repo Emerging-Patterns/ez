@@ -1,12 +1,10 @@
 result
 .ez/*
-# except a dependency marked `vendor = true` in ez.toml. ez's own Bend imports
-# sha256 out of BEND_LIB, so a checkout with an empty BEND_LIB cannot check
-# any Bend here, let alone run `ez fetch` to fill it. The allowlist line is
-# the hash of that tree. `ez lock --upgrade` rewrites the line when the pin
-# moves and lays the new tree beside it.
+# except a dependency marked `vendor = true` in ez.toml: ez adds, drops and
+# rewrites a `!.ez/lib/<hash>` line for each, and these two rules are what let
+# that line work. Nothing is vendored today; a clone fills .ez/lib with
+# `sh bootstrap.sh`, `ez fetch`, or nix.
 !.ez/lib
 .ez/lib/*
-!.ez/lib/0x33de775bd13bab25b3e2d6f5bbcb8776
 bin/ez.bin
 .claude/
