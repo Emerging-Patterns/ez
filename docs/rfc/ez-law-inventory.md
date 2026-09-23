@@ -171,15 +171,28 @@ The tables below keep the closed laws as they were at `f009e42`; none of them is
 | among_agrees | Q | struct | New char search equals the old one. | refactor-eq |
 | hex_all_agrees | Q | struct | New hex scan equals the old one. | refactor-eq |
 | peeled_agrees | Q | struct | New peeled-tag search equals the old one. Decides which commit a tag pins. | refactor-eq (touches EZ-RES-1) |
-| is_rev_needs_40 | Q | struct | A ref that is not 40 chars is not a commit. | EZ-RES-1 (supporting) |
-| is_rev_needs_hex | Q | struct | 40 chars with a non-hex char is not a commit. | EZ-RES-1 (supporting) |
-| is_rev_hex40 | Q | struct | 40 hex chars is a commit, needing no remote. | EZ-RES-1 (supporting) |
+| is_rev_needs_40 | Q | struct | A ref that is not 40 chars is not a commit. | EZ-RES-1 (tagged) |
+| is_rev_needs_hex | Q | struct | 40 chars with a non-hex char is not a commit. | EZ-RES-1 (tagged) |
+| is_rev_hex40 | Q | struct | 40 hex chars is a commit, needing no remote. | EZ-RES-1 (tagged) |
 | but_drops | Q | struct | Rewriting `origins.toml` drops the table of the given name. | EZ-DOC-3 (origins cache) |
 | but_keeps | Q | struct | Rewriting `origins.toml` keeps other tables in order. | EZ-DOC-3 (origins cache) |
 | root_rel_here | Q | struct | Recorded `root` when entry and checkout root are at the same depth. | new: recorded root |
 | sha256_remote_tip | C | refl | For one `ls-remote --symref` transcript, the tip is the commit row. | EZ-RES-5 |
 | sha256_remote_branch | C | refl | For that transcript, the default branch is `main`. | EZ-RES-5 |
 | root_rel_up | Q | struct | Recorded `root` when the checkout root is one level above the entry. | new: recorded root |
+| choose_release | Q | struct | When any tag is a release, `choose` answers a release. | EZ-RES-1 (tagged) |
+| choose_prerelease | Q | struct | With no release, `choose` is `latest` over every tag. | EZ-RES-1 (tagged) |
+| branch_of_symref | Q | struct | The default branch is the one HEAD's symref row names. | EZ-RES-1 (tagged) |
+| branch_skips_other | Q | struct | A row that is not HEAD's says nothing about the default branch. | EZ-RES-1 (tagged) |
+| branch_skips_commit | Q | struct | Nor does HEAD's commit row. | EZ-RES-1 (tagged) |
+| exact_skips | Q | struct | A row not named exactly `refs/tags/<ref>`, its `^{}` form, or `refs/heads/<ref>` is never picked. | EZ-RES-1 (tagged) |
+| exact_tag_first | Q | struct | A tag of the name is the answer, whatever branch shares it. | EZ-RES-1 (tagged) |
+| exact_branch | Q | struct | A branch is the answer only when no tag has the name. | EZ-RES-1 (tagged) |
+| latest_greatest | Q | struct | No semver-ish tag in the list is newer, by `ord.ver`, than the one `latest` answers. Key lemma: `ord.ver` read as a `Cmp` is a total preorder (consistent across three versions, flipped when swapped), layer by layer down to `Nat.cmp` and `String.order`. | EZ-RES-1 (tagged) |
+| latest_rel_greatest | Q | struct | No release in the list is newer than the one `latest.rel` answers. | EZ-RES-1 (tagged) |
+| choose_greatest_release | Q | struct | No release in the list is newer than the tag `choose` answers. | EZ-RES-1 (tagged) |
+| choose_greatest_prerelease | Q | struct | With no release, no semver-ish tag is newer than the tag `choose` answers. | EZ-RES-1 (tagged) |
+| choose_is_a_tag | Q | struct | A tag `choose` answers is one of the tags in the list. | EZ-RES-1 (tagged) |
 
 ### manifest/LAWS.bend
 
@@ -396,6 +409,13 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | hint_sync_when_tools | C | refl | Wording of the `sync` hint with tools. | none (incidental) |
 | hint_sync_without_tools | C | refl | Wording of the `sync` hint without tools. | none (incidental) |
 
+**Update:** A3 and A6 of [ez-add-planner.md](ez-add-planner.md) add `add_keep_idem`, tagged EZ-LED-2, the untagged `vendor_reads_back`, and four untagged lemmas in `manifest/PROOF.bend` (`find_last.arm`, `find_last`, `revend_again`, `readd_again`). A3 also renders the vendor key bare, `vendor = true`, where ez wrote `vendor = "true"`; `M.flag` reads both. EZ-LED-2 stays pending until `ez add` is in planner form and `add_edits_ledger` (A2) ties the command to `R.add.keep`, when A7 flips it. `vendor_reads_back` fixes the ledger around the dependency and is proved by computation for each bit, so it is two cases rather than a law over ledgers, and it carries no EZ-LED-4 tag.
+
+| Law | Kind | Proof | Claim | Points toward |
+| :---- | :---- | :---- | :---- | :---- |
+| add_keep_idem | Q | struct | `R.add.keep`, the edit `ez add` makes, twice equals once: the second add finds the entry the first wrote (`find_last`), so the vendor bit it keeps is that entry's (`revend_again`), and the rest is `add_idem`. | EZ-LED-2 (the model law; the plan law is A2's) |
+| vendor_reads_back | Q | struct | For either bit, a git dependency's vendor bit, in one fixed ledger rendered by `R.show` and parsed back by `M.parse`, is the bit. | none (a check of the bare spelling; EZ-LED-4 needs every ledger) |
+
 ## Coverage by RFC requirement
 
 | Requirement | Quantified laws | Closed laws | Status today |
@@ -411,7 +431,7 @@ This file mixes the `ez test` runner, the CLI parser, tool target classification
 | EZ-DOC-3 | origin_first, origin_agrees, origin_read, but_drops, but_keeps | hashes_sorted | The resolver's ledger-over-cache rule is proved. The whole-command frame property is not stated. **Update:** proved by `lock/lock_reproducible` and `lock/clone_reproduces` over the planner (WP1). |
 | EZ-DOC-4 | none | same_rev_keeps (supporting) | No law. **Update:** proved for a plain lock by `lock/lock_idempotent` and `lock/relock_lays_nothing` over the planner (WP5a); the `--upgrade` half is WP5b. |
 | EZ-DOC-5 | rev_of_names_the_commit, tag_of_names_the_tag (supporting) | none | No law about the command. **Update:** proved by `lock/plain_lock_keeps_ledger` and `lock/plain_lock_pins_ledger_sources` over the planner (WP1). |
-| EZ-RES-1 | is_rev_* (supporting), peeled_agrees | none | No law about tag selection. |
+| EZ-RES-1 | is_rev_* (supporting), peeled_agrees | none | No law about tag selection. **Update:** the decisions are proved over what `git ls-remote` printed, and tagged: `choose_release`, `choose_prerelease`, `choose_greatest_release`, `choose_greatest_prerelease`, `choose_is_a_tag` (with `latest_greatest` and `latest_rel_greatest` under them), `branch_of_symref`, `branch_skips_*`, `exact_*` and `is_rev_*`. Pending until `ez add` asks through the planner (A2 of the add design). |
 | EZ-RES-2 | none | none | No law. |
 | EZ-RES-3 | none | target_* , expand_* | Examples only. |
 | EZ-RES-4 | source_of_hub (supporting) | hub_holds | One example. |
@@ -560,7 +580,7 @@ The design for converting `ez add` and `ez remove`, [ez-add-planner.md](ez-add-p
 | A2 | open | `ez add` in planner form. |
 | A3 | open | Bare `vendor = true`. |
 | A4 | open | `ez init` in planner form. |
-| A5 | open | EZ-RES-1: the release chosen is the greatest. |
+| A5 | done | EZ-RES-1's greatest-release laws in `git/LAWS.bend`: `latest_greatest`, `latest_rel_greatest`, `choose_greatest_release`, `choose_greatest_prerelease`, `choose_is_a_tag`, each over any list with the tag anywhere in it, in the order `ord.ver` gives (numeric parts as numbers, zero-padded; semver pre-release precedence). The existing ref-choice laws are tagged EZ-RES-1. Probing the real binary found no bug in the comparator. The row stays pending until A2 lands `add_pins_chosen` and `add_commit_asks_nothing`. |
 | A6 | open | EZ-LED-2 over `Rend.add.keep`. |
 | A7 | open | Flip the rows whose halves have all landed. |
 
