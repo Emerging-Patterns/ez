@@ -9,8 +9,15 @@ import ./manifest.bend as M
 def line(key: String, +val: String) -> String:
   Bool.pick(String, String.is_empty(val), "", key ++ " = \"" ++ val ++ "\"\n")
 
+# a key line whose value is written bare, as a TOML boolean is, or nothing at
+# all when the value is empty
+def line.bare(key: String, +val: String) -> String:
+  Bool.pick(String, String.is_empty(val), "", key ++ " = " ++ val ++ "\n")
+
 # `true` when the tree is committed, and nothing when it is not, so the key
-# is absent rather than written as an empty string
+# is absent rather than written as an empty string. It is written bare: in
+# TOML `vendor = "true"` is a string, and a reader other than ez, such as
+# nix's `builtins.fromTOML`, would take it for one. ez reads both spellings.
 def vendor.word(vend: Bool) -> String:
   match vend:
     case True{}:
@@ -25,7 +32,7 @@ def source(src: M.Source) -> String:
       ""
     case M.Git{url, rev, tag, root, nar, vend}:
       line("git", url) ++ line("rev", rev) ++ line("tag", tag) ++
-      line("root", root) ++ line("narHash", nar) ++ line("vendor", vendor.word(vend))
+      line("root", root) ++ line("narHash", nar) ++ line.bare("vendor", vendor.word(vend))
 
 # one `[deps.<name>]` section
 def dep(dependency: M.Dep) -> String:

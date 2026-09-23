@@ -39,7 +39,7 @@ Untagged quantified laws are allowed. They pass the proof gate like any law, but
 | ID | Requirement | Level | Status | Law |
 | :---- | :---- | :---- | :---- | :---- |
 | EZ-LED-1 | A ledger that does not parse is never read into a model, and renders as nothing, so no command writes a guess over it. | Proved | pending | |
-| EZ-LED-2 | Adding a dependency to a ledger model twice is adding it once. | Proved | pending | |
+| EZ-LED-2 | Adding a dependency to a ledger model twice is adding it once. | Proved | pending | manifest/LAWS.bend add_keep_idem |
 | EZ-LED-3 | Removing a dependency from a ledger model twice is removing it once. | Proved | pending | |
 | EZ-LED-4 | A ledger ez rendered parses back to the model it was rendered from. | Proved | pending | |
 | EZ-LED-5 | A `[tools.*]` section is a tool, never a dependency, and needs no `hash`. | Proved | pending | |
@@ -121,6 +121,7 @@ What stands between a pending requirement that has tagged laws and the status pr
 | ID | Proved so far | Left to prove |
 | :---- | :---- | :---- |
 | EZ-DOC-4 | For a plain lock: run again on the World it leaves (`after`: the same ledger and committed sources, every tree it laid read from BEND_LIB), it writes the same bytes to ez.lock.toml, and after one that succeeded no tree arrives by a clone that passes, so none is laid again. | The `--upgrade` half: that `ez lock --upgrade` run on the World it leaves writes the same lock and does not rewrite ez.toml, since each moved pin is at its own tip and is kept (WP5b, once `--upgrade` is in planner form). |
+| EZ-LED-2 | `Rend.add.keep`, the edit `ez add` makes to the model, which keeps a vendor bit the ledger already set: applying it twice is applying it once. | That `ez add` edits the ledger with `Rend.add.keep` and nothing else, which needs `ez add` in planner form (the plan law `add_edits_ledger` in [docs/rfc/ez-add-planner.md](docs/rfc/ez-add-planner.md)). The file's bytes are then relative to EZ-LED-4. |
 | EZ-LED-6 | The decisions: `Cmd.init.plan` plans no write over a ledger that exists, and `Cmd.ledger.of` reads a missing ledger, for a command that works on one, as a read that renders as nothing. | That `ez init`, `ez add`, `ez remove` and `ez lock` act on those decisions and write nothing else first, which needs them in planner form. |
 | EZ-LED-7 | The decision functions in `ez/named.bend`: `as`, `name`, `own`, `had`, `clash` and `moved`. | That `ez add` records the dependency under the name they return and writes nothing when they refuse, which needs `ez add` in planner form. |
 | EZ-LED-8 | `P.anchor` keeps a URL and an absolute path and joins a relative path to the project root. | That every git question a planner asks carries the source the planner anchored with `P.anchor`, and that `ez add` records the target as given, which needs `ez add`, `ez lock --upgrade` and `ez fetch` in planner form ([docs/rfc/ez-add-planner.md](docs/rfc/ez-add-planner.md)). |
