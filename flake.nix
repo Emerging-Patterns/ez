@@ -68,6 +68,7 @@
       #               wrapEnv?, defaultWrapEnv?, extraPath?, extraInstall? }
       #   mkProofs { ez, src, name?, lock?, bendLib? }
       #   mkLint { src, bolt?, bend?, name?, lock?, bendLib? }
+      #   mkFresh { src, bend?, name?, bendLib?, nativeBuildInputs? }
       #   toolPackage { name, src, bend?, lock?, wrapFlags?, ... }
       #   devPackages src
       #   mkShell { packages, extraHook?, src? }
@@ -75,6 +76,9 @@
       # main.bend, and wraps $out/bin/<name> with bend on PATH. Version falls
       # back to 0.1.0. mkProofs and mkLint set BEND_LIB from an explicit
       # bendLib, else from lock (or src/ez.lock.toml), else set none.
+      # mkFresh is ez's own fresh-clone check: bootstrap.sh over the lock's
+      # BEND_LIB fetches nothing, the README's build builds, and `ez lock`
+      # writes the committed ez.lock.toml back byte for byte, all offline.
       # A check, which runs `ez prove`:
       #   checks.${system}.proofs = inputs.ez.lib.${system}.mkProofs {
       #     ez = inputs.ez.packages.${system}.default;
@@ -86,10 +90,12 @@
       lib.${system} = ez;
       apps.${system}.default = { type = "app"; program = "${ezBin}/bin/ez"; };
       # `lint` is bolt at the lock's `[tools.bolt]` pin, run with `--gpu off`
-      # over a copy of the tree, graded by ./bolt.bend
+      # over a copy of the tree, graded by ./bolt.bend. `fresh` is EZ-DOC-3
+      # checked directly: a clone's `ez lock` gives back the committed lock.
       checks.${system} = {
         inherit proofs;
         lint = ez.mkLint { src = self; };
+        fresh = ez.mkFresh { src = self; };
         ez = ezBin;
       };
       devShells.${system}.default = ez.mkShell {

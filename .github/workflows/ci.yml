@@ -9,3 +9,28 @@ on:
 jobs:
   check:
     uses: Emerging-Patterns/actions/.github/workflows/nix-flake-check.yml@9523e8b294ae014fade5861c32d5ab911866acb2
+
+  # The README's install, followed without nix on a fresh checkout: bend,
+  # `sh bootstrap.sh`, the build, then the proof gate with the built ez.
+  # bend is the release flake.lock pins (bendlang/bend's flake fetches this
+  # archive, with this sha256), not bend-lang.com/install.sh, which installs
+  # whatever bend is newest.
+  readme:
+    runs-on: ubuntu-latest
+    env:
+      BEND_VERSION: 2.0.25
+      BEND_SHA256: 91c0e2640f8d2e3e73fd3dd62ed4d178ce9a6f7ce8f8980b4dc4abf7a6f9ccd4
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Install bend
+        run: |
+          archive="bend-${BEND_VERSION}-linux-x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/bendlang/bend/releases/download/v${BEND_VERSION}/$archive"
+          echo "${BEND_SHA256}  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/bend/bin" >> "$GITHUB_PATH"
+      - run: sh bootstrap.sh
+      - run: mkdir -p bin
+      - run: BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
+      - run: bin/ez.bin prove

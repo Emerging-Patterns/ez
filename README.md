@@ -244,7 +244,11 @@ an explicit lock path. `bendLib`, when set, is the store path used as
 that tree on its own. Every file comes from a fixed-output derivation keyed
 by the sha256 the lock already records, so the build needs no network and
 `bend` never reaches the hub. `mkProofs` runs `ez prove` over a copy of
-`src`, and this repo's own `proofs` check is that.
+`src`, and this repo's own `proofs` check is that. This repo's `fresh` check
+(`mkFresh`) is a clone with no network: `sh bootstrap.sh` over that tree
+fetches nothing, the build above builds, and `ez lock` with `ez.lock.toml`
+deleted writes it back byte for byte. CI also follows the install steps
+above without nix and runs `ez prove`.
 
 `ez prove` is the gate. It runs `bend` on every PROOF.bend in the tree, all at
 once, and passes a proof only when the first line bend prints is exactly
