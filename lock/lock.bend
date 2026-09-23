@@ -10,7 +10,7 @@
 #
 # Everything here is pure. Deciding the lock is lock/plan.bend's, over the
 # World lock/world.bend describes, and reading and writing are
-# lock/run.bend's. `ez fetch` reads a lock back with lock/restore.bend.
+# lock/run.bend's. `ez fetch` reads a lock back in fetch/plan.bend.
 import Base
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../manifest/manifest.bend as M

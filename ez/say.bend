@@ -54,10 +54,6 @@ def dep.git(+name: String, +url: String) -> String:
 def dep.hub(+name: String) -> String:
   "dep " ++ name ++ ": hub fetch"
 
-# a tree already laid out, so nothing is fetched
-def dep.cached(+name: String) -> String:
-  "dep " ++ name ++ ": cached"
-
 # a checkout or a pin that did not move
 def kept(+name: String) -> String:
   name ++ ": unchanged"

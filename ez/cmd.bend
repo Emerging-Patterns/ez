@@ -7,13 +7,13 @@ import ../io/file.bend as F
 import ../manifest/manifest.bend as M
 import ../lock/run.bend as Run
 import ../lock/world.bend as W
-import ../lock/restore.bend as Restore
 import ../pub/pub.bend as Pub
 import ./env.bend as Env
 import ./cap.bend as Cap
 import ../init/run.bend as InitRun
 import ../remove/run.bend as RemoveRun
 import ../add/run.bend as AddRun
+import ../fetch/run.bend as FetchRun
 
 # the ledger's path, which is fixed
 def toml() -> String:
@@ -174,10 +174,6 @@ def publish() -> IO(Unit):
     lib : String <- Env.lib()
     Pub.publish(lib, at)
 
-# the lock's path, which is fixed
-def lockfile() -> String:
-  "ez.lock.toml"
-
 # `ez lock`, plain or `--upgrade`, is the planner's
 # (lock/plan.bend, lock/up.bend): a plain lock copies every pin as the ledger
 # has it, refuses one it would have to fill, and never writes ez.toml; an
@@ -196,9 +192,10 @@ def lock.go(ok: Bool, up: Bool, +name: String) -> IO(Unit):
 def lock(+up: Bool, +name: String) -> IO(Unit):
   lock.go(Bool.or(up, String.is_empty(name)), up, name)
 
-# BEND_LIB filled from the lock, with nothing re-resolved
+# `ez fetch`, planned by fetch/plan.bend: BEND_LIB filled from the lock, with
+# nothing re-resolved, and nothing laid unless every package checks
 def fetch() -> IO(Unit):
-  Restore.restore(lockfile())
+  FetchRun.run()
 
 # `ez init [name] [entry.bend]`: a new project, planned by init/plan.bend
 def init(+asked: String, +file: String) -> IO(Unit):
