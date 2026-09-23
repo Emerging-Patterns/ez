@@ -13,6 +13,10 @@ import ../check/toml.bend as Toml
 import ../pkg/pkg.bend as K
 import ../pkg/LAWS.bend as KL
 import ../pkg/PROOF.bend as KP
+import ../manifest/ignore.bend as I
+import ../manifest/render.bend as Rend
+import ../manifest/LAWS.bend as ML
+import ../manifest/PROOF.bend as MP
 import ./LAWS.bend as Laws
 
 def Laws.origin_first(h, s, rest):
@@ -5235,6 +5239,1264 @@ def Laws.upgrade_one_asks_alone(w, n, u, e, ne):
                 == Up.next.asks(Up.next(n, Laws.alone(W.parsed(ledger), n), ups)) : List<&2, Up.Ask>}
               asks_next(n, W.parsed(ledger), ups, ne)
 
+# What an upgrade writes around the ledger (EZ-VEN-1, EZ-VEN-2, EZ-VEN-3). The
+# upgrade's own files are ez.toml and `.gitignore`, and nothing else: each
+# stage of `Up.next` either stops with no file or goes on, and the last one,
+# `Up.done`, writes ez.toml over the ledger it leaves when a pin moved and
+# `.gitignore` as `I.sync` makes it from the file it read. `ok.next` says
+# that of a decision; every decision `Up.next` makes is one. The sources are
+# written after them, one write per source whose text the moves change, and
+# the lock last.
+
+# what one of the upgrade's own files may be: ez.toml over the ledger the
+# model renders, or `.gitignore` with the allowlist of the hashes it commits
+# and the lines of the file it read that are not ez's. Law vocabulary: ez
+# never calls it.
+def ok.go(
+  toml: Bool,
+  gi: Bool,
+  +t: String,
+  +vs: List<&2, String>,
+  model: M.Read,
+  +ig: String
+) -> Type:
+  match toml gi:
+    case True{} _:
+      {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}
+    case False{} True{}:
+      {Str.clear.all(vs, '\n') == True{} : Bool} ->
+        ({I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+          {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>})
+    case False{} False{}:
+      Empty
+
+# one file the upgrade writes, so
+def ok.edit(e: Up.Edit, +vs: List<&2, String>, +model: M.Read, +ig: String) -> Type:
+  Up.Edit{+p, t} = e
+  ok.go(String.eq(p, "ez.toml"), String.eq(p, ".gitignore"), t, vs, model, ig)
+
+# every file the upgrade writes, so
+def ok.edits(es: List<&2, Up.Edit>, +vs: List<&2, String>, +model: M.Read, +ig: String) -> Type:
+  match es:
+    case []:
+      Unit
+    case e <> t:
+      ok.edit(e, vs, model, ig) & ok.edits(t, vs, model, ig)
+
+# what the upgrade decided, over `.gitignore` as it read it
+def ok.next(+nx: Up.Next, +ig: String) -> Type:
+  ok.edits(Up.next.edits(nx), Up.next.vends(nx), Up.next.model(nx), ig)
+
+# LAW: the files `Up.done` writes, with whether a pin moved and whether the
+# allowlist changed the file given as parameters
+law ok_done.arm:
+  for moved: Bool
+  for b: Bool
+  for +pn: String
+  for +pe: String
+  for +pb: String
+  for +hb: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +ods: List<&2, M.Dep>
+  for +ots: List<&2, M.Tool>
+  for +ig: String
+  ok.edits(Up.edit.toml(moved, Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts}),
+      Up.edit.if(b, ".gitignore", I.sync(ds, ig), [])),
+    I.vended(ds),
+    Up.model.next(moved, M.Manifest{pn, pe, pb, hb, ds, ts}, M.Manifest{pn, pe, pb, hb, ods, ots}),
+    ig)
+
+def ok_done.arm(moved, b, _pn, _pe, _pb, _hb, ds, _ts, _ods, _ots, ig):
+  match moved b:
+    case True{} True{}:
+      ({==}, Unit{})
+    case True{} False{}:
+      ({==}, (+ev => (ML.sync_allowlist_is_the_ledger(ds, ig, ev),
+        ML.sync_keeps_other_lines(ds, ig, ev)), Unit{}))
+    case False{} True{}:
+      Unit{}
+    case False{} False{}:
+      (+ev => (ML.sync_allowlist_is_the_ledger(ds, ig, ev),
+        ML.sync_keeps_other_lines(ds, ig, ev)), Unit{})
+
+law ok_done:
+  for +pn: String
+  for +pe: String
+  for +pb: String
+  for +hb: String
+  for +ods: List<&2, M.Dep>
+  for +ots: List<&2, M.Tool>
+  for dd: Up.Deps
+  for tt: Up.Tools
+  for +ig: String
+  for fs: List<&2, Up.Found>
+  ok.next(Up.done(M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt, ig, fs), ig)
+
+def ok_done(pn, pe, pb, hb, ods, ots, dd, tt, ig, _fs):
+  match dd:
+    case Up.Deps{+ds, ss, es, dm, dsy, dtr, das, dbad}:
+      match tt:
+        case Up.Tools{+ts, tm, tsy, tas, tbad}:
+          ok_done.arm(Bool.or(dm, tm), String.eq(I.sync(ds, ig), ig), pn, pe, pb, hb,
+            ds, ts, ods, ots, ig)
+
+law ok_srcs:
+  for srcs: Up.Srcs
+  for +pn: String
+  for +pe: String
+  for +pb: String
+  for +hb: String
+  for +ods: List<&2, M.Dep>
+  for +ots: List<&2, M.Tool>
+  for dd: Up.Deps
+  for tt: Up.Tools
+  for +ig: String
+  ok.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt, ig), ig)
+
+def ok_srcs(srcs, pn, pe, pb, hb, ods, ots, dd, tt, ig):
+  match srcs:
+    case Up.Srcs{fs}:
+      ok_done(pn, pe, pb, hb, ods, ots, dd, tt, ig, fs)
+    case Up.SrcsWait{_ask}:
+      Unit{}
+    case Up.SrcsNo{_why}:
+      Unit{}
+
+law ok_ignore:
+  for said: Up.Said
+  for +srcs: Up.Srcs
+  for +pn: String
+  for +pe: String
+  for +pb: String
+  for +hb: String
+  for +ods: List<&2, M.Dep>
+  for +ots: List<&2, M.Tool>
+  for +dd: Up.Deps
+  for +tt: Up.Tools
+  for +rs: List<&2, Up.Reply>
+  for es: {Up.text.said(rs, Up.Ignore{}) == said : Up.Said}
+  ok.next(Up.got.ignore(said, srcs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt),
+    Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
+
+def ok_ignore(said, srcs, pn, pe, pb, hb, ods, ots, dd, tt, rs, es):
+  match said:
+    case Up.Said{+x}:
+      %Equal.sym(Up.Said, Up.text.said(rs, Up.Ignore{}), Up.Said{x}, es)
+        : ok.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt, x),
+          Laws.ignore.said(_))
+      ok_srcs(srcs, pn, pe, pb, hb, ods, ots, dd, tt, x)
+    case Up.Unsaid{_why}:
+      Unit{}
+    case Up.Unasked{_ask}:
+      Unit{}
+
+law ok_asks:
+  for asks: List<&2, Up.Ask>
+  for +rs: List<&2, Up.Reply>
+  for +pn: String
+  for +pe: String
+  for +pb: String
+  for +hb: String
+  for +ods: List<&2, M.Dep>
+  for +ots: List<&2, M.Tool>
+  for +dd: Up.Deps
+  for +tt: Up.Tools
+  ok.next(Up.pins.asks(asks, rs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt),
+    Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
+
+def ok_asks(asks, rs, pn, pe, pb, hb, ods, ots, dd, tt):
+  match asks:
+    case []:
+      ok_ignore(Up.text.said(rs, Up.Ignore{}),
+        Up.ask.srcs(List.is_empty(&2, U.Swap, Up.deps.edits(dd)), rs),
+        pn, pe, pb, hb, ods, ots, dd, tt, rs, {==})
+    case _h <> _t:
+      Unit{}
+
+law ok_bad:
+  for clean: Bool
+  for +bad: String
+  for asks: List<&2, Up.Ask>
+  for +rs: List<&2, Up.Reply>
+  for +pn: String
+  for +pe: String
+  for +pb: String
+  for +hb: String
+  for +ods: List<&2, M.Dep>
+  for +ots: List<&2, M.Tool>
+  for +dd: Up.Deps
+  for +tt: Up.Tools
+  ok.next(Up.pins.bad(clean, bad, asks, rs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt),
+    Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
+
+def ok_bad(clean, _bad, asks, rs, pn, pe, pb, hb, ods, ots, dd, tt):
+  match clean:
+    case True{}:
+      ok_asks(asks, rs, pn, pe, pb, hb, ods, ots, dd, tt)
+    case False{}:
+      Unit{}
+
+law ok_pins:
+  for dd: Up.Deps
+  for tt: Up.Tools
+  for +rs: List<&2, Up.Reply>
+  for +pn: String
+  for +pe: String
+  for +pb: String
+  for +hb: String
+  for +ods: List<&2, M.Dep>
+  for +ots: List<&2, M.Tool>
+  ok.next(Up.pins(dd, tt, rs, M.Manifest{pn, pe, pb, hb, ods, ots}),
+    Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
+
+def ok_pins(dd, tt, rs, pn, pe, pb, hb, ods, ots):
+  match dd:
+    case Up.Deps{+ds, +ss, +es, +dm, +dsy, +dtr, +das, +dbad}:
+      match tt:
+        case Up.Tools{+ts, +tm, +tsy, +tas, +tbad}:
+          ok_bad(Bool.and(String.is_empty(dbad), String.is_empty(tbad)),
+            Bool.pick(String, String.is_empty(dbad), tbad, dbad),
+            List.append(&2, Up.Ask, das, tas), rs, pn, pe, pb, hb, ods, ots,
+            Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""})
+
+law ok_known:
+  for ok: Bool
+  for +only: String
+  for +rs: List<&2, Up.Reply>
+  for +pn: String
+  for +pe: String
+  for +pb: String
+  for +hb: String
+  for +ods: List<&2, M.Dep>
+  for +ots: List<&2, M.Tool>
+  ok.next(Up.known(ok, only, rs, M.Manifest{pn, pe, pb, hb, ods, ots}),
+    Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
+
+def ok_known(ok, only, rs, pn, pe, pb, hb, ods, ots):
+  match ok:
+    case False{}:
+      Unit{}
+    case True{}:
+      ok_pins(Up.deps.walk(rs, only, M.hub.or(hb), ods), Up.tools.walk(rs, only, ots), rs,
+        pn, pe, pb, hb, ods, ots)
+
+# LAW: every decision `ez lock --upgrade` makes writes only ez.toml over the
+# ledger it renders and `.gitignore` as `I.sync` makes it
+law ok_next:
+  for +only: String
+  for r: M.Read
+  for +rs: List<&2, Up.Reply>
+  ok.next(Up.next(only, r, rs), Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
+
+def ok_next(only, r, rs):
+  match r:
+    case M.Bad{_why}:
+      Unit{}
+    case M.Good{m}:
+      match m:
+        case M.Manifest{+pn, +pe, +pb, +hb, +ods, +ots}:
+          ok_known(Bool.or(U.known(only, ods), M.tool.known(only, ots)), only, rs,
+            pn, pe, pb, hb, ods, ots)
+
+# LAW: and so does every decision `ez lock` makes on a World, plain or not
+law ok_world:
+  for +args: W.Args
+  for +ledger: Maybe<&2, String>
+  for +ups: List<&2, Up.Reply>
+  ok.next(W.next(args, ledger, ups), Laws.ignore.said(Up.text.said(ups, Up.Ignore{})))
+
+def ok_world(args, ledger, ups):
+  match args:
+    case W.Args{up, +only}:
+      match up:
+        case False{}:
+          Unit{}
+        case True{}:
+          ok_next(only, W.parsed(ledger), ups)
+
+# The plan's writes. A write to another path leaves a path as it was; the
+# upgrade's own files are ez.toml and `.gitignore` alone; and the sources are
+# written after them, each once.
+
+# the type that is empty where a path was written
+def wrote.emp(w: P.Wrote) -> Type:
+  match w:
+    case P.Kept{}:
+      Unit
+    case P.Put{_t}:
+      Empty
+
+# the text a path was written with, "" when it was not
+def wrote.text(w: P.Wrote) -> String:
+  match w:
+    case P.Kept{}:
+      ""
+    case P.Put{t}:
+      t
+
+# LAW: a path left as it was is not a path written
+law kept_put:
+  for +t: String
+  for e: {P.Kept{} == P.Put{t} : P.Wrote}
+  Empty
+
+def kept_put(_t, e):
+  %e : wrote.emp(_)
+  Unit{}
+
+# LAW: a write to another path leaves a path as it was
+law put_one_other:
+  for +a: String
+  for +t: String
+  for +p: String
+  for r: P.Wrote
+  for ne: {String.eq(a, p) == False{} : Bool}
+  {P.put.one(P.Write{a, t}, p, r) == r : P.Wrote}
+
+def put_one_other(a, t, p, r, ne):
+  match r:
+    case P.Kept{}:
+      %Equal.sym(Bool, String.eq(a, p), False{}, ne)
+        : {Bool.pick(P.Wrote, _, P.Put{t}, P.Kept{}) == P.Kept{} : P.Wrote}
+      {==}
+    case P.Put{x}:
+      {==}
+
+# LAW: none of the upgrade's own files is at a path that is neither ez.toml
+# nor `.gitignore`
+law ok_go_empty:
+  for a: Bool
+  for b: Bool
+  for +t: String
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for ea: {a == False{} : Bool}
+  for eb: {b == False{} : Bool}
+  for h: ok.go(a, b, t, vs, model, ig)
+  Empty
+
+def ok_go_empty(a, b, _t, _vs, _model, _ig, ea, eb, h):
+  match a b:
+    case True{} _:
+      Eq.bit.absurd2(&1, Empty, ea)
+    case False{} True{}:
+      Eq.bit.absurd2(&1, Empty, eb)
+    case False{} False{}:
+      h
+
+# LAW: one of the upgrade's own files, with how its path compares to another
+# given as a parameter: it is not at a path that is neither of its two
+law other_ne:
+  for +q: String
+  for +p: String
+  for c: Bool
+  for +ec: {String.eq(q, p) == c : Bool}
+  for +t: String
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for h: ok.go(String.eq(q, "ez.toml"), String.eq(q, ".gitignore"), t, vs, model, ig)
+  for +n1: {String.eq(p, "ez.toml") == False{} : Bool}
+  for +n2: {String.eq(p, ".gitignore") == False{} : Bool}
+  {String.eq(q, p) == False{} : Bool}
+
+def other_ne(q, p, c, ec, t, vs, model, ig, h, n1, n2):
+  match c:
+    case False{}:
+      ec
+    case True{}:
+      Empty.absurd({String.eq(q, p) == False{} : Bool},
+        ok_go_empty(String.eq(q, "ez.toml"), String.eq(q, ".gitignore"), t, vs, model, ig,
+          Equal.trans(Bool, String.eq(q, "ez.toml"), String.eq(p, "ez.toml"), False{},
+            Equal.cong(String, Bool, x => String.eq(x, "ez.toml"), q, p,
+              Str.string_eq_true(q, p, ec)), n1),
+          Equal.trans(Bool, String.eq(q, ".gitignore"), String.eq(p, ".gitignore"), False{},
+            Equal.cong(String, Bool, x => String.eq(x, ".gitignore"), q, p,
+              Str.string_eq_true(q, p, ec)), n2),
+          h))
+
+# LAW: the upgrade's own files leave every other path as it was
+law edits_other:
+  for es: List<&2, Up.Edit>
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for h: ok.edits(es, vs, model, ig)
+  for +rest: List<&2, P.Effect>
+  for +p: String
+  for +n1: {String.eq(p, "ez.toml") == False{} : Bool}
+  for +n2: {String.eq(p, ".gitignore") == False{} : Bool}
+  {P.put.in(P.edits.of(es, rest), p) == P.put.in(rest, p) : P.Wrote}
+
+def edits_other(es, vs, model, ig, h, rest, p, n1, n2):
+  match es:
+    case []:
+      {==}
+    case Up.Edit{+q, +t} <> +tl:
+      (h1, h2) = h
+      Equal.trans(P.Wrote,
+        P.put.one(P.Write{q, t}, p, P.put.in(P.edits.of(tl, rest), p)),
+        P.put.in(P.edits.of(tl, rest), p),
+        P.put.in(rest, p),
+        put_one_other(q, t, p, P.put.in(P.edits.of(tl, rest), p),
+          other_ne(q, p, String.eq(q, p), {==}, t, vs, model, ig, h1, n1, n2)),
+        edits_other(tl, vs, model, ig, h2, rest, p, n1, n2))
+
+# LAW: a `.gitignore` the upgrade writes is one of its own files'
+law ok_go_ign:
+  for a: Bool
+  for b: Bool
+  for +t: String
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for ea: {a == False{} : Bool}
+  for eb: {b == True{} : Bool}
+  for h: ok.go(a, b, t, vs, model, ig)
+  {Str.clear.all(vs, '\n') == True{} : Bool} ->
+    ({I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+      {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>})
+
+def ok_go_ign(a, b, t, vs, _model, ig, ea, eb, h):
+  match a b:
+    case True{} _:
+      Eq.bit.absurd2(&1, {Str.clear.all(vs, '\n') == True{} : Bool} ->
+        ({I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+          {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>}), ea)
+    case False{} True{}:
+      h
+    case False{} False{}:
+      Eq.bit.absurd(&1, {Str.clear.all(vs, '\n') == True{} : Bool} ->
+        ({I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+          {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>}), eb)
+
+# LAW: one of the upgrade's own files, with whether it is at `.gitignore`
+# given as a parameter, written where nothing after it writes `.gitignore`
+law ign_kept:
+  for c: Bool
+  for +q: String
+  for +t2: String
+  for +t: String
+  for +ec: {String.eq(q, ".gitignore") == c : Bool}
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for h: ok.go(String.eq(q, "ez.toml"), String.eq(q, ".gitignore"), t2, vs, model, ig)
+  for e: {Bool.pick(P.Wrote, c, P.Put{t2}, P.Kept{}) == P.Put{t} : P.Wrote}
+  for +ev: {Str.clear.all(vs, '\n') == True{} : Bool}
+  {I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+    {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>}
+
+def ign_kept(c, q, t2, t, ec, vs, model, ig, h, e, ev):
+  match c:
+    case False{}:
+      Empty.absurd({I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+        {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>},
+        kept_put(t, e))
+    case True{}:
+      %Equal.cong(P.Wrote, String, x => wrote.text(x), P.Put{t2}, P.Put{t}, e)
+        : {I.hashes(I.file.lines(_)) == vs : List<&2, String>} &
+          {I.others(I.file.lines(_)) == I.others(I.file.lines(ig)) : List<&2, String>}
+      ok_go_ign(String.eq(q, "ez.toml"), String.eq(q, ".gitignore"), t2, vs, model, ig,
+        Equal.trans(Bool, String.eq(q, "ez.toml"), String.eq(".gitignore", "ez.toml"), False{},
+          Equal.cong(String, Bool, x => String.eq(x, "ez.toml"), q, ".gitignore",
+            Str.string_eq_true(q, ".gitignore", ec)), {==}),
+        ec, h)(ev)
+
+# LAW: one of the upgrade's own files in front of the rest, with what the rest
+# leaves at `.gitignore` given as a parameter
+law ign_arm:
+  for r: P.Wrote
+  for +q: String
+  for +t2: String
+  for +rr: P.Wrote
+  for er: {rr == r : P.Wrote}
+  for +t: String
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for h: ok.go(String.eq(q, "ez.toml"), String.eq(q, ".gitignore"), t2, vs, model, ig)
+  for e: {P.put.one(P.Write{q, t2}, ".gitignore", r) == P.Put{t} : P.Wrote}
+  for ih: {rr == P.Put{t} : P.Wrote} ->
+    ({I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+      {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>})
+  for +ev: {Str.clear.all(vs, '\n') == True{} : Bool}
+  {I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+    {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>}
+
+def ign_arm(r, q, t2, rr, er, t, vs, model, ig, h, e, ih, ev):
+  match r:
+    case P.Put{x}:
+      ih(Equal.trans(P.Wrote, rr, P.Put{x}, P.Put{t}, er, e))
+    case P.Kept{}:
+      ign_kept(String.eq(q, ".gitignore"), q, t2, t, {==}, vs, model, ig, h, e, ev)
+
+# LAW: the `.gitignore` the upgrade writes, where nothing after its own files
+# writes one, has the allowlist of the hashes it commits and keeps the lines
+# of the file it read that are not ez's
+law edits_ign:
+  for es: List<&2, Up.Edit>
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for h: ok.edits(es, vs, model, ig)
+  for +rest: List<&2, P.Effect>
+  for +kr: {P.put.in(rest, ".gitignore") == P.Kept{} : P.Wrote}
+  for +t: String
+  for e: {P.put.in(P.edits.of(es, rest), ".gitignore") == P.Put{t} : P.Wrote}
+  for +ev: {Str.clear.all(vs, '\n') == True{} : Bool}
+  {I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+    {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>}
+
+def edits_ign(es, vs, model, ig, h, rest, kr, t, e, ev):
+  match es:
+    case []:
+      Empty.absurd({I.hashes(I.file.lines(t)) == vs : List<&2, String>} &
+        {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>},
+        kept_put(t, Equal.trans(P.Wrote, P.Kept{}, P.put.in(rest, ".gitignore"), P.Put{t},
+          Equal.sym(P.Wrote, P.put.in(rest, ".gitignore"), P.Kept{}, kr), e)))
+    case Up.Edit{+q, +t2} <> +tl:
+      (h1, h2) = h
+      ign_arm(P.put.in(P.edits.of(tl, rest), ".gitignore"), q, t2,
+        P.put.in(P.edits.of(tl, rest), ".gitignore"), {==}, t, vs, model, ig, h1, e,
+        x => edits_ign(tl, vs, model, ig, h2, rest, kr, t, x, ev), ev)
+
+# LAW: an ez.toml the upgrade writes is one of its own files'
+law ok_go_toml:
+  for a: Bool
+  for b: Bool
+  for +t: String
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for ea: {a == True{} : Bool}
+  for h: ok.go(a, b, t, vs, model, ig)
+  {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}
+
+def ok_go_toml(a, b, _t, vs, model, _ig, ea, h):
+  match a b:
+    case True{} _:
+      h
+    case False{} True{}:
+      Eq.bit.absurd(&2, {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}, ea)
+    case False{} False{}:
+      Eq.bit.absurd(&2, {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}, ea)
+
+law toml_kept:
+  for c: Bool
+  for +q: String
+  for +t2: String
+  for +t: String
+  for +ec: {String.eq(q, "ez.toml") == c : Bool}
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for h: ok.go(String.eq(q, "ez.toml"), String.eq(q, ".gitignore"), t2, vs, model, ig)
+  for e: {Bool.pick(P.Wrote, c, P.Put{t2}, P.Kept{}) == P.Put{t} : P.Wrote}
+  {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}
+
+def toml_kept(c, q, t2, t, ec, vs, model, ig, h, e):
+  match c:
+    case False{}:
+      Empty.absurd({vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>},
+        kept_put(t, e))
+    case True{}:
+      ok_go_toml(String.eq(q, "ez.toml"), String.eq(q, ".gitignore"), t2, vs, model, ig,
+        ec, h)
+
+law toml_arm:
+  for r: P.Wrote
+  for +q: String
+  for +t2: String
+  for +rr: P.Wrote
+  for er: {rr == r : P.Wrote}
+  for +t: String
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for h: ok.go(String.eq(q, "ez.toml"), String.eq(q, ".gitignore"), t2, vs, model, ig)
+  for e: {P.put.one(P.Write{q, t2}, "ez.toml", r) == P.Put{t} : P.Wrote}
+  for ih: {rr == P.Put{t} : P.Wrote} ->
+    {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}
+  {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}
+
+def toml_arm(r, q, t2, rr, er, t, vs, model, ig, h, e, ih):
+  match r:
+    case P.Put{x}:
+      ih(Equal.trans(P.Wrote, rr, P.Put{x}, P.Put{t}, er, e))
+    case P.Kept{}:
+      toml_kept(String.eq(q, "ez.toml"), q, t2, t, {==}, vs, model, ig, h, e)
+
+# LAW: an ez.toml the upgrade writes, where nothing after its own files
+# writes one, goes with the hashes the ledger it renders vends
+law edits_toml:
+  for es: List<&2, Up.Edit>
+  for +vs: List<&2, String>
+  for +model: M.Read
+  for +ig: String
+  for h: ok.edits(es, vs, model, ig)
+  for +rest: List<&2, P.Effect>
+  for +kr: {P.put.in(rest, "ez.toml") == P.Kept{} : P.Wrote}
+  for +t: String
+  for e: {P.put.in(P.edits.of(es, rest), "ez.toml") == P.Put{t} : P.Wrote}
+  {vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>}
+
+def edits_toml(es, vs, model, ig, h, rest, kr, t, e):
+  match es:
+    case []:
+      Empty.absurd({vs == I.vended(Laws.ledger.deps(model)) : List<&2, String>},
+        kept_put(t, Equal.trans(P.Wrote, P.Kept{}, P.put.in(rest, "ez.toml"), P.Put{t},
+          Equal.sym(P.Wrote, P.put.in(rest, "ez.toml"), P.Kept{}, kr), e)))
+    case Up.Edit{+q, +t2} <> +tl:
+      (h1, h2) = h
+      toml_arm(P.put.in(P.edits.of(tl, rest), "ez.toml"), q, t2,
+        P.put.in(P.edits.of(tl, rest), "ez.toml"), {==}, t, vs, model, ig, h1, e,
+        x => edits_toml(tl, vs, model, ig, h2, rest, kr, t, x))
+
+# The sources. Each is written only when the moves change it.
+
+# LAW: one source, with whether the moves change it given as a parameter:
+# written at its own path, or not written
+law src_miss.arm:
+  for b: Bool
+  for +a: String
+  for +m: String
+  for +es: List<&2, Up.Edit>
+  for +rest: List<&2, P.Effect>
+  for +p: String
+  for ne: {String.eq(a, p) == False{} : Bool}
+  {P.put.in(P.edits.of(Up.edit.if(b, a, m, es), rest), p)
+    == P.put.in(P.edits.of(es, rest), p) : P.Wrote}
+
+def src_miss.arm(b, a, m, es, rest, p, ne):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      put_one_other(a, m, p, P.put.in(P.edits.of(es, rest), p), ne)
+
+# LAW: sources none of which is at a path leave it as it was
+law src_miss:
+  for fs: List<&2, Up.Found>
+  for +sw: List<&2, U.Swap>
+  for +rest: List<&2, P.Effect>
+  for +p: String
+  for +m: {Laws.found.miss(fs, p) == True{} : Bool}
+  {P.put.in(P.edits.of(Up.edit.sources(fs, sw), rest), p) == P.put.in(rest, p) : P.Wrote}
+
+def src_miss(fs, sw, rest, p, m):
+  match fs:
+    case []:
+      {==}
+    case Up.Found{+a, +x} <> +tl:
+      Equal.trans(P.Wrote,
+        P.put.in(P.edits.of(Up.edit.if(String.eq(U.reimport.many(sw, x), x), a,
+          U.reimport.many(sw, x), Up.edit.sources(tl, sw)), rest), p),
+        P.put.in(P.edits.of(Up.edit.sources(tl, sw), rest), p),
+        P.put.in(rest, p),
+        src_miss.arm(String.eq(U.reimport.many(sw, x), x), a, U.reimport.many(sw, x),
+          Up.edit.sources(tl, sw), rest, p,
+          Eq.not.true(String.eq(a, p),
+            Eq.and.left(Bool.not(String.eq(a, p)), Laws.found.miss(tl, p), m))),
+        src_miss(tl, sw, rest, p,
+          Eq.and.right(Bool.not(String.eq(a, p)), Laws.found.miss(tl, p), m)))
+
+# LAW: sources in front of one, none of which is at its path, leave what it
+# gets as it is
+law src_pre:
+  for pre: List<&2, Up.Found>
+  for +xs: List<&2, Up.Found>
+  for +sw: List<&2, U.Swap>
+  for +rest: List<&2, P.Effect>
+  for +p: String
+  for +m: {Laws.found.miss(pre, p) == True{} : Bool}
+  {P.put.in(P.edits.of(Up.edit.sources(List.append(&2, Up.Found, pre, xs), sw), rest), p)
+    == P.put.in(P.edits.of(Up.edit.sources(xs, sw), rest), p) : P.Wrote}
+
+def src_pre(pre, xs, sw, rest, p, m):
+  match pre:
+    case []:
+      {==}
+    case Up.Found{+a, +x} <> +tl:
+      Equal.trans(P.Wrote,
+        P.put.in(P.edits.of(Up.edit.if(String.eq(U.reimport.many(sw, x), x), a,
+          U.reimport.many(sw, x), Up.edit.sources(List.append(&2, Up.Found, tl, xs), sw)),
+          rest), p),
+        P.put.in(P.edits.of(Up.edit.sources(List.append(&2, Up.Found, tl, xs), sw), rest), p),
+        P.put.in(P.edits.of(Up.edit.sources(xs, sw), rest), p),
+        src_miss.arm(String.eq(U.reimport.many(sw, x), x), a, U.reimport.many(sw, x),
+          Up.edit.sources(List.append(&2, Up.Found, tl, xs), sw), rest, p,
+          Eq.not.true(String.eq(a, p),
+            Eq.and.left(Bool.not(String.eq(a, p)), Laws.found.miss(tl, p), m))),
+        src_pre(tl, xs, sw, rest, p,
+          Eq.and.right(Bool.not(String.eq(a, p)), Laws.found.miss(tl, p), m)))
+
+# what a source leaves at its path: nothing when the moves left its text as
+# it was, and the rewritten text otherwise. Law vocabulary: ez never calls it.
+def wrote.of(same: Bool, +t: String) -> P.Wrote:
+  match same:
+    case True{}:
+      P.Kept{}
+    case False{}:
+      P.Put{t}
+
+# LAW: one source, with whether the moves change it given as a parameter,
+# written where nothing after it writes its path
+law src_one.arm:
+  for b: Bool
+  for +at: String
+  for +m: String
+  for +es: List<&2, Up.Edit>
+  for +rest: List<&2, P.Effect>
+  for kr: {P.put.in(P.edits.of(es, rest), at) == P.Kept{} : P.Wrote}
+  {P.put.in(P.edits.of(Up.edit.if(b, at, m, es), rest), at) == wrote.of(b, m) : P.Wrote}
+
+def src_one.arm(b, at, m, es, rest, kr):
+  match b:
+    case True{}:
+      kr
+    case False{}:
+      %Equal.sym(P.Wrote, P.put.in(P.edits.of(es, rest), at), P.Kept{}, kr)
+        : {P.put.one(P.Write{at, m}, at, _) == P.Put{m} : P.Wrote}
+      %Equal.sym(Bool, String.eq(at, at), True{}, Eq.string_eq_self(at))
+        : {Bool.pick(P.Wrote, _, P.Put{m}, P.Kept{}) == P.Put{m} : P.Wrote}
+      {==}
+
+# LAW: a source the World names once is written with its text rewritten, or
+# not written when the moves leave it as it was
+law src_all:
+  for +pre: List<&2, Up.Found>
+  for +at: String
+  for +text: String
+  for +post: List<&2, Up.Found>
+  for +sw: List<&2, U.Swap>
+  for +rest: List<&2, P.Effect>
+  for +mp: {Laws.found.miss(pre, at) == True{} : Bool}
+  for +mq: {Laws.found.miss(post, at) == True{} : Bool}
+  for +kr: {P.put.in(rest, at) == P.Kept{} : P.Wrote}
+  {P.put.in(P.edits.of(Up.edit.sources(List.append(&2, Up.Found, pre,
+    Up.Found{at, text} <> post), sw), rest), at)
+    == wrote.of(String.eq(U.reimport.many(sw, text), text), U.reimport.many(sw, text))
+    : P.Wrote}
+
+def src_all(pre, at, text, post, sw, rest, mp, mq, kr):
+  Equal.trans(P.Wrote,
+    P.put.in(P.edits.of(Up.edit.sources(List.append(&2, Up.Found, pre,
+      Up.Found{at, text} <> post), sw), rest), at),
+    P.put.in(P.edits.of(Up.edit.sources(Up.Found{at, text} <> post, sw), rest), at),
+    wrote.of(String.eq(U.reimport.many(sw, text), text), U.reimport.many(sw, text)),
+    src_pre(pre, Up.Found{at, text} <> post, sw, rest, at, mp),
+    src_one.arm(String.eq(U.reimport.many(sw, text), text), at, U.reimport.many(sw, text),
+      Up.edit.sources(post, sw), rest,
+      Equal.trans(P.Wrote, P.put.in(P.edits.of(Up.edit.sources(post, sw), rest), at),
+        P.put.in(rest, at), P.Kept{}, src_miss(post, sw, rest, at, mq), kr)))
+
+# LAW: a path that ends `.bend` is none of the paths that do not, with how
+# they compare given as a parameter
+law not_bend.arm:
+  for +lit: String
+  for +at: String
+  for c: Bool
+  for ec: {String.eq(at, lit) == c : Bool}
+  for lb: {String.ends_with(lit, ".bend") == False{} : Bool}
+  for bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  {String.eq(at, lit) == False{} : Bool}
+
+def not_bend.arm(lit, at, c, ec, lb, bend):
+  match c:
+    case False{}:
+      ec
+    case True{}:
+      Eq.bit.absurd2(&2, {String.eq(at, lit) == False{} : Bool},
+        Equal.trans(Bool, True{}, String.ends_with(lit, ".bend"), False{},
+          Equal.trans(Bool, True{}, String.ends_with(at, ".bend"), String.ends_with(lit, ".bend"),
+            Equal.sym(Bool, String.ends_with(at, ".bend"), True{}, bend),
+            Equal.cong(String, Bool, x => String.ends_with(x, ".bend"), at, lit,
+              Str.string_eq_true(at, lit, ec))),
+          lb))
+
+law not_bend:
+  for +lit: String
+  for +at: String
+  for lb: {String.ends_with(lit, ".bend") == False{} : Bool}
+  for bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  {String.eq(at, lit) == False{} : Bool}
+
+def not_bend(lit, at, lb, bend):
+  not_bend.arm(lit, at, String.eq(at, lit), {==}, lb, bend)
+
+# LAW: and the other way round
+law not_bend.flip:
+  for +lit: String
+  for +at: String
+  for lb: {String.ends_with(lit, ".bend") == False{} : Bool}
+  for bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  {String.eq(lit, at) == False{} : Bool}
+
+def not_bend.flip(lit, at, lb, bend):
+  MP.eq_flip(at, lit, not_bend(lit, at, lb, bend))
+
+# LAW: the lock, written last, is not at a source's path
+law lock_kept:
+  for +at: String
+  for +lt: String
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  {P.put.in([P.Write{P.lockfile(), lt}], at) == P.Kept{} : P.Wrote}
+
+def lock_kept(at, lt, bend):
+  put_one_other("ez.lock.toml", lt, at, P.Kept{}, not_bend.flip("ez.lock.toml", at, {==}, bend))
+
+# LAW: the sources' writes, and the lock after them, leave at a source's path
+# the World names once what its own write leaves
+law src_after:
+  for +nx: Up.Next
+  for +lt: String
+  for +at: String
+  for +text: String
+  for +pre: List<&2, Up.Found>
+  for +post: List<&2, Up.Found>
+  for efs: {Up.next.found(nx) == List.append(&2, Up.Found, pre, Up.Found{at, text} <> post)
+    : List<&2, Up.Found>}
+  for +mp: {Laws.found.miss(pre, at) == True{} : Bool}
+  for +mq: {Laws.found.miss(post, at) == True{} : Bool}
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  {P.put.in(P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+    P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])), at)
+    == wrote.of(String.eq(U.reimport.many(Up.next.swaps(nx), text), text),
+      U.reimport.many(Up.next.swaps(nx), text)) : P.Wrote}
+
+def src_after(nx, lt, at, text, pre, post, efs, mp, mq, bend):
+  %Equal.sym(List<&2, Up.Found>, Up.next.found(nx),
+    List.append(&2, Up.Found, pre, Up.Found{at, text} <> post), efs)
+    : {P.put.in(P.edits.of(Up.edit.sources(_, Up.next.swaps(nx)),
+      P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])), at)
+      == wrote.of(String.eq(U.reimport.many(Up.next.swaps(nx), text), text),
+        U.reimport.many(Up.next.swaps(nx), text)) : P.Wrote}
+  src_all(pre, at, text, post, Up.next.swaps(nx),
+    P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]), mp, mq,
+    Equal.trans(P.Wrote,
+      P.put.in(P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]), at),
+      P.put.in([P.Write{P.lockfile(), lt}], at),
+      P.Kept{},
+      drops_put(Up.next.drops(nx), [P.Write{P.lockfile(), lt}], at),
+      lock_kept(at, lt, bend)))
+
+# LAW: a made plan leaves at a source's path what the sources' writes leave
+# there
+law made_src:
+  for +nx: Up.Next
+  for +cs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for +lt: String
+  for +at: String
+  for +text: String
+  for +pre: List<&2, Up.Found>
+  for +post: List<&2, Up.Found>
+  for +ig: String
+  for okn: ok.next(nx, ig)
+  for efs: {Up.next.found(nx) == List.append(&2, Up.Found, pre, Up.Found{at, text} <> post)
+    : List<&2, Up.Found>}
+  for +mp: {Laws.found.miss(pre, at) == True{} : Bool}
+  for +mq: {Laws.found.miss(post, at) == True{} : Bool}
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  {P.put.plan(P.made(nx, cs, js, P.Doc{lt}), at)
+    == wrote.of(String.eq(U.reimport.many(Up.next.swaps(nx), text), text),
+      U.reimport.many(Up.next.swaps(nx), text)) : P.Wrote}
+
+def made_src(nx, cs, js, lt, at, text, pre, post, ig, okn, efs, mp, mq, bend):
+  Equal.trans(P.Wrote,
+    P.put.in(P.says.of(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+      P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))))), at),
+    P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+      Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), at),
+    wrote.of(String.eq(U.reimport.many(Up.next.swaps(nx), text), text),
+      U.reimport.many(Up.next.swaps(nx), text)),
+    Equal.trans(P.Wrote,
+      P.put.in(P.says.of(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+        P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+          Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))))), at),
+      P.put.in(P.lays(cs, Up.next.vends(nx), js,
+        P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+          Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))), at),
+      P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), at),
+      says_put(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+        P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+          Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))), at),
+      lays_put(cs, Up.next.vends(nx), js,
+        P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+          Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), at)),
+    Equal.trans(P.Wrote,
+      P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), at),
+      P.put.in(P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+        P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])), at),
+      wrote.of(String.eq(U.reimport.many(Up.next.swaps(nx), text), text),
+        U.reimport.many(Up.next.swaps(nx), text)),
+      edits_other(Up.next.edits(nx), Up.next.vends(nx), Up.next.model(nx), ig, okn,
+        P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+          P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])), at,
+        not_bend("ez.toml", at, {==}, bend), not_bend(".gitignore", at, {==}, bend)),
+      src_after(nx, lt, at, text, pre, post, efs, mp, mq, bend)))
+
+# LAW: what a source leaves, rewritten or not written, is its rewritten text
+law left_of:
+  for b: Bool
+  for +m: String
+  for +text: String
+  for eb: {String.eq(m, text) == b : Bool}
+  {Laws.left.at(wrote.of(b, m), text) == m : String}
+
+def left_of(b, m, text, eb):
+  match b:
+    case True{}:
+      Equal.sym(String, m, text, Str.string_eq_true(m, text, eb))
+    case False{}:
+      {==}
+
+# LAW: a plan that is made leaves at a `.bend` source the World names once its
+# text with every moved hash rewritten; a refusal is not made
+law rw_arm:
+  for d: P.Doc
+  for +nx: Up.Next
+  for +cs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for +at: String
+  for +text: String
+  for +pre: List<&2, Up.Found>
+  for +post: List<&2, Up.Found>
+  for +ig: String
+  for okn: ok.next(nx, ig)
+  for efs: {Up.next.found(nx) == List.append(&2, Up.Found, pre, Up.Found{at, text} <> post)
+    : List<&2, Up.Found>}
+  for +mp: {Laws.found.miss(pre, at) == True{} : Bool}
+  for +mq: {Laws.found.miss(post, at) == True{} : Bool}
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  for ok: {P.refuses.doc(d) == False{} : Bool}
+  {Laws.left.at(P.put.plan(P.made(nx, cs, js, d), at), text)
+    == U.reimport.many(Up.next.swaps(nx), text) : String}
+
+def rw_arm(d, nx, cs, js, at, text, pre, post, ig, okn, efs, mp, mq, bend, ok):
+  match d:
+    case P.Stop{_why}:
+      Eq.bit.absurd2(&2, {Laws.left.at(P.Kept{}, text) == U.reimport.many(Up.next.swaps(nx), text)
+        : String}, ok)
+    case P.Doc{+lt}:
+      %Equal.sym(P.Wrote, P.put.plan(P.made(nx, cs, js, P.Doc{lt}), at),
+        wrote.of(String.eq(U.reimport.many(Up.next.swaps(nx), text), text),
+          U.reimport.many(Up.next.swaps(nx), text)),
+        made_src(nx, cs, js, lt, at, text, pre, post, ig, okn, efs, mp, mq, bend))
+        : {Laws.left.at(_, text) == U.reimport.many(Up.next.swaps(nx), text) : String}
+      left_of(String.eq(U.reimport.many(Up.next.swaps(nx), text), text),
+        U.reimport.many(Up.next.swaps(nx), text), text, {==})
+
+def Laws.upgrade_rewrites_sources(w, at, text, pre, post, fs, mp, mq, bend, ok):
+  match w:
+    case W.World{+args, +ledger, +listing, +replies, +ups}:
+      rw_arm(P.decide(W.Inputs{Up.next.read(W.next(args, ledger, ups)),
+          Up.next.stop(W.next(args, ledger, ups)),
+          W.listing.of(W.next(args, ledger, ups), listing),
+          W.judged.of(W.next(args, ledger, ups), replies)}),
+        W.next(args, ledger, ups),
+        P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
+        W.judged.of(W.next(args, ledger, ups), replies),
+        at, text, pre, post, Laws.ignore.said(Up.text.said(ups, Up.Ignore{})),
+        ok_world(args, ledger, ups), fs, mp, mq, bend, ok)
+
+def Laws.upgrade_rewrites_imports(
+  w,
+  at,
+  text,
+  pre,
+  post,
+  fs,
+  mp,
+  mq,
+  bend,
+  ok,
+  i,
+  old,
+  new,
+  mv,
+  to,
+  hit
+):
+  %Equal.sym(String, Laws.left.at(P.put(w, at), text), U.reimport.many(Laws.swaps(w), text),
+    Laws.upgrade_rewrites_sources(w, at, text, pre, post, fs, mp, mq, bend, ok))
+    : {String.starts_with(ML.line.at(String.lines(_), i), U.reimport.head(new)) == True{} : Bool}
+  ML.rewrite_names_new(Laws.swaps(w), text, i, old, new, mv, to, hit)
+
+def Laws.upgrade_leaves_other_lines(w, at, text, pre, post, fs, mp, mq, bend, ok, i, mv, miss):
+  %Equal.sym(String, Laws.left.at(P.put(w, at), text), U.reimport.many(Laws.swaps(w), text),
+    Laws.upgrade_rewrites_sources(w, at, text, pre, post, fs, mp, mq, bend, ok))
+    : {ML.line.at(String.lines(_), i) == ML.line.at(String.lines(text), i) : String}
+  ML.rewrite_keeps_other_lines(Laws.swaps(w), text, i, mv, miss)
+
+def Laws.upgrade_keeps_line_count(w, at, text, pre, post, fs, mp, mq, bend, ok, mv):
+  %Equal.sym(String, Laws.left.at(P.put(w, at), text), U.reimport.many(Laws.swaps(w), text),
+    Laws.upgrade_rewrites_sources(w, at, text, pre, post, fs, mp, mq, bend, ok))
+    : {List.length(&2, String, String.lines(_))
+      == List.length(&2, String, String.lines(text)) : Nat}
+  ML.rewrite_keeps_line_count(Laws.swaps(w), text, mv)
+
+# LAW: a source the moves leave as it was is not written
+law kept_of:
+  for +m: String
+  for +text: String
+  for +e: {m == text : String}
+  {wrote.of(String.eq(m, text), m) == P.Kept{} : P.Wrote}
+
+def kept_of(m, text, e):
+  %Equal.sym(String, m, text, e) : {wrote.of(String.eq(_, text), _) == P.Kept{} : P.Wrote}
+  %Equal.sym(Bool, String.eq(text, text), True{}, Eq.string_eq_self(text))
+    : {wrote.of(_, text) == P.Kept{} : P.Wrote}
+  {==}
+
+# LAW: a plan leaves a source none of whose lines names a moved hash
+# unwritten, whether it is made or refused
+law hits_arm:
+  for d: P.Doc
+  for +nx: Up.Next
+  for +cs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for +at: String
+  for +text: String
+  for +pre: List<&2, Up.Found>
+  for +post: List<&2, Up.Found>
+  for +ig: String
+  for okn: ok.next(nx, ig)
+  for efs: {Up.next.found(nx) == List.append(&2, Up.Found, pre, Up.Found{at, text} <> post)
+    : List<&2, Up.Found>}
+  for +mp: {Laws.found.miss(pre, at) == True{} : Bool}
+  for +mq: {Laws.found.miss(post, at) == True{} : Bool}
+  for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
+  for none: {ML.names.none.all(Up.next.swaps(nx), String.lines(text)) == True{} : Bool}
+  {P.put.plan(P.made(nx, cs, js, d), at) == P.Kept{} : P.Wrote}
+
+def hits_arm(d, nx, cs, js, at, text, pre, post, ig, okn, efs, mp, mq, bend, none):
+  match d:
+    case P.Stop{_why}:
+      {==}
+    case P.Doc{+lt}:
+      Equal.trans(P.Wrote,
+        P.put.plan(P.made(nx, cs, js, P.Doc{lt}), at),
+        wrote.of(String.eq(U.reimport.many(Up.next.swaps(nx), text), text),
+          U.reimport.many(Up.next.swaps(nx), text)),
+        P.Kept{},
+        made_src(nx, cs, js, lt, at, text, pre, post, ig, okn, efs, mp, mq, bend),
+        kept_of(U.reimport.many(Up.next.swaps(nx), text), text,
+          ML.rewrite_nothing_named(Up.next.swaps(nx), text, none)))
+
+def Laws.upgrade_writes_only_hits(w, at, text, pre, post, fs, mp, mq, bend, none):
+  match w:
+    case W.World{+args, +ledger, +listing, +replies, +ups}:
+      hits_arm(P.decide(W.Inputs{Up.next.read(W.next(args, ledger, ups)),
+          Up.next.stop(W.next(args, ledger, ups)),
+          W.listing.of(W.next(args, ledger, ups), listing),
+          W.judged.of(W.next(args, ledger, ups), replies)}),
+        W.next(args, ledger, ups),
+        P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
+        W.judged.of(W.next(args, ledger, ups), replies),
+        at, text, pre, post, Laws.ignore.said(Up.text.said(ups, Up.Ignore{})),
+        ok_world(args, ledger, ups), fs, mp, mq, bend, none)
+
+# LAW: a made plan's writes after the upgrade's own files, the sources and
+# the lock, leave `.gitignore` and ez.toml as they were, when no source is at
+# either
+law rest_kept:
+  for +nx: Up.Next
+  for +lt: String
+  for +p: String
+  for m: {Laws.found.miss(Up.next.found(nx), p) == True{} : Bool}
+  for lk: {P.put.in([P.Write{P.lockfile(), lt}], p) == P.Kept{} : P.Wrote}
+  {P.put.in(P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+    P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])), p) == P.Kept{} : P.Wrote}
+
+def rest_kept(nx, lt, p, m, lk):
+  Equal.trans(P.Wrote,
+    P.put.in(P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+      P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])), p),
+    P.put.in(P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]), p),
+    P.Kept{},
+    src_miss(Up.next.found(nx), Up.next.swaps(nx),
+      P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]), p, m),
+    Equal.trans(P.Wrote,
+      P.put.in(P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]), p),
+      P.put.in([P.Write{P.lockfile(), lt}], p),
+      P.Kept{},
+      drops_put(Up.next.drops(nx), [P.Write{P.lockfile(), lt}], p),
+      lk))
+
+# LAW: a made plan leaves at a path what the upgrade's own files and what
+# follows them leave there
+law made_edits:
+  for +nx: Up.Next
+  for +cs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for +lt: String
+  for +p: String
+  {P.put.plan(P.made(nx, cs, js, P.Doc{lt}), p)
+    == P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+      Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), p)
+    : P.Wrote}
+
+def made_edits(nx, cs, js, lt, p):
+  Equal.trans(P.Wrote,
+    P.put.in(P.says.of(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+      P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))))), p),
+    P.put.in(P.lays(cs, Up.next.vends(nx), js,
+      P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))), p),
+    P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+      Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), p),
+    says_put(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+      P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))), p),
+    lays_put(cs, Up.next.vends(nx), js,
+      P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), p))
+
+# LAW: the `.gitignore` a plan writes, when no source is at it, has the
+# allowlist of the hashes the upgrade commits and keeps the lines of the file
+# it read that are not ez's
+law ign_plan:
+  for d: P.Doc
+  for +nx: Up.Next
+  for +cs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for +t: String
+  for e: {P.put.plan(P.made(nx, cs, js, d), ".gitignore") == P.Put{t} : P.Wrote}
+  for +miss: {Laws.found.miss(Up.next.found(nx), ".gitignore") == True{} : Bool}
+  for +ig: String
+  for okn: ok.next(nx, ig)
+  for +ev: {Str.clear.all(Up.next.vends(nx), '\n') == True{} : Bool}
+  {I.hashes(I.file.lines(t)) == Up.next.vends(nx) : List<&2, String>} &
+    {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>}
+
+def ign_plan(d, nx, cs, js, t, e, miss, ig, okn, ev):
+  match d:
+    case P.Stop{_why}:
+      Empty.absurd({I.hashes(I.file.lines(t)) == Up.next.vends(nx) : List<&2, String>} &
+        {I.others(I.file.lines(t)) == I.others(I.file.lines(ig)) : List<&2, String>},
+        kept_put(t, e))
+    case P.Doc{+lt}:
+      edits_ign(Up.next.edits(nx), Up.next.vends(nx), Up.next.model(nx), ig, okn,
+        P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+          P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])),
+        rest_kept(nx, lt, ".gitignore", miss, {==}), t,
+        Equal.trans(P.Wrote,
+          P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+            Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))),
+            ".gitignore"),
+          P.put.plan(P.made(nx, cs, js, P.Doc{lt}), ".gitignore"),
+          P.Put{t},
+          Equal.sym(P.Wrote, P.put.plan(P.made(nx, cs, js, P.Doc{lt}), ".gitignore"),
+            P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+              Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))),
+              ".gitignore"),
+            made_edits(nx, cs, js, lt, ".gitignore")),
+          e),
+        ev)
+
+# the `.gitignore` facts on a World
+law ign_world:
+  for +w: W.World
+  for +text: String
+  for put: {P.put(w, ".gitignore") == P.Put{text} : P.Wrote}
+  for +miss: {Laws.found.miss(Laws.found(w), ".gitignore") == True{} : Bool}
+  for +ev: {Str.clear.all(Laws.vends(w), '\n') == True{} : Bool}
+  {I.hashes(I.file.lines(text)) == Laws.vends(w) : List<&2, String>} &
+    {I.others(I.file.lines(text)) == I.others(I.file.lines(Laws.ignore.read(w)))
+      : List<&2, String>}
+
+def ign_world(w, text, put, miss, ev):
+  match w:
+    case W.World{+args, +ledger, +listing, +replies, +ups}:
+      ign_plan(P.decide(W.Inputs{Up.next.read(W.next(args, ledger, ups)),
+          Up.next.stop(W.next(args, ledger, ups)),
+          W.listing.of(W.next(args, ledger, ups), listing),
+          W.judged.of(W.next(args, ledger, ups), replies)}),
+        W.next(args, ledger, ups),
+        P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
+        W.judged.of(W.next(args, ledger, ups), replies),
+        text, put, miss, Laws.ignore.said(Up.text.said(ups, Up.Ignore{})),
+        ok_world(args, ledger, ups), ev)
+
+# the first of two facts
+def fst(-A: Type, -B: Type, p: A & B) -> A:
+  (a, _b) = p
+  a
+
+# the second
+def snd(-A: Type, -B: Type, p: A & B) -> B:
+  (_a, b) = p
+  b
+
+def Laws.upgrade_allowlist_is_the_ledger(w, text, put, miss, ev):
+  fst({I.hashes(I.file.lines(text)) == Laws.vends(w) : List<&2, String>},
+    {I.others(I.file.lines(text)) == I.others(I.file.lines(Laws.ignore.read(w)))
+      : List<&2, String>},
+    ign_world(w, text, put, miss, ev))
+
+def Laws.upgrade_allowlist_keeps_other_lines(w, text, put, miss, ev):
+  snd({I.hashes(I.file.lines(text)) == Laws.vends(w) : List<&2, String>},
+    {I.others(I.file.lines(text)) == I.others(I.file.lines(Laws.ignore.read(w)))
+      : List<&2, String>},
+    ign_world(w, text, put, miss, ev))
+
+# LAW: the ez.toml a plan writes, when no source is at it, goes with the
+# hashes of the ledger it renders
+law toml_plan:
+  for d: P.Doc
+  for +nx: Up.Next
+  for +cs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for +t: String
+  for e: {P.put.plan(P.made(nx, cs, js, d), "ez.toml") == P.Put{t} : P.Wrote}
+  for +miss: {Laws.found.miss(Up.next.found(nx), "ez.toml") == True{} : Bool}
+  for +ig: String
+  for okn: ok.next(nx, ig)
+  {Up.next.vends(nx) == I.vended(Laws.ledger.deps(Up.next.model(nx))) : List<&2, String>}
+
+def toml_plan(d, nx, cs, js, t, e, miss, ig, okn):
+  match d:
+    case P.Stop{_why}:
+      Empty.absurd({Up.next.vends(nx) == I.vended(Laws.ledger.deps(Up.next.model(nx)))
+        : List<&2, String>}, kept_put(t, e))
+    case P.Doc{+lt}:
+      edits_toml(Up.next.edits(nx), Up.next.vends(nx), Up.next.model(nx), ig, okn,
+        P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+          P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])),
+        rest_kept(nx, lt, "ez.toml", miss, {==}), t,
+        Equal.trans(P.Wrote,
+          P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+            Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))),
+            "ez.toml"),
+          P.put.plan(P.made(nx, cs, js, P.Doc{lt}), "ez.toml"),
+          P.Put{t},
+          Equal.sym(P.Wrote, P.put.plan(P.made(nx, cs, js, P.Doc{lt}), "ez.toml"),
+            P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+              Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))),
+              "ez.toml"),
+            made_edits(nx, cs, js, lt, "ez.toml")),
+          e))
+
+def Laws.upgrade_vends_the_ledger(w, text, put, miss):
+  match w:
+    case W.World{+args, +ledger, +listing, +replies, +ups}:
+      toml_plan(P.decide(W.Inputs{Up.next.read(W.next(args, ledger, ups)),
+          Up.next.stop(W.next(args, ledger, ups)),
+          W.listing.of(W.next(args, ledger, ups), listing),
+          W.judged.of(W.next(args, ledger, ups), replies)}),
+        W.next(args, ledger, ups),
+        P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
+        W.judged.of(W.next(args, ledger, ups), replies),
+        text, put, miss, Laws.ignore.said(Up.text.said(ups, Up.Ignore{})),
+        ok_world(args, ledger, ups))
 # The upgrade's moves (EZ-RES-5, EZ-RES-8). Each law is one fact about one
 # dependency's fate (`Up.dep.one`), carried through the walk over the ledger's
 # dependencies (`Up.deps.walk`) to the ledger model the upgrade renders
