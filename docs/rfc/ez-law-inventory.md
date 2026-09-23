@@ -30,6 +30,26 @@ We could not re-run `bend PROOF.bend` while writing this: the sandbox has no `be
 
 What ez proves today, in one paragraph: the 0x hash of a package's file set is independent of the order the files were found in (`pkg/hash_perm`, for file lists with distinct paths), which is EZ-HASH-1 already Proved. The lock cache cannot override the ledger for a given hash (`lock/origin_agrees`), which is a real fragment of EZ-DOC-3. The ledger parser and renderer have a strong quantified structure (add and remove are idempotent, sections are read in order, a bad read never renders). The HTTP client's framing, the `ez publish` hash check, and the path algebra are proved for all inputs. Everything about upgrade decisions, lock rendering order, lock round-tripping, import rewriting, the gitignore allowlist, target classification, NAR hashing, and SHA-256 is closed: pinned on one example each.
 
+**Update:** no closed law remains. The first rollout phase deleted the 78 that pointed toward no Proved requirement and kept the rest as `# toward` trails. The last 40 trails were deleted together, with their proofs and the sample values only they used, when ez moved to the bolt with a strict `closed` rule and the `trace` rule. They were, by requirement:
+
+- EZ-DOC-1: `lock/LAWS.bend` `lock_roundtrip`, `tool_pin_reads_back`.
+- EZ-DOC-2: `lock/LAWS.bend` `hashes_sorted`.
+- EZ-DOC-4: `manifest/LAWS.bend` `same_rev_keeps`.
+- EZ-LED-4: `manifest/LAWS.bend` `render_parse_roundtrip`, `bolt_rev`.
+- EZ-LED-5: `manifest/LAWS.bend` `tool_needs_no_hash`, `tool_is_not_a_dep`, `bolt_is_a_tool`, `bolt_is_not_a_dep`; `lock/LAWS.bend` `tools_are_not_packages`.
+- EZ-RES-4: `manifest/LAWS.bend` `hub_holds`.
+- EZ-RES-5: `manifest/LAWS.bend` `sha256_aims_forward`, `sha256_advances`, `sha256_retarget`; `git/LAWS.bend` `sha256_remote_tip`, `sha256_remote_branch`.
+- EZ-RES-6: `manifest/LAWS.bend` `unselected_holds`.
+- EZ-RES-8: `manifest/LAWS.bend` `tag_follows`, `same_rev_drifts`, `tag_moved_off`.
+- EZ-VEN-2: `manifest/LAWS.bend` `imports_follow_hash`.
+- EZ-VEN-5: `ez/LAWS.bend` `hash_of_import`, `hash_of_relative`, `imported_dedups`, `report_agrees`, `report_both_ways`, `report_unused`.
+- EZ-TOOL-7: `ez/LAWS.bend` `file_bin`, `file_entry`, `file_default`, `out_name_empty`, `out_name`.
+- EZ-TOOL-8: `ez/LAWS.bend` `target_escapes`.
+- EZ-TOOL-9: `ez/LAWS.bend` `argv_of_run`, `argv_of_tool`, `tool_rest_dashes`, `tool_rest_plain`.
+- EZ-FETCH-1: `hub/LAWS.bend` `hash_match`, `hash_refuse`.
+
+The tables below keep the closed laws as they were at `f009e42`; none of them is in the tree now.
+
 ## Inventory
 
 ### sha/LAWS.bend
@@ -397,6 +417,8 @@ These come out of reading the laws and the gate that runs them. The findings fro
 
 **bolt does not run in CI, and it would fail if it did.** `flake.nix` exposes `checks = { tests; ez; }` with no `mkLint`. The bolt ez pins is v0.4.0 (`24b497e`); current bolt is v0.8.1 (`0b92fbb`), and what follows holds for both unless noted. The `laws` group has three rules: `closed` flags a law in a LAWS.bend with no `for` or `exs` binder, `law` flags a top-level def no law names, and `unsafe` flags an `@unsafe` def a LAWS or PROOF file reaches. ez's `bolt.bend` sets `laws` to `error`, so the 122 closed laws above would each be an error. In the pinned v0.4.0 the `law` rule also exempts any file whose text contains `IO`, which leaves 11 of ez's 37 non-test modules under it; `lock/lock.bend`, `pkg/pkg.bend`, `git/git.bend` and `sha/nar.bend` are exempt. bolt removed that clause in v0.5.0 (bolt#10), and since v0.8.1 fixtures pin it down (bolt#40): a file is exempt only if its path ends in `LAWS.bend` or `PROOF.bend` or contains `tests/`, and IO defs and `main` are graded like any other def. Moving ez's `[tools.bolt]` pin to v0.8.1 therefore puts every module under a law directory under the `law` rule, IO modules included; `run/` and `check/` have no LAWS.bend of their own and stay outside it.
 
+**Update:** `mkLint` is in the flake checks, and `[tools.bolt]` has moved past v0.8.1 and v0.9.0 to the bolt with `trace` (bolt#106). There `law` is named `coverage` (L001) and stays at `warn`; `closed` (L002) flags every law with no binder, equality or not, and `trace` (L005) checks `SPEC.md`'s rows against the law tags. ez's `bolt.bend` sets `closed`, `unsafe` and `trace` to `error`, and bolt reports no errors.
+
 **The lock reads a cache.** `lock/origin_agrees` exists because `ez lock` reads `.ez/origins.toml` as well as `ez.toml`. The law proves the ledger wins for any hash the ledger names. It says nothing about a hash only the cache names, which is exactly the fresh-clone case EZ-DOC-3 is about. This is the first input outside ledger plus committed tree, and step 4 traces the rest.
 
 **The 0x hash is over an import closure, not a tree.** `pkg/hash_perm` quantifies over a `List<File>` where `File{at, sum}` is a path and a content digest, gathered by walking local imports and foreign bodies from an entry (`pkg/pkg.bend`). The RFC's "hash of a tree" should be restated in those terms, and the precondition `distinct(xs)` is part of the guarantee.
@@ -497,7 +519,7 @@ Under `--upgrade`, `ez lock` also reads `.gitignore`, a second `find` (`-not -pa
 
 What the README's reproducibility sentence ("`ez lock` never has to consult anything a clone does not have") gets right is narrower: dependency `root` and `narHash` are copied from the ledger and never recomputed by plain lock.
 
-**Update:** the decided input changes have landed. At `bec3435` plain `ez lock` reads the ledger, `git ls-files '*.bend'` and those files, trees under `$BEND_LIB` or clones at the ledger rev checked against `narHash`, and hub content, plus any untracked local file a tracked file imports. The planner design for phase three, [ez-lock-planner.md](ez-lock-planner.md), re-traces the inputs and proposes the World that models them. The maintainer accepted that design with every recommendation it made, which adds five behavior changes to the RFC's "Decided behavior changes", rewords EZ-DOC-5 and EZ-RES-6, and adds EZ-OUT-2. Its work packages are how phase three is tracked from here: each lands its requirements' laws, deletes the trails the design names, and updates this inventory.
+**Update:** the decided input changes have landed. At `bec3435` plain `ez lock` reads the ledger, `git ls-files '*.bend'` and those files, trees under `$BEND_LIB` or clones at the ledger rev checked against `narHash`, and hub content, plus any untracked local file a tracked file imports. The planner design for phase three, [ez-lock-planner.md](ez-lock-planner.md), re-traces the inputs and proposes the World that models them. The maintainer accepted that design with every recommendation it made, which adds five behavior changes to the RFC's "Decided behavior changes", rewords EZ-DOC-5 and EZ-RES-6, and adds EZ-OUT-2. Its work packages are how phase three is tracked from here: each lands its requirements' laws and updates this inventory. The trails the design names are already deleted, with every other trail (see the Summary).
 
 ## Missing behavior
 
@@ -532,4 +554,4 @@ The RFC's "Decided behavior changes" picks five of these to fix, in this order, 
 
 ### RFC requirements with no corresponding code
 
-EZ-OUT-1's `ez: <area>:` prefix and structured `Failed{area, reason}` outcome do not exist. No code implements a `World`, a `Plan`, a planner or an interpreter. No code checks that a vendored tree's directory name is the hash of its contents after the tree is written (EZ-HASH-3). EZ-DOC-2's "rendering a parsed lock reproduces the bytes" has no code path that exercises it. No traceability check exists, and bolt reads only `.bend` files, so it cannot read a `SPEC.md` today.
+EZ-OUT-1's `ez: <area>:` prefix and structured `Failed{area, reason}` outcome do not exist. No code implements a `World`, a `Plan`, a planner or an interpreter. No code checks that a vendored tree's directory name is the hash of its contents after the tree is written (EZ-HASH-3). EZ-DOC-2's "rendering a parsed lock reproduces the bytes" has no code path that exercises it. No traceability check exists, and bolt reads only `.bend` files, so it cannot read a `SPEC.md` today. **Update:** bolt's `trace` rule (bolt#106) reads `SPEC.md`, and ez runs it at `error`.

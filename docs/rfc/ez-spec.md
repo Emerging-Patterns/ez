@@ -24,7 +24,7 @@ Items for review:
 - [x] <!-- REVIEW (resolved): The proof gate moves out of `ez test` into its own command, `ez prove`, which `mkProofs` runs. `ez test` may call it. -->
 - [x] <!-- REVIEW (resolved): `SPEC.md` is the single requirement list. The bolt rule parses only its requirement table rows. -->
 - [x] <!-- REVIEW (resolved): `mkLint` joins ez's flake checks now, with `[tools.bolt]` moved to v0.8.1 and `closed` and `law` at `warn` until the first rollout phase is done. `unsafe` stays at `error`. -->
-- [x] <!-- REVIEW (resolved): bolt v0.8.1's `closed` rule accepts closed equalities (bolt#10), so it does not enforce "closed laws have no standing". ez asked bolt for an opt-in stricter setting rather than enforcing it in its own rule; bolt v0.9.0 added it as the `quantify` rule (L004), and ez turns it on. -->
+- [x] <!-- REVIEW (resolved): bolt v0.8.1's `closed` rule accepts closed equalities (bolt#10), so it does not enforce "closed laws have no standing". ez asked bolt for an opt-in stricter setting rather than enforcing it in its own rule; bolt v0.9.0 added it as the `quantify` rule (L004), and ez turned it on. bolt has since made `closed` itself strict and retired `quantify`; ez deleted its trails and moved to that bolt, with `closed` at `error`. -->
 - [x] <!-- REVIEW (resolved): bolt v0.8.1 reports about 900 style, correctness and suspicious findings in ez beyond the law rules. A preliminary phase fixes all of them before `mkLint` is enabled. -->
 - [x] <!-- REVIEW (resolved): The thirteen refactor-equivalence laws, and the `old.*` definitions they compare against, are deleted in the first rollout phase. -->
 - [x] <!-- REVIEW (resolved): Guarantees proved in a pinned dependency are Trusted from ez's side, with the dependency and pin as the reason. -->
@@ -328,7 +328,7 @@ law upgrade_one_frames_others:
   {M.dep(upgrade_plan.ledger(w, n), m) == M.dep(M.parse(w.ledger), m) : M.Dep}
 ```
 
-EZ-RES-8 is new. The code refuses on a moved tag and on drift, and closed laws (`tag_moved_off`, `same_rev_drifts`) show the verdicts. In the dependency path the drift decision is made after the new tree has been laid, by `confirmed` in `ez/upgrade.bend`, and `U.judge` is called with its agreement bit fixed to true, so its `Drift` arm cannot fire there.
+EZ-RES-8 is new. The code refuses on a moved tag and on drift, and closed laws (`tag_moved_off`, `same_rev_drifts`) showed the verdicts until the trails were deleted. In the dependency path the drift decision is made after the new tree has been laid, by `confirmed` in `ez/upgrade.bend`, and `U.judge` is called with its agreement bit fixed to true, so its `Drift` arm cannot fire there.
 
 EZ-RES-5 and EZ-RES-8 are proved relative to EZ-RES-7. The law says ez moves a pin only when the model's ancestry relation says so; whether that relation matches the real repository is git's responsibility.
 
@@ -344,9 +344,9 @@ EZ-RES-5 and EZ-RES-8 are proved relative to EZ-RES-7. The law says ez moves a p
 
 EZ-VEN-1 is not true today: only `ez lock --upgrade` writes the allowlist, `ez add` never writes it, `ez remove` never removes a line, and `ez init` writes `.ez/`, under which git ignores every allowlist line. The decided change derives the allowlist from the ledger with one pure function, which the three commands call, and changes `ez init` to write `.ez/*`, `!.ez/lib` and `.ez/lib/*`. The law is then stated over that function.
 
-EZ-VEN-2 and EZ-VEN-3 together specify rewriting completely: the first says what changes, the second says nothing else does. The match is exact at column 0, so an indented import (which the package walk accepts) is not rewritten; the requirement states the column-0 rule so that a change to it is a behavior change. Swaps apply one after another, so the law should quantify over swap lists with distinct old and new hashes. The single closed example, `imports_follow_hash`, covers both requirements on one file.
+EZ-VEN-2 and EZ-VEN-3 together specify rewriting completely: the first says what changes, the second says nothing else does. The match is exact at column 0, so an indented import (which the package walk accepts) is not rewritten; the requirement states the column-0 rule so that a change to it is a behavior change. Swaps apply one after another, so the law should quantify over swap lists with distinct old and new hashes. A single closed example, `imports_follow_hash`, covered both requirements on one file until the trails were deleted.
 
-EZ-VEN-4 holds today (`ez/doctor.bend` has no file write) and is only provable because of the planner split, where it becomes a claim that the plan `doctor_plan` returns contains no effect under the project root. Every command used to run `Env.make()` first, which created `.ez`, `bin` and the library directory; that was recorded as accidental in the inventory and is fixed, so `ez doctor` creates nothing (`Env.dirs`, law `dirs_other`). EZ-VEN-5 is new; the drift report has six closed laws in `ez/LAWS.bend` (`report_both_ways` and the rest) and no requirement until now.
+EZ-VEN-4 holds today (`ez/doctor.bend` has no file write) and is only provable because of the planner split, where it becomes a claim that the plan `doctor_plan` returns contains no effect under the project root. Every command used to run `Env.make()` first, which created `.ez`, `bin` and the library directory; that was recorded as accidental in the inventory and is fixed, so `ez doctor` creates nothing (`Env.dirs`, law `dirs_other`). EZ-VEN-5 is new; the drift report had six closed laws in `ez/LAWS.bend` (`report_both_ways` and the rest), deleted with the other trails, and no requirement until now.
 
 #### Fetch (EZ-FETCH)
 
@@ -370,7 +370,7 @@ This takes most of the weight off the draft's EZ-TRUST-3 ("the hub serves the tr
 | EZ-TOOL-8 | A remote target whose cache slug is empty, absolute, or climbs with `..` is refused. | Proved | pending |
 | EZ-TOOL-9 | `ez tool run <target>` passes every word after the target to the program, dropping one leading `--`. `ez run` passes every word after `run` to the entry. | Proved | pending |
 
-EZ-TOOL-2 is a decided change. Today one file records only the commit, for both the checkout and the binary, so a pinned tool with an `entry` override and a free run of the same repo at the same rev can share a binary. EZ-TOOL-7, EZ-TOOL-8 and EZ-TOOL-9 are new; closed laws for them exist in `ez/LAWS.bend` (`file_*`, `out_name*`, `target_escapes`, `argv_of_*`, `tool_rest_*`).
+EZ-TOOL-2 is a decided change. Today one file records only the commit, for both the checkout and the binary, so a pinned tool with an `entry` override and a free run of the same repo at the same rev can share a binary. EZ-TOOL-7, EZ-TOOL-8 and EZ-TOOL-9 are new; the closed laws for them in `ez/LAWS.bend` (`file_*`, `out_name*`, `target_escapes`, `argv_of_*`, `tool_rest_*`) were deleted with the other trails.
 
 EZ-TOOL-5 is stated over the planner's outcome, not over a real process. The planner returns a run effect as its final effect after a successful build and exit 1 on every earlier failure; the interpreter passing the child's status through unchanged is covered by the interpreter trust assumption. The program runs with stdin at `/dev/null` and its output buffered until it exits; that is interpreter behavior and not part of the requirement.
 
@@ -406,9 +406,9 @@ Closed laws have no standing in this specification. They are not a level, they c
 
 In the first rollout phase, every existing closed law is sorted against the requirement list, using the inventory's "Points toward" column. A closed law that illustrates a requirement is kept temporarily and marked with the ID it points toward, so the pending requirement has a visible trail. A closed law that fits no requirement is deleted, since it pins behavior nobody has decided to guarantee. By the inventory, 78 of the 122 closed laws are deleted in this step: the ones about the `ez test` runner, the CLI parser, progress and error wording, the spinner's terminal choice, and the SHA-256 and NAR vectors, whose requirements are Trusted. 43 point toward a Proved requirement and are kept, tagged, until its law lands. The remaining one, `dflt_https`, moves to ezhttp with the rest of `net/`. The thirteen refactor-equivalence laws are deleted in the same step, with the `old.*` definitions they compare against: the rewrites they checked have landed, and keeping the old definitions would maintain a second specification nobody reads.
 
-When a requirement's quantified law lands, the closed laws pointing at it are deleted in the same PR. The quantified law strictly subsumes them, and keeping them would reintroduce exactly the brittleness this RFC removes.
+The plan was to delete the closed laws pointing at a requirement in the same PR that lands its quantified law, which strictly subsumes them. We took the second step sooner. With 40 trails left and every pending row's real law already stated in an accepted design document (this RFC's requirement sections, and [ez-lock-planner.md](ez-lock-planner.md) for the lock), the trails were no longer telling anyone what to prove, and they held ez on an old bolt. We deleted all of them in one change ([ez-law-inventory.md](ez-law-inventory.md) lists them), with their proofs and the sample values only they used. No closed law remains in ez.
 
-bolt enforces the end state through an opt-in rule. Its `closed` rule flagged every law with no binder up to v0.4.0, but since v0.5.0 (bolt#10) it deliberately accepts a closed equality as a stated claim and flags only a law that is neither quantified nor an equality. That default follows the direction this RFC abandons, and it is bolt's to keep. At ez's request bolt v0.9.0 added `quantify` (L004), off unless a project names it: it flags every law in a LAWS.bend with no binder, equality or not, unless the comment line right above the law starts with `# toward `. ez turns it on at `error`, so a new closed law cannot land, and the trails disappear as their requirements are proved.
+bolt enforces the end state. Its `closed` rule flagged every law with no binder up to v0.4.0, but from v0.5.0 (bolt#10) it accepted a closed equality as a stated claim. At ez's request bolt v0.9.0 added `quantify` (L004), an opt-in rule that flagged every law with no binder unless the comment line right above it started with `# toward `, and ez ran it at `error` while the trails remained. bolt has since made `closed` (L002) strict itself: it flags every law in a LAWS.bend with no `for` or `exs` binder, equality or not, and nothing exempts one. L004 is retired. ez runs `closed` at `error`, so a new closed law cannot land.
 
 ### Tagging and traceability
 
@@ -421,16 +421,16 @@ law upgrade_one_frames_others: ...
 
 A check reads the requirement list and every LAWS.bend and fails when:
 
-- A requirement at level Proved, marked proved, has no quantified law tagged with its ID.
-- A law is tagged with an ID that does not exist in the requirement list.
-- A tagged law has no binders.
-- A requirement at level Trusted has no row in the trust boundary table.
+- A requirement at level Proved, marked proved, has an empty Law cell.
+- A law a Proved row names, proved or pending, is missing, has no binder, or does not carry the row's ID.
+- A law is tagged with an ID that the requirement list does not have as a Proved row.
+- A requirement at level Trusted has a Law cell, or no row in the trust boundary table.
 
-It reports, without failing, every requirement still pending. That report is the honest answer to "what does ez prove right now", and it shrinks as proofs land.
+A pending row passes with an empty Law cell. `SPEC.md`'s pending statuses and its "Left to prove" section are the honest answer to "what does ez prove right now", and they shrink as proofs land.
 
 Untagged quantified laws are allowed. ez has many of them: path lemmas, string lemmas, and the ledger reading laws that support EZ-LED. They pass the gate like any law, but the refactoring contract does not protect them, so a change may edit or delete them freely.
 
-The check belongs in bolt, as a rule in the `laws` group next to `closed`, `law` and `unsafe`, run through `mkLint`. It depends only on file contents, which keeps it inside the lint gate rather than adding a new runner. `SPEC.md` stays the single requirement list, and the rule parses only its requirement table rows (ID, level, status), so the document remains prose for people and a table for the check. ez's flake checks gain `mkLint` in the first rollout phase.
+The check belongs in bolt, as a rule in the `laws` group next to `closed`, `coverage` (which bolt v0.9.0 called `law`) and `unsafe`, run through `mkLint`. It depends only on file contents, which keeps it inside the lint gate rather than adding a new runner. `SPEC.md` stays the single requirement list, and the rule parses only its requirement and trust table rows, so the document remains prose for people and a table for the check. ez's flake checks gain `mkLint` in the first rollout phase. bolt shipped the check as `trace` (L005, bolt#106), opt-in: no group setting reaches it, and a project turns it on by naming it. ez's `bolt.bend` sets it to `error`.
 
 ### Refactoring contract
 
@@ -536,13 +536,13 @@ A preliminary phase makes ez lint clean under bolt v0.8.1: it fixes every style,
 
 The first phase writes `SPEC.md` from this RFC, with the proved and pending status of each requirement, and sorts the existing closed laws using the inventory: 43 that illustrate a Proved requirement are tagged with its ID, and 78 are deleted, along with the thirteen refactor-equivalence laws and their `old.*` definitions. It tags `pkg/hash_perm` with EZ-HASH-1. With the preliminary phase, it adds `mkLint` to ez's flake checks and moves `[tools.bolt]` to v0.8.1, with `closed` and `law` at `warn` and everything else at `error` in `bolt.bend`. This phase changes no behavior and immediately shows how far ez is from its own spec.
 
-The second phase enables the traceability check in bolt, reading `SPEC.md`. Pending requirements are reported but do not fail it, so it can go on at once. `quantify` is already on at `error`, which keeps the closed laws from coming back; `law` returns to `error` when the commands it grades are in planner form.
+The second phase enables the traceability check in bolt, reading `SPEC.md`. Pending requirements do not fail it, so it can go on at once. `closed` is on at `error`, which keeps the closed laws from coming back; `coverage` (bolt v0.9.0's `law`) returns to `error` when the commands it grades are in planner form.
 
 The third phase introduces the World model and converts `ez lock` to planner form, then proves EZ-DOC-1 through EZ-DOC-5, EZ-RES-4 through EZ-RES-6 and EZ-RES-8, EZ-VEN-1 through EZ-VEN-3, and EZ-HASH-2, deleting the closed laws each one subsumes. EZ-DOC-3 is proved once the lock input changes have landed. `ez lock` goes first because its guarantees are the most important. The design for this phase, with its World, its laws and its work packages, is in [ez-lock-planner.md](ez-lock-planner.md). The phase's upgrade laws (EZ-RES-4 to EZ-RES-6, EZ-RES-8 and the upgrade half of EZ-VEN-1) are stated over the ledger model the plan renders into ez.toml, so they hold of the file's bytes only relative to EZ-LED-4, which is not in this phase; `SPEC.md` records that dependency under "Left to prove".
 
 Later phases convert `ez add`, `ez fetch`, `ez publish`, `ez doctor` and the tool commands in the same way, one command per phase, each ending with its requirements proved and its closed laws gone.
 
-ez stays on bolt v0.9.0 while any `# toward` trail remains. bolt is retiring `quantify` and its `# toward` exemption in favour of a strict `closed`, which ez's trails would fail. When the last trail is deleted, ez moves to the current bolt, drops `def quantify()` from `bolt.bend`, and turns on the strict `closed`.
+ez stayed on bolt v0.9.0 while any `# toward` trail remained, because bolt retired `quantify` and its `# toward` exemption in favour of a strict `closed`, which the trails would fail. We deleted the last 40 trails in one change rather than one requirement at a time (see "Retiring closed laws"), and in the same change moved `[tools.bolt]` to the bolt that ships `trace`, dropped `def quantify()` from `bolt.bend`, and set `closed` and `trace` to `error`. From then on the lint gate checks `SPEC.md` against the law tags mechanically.
 
 The refactoring contract applies from the first phase, since it depends only on law statements and the trust boundary.
 

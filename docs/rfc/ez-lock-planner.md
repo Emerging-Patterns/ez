@@ -480,6 +480,8 @@ Reuses `sort_perm`, `perm`, `distinct`. Replaces no trail. Effort: small. It doe
 
 `lock/LAWS.bend`: `hashes_sorted`, `lock_roundtrip`, `tool_pin_reads_back`. `manifest/LAWS.bend`: `sha256_aims_forward`, `hub_holds`, `tag_follows`, `unselected_holds`, `sha256_advances`, `same_rev_keeps`, `same_rev_drifts`, `tag_moved_off`, `sha256_retarget`, `imports_follow_hash`. `git/LAWS.bend`: `sha256_remote_tip`, `sha256_remote_branch`. Each goes in the change that lands the law naming it above. The trails toward EZ-LED-4, EZ-LED-5, EZ-VEN-5, EZ-TOOL-* and EZ-FETCH-1 stay.
 
+**Update:** these trails, and every other trail, are already gone. We deleted all 40 remaining `# toward` laws in one change, ahead of the laws that were to replace them, so that ez could move to the bolt whose strict `closed` and `trace` rules check `SPEC.md` (see the RFC's "Retiring closed laws"). Where a WP above says it replaces a closed law, there is nothing left to delete: the WP lands its quantified law and tags it.
+
 ## The spike
 
 The spike lives in `lock/world/` and is inside the proof gate. It changes no behavior: nothing imports `lock/world/world.bend`, and `ez lock` still runs `lock/lock.bend`. Its laws carry no requirement tag, because the planner they are about is not the one `ez lock` runs.
@@ -537,7 +539,7 @@ What it does not tell us. It has no upgrade, no interpreter, and no performance 
 | WP7 | EZ-VEN-1 text layer, EZ-VEN-2, EZ-VEN-3. | WP0, WP2 | medium to large |
 | WP8 | EZ-HASH-2: pure `Nar.dir`, `sha/nar.bend` sorting loaded entries, the law. | nothing | small |
 
-Each WP ends with the gate passing, bolt at zero errors, its laws tagged, its trails deleted, and `SPEC.md` and the inventory updated for the requirements it proved. WP1 and WP2 are the only ones that change behavior, and each lists its changes in its PR description.
+Each WP ends with the gate passing, bolt at zero errors (`trace` included), its laws tagged, and `SPEC.md` and the inventory updated for the requirements it proved. WP1 and WP2 are the only ones that change behavior, and each lists its changes in its PR description.
 
 ## Risks
 

@@ -13,11 +13,11 @@ A quantified law that proves a requirement carries the requirement's ID in a com
 law hash_perm:
 ```
 
-A closed law that illustrates a pending requirement is marked `# toward EZ-X-N` directly above its `law` line. It is a trail, not a proof, and we delete it in the same change that lands its requirement's quantified law. bolt's `quantify` rule (L004), on at `error` in `bolt.bend`, rejects any other law without a binder.
+A law with no binder claims one computed case and no requirement, so ez has none. bolt's `closed` rule (L002), on at `error` in `bolt.bend`, rejects any law in a LAWS.bend without a `for` or `exs` binder, equality or not, and nothing exempts one.
 
 A pending requirement may already have tagged quantified laws that prove part of it. The Law column names them, and "Left to prove" below says what is missing before the status becomes proved.
 
-The Law column lists `<path> <law>` entries, the path relative to this file, joined by `; `, which is the form bolt's `trace` rule reads.
+The Law column lists `<path> <law>` entries, the path relative to this file, joined by `; `. bolt's `trace` rule (L005), on at `error` in `bolt.bend`, reads this file and checks it against the tags. Every law a Proved row names, proved or pending, must exist, have a binder and carry the row's ID; a proved row must name at least one; a Trusted row names none and has a row in the trust boundary; and no law may carry an ID that is not a Proved row here.
 
 Untagged quantified laws are allowed. They pass the proof gate like any law, but nothing here protects them, so a change may edit or delete them freely.
 
