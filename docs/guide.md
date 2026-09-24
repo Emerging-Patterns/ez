@@ -468,6 +468,28 @@ Hub packages come from `https://hub.bend-lang.com`, or from the hub a `hub`
 key in the ledger's `[package]` table names. The lock records that hub, and
 `ez fetch` fetches hub packages from it. `ez lock` does not read `BEND_HUB`.
 
+### Named imports
+
+A hub package can be imported by name, as bend 2.0.26 and later allow:
+`import <name>@<version>/file.bend as P`. Record it in ez.toml as a
+dependency with `hub = "<name>@<version>"` and its `hash`:
+
+```toml
+[deps.tensors]
+hub = "bend-tensors@0.0.0.2"
+hash = "0x39d8166231e68361eb37e8bef9287b8a"
+```
+
+`ez lock` pins every name to its hash under `[names]` in ez.lock.toml. It asks
+the hub only for a name that neither ez.toml nor the lock already records,
+which happens only for names a dependency imports. A named import in your own
+files must be in ez.toml, or `ez lock` refuses. `ez lock` and `ez fetch`
+write `BEND_LIB/names/<name>@<version>`, the file bend reads a name from, so
+bend never asks the hub at build time; `ez fetch` rewrites one that names
+another hash and says so. `ez doctor` fails when a names file is missing or
+names another hash. A name is a pin: `ez lock --upgrade` does not move it,
+since the hub cannot list a name's versions.
+
 ## Publish
 
 `ez publish` sends the entry to the hub with `bend --publish`, under ez's own
