@@ -318,8 +318,9 @@ law plain_lock_ledger_next:
   {P.ledger.next(w) == W.parsed(W.ledger.of(w)) : M.Read}
 
 # What `ez lock --upgrade` keeps and what it asks about. These laws are stated
-# over `P.ledger.next`, the ledger model the upgrade renders into ez.toml, so
-# they hold of the file's bytes relative to EZ-LED-4. Whatever the remote
+# over `P.ledger.next`, the ledger model the upgrade renders into ez.toml,
+# which is what the file's bytes read back as (`upgrade_reads_back`, EZ-LED-4),
+# so they hold of the bytes. Whatever the remote
 # answered, and on every round of questions, the model keeps the entries these
 # name. `W.dep(w, n)` is the dependency ez.toml records under `n`, as `M.dep`
 # finds it, the first of that name.
@@ -830,7 +831,7 @@ law upgrade_allowlist_keeps_other_lines:
 
 # LAW: and when it writes ez.toml, the hashes it commits are the vendored
 # hashes of the ledger model it renders there, `P.ledger.next`, so the
-# allowlist is that ledger's relative to EZ-LED-4
+# allowlist is that of the ledger ez.toml reads back as (EZ-LED-4)
 # EZ-VEN-1
 law upgrade_vends_the_ledger:
   for +w: W.World
@@ -1051,7 +1052,8 @@ law lock_tools_read_back:
 # remote says descends from the pin (an `Above` answer, read by `Up.onward`).
 # The laws are stated over `P.ledger.next`, the ledger model the upgrade
 # renders into ez.toml, which is ez.toml as it was when the upgrade refuses,
-# so they hold of the file's bytes relative to EZ-LED-4. That the remote's
+# and what the file's bytes read back as (`upgrade_reads_back`), so they hold
+# of the bytes. That the remote's
 # answers are true of the repository is EZ-RES-7. Law vocabulary: ez never
 # calls it.
 
