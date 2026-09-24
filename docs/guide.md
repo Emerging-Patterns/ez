@@ -560,7 +560,27 @@ made before the upload is made first:
    could answer it (EZ-PUB-1);
 3. the walk from the entry makes a package;
 4. git tracks every file of that package, unchanged (`git ls-files -v` tag
-   `H`), so an ignored file is refused too.
+   `H`), so an ignored file is refused too;
+5. every hub package the package imports is on the hub (EZ-PUB-5).
+
+For the last check ez reads the hub imports of the package's files, each
+`0x<hash>/...` and each `<name>@<version>/...`, and asks the hub the ledger
+names (`[package] hub`) about each, as `ez lock` does: the hub must serve a
+manifest that hashes to the `0x` name, and must resolve a name to a `0x` name,
+the one `ez.lock.toml`'s `[names]` or ez.toml records for it when either does.
+A package on the hub is built from the hub alone, so one that imports a
+dependency you vendored from git, or a name the hub does not know, is refused,
+as `cargo publish` refuses a dependency that is not on crates.io:
+
+```
+ez: the package imports hub packages that https://hub.bend-lang.com does not have, or could not be asked about, and a package on the hub has to build from the hub alone, so nothing was sent:
+  0x04b9afdd6d6a56039c5ce6dfb1e55294 (eztoml, git https://github.com/Emerging-Patterns/eztoml) is not on the hub; publish it first
+```
+
+Every missing import is named, with the dependency's key and origin when
+ez.toml records it. A hub that cannot be reached, or that answers with
+anything but the package or a 404, refuses too, since what cannot be checked
+is not sent. A package with no hub import asks the hub nothing.
 
 Only then does bend upload. Just before it does, ez prints, on stderr, the
 line the hub will describe the package by:
@@ -587,7 +607,10 @@ ez's own hash. It then prints that hash and the import line for the entry's
 path inside the package. Any other answer exits 1, with no import line
 (EZ-PUB-2).
 
-`bend --publish` reads the hub from `BEND_HUB` itself.
+`bend --publish` reads the hub from `BEND_HUB` itself, while ez checks the
+imports against the hub the ledger names. Both are
+`https://hub.bend-lang.com` unless you set one, so a project that publishes to
+another hub names it in both places.
 
 ### Publishing by name
 
