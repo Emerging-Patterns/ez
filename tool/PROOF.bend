@@ -381,6 +381,46 @@ def Laws.tool_path_rev(w, p, abs, top, head, ok, status, s, l):
     : {TP.loc.rev(_) == TP.local.rev(abs, top, head, ok, status) : String}
   {==}
 
+# LAW: `made` for a plain repository fetches no lock
+law nolock_made:
+  for +w: TW.World
+  for miss: {TP.reuse(w) == False{} : Bool}
+  for p: {TP.plain(w) == True{} : Bool}
+  {TP.fetches(TP.made(w)) == False{} : Bool}
+
+def nolock_made(w, miss, p):
+  %Equal.sym(Bool, TP.reuse(w), False{}, miss)
+    : {TP.fetches(TP.Plan{TP.lay(w), TP.make.of(_, w), TP.finish(w), P.Success{}}) == False{}
+      : Bool}
+  %Equal.sym(Bool, TP.plain(w), True{}, p) : {Bool.not(_) == False{} : Bool}
+  {==}
+
+def Laws.tool_plain_no_lock(w, ok, miss, p):
+  Equal.trans(Bool, TP.fetches(TP.plan(w)), TP.fetches(TP.made(w)), False{},
+    Equal.cong(TP.Plan, Bool, pl => TP.fetches(pl), TP.plan(w), TP.made(w), made_of(w, ok)),
+    nolock_made(w, miss, p))
+
+# LAW: and builds with the library beside its binaries
+law lib_made:
+  for +w: TW.World
+  for miss: {TP.reuse(w) == False{} : Bool}
+  for p: {TP.plain(w) == True{} : Bool}
+  {TP.built.lib(TP.made(w)) == TP.dir(w) ++ "/lib" : String}
+
+def lib_made(w, miss, p):
+  %Equal.sym(Bool, TP.reuse(w), False{}, miss)
+    : {TP.built.lib(TP.Plan{TP.lay(w), TP.make.of(_, w), TP.finish(w), P.Success{}})
+      == TP.dir(w) ++ "/lib" : String}
+  %Equal.sym(Bool, TP.plain(w), True{}, p)
+    : {Bool.pick(String, _, TP.dir(w) ++ "/lib", TP.lib.of(TP.place(w), w))
+      == TP.dir(w) ++ "/lib" : String}
+  {==}
+
+def Laws.tool_plain_lib(w, ok, miss, p):
+  Equal.trans(String, TP.built.lib(TP.plan(w)), TP.built.lib(TP.made(w)), TP.dir(w) ++ "/lib",
+    Equal.cong(TP.Plan, String, pl => TP.built.lib(pl), TP.plan(w), TP.made(w), made_of(w, ok)),
+    lib_made(w, miss, p))
+
 # ---------------------------------------------------------------------------
 # EZ-TOOL-5 and EZ-TOOL-6
 
@@ -545,19 +585,126 @@ law built_made:
   for +w: TW.World
   for miss: {TP.reuse(w) == False{} : Bool}
   {TP.built(TP.made(w))
-    == Path.join(TP.top(w), TP.chosen(TP.over(w), TP.bin(w), TP.entry(w))) : String}
+    == Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w)))
+    : String}
 
 def built_made(w, miss):
   %Equal.sym(Bool, TP.reuse(w), False{}, miss)
     : {TP.built(TP.Plan{TP.lay(w), TP.make.of(_, w), TP.finish(w), P.Success{}})
-      == Path.join(TP.top(w), TP.chosen(TP.over(w), TP.bin(w), TP.entry(w))) : String}
+      == Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w),
+        TP.entry(w))) : String}
   {==}
 
 def Laws.tool_builds_file(w, ok, miss):
   Equal.trans(String, TP.built(TP.plan(w)), TP.built(TP.made(w)),
-    Path.join(TP.top(w), TP.chosen(TP.over(w), TP.bin(w), TP.entry(w))),
+    Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w))),
     Equal.cong(TP.Plan, String, pl => TP.built(pl), TP.plan(w), TP.made(w), made_of(w, ok)),
     built_made(w, miss))
+
+def Laws.file_flag_over_ledger(f, b, e, ne):
+  %ne : {Bool.pick(String, _, Tgt.file.of(b, e), f) == f : String}
+  {==}
+
+def Laws.file_pin_over_flag(o, f, b, e, ne):
+  %ne : {TP.chosen(Bool.pick(String, _, f, o), b, e) == o : String}
+  %ne : {Bool.pick(String, _, Tgt.file.of(b, e), o) == o : String}
+  {==}
+
+def Laws.plain_name_stem(f, u, ne):
+  %ne : {Bool.pick(String, _, TP.repo.name(u), TP.stem(f)) == TP.stem(f) : String}
+  {==}
+
+def Laws.plain_name_repo(f, u, m):
+  %m : {Bool.pick(String, _, TP.repo.name(u), TP.stem(f)) == TP.repo.name(u) : String}
+  {==}
+
+def Laws.tool_plain_named(w, p):
+  %Equal.sym(Bool, TP.plain(w), True{}, p)
+    : {TP.name.of(_, w) == TP.plain.name(TP.choice(w), TP.origin(w)) : String}
+  {==}
+
+# LAW: a checkout with no ez.toml reads as a ledger that names nothing
+law none_man:
+  for m: Maybe<&2, String>
+  for h: {TP.none(m) == True{} : Bool}
+  {TP.man.of(TP.led.of(m)) == M.Manifest{"", "", "", "", [], []} : M.Manifest}
+
+def none_man(m, h):
+  match m:
+    case None{}:
+      {==}
+    case Some{t}:
+      Eq.bit.absurd(&2, {TP.man.of(TP.led.of(Some{t})) == M.Manifest{"", "", "", "", [], []}
+        : M.Manifest}, h)
+
+# LAW: so a plain repository's ledger names no `bin` and no `entry`
+law plain_man:
+  for +w: TW.World
+  for p: {TP.plain(w) == True{} : Bool}
+  {TP.man(w) == M.Manifest{"", "", "", "", [], []} : M.Manifest}
+
+def plain_man(w, p):
+  none_man(TP.co.toml(TP.co(w)), p)
+
+# LAW: what a plain repository that no pin names a file for builds, before
+# `--entry` is read
+law plain_file:
+  for +w: TW.World
+  for p: {TP.plain(w) == True{} : Bool}
+  for free: {TP.over(w) == "" : String}
+  {Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w)))
+    == Path.join(TP.top(w), TP.chosen(TW.want(w), "", "")) : String}
+
+def plain_file(w, p, free):
+  %Equal.sym(String, TP.over(w), "", free)
+    : {Path.join(TP.top(w), TP.chosen(TP.wish(_, TW.want(w)), TP.bin(w), TP.entry(w)))
+      == Path.join(TP.top(w), TP.chosen(TW.want(w), "", "")) : String}
+  %Equal.sym(M.Manifest, TP.man(w), M.Manifest{"", "", "", "", [], []}, plain_man(w, p))
+    : {Path.join(TP.top(w), TP.chosen(TW.want(w), TP.man.bin(_), TP.man.entry(_)))
+      == Path.join(TP.top(w), TP.chosen(TW.want(w), "", "")) : String}
+  {==}
+
+# LAW: a plain repository with no `--entry` builds `main.bend`
+law plain_main:
+  for +w: TW.World
+  for p: {TP.plain(w) == True{} : Bool}
+  for free: {TP.over(w) == "" : String}
+  for flag: {TW.want(w) == "" : String}
+  {Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w)))
+    == Path.join(TP.top(w), "main.bend") : String}
+
+def plain_main(w, p, free, flag):
+  %flag
+    : {Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w)))
+      == Path.join(TP.top(w), TP.chosen(_, "", "")) : String}
+  plain_file(w, p, free)
+
+def Laws.tool_plain_builds_main(w, ok, miss, p, free, flag):
+  Equal.trans(String, TP.built(TP.plan(w)),
+    Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w))),
+    Path.join(TP.top(w), "main.bend"),
+    Laws.tool_builds_file(w, ok, miss), plain_main(w, p, free, flag))
+
+# LAW: and with `--entry`, the file it names
+law plain_entry:
+  for +w: TW.World
+  for p: {TP.plain(w) == True{} : Bool}
+  for free: {TP.over(w) == "" : String}
+  for ne: {False{} == String.is_empty(TW.want(w)) : Bool}
+  {Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w)))
+    == Path.join(TP.top(w), TW.want(w)) : String}
+
+def plain_entry(w, p, free, ne):
+  %Equal.sym(Bool, False{}, String.is_empty(TW.want(w)), ne)
+    : {Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w)))
+      == Path.join(TP.top(w), Bool.pick(String, _, Tgt.file.of("", ""), TW.want(w))) : String}
+  plain_file(w, p, free)
+
+def Laws.tool_plain_builds_entry(w, ok, miss, p, free, ne):
+  Equal.trans(String, TP.built(TP.plan(w)),
+    Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w))),
+    Path.join(TP.top(w), TW.want(w)),
+    Laws.tool_builds_file(w, ok, miss), plain_entry(w, p, free, ne))
 
 def Laws.out_name_own(n, ne):
   %ne : {Bool.pick(String, _, "app", n) == n : String}
@@ -778,6 +925,150 @@ def Laws.tool_refuses_unsafe_name(w, bad):
   pre(w, co_place(TP.place(w), w, bad_co(TP.co(w), w, bad)))
 
 # ---------------------------------------------------------------------------
+# EZ-TOOL-7: a file to build that is not in the checkout
+#
+# `fin_*` walks from the checkout to the stage that asks whether the file is
+# there: every stage before it stops, waits, or goes on to the next.
+
+law fin_name:
+  for ok: Bool
+  for +w: TW.World
+  for h: {TP.refuses.plan(TP.plan.v(TP.decide.file(TP.file.asks(w), w), w)) == True{} : Bool}
+  {TP.refuses.plan(TP.plan.v(TP.decide.name(ok, w), w)) == True{} : Bool}
+
+def fin_name(ok, _w, h):
+  match ok:
+    case True{}:
+      h
+    case False{}:
+      {==}
+
+law fin_led:
+  for r: M.Read
+  for +w: TW.World
+  for h: {TP.refuses.plan(TP.plan.v(TP.decide.file(TP.file.asks(w), w), w)) == True{} : Bool}
+  {TP.refuses.plan(TP.plan.v(TP.decide.led(r, w), w)) == True{} : Bool}
+
+def fin_led(r, w, h):
+  match r:
+    case M.Bad{_why}:
+      {==}
+    case M.Good{_m}:
+      fin_name(TP.name.ok(TP.name.raw(w)), w, h)
+
+law fin_co:
+  for c: TP.Co
+  for +w: TW.World
+  for h: {TP.refuses.plan(TP.plan.v(TP.decide.file(TP.file.asks(w), w), w)) == True{} : Bool}
+  {TP.refuses.plan(TP.plan.v(TP.decide.co(c, w), w)) == True{} : Bool}
+
+def fin_co(c, w, h):
+  match c:
+    case TP.Kept{_t, _l}:
+      fin_led(TP.led(w), w, h)
+    case TP.Laid{_fs}:
+      fin_led(TP.led(w), w, h)
+    case TP.CoWait{_as, _us}:
+      {==}
+    case TP.CoNo{_why}:
+      {==}
+
+# LAW: a World whose stage that asks for the file refuses refuses
+law fin:
+  for +w: TW.World
+  for h: {TP.refuses.plan(TP.plan.v(TP.decide.file(TP.file.asks(w), w), w)) == True{} : Bool}
+  {TP.refuses(w) == True{} : Bool}
+
+def fin(w, h):
+  pre(w, co_place(TP.place(w), w, fin_co(TP.co(w), w, h)))
+
+law gone_file:
+  for open: List<&2, TW.Ask>
+  for +w: TW.World
+  for miss: {TP.present(w) == False{} : Bool}
+  {TP.refuses.plan(TP.plan.v(TP.decide.file(open, w), w)) == True{} : Bool}
+
+def gone_file(open, w, miss):
+  match open:
+    case []:
+      %Equal.sym(Bool, TP.present(w), False{}, miss)
+        : {TP.refuses.plan(TP.plan.v(TP.decide.present(_, w), w)) == True{} : Bool}
+      {==}
+    case _h <> _t:
+      {==}
+
+def Laws.tool_refuses_missing_entry(w, miss):
+  fin(w, gone_file(TP.file.asks(w), w, miss))
+
+def Laws.tool_missing_entry_writes_nothing(w, miss):
+  Laws.tool_refusal_writes_nothing(w, Laws.tool_refuses_missing_entry(w, miss))
+
+# ---------------------------------------------------------------------------
+# EZ-TOOL-4: an ez project with no lock
+
+# LAW: an ez project with no lock, whose binary is to be built, is unlocked
+law unlocked_is:
+  for +w: TW.World
+  for miss: {TP.reuse(w) == False{} : Bool}
+  for p: {TP.plain(w) == False{} : Bool}
+  for none: {TP.co.lock(TP.co(w)) == None{} : Maybe<&2, String>}
+  {TP.unlocked(w) == True{} : Bool}
+
+def unlocked_is(w, miss, p, none):
+  %Equal.sym(Bool, TP.reuse(w), False{}, miss)
+    : {Bool.and(Bool.not(_), Bool.and(Bool.not(TP.plain(w)), TP.none(TP.co.lock(TP.co(w)))))
+      == True{} : Bool}
+  %Equal.sym(Bool, TP.plain(w), False{}, p)
+    : {Bool.and(True{}, Bool.and(Bool.not(_), TP.none(TP.co.lock(TP.co(w))))) == True{} : Bool}
+  %Equal.sym(Maybe<&2, String>, TP.co.lock(TP.co(w)), None{}, none)
+    : {Bool.and(True{}, Bool.and(True{}, TP.none(_))) == True{} : Bool}
+  {==}
+
+law lock_cache:
+  for open: List<&2, TW.Ask>
+  for +w: TW.World
+  for u: {TP.unlocked(w) == True{} : Bool}
+  {TP.refuses.plan(TP.plan.v(TP.decide.cache(open, w), w)) == True{} : Bool}
+
+def lock_cache(open, w, u):
+  match open:
+    case []:
+      %Equal.sym(Bool, TP.unlocked(w), True{}, u)
+        : {TP.refuses.plan(TP.plan.v(TP.decide.lock(_, w), w)) == True{} : Bool}
+      {==}
+    case _h <> _t:
+      {==}
+
+law lock_present:
+  for ok: Bool
+  for +w: TW.World
+  for u: {TP.unlocked(w) == True{} : Bool}
+  {TP.refuses.plan(TP.plan.v(TP.decide.present(ok, w), w)) == True{} : Bool}
+
+def lock_present(ok, w, u):
+  match ok:
+    case True{}:
+      lock_cache(TP.cache.asks(w), w, u)
+    case False{}:
+      {==}
+
+law lock_file:
+  for open: List<&2, TW.Ask>
+  for +w: TW.World
+  for u: {TP.unlocked(w) == True{} : Bool}
+  {TP.refuses.plan(TP.plan.v(TP.decide.file(open, w), w)) == True{} : Bool}
+
+def lock_file(open, w, u):
+  match open:
+    case []:
+      lock_present(TP.present(w), w, u)
+    case _h <> _t:
+      {==}
+
+def Laws.tool_ledger_needs_lock(w, miss, p, none):
+  fin(w, lock_file(TP.file.asks(w), w, unlocked_is(w, miss, p, none)))
+
+# ---------------------------------------------------------------------------
 # EZ-TOOL-8
 
 def Laws.remote_refuses_slug(url, slug, bad):
@@ -821,14 +1112,23 @@ def Laws.tool_refuses_nowhere(w, why, pl):
 # ---------------------------------------------------------------------------
 # EZ-TOOL-9
 
-def Laws.tool_rest_dash(_a, _b, _t, _ws):
+def Laws.tool_rest_dash(_a, _b, t, ws, nt):
+  %nt : {Args.undash(Args.rest(Bool.pick(List<&2, String>, _, Args.rest("--" <> ws),
+    t <> ("--" <> ws)))) == ws : List<&2, String>}
   {==}
 
-def Laws.tool_rest_word(_a, _b, _t, h, ws, ne):
+def Laws.tool_rest_word(_a, _b, t, h, ws, nt, ne):
+  %nt : {Args.undash(Args.rest(Bool.pick(List<&2, String>, _, Args.rest(h <> ws),
+    t <> (h <> ws)))) == h <> ws : List<&2, String>}
   %ne : {Bool.pick(List<&2, String>, _, ws, h <> ws) == h <> ws : List<&2, String>}
   {==}
 
-def Laws.tool_rest_none(_a, _b, _t):
+def Laws.tool_rest_none(_a, _b, t, nt):
+  %nt : {Args.undash(Args.rest(Bool.pick(List<&2, String>, _, Args.rest([]), t <> [])))
+    == [] : List<&2, String>}
+  {==}
+
+def Laws.tool_rest_entry(_a, _b, _f, _t, _ws):
   {==}
 
 def Laws.run_line_rest(_e, _a, _ws):

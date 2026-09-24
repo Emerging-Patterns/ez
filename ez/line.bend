@@ -71,17 +71,23 @@ def spec() -> Shake.Cli:
         Shake.sub("run", "fetch, build and run the binary a repo declares",
           [
             Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
-              [])
+              []),
+            Shake.opt("entry", None{}, Some{"entry"},
+              "build this file of the checkout, not the one it names", False{}, None{}, [])
           ], []),
         Shake.sub("install", "build the binary and link it on PATH",
           [
             Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
-              [])
+              []),
+            Shake.opt("entry", None{}, Some{"entry"},
+              "build this file of the checkout, not the one it names", False{}, None{}, [])
           ], []),
         Shake.sub("upgrade", "rebuild when the commit moved, and refresh the link",
           [
             Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
-              [])
+              []),
+            Shake.opt("entry", None{}, Some{"entry"},
+              "build this file of the checkout, not the one it names", False{}, None{}, [])
           ], [])
       ]),
       Shake.sub("publish", "send the entry to the hub, under ez's 0x name",

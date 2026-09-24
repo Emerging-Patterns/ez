@@ -47,11 +47,12 @@ def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(U
     case L.CToolSync{}:
       ToolRun.sync()
     case L.CToolRun{}:
-      ToolRun.run(TW.Run{Args.tool.rest(as)}, Shake.get(matched, "target"))
+      ToolRun.run(TW.Run{Args.tool.rest(as)}, Shake.get(matched, "target"),
+        Shake.get(matched, "entry"))
     case L.CToolInstall{}:
-      ToolRun.run(TW.Install{}, Shake.get(matched, "target"))
+      ToolRun.run(TW.Install{}, Shake.get(matched, "target"), Shake.get(matched, "entry"))
     case L.CToolUpgrade{}:
-      ToolRun.run(TW.Upgrade{}, Shake.get(matched, "target"))
+      ToolRun.run(TW.Upgrade{}, Shake.get(matched, "target"), Shake.get(matched, "entry"))
     case L.CPublish{}:
       Cmd.publish()
     case L.CTest{}:

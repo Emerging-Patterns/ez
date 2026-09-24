@@ -61,6 +61,16 @@ ez run                           # check and run main.bend
 
 On a fresh clone of a project, `ez fetch` fills `BEND_LIB` from the lock.
 
+Run any Bend repository's program, as `uvx` runs a package. One with no
+`ez.toml` builds its `main.bend`, or the file `--entry` names:
+
+```bash
+ezx Emerging-Patterns/bolt -- --gpu off   # an ez project, at its HEAD
+ezx ./hello                               # a plain Bend repo; the second run reuses the binary
+ezx --entry src/cli.bend ./hello          # another file of it
+ez tool install ./hello                   # link it on PATH as `hello`
+```
+
 ## Usage
 
 ```
@@ -75,10 +85,14 @@ ez check                         check the entry, without running it
 ez build [out]                   build the entry to a native binary
 ez run [args..]                  check and run the entry
 ez tool sync                      build and link every pinned tool, at its lock rev
-ez tool run <target> [-- args..] fetch, build and run a repo's binary
-ez tool install <target>         build the binary and link it on PATH
-ez tool upgrade <target>         rebuild when the commit moved, refresh the link
-ezx <target> [-- args..]         ez tool run, when ezx is on PATH
+ez tool run [--entry F] <target> [-- args..]
+                                 fetch, build and run a repo's binary
+ez tool install <target> [--entry F]
+                                 build the binary and link it on PATH
+ez tool upgrade <target> [--entry F]
+                                 rebuild when the commit moved, refresh the link
+ezx [--entry F] <target> [-- args..]
+                                 ez tool run, when ezx is on PATH
 ez publish                       send the entry to the hub, under ez's 0x name
 ez test                          run every */tests/*.bend against its trailer
 ez prove                         check every PROOF.bend: the proof gate

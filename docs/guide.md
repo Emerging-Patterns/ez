@@ -329,17 +329,29 @@ the three.
 
 ## Tools
 
-The tool commands build and run another project's binary:
+The tool commands build and run another project's binary, whether that
+project uses ez or is a plain Bend repository:
 
 ```
 ez tool sync                      build and link every pinned tool, at its lock rev
-ez tool run <target> [-- args..]  fetch, build and run a repo's binary
-ez tool install <target>          build the binary and link it on PATH
-ez tool upgrade <target>          rebuild when the commit moved, refresh the link
+ez tool run [--entry F] <target> [-- args..]
+                                  fetch, build and run a repo's binary
+ez tool install <target> [--entry F]
+                                  build the binary and link it on PATH
+ez tool upgrade <target> [--entry F]
+                                  rebuild when the commit moved, refresh the link
 ```
 
 A target is read as in [Targets](#targets). `ez tool run <target>` passes
-every word after the target to the program, dropping one leading `--`.
+every word after the target to the program, dropping one leading `--`, so
+`--entry` goes before the target there, as uvx takes its own options before
+the command.
+
+```bash
+ezx Emerging-Patterns/bolt -- --gpu off   # an ez project, built from its lock
+ezx ./hello                               # a plain Bend repo: builds main.bend
+ezx --entry src/cli.bend ./hello          # another file of the same checkout
+```
 
 ### Pinned tools
 
@@ -375,8 +387,25 @@ A target resolves to a commit (EZ-TOOL-4):
   hide), or a path that is not the top of a checkout, has no commit and is
   built every time (EZ-TOOL-3).
 
-The built file is the pin's `bin`, then the pin's `entry`, then the
-checkout's `bin`, then its `entry`, then `main.bend` (EZ-TOOL-7).
+The built file is the pin's `bin`, then the pin's `entry`, then the file
+`--entry` names, then the checkout's `bin`, then its `entry`, then
+`main.bend` (EZ-TOOL-7). So `--entry` picks another file of an ez project, as
+cargo's `--bin` does, but does not move a pin, which the project decided. A
+built file that is not in the checkout is refused before anything is
+written, with a message that names it and suggests `--entry`.
+
+### Plain Bend repositories
+
+A checkout with no `ez.toml` is a plain Bend repository, and runs the way
+`uvx` runs any package. It has no git dependencies and no lock, so ez builds
+it with `BEND_LIB` set to a library of its own in the cache, `<slug>/lib`,
+beside its binaries, and bend fetches the program's `0x…` and
+`<name>@<version>` hub imports into it itself. Those are content-addressed,
+so bend checks each against its name. A build that fails because bend could
+not load an import says so on stderr, as any failed build does.
+
+A checkout that has an `ez.toml` and no `ez.lock.toml` is an ez project whose
+author has not locked it, and is refused with a pointer to `ez lock`.
 
 ### The cache
 
@@ -405,14 +434,16 @@ make one yourself, see the [README](../README.md#install).
 
 ### install and upgrade
 
-`ez tool install` fetches the lock and builds `<slug>/bin/<record>/<name>.out`,
-then links that file onto PATH as `<name>`. Each long step says what it is
-doing before it waits, and on success the command names what it installed and
-where the link is.
+`ez tool install` fetches the lock, for an ez project, and builds
+`<slug>/bin/<record>/<name>.out`, then links that file onto PATH as
+`<name>`. Each long step says what it is doing before it waits, and on
+success the command names what it installed and where the link is.
 
 `<name>` is the package name in the target's `ez.toml` (`bolt` for bolt), or
-`app` when the ledger names none. A name that is not a TOML bare key is
-refused.
+`app` when the ledger names none. For a plain repository it is the built
+file's name without `.bend` (`cli` for `src/cli.bend`), or the repository's
+name, the last segment of its URL or path with `.git` dropped, when that is
+`main`. A name that is not a TOML bare key is refused.
 
 The link goes in the first of these that is set and nonempty (EZ-TOOL-1):
 
