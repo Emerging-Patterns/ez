@@ -5,16 +5,18 @@
 import Base
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 
-# where a package's bytes come from. A hub package needs nothing else; a git one
-# pins a commit, and remembers the tag that was asked for so an upgrade knows
-# what to re-resolve. It also carries the two facts nothing can work out again
+# where a package's bytes come from. A hub package needs nothing else, though
+# one added by its `<name>@<version>` keeps it, which is what its import lines
+# say and what the hub named the hash by; a git one pins a commit, and
+# remembers the tag that was asked for so an upgrade knows what to
+# re-resolve. It also carries the two facts nothing can work out again
 # without the checkout: the directory inside it the package's paths are written
 # from, and the NAR hash nix rebuilds it by. They live here, in the file that is
 # committed, because a clone gets the ledger and not the vendoring cache.
 # `vend` is the committed tree: the package is allowlisted under `.ez/lib` and
 # an upgrade that moves it lays the new hash there. Absent, it is not.
 type Source is Data:
-  Hub{}
+  Hub{named: String}
   Git{url: String, rev: String, tag: String, root: String, nar: String, vend: Bool}
 
 # one tracked dependency
@@ -66,8 +68,18 @@ def flag(+word: String) -> Bool:
 def source.go(hub: Bool, url: String, rev: String, tag: String, root: String, nar: String, vend: Bool) -> Source:
   match hub:
     case True{}:
-      Hub{}
+      Hub{""}
     case False{}:
+      Git{url, rev, tag, root, nar, vend}
+
+# a hub source, with the `<name>@<version>` a dependency's section records
+# under `hub`, "" for none. A git source keeps no name, and neither does a
+# tool: a tool is not imported, so nothing names it.
+def source.named(named: String, src: Source) -> Source:
+  match src:
+    case Hub{_old}:
+      Hub{named}
+    case Git{url, rev, tag, root, nar, vend}:
       Git{url, rev, tag, root, nar, vend}
 
 # a git section that names no root was written from the top of its checkout,
@@ -82,9 +94,12 @@ def source_of(+pairs: List<&2, T.Kv>) -> Source:
     value(pairs, "rev"), value(pairs, "tag"), root.or(value(pairs, "root")),
     value(pairs, "narHash"), flag(value(pairs, "vendor")))
 
-# a `[deps.<name>]` section as a dependency
+# a `[deps.<name>]` section as a dependency. A hub dependency added by its
+# `<name>@<version>` records it as `hub`, beside the hash it named when it
+# was added, as a git dependency records its tag beside its rev.
 def dep_of(+full: String, +pairs: List<&2, T.Kv>) -> Dep:
-  Dep{String.drop(full, 5n), value(pairs, "hash"), value(pairs, "entry"), source_of(pairs)}
+  Dep{String.drop(full, 5n), value(pairs, "hash"), value(pairs, "entry"),
+    source.named(value(pairs, "hub"), source_of(pairs))}
 
 # a dependency's own name, for finding or replacing it
 def dep.name(dependency: Dep) -> String:
@@ -226,7 +241,7 @@ def parse(text: String) -> Read:
 # how a dependency reads on one line
 def show.source(src: Source) -> String:
   match src:
-    case Hub{}:
+    case Hub{_named}:
       "hub"
     case Git{_url, _rev, _tag, _root, _nar, _vend}:
       "git"
@@ -275,7 +290,7 @@ def find.at(+dependency: Dep, rest: Dep, name: String) -> Dep:
 def find(ds: List<&2, Dep>, +name: String) -> Dep:
   match ds:
     case []:
-      Dep{"", "", "", Hub{}}
+      Dep{"", "", "", Hub{""}}
     case h <> t:
       find.at(h, find(t, name), name)
 
@@ -283,7 +298,7 @@ def find(ds: List<&2, Dep>, +name: String) -> Dep:
 def dep(ledger: Read, name: String) -> Dep:
   match ledger:
     case Bad{_why}:
-      Dep{"", "", "", Hub{}}
+      Dep{"", "", "", Hub{""}}
     case Good{m}:
       Manifest{_n, _e, _b, _h, ds, _ts} = m
       find(ds, name)
@@ -291,7 +306,7 @@ def dep(ledger: Read, name: String) -> Dep:
 # the commit a dependency is pinned to, or "" when it is a hub package
 def source.rev(src: Source) -> String:
   match src:
-    case Hub{}:
+    case Hub{_named}:
       ""
     case Git{_url, rev, _tag, _root, _nar, _vend}:
       rev
@@ -299,7 +314,7 @@ def source.rev(src: Source) -> String:
 # the tag a dependency was asked for, or "" when it was pinned by commit
 def source.tag(src: Source) -> String:
   match src:
-    case Hub{}:
+    case Hub{_named}:
       ""
     case Git{_url, _rev, tag, _root, _nar, _vend}:
       tag
@@ -307,7 +322,7 @@ def source.tag(src: Source) -> String:
 # the repo a dependency was vendored from, or "" when it is a hub package
 def source.url(src: Source) -> String:
   match src:
-    case Hub{}:
+    case Hub{_named}:
       ""
     case Git{url, _rev, _tag, _root, _nar, _vend}:
       url
@@ -315,7 +330,7 @@ def source.url(src: Source) -> String:
 # the directory inside the checkout a dependency's paths are written from
 def source.root(src: Source) -> String:
   match src:
-    case Hub{}:
+    case Hub{_named}:
       ""
     case Git{_url, _rev, _tag, root, _nar, _vend}:
       root
@@ -323,15 +338,24 @@ def source.root(src: Source) -> String:
 # the NAR hash nix rebuilds a dependency's checkout by
 def source.nar(src: Source) -> String:
   match src:
-    case Hub{}:
+    case Hub{_named}:
       ""
     case Git{_url, _rev, _tag, _root, nar, _vend}:
       nar
 
+# the `<name>@<version>` a hub dependency was added by, or "" for one added
+# by its hash, and for a git one
+def source.nv(src: Source) -> String:
+  match src:
+    case Hub{named}:
+      named
+    case Git{_url, _rev, _tag, _root, _nar, _vend}:
+      ""
+
 # whether a dependency names a repo rather than the hub
 def source.is_git(src: Source) -> Bool:
   match src:
-    case Hub{}:
+    case Hub{_named}:
       False{}
     case Git{_url, _rev, _tag, _root, _nar, _vend}:
       True{}
@@ -339,7 +363,7 @@ def source.is_git(src: Source) -> Bool:
 # whether an upgrade that moves this dependency also commits the new tree
 def source.vendor(src: Source) -> Bool:
   match src:
-    case Hub{}:
+    case Hub{_named}:
       False{}
     case Git{_url, _rev, _tag, _root, _nar, vend}:
       vend
@@ -399,7 +423,7 @@ def tool.find.at(+pin: Tool, rest: Tool, +name: String) -> Tool:
 def tool.find(ts: List<&2, Tool>, +name: String) -> Tool:
   match ts:
     case []:
-      Tool{"", "", "", Hub{}}
+      Tool{"", "", "", Hub{""}}
     case h <> t:
       tool.find.at(h, tool.find(t, name), name)
 

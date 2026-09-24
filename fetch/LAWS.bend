@@ -145,3 +145,93 @@ law fetch_refuses_unweighed:
   for ls: List<&2, W.Source>
   for n: {String.is_empty(why) == False{} : Bool}
   {FP.judge(fs, h, FP.weigh.part(why, FP.Got{ls})) == FP.Stop{why} : FP.Verdict}
+
+# Names. Every name the lock records has its file under BEND_LIB, the file
+# bend reads the name's hash from before it would ask the hub. `FP.name.part`
+# is where one name stands: its file still to read, kept, to lay (with the
+# hash the file there held), or a refusal.
+
+# whether a name's part lays the name with this hash, when it lays it. Law
+# vocabulary.
+def put.agrees(+nv: String, +hash: String, part: FP.Nm) -> Bool:
+  match part:
+    case FP.NmPut{n, h, _was}:
+      Bool.and(String.eq(n, nv), String.eq(h, hash))
+    case _:
+      True{}
+
+# the names every part lays, in order. Law vocabulary.
+def puts(ms: List<&2, FP.Nm>) -> List<&2, L.Name>:
+  match ms:
+    case []:
+      []
+    case m <> t:
+      match m:
+        case FP.NmPut{nv, hash, _was}:
+          L.Name{nv, hash} <> puts(t)
+        case _:
+          puts(t)
+
+# the names files a list of effects lays, in order. Law vocabulary.
+def names.laid(es: List<&2, P.Effect>) -> List<&2, L.Name>:
+  match es:
+    case []:
+      []
+    case e <> t:
+      match e:
+        case P.Name{nv, hash}:
+          L.Name{nv, hash} <> names.laid(t)
+        case _:
+          names.laid(t)
+
+# LAW: a names file `ez fetch` lays for a name holds the hash the lock
+# records for that name
+# EZ-HUB-1
+law fetch_names_the_lock:
+  for +rs: List<&2, F.Reply>
+  for +nv: String
+  for +hash: String
+  {put.agrees(nv, hash, FP.name.part(rs, L.Name{nv, hash})) == True{} : Bool}
+
+# LAW: a name whose file BEND_LIB lacks is laid, with the lock's hash
+# EZ-HUB-4
+law fetch_lays_missing_name:
+  for +rs: List<&2, F.Reply>
+  for +nv: String
+  for +hash: String
+  for v: {True{} == L.name.valid(L.Name{nv, hash}) : Bool}
+  for g: {F.Heard{F.Held{None{}}} == F.heard(rs, F.Named{nv}) : F.Heard}
+  {FP.name.part(rs, L.Name{nv, hash}) == FP.NmPut{nv, hash, ""} : FP.Nm}
+
+# LAW: and one whose file names another hash is laid over it, saying what it
+# named, since the lock wins over it
+# EZ-HUB-4
+law fetch_rewrites_name:
+  for +rs: List<&2, F.Reply>
+  for +nv: String
+  for +hash: String
+  for +x: String
+  for v: {True{} == L.name.valid(L.Name{nv, hash}) : Bool}
+  for g: {F.Heard{F.Held{Some{x}}} == F.heard(rs, F.Named{nv}) : F.Heard}
+  for ne: {False{} == String.eq(String.trim(x), hash) : Bool}
+  {FP.name.part(rs, L.Name{nv, hash}) == FP.NmPut{nv, hash, String.trim(x)} : FP.Nm}
+
+# LAW: a name bend would not read back refuses the fetch, rather than laying
+# a file at a path the lock chose that bend would not read
+# EZ-HUB-4
+law fetch_refuses_unread_name:
+  for +rs: List<&2, F.Reply>
+  for +nv: String
+  for +hash: String
+  for v: {False{} == L.name.valid(L.Name{nv, hash}) : Bool}
+  {FP.names.outcome([FP.name.part(rs, L.Name{nv, hash})])
+    == P.Refused{"ez: the lock names " ++ nv ++ " as " ++ hash ++
+      ", which bend would not read back; run ez lock"} : P.Outcome}
+
+# LAW: a fetch that succeeds lays the names file of every name its parts lay,
+# and no other
+# EZ-HUB-4
+law fetch_lays_the_names:
+  for +w: F.World
+  for ok: {FP.refuses(w) == False{} : Bool}
+  {names.laid(FP.effects(FP.plan(w))) == puts(FP.name.parts.of(F.sects(w), w)) : List<&2, L.Name>}

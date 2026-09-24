@@ -27,7 +27,7 @@ def gap.git(no_rev: Bool, no_nar: Bool, +name: String) -> String:
 def gap(pin: M.Tool) -> String:
   M.Tool{n, _e, _b, s} = pin
   match s:
-    case M.Hub{}:
+    case M.Hub{_named}:
       "ez: tools." ++ n ++ " has no git"
     case M.Git{_url, rev, _tag, _root, nar, _vend}:
       gap.git(String.is_empty(rev), String.is_empty(nar), n)

@@ -17,6 +17,14 @@
 # git's listing of the tracked sources, and a package's files read from under
 # BEND_LIB.
 #
+# A named import, `import <name>@<version>/...`, is read the same way: its
+# name is what the import line names, reported when no dependency of the
+# ledger records it, and a dependency recorded by a name is used when an
+# import line names it by that name or by its hash. Each name the lock
+# records has its file under `BEND_LIB/names`, which bend reads the name's
+# hash from before it asks the hub; one missing, or naming another hash, is
+# reported with the library, and fails the command.
+#
 # The drift report is the ledger against the import lines. A package's `0x`
 # hash is written in two places, the `[deps.<name>]` section of ez.toml and
 # the `import 0x...` line that uses it, so the two can disagree. ez treats the
@@ -280,26 +288,101 @@ def missing(xs: List<&2, String>, +known: List<&2, String>) -> List<&2, String>:
     case +h <> t:
       missing.put(has(known, h), h, missing(t, known))
 
+# the names the lock records, with the hash each names; none when there is
+# no lock, or when it does not read
+def lock.names(lock: Maybe<&2, String>) -> List<&2, L.Name>:
+  match lock:
+    case None{}:
+      []
+    case Some{text}:
+      L.names.read(text)
+
+# what a name's file says against the lock: nothing when it holds the lock's
+# hash, as bend trims it, and the fault otherwise
+def name.held(same: Bool, +nv: String, +hash: String, +was: String) -> List<&2, String>:
+  match same:
+    case True{}:
+      []
+    case False{}:
+      ["names/" ++ nv ++ " names " ++ was ++ " where the lock names " ++ hash]
+
+def name.got(got: Maybe<&2, String>, +nv: String, +hash: String) -> List<&2, String>:
+  match got:
+    case None{}:
+      ["names/" ++ nv ++ " is not there"]
+    case Some{text}:
+      +was = String.trim(text)
+      name.held(String.eq(was, hash), nv, hash, was)
+
+def name.heard(got: DW.Heard, +nv: String, +hash: String) -> List<&2, String>:
+  match got:
+    case DW.Heard{a}:
+      match a:
+        case DW.Held{m}:
+          name.got(m, nv, hash)
+        case _:
+          ["names/" ++ nv ++ " was not read"]
+    case DW.Open{}:
+      ["names/" ++ nv ++ " was not read"]
+
+# every name of the lock whose file under BEND_LIB is missing, or names
+# another hash than the lock does, which bend would read instead of asking
+# the hub
+def names.wrong(ns: List<&2, L.Name>, +rs: List<&2, DW.Reply>) -> List<&2, String>:
+  match ns:
+    case []:
+      []
+    case L.Name{+nv, +hash} <> t:
+      List.append(&2, String, name.heard(DW.heard(rs, DW.Name{nv}), nv, hash), names.wrong(t, rs))
+
+# what the library holds of the lock's names, said after its packages
+def names.said(+count: Nat) -> String:
+  match count:
+    case 0n:
+      ""
+    case 1n+_p:
+      " with their " ++ plural(count, "name", "names")
+
+# what is wrong with the library, each fault in its place
+def lib.faults(gone: List<&2, String>, bad: List<&2, String>) -> String:
+  match gone:
+    case []:
+      String.join(bad, "; ")
+    case _g <> _t:
+      match bad:
+        case []:
+          "lacks " ++ String.join(gone, " ")
+        case _b <> _u:
+          "lacks " ++ String.join(gone, " ") ++ "; " ++ String.join(bad, "; ")
+
 # BEND_LIB judged against the lock: every package the lock names has to be on
 # disk, because bend resolves a hub import during the check and a sandbox has
-# no network to fall back on
-def lib.said(all: Bool, +dir: String, +count: Nat, gone: List<&2, String>) -> Note:
+# no network to fall back on, and so does every name's file, since bend
+# would otherwise ask the hub what the name names
+def lib.said(all: Bool, +dir: String, +count: Nat, +names: Nat, gone: List<&2, String>, bad: List<&2, String>) -> Note:
   match all:
     case True{}:
       Note{False{}, "BEND_LIB: " ++ dir ++ ", all " ++
-        plural(count, "locked package", "locked packages") ++ " present"}
+        plural(count, "locked package", "locked packages") ++ " present" ++ names.said(names)}
     case False{}:
-      Note{True{}, "BEND_LIB: " ++ dir ++ " lacks " ++ String.join(gone, " ") ++
-        "; run ez fetch"}
+      Note{True{}, "BEND_LIB: " ++ dir ++ " " ++ lib.faults(gone, bad) ++ "; run ez fetch"}
 
 # the verdict, once what is wanted and what is there are both known
-def lib.judge(+dir: String, +want: List<&2, String>, have: List<&2, String>) -> Note:
+def lib.judge(
+  +dir: String,
+  +want: List<&2, String>,
+  +ns: List<&2, L.Name>,
+  have: List<&2, String>,
+  +rs: List<&2, DW.Reply>
+) -> Note:
   +gone = missing(want, have)
-  lib.said(List.is_empty(&2, String, gone), dir, List.length(&2, String, want), gone)
+  +bad = names.wrong(ns, rs)
+  lib.said(Bool.and(List.is_empty(&2, String, gone), List.is_empty(&2, String, bad)), dir,
+    List.length(&2, String, want), List.length(&2, L.Name, ns), gone, bad)
 
 # the library's line
-def lib.note(+dir: String, +want: List<&2, String>, +rs: List<&2, DW.Reply>) -> Note:
-  lib.judge(dir, want, lib.have(DW.heard(rs, DW.Lib{dir})))
+def lib.note(+dir: String, +want: List<&2, String>, +ns: List<&2, L.Name>, +rs: List<&2, DW.Reply>) -> Note:
+  lib.judge(dir, want, ns, lib.have(DW.heard(rs, DW.Lib{dir})), rs)
 
 # ---------------------------------------------------------------------------
 # the drift report
@@ -320,19 +403,36 @@ def once(ss: List<&2, String>) -> List<&2, String>:
     case +h <> +t:
       once.put(has(t, h), h, once(t))
 
-# every hub package the project's sources import, each once. These are the
-# lock's roots: the header imports of every tracked `.bend` file outside
-# `.ez/`, as the package walk scans them.
-def imports(fs: List<&2, W.Source>) -> List<&2, String>:
-  once(P.roots(fs))
+# every hub package the project's sources import, each once, by hash and by
+# name. These are the lock's roots: the header imports of every tracked
+# `.bend` file outside `.ez/`, as the package walk scans them.
+def imports(+fs: List<&2, W.Source>) -> List<&2, String>:
+  once(List.append(&2, String, P.roots(fs), P.roots.named(fs)))
 
-# the hashes a ledger's dependencies name
+# a dependency's name, when the ledger records it by one
+def pinned.at(none: Bool, nv: String, rest: List<&2, String>) -> List<&2, String>:
+  match none:
+    case True{}:
+      rest
+    case False{}:
+      nv <> rest
+
+def pinned.nv(+nv: String, rest: List<&2, String>) -> List<&2, String>:
+  pinned.at(String.is_empty(nv), nv, rest)
+
+# the hashes a ledger's dependencies name, and the names it records them by
 def pinned(ds: List<&2, M.Dep>) -> List<&2, String>:
   match ds:
     case []:
       []
-    case h <> t:
-      M.dep.hash(h) <> pinned(t)
+    case +h <> t:
+      M.dep.hash(h) <> pinned.nv(M.source.nv(M.source.dep(h)), pinned(t))
+
+# whether an import line names a dependency, by its hash or by its name
+def used(+hs: List<&2, String>, +dependency: M.Dep) -> Bool:
+  +nv = M.source.nv(M.source.dep(dependency))
+  Bool.or(has(hs, M.dep.hash(dependency)),
+    Bool.and(Bool.not(String.is_empty(nv)), has(hs, nv)))
 
 # how a hash imported and not in the ledger reads
 def unrecorded.line(+hash: String) -> String:
@@ -365,7 +465,7 @@ def unused(ds: List<&2, M.Dep>, +hs: List<&2, String>) -> List<&2, String>:
     case []:
       []
     case +h <> t:
-      unused.put(has(hs, M.dep.hash(h)), h, unused(t, hs))
+      unused.put(used(hs, h), h, unused(t, hs))
 
 # both directions of the disagreement: a hash the source imports that the
 # ledger never names, and a ledger entry no import line uses
@@ -437,8 +537,13 @@ def tree.how(src: L.Src) -> W.How:
 
 # the source a lock question names
 def ask.src(ask: W.Ask) -> L.Src:
-  W.Pkg{_hash, src, _hub} = ask
-  src
+  match ask:
+    case W.Pkg{_hash, src, _hub}:
+      src
+    case W.Name{_nv, _hub}:
+      L.Hub{}
+    case W.Lock{}:
+      L.Hub{}
 
 # a tree BEND_LIB held, as the answer the lock reads, ahead of the rest. One
 # it did not hold answers nothing, so the lock goes on asking for it.
@@ -465,16 +570,63 @@ def trees(rs: List<&2, DW.Reply>) -> List<&2, W.Reply>:
     case DW.Reply{ask, answer} <> t:
       tree.reply(ask, answer, trees(t))
 
+# the lock's text, "" when there is none, as the lock's own question reads it
+def lock.text(lock: Maybe<&2, String>) -> String:
+  match lock:
+    case None{}:
+      ""
+    case Some{text}:
+      text
+
+# a name's file BEND_LIB held, as the answer the lock reads for the name,
+# ahead of the rest. One it did not hold answers nothing, so the lock goes on
+# asking for it.
+def name.put(+nv: String, got: Maybe<&2, String>, rest: List<&2, W.Reply>) -> List<&2, W.Reply>:
+  match got:
+    case Some{text}:
+      W.Reply{W.Name{nv, "BEND_LIB/names"}, W.Said{text}} <> rest
+    case None{}:
+      rest
+
+# a reply kept when it answers a name's question
+def name.reply(ask: DW.Ask, answer: DW.Answer, rest: List<&2, W.Reply>) -> List<&2, W.Reply>:
+  match ask:
+    case DW.Name{nv}:
+      match answer:
+        case DW.Held{got}:
+          name.put(nv, got, rest)
+        case _:
+          rest
+    case _:
+      rest
+
+# every name's file BEND_LIB held, as the lock's answers
+def held(rs: List<&2, DW.Reply>) -> List<&2, W.Reply>:
+  match rs:
+    case []:
+      []
+    case DW.Reply{ask, answer} <> t:
+      name.reply(ask, answer, held(t))
+
 # the World doctor puts to the lock planner: a plain lock over the ledger's
-# text as it is, the sources as git listed them, and every tree BEND_LIB held.
-# The directory a lock runs in only anchors the questions it asks, which
-# doctor answers by hash from BEND_LIB, so it is left empty.
-def relock.world(ledger: Maybe<&2, String>, listing: W.Listing, rs: List<&2, DW.Reply>) -> W.World:
-  W.World{W.Args{False{}, "", ""}, ledger, listing, trees(rs), []}
+# text as it is, the sources as git listed them, the lock as it is, which
+# answers the lock's question about the names it records, every tree
+# BEND_LIB held, and every name's file it held, never the network. The
+# directory a lock runs in only anchors the questions it asks, which doctor
+# answers by hash from BEND_LIB, so it is left empty.
+def relock.world(
+  ledger: Maybe<&2, String>,
+  lock: Maybe<&2, String>,
+  listing: W.Listing,
+  +rs: List<&2, DW.Reply>
+) -> W.World:
+  W.World{W.Args{False{}, "", ""}, ledger, listing,
+    List.append(&2, W.Reply, trees(rs), W.Reply{W.Lock{}, W.Locked{lock.text(lock)}} <> held(rs)),
+    []}
 
 # that World, over the sources as a list of files
 def relock(+world: DW.World, fs: List<&2, W.Source>) -> W.World:
-  relock.world(DW.ledger(world), W.Listed{fs}, DW.replies(world))
+  relock.world(DW.ledger(world), DW.lock(world), W.Listed{fs}, DW.replies(world))
 
 # the line for a lock `ez lock` would write as it is
 def fresh.line() -> String:
@@ -509,40 +661,47 @@ def ask.hashes(as: List<&2, W.Ask>) -> List<&2, String>:
     case h <> t:
       W.ask.hash(h) <> ask.hashes(t)
 
-# the lock, once every question the lock planner asks is known: when none is
-# left, what it decided; when some are, they are about packages BEND_LIB does
-# not hold, and doctor does not ask the network for them
-def fresh.away(as: List<&2, W.Ask>, +lw: W.World, +text: String) -> Note:
+# the lock, once every name the lock planner asks about is known: when none
+# is left, what it decided; when some are, their files are not under
+# BEND_LIB, and doctor does not ask the hub for them
+def fresh.named(as: List<&2, W.Ask>, +lw: W.World, +text: String) -> Note:
   match as:
     case []:
       fresh.doc(P.decide(W.inputs(lw)), text)
+    case h <> t:
+      Note{True{}, DW.lockfile() ++ ": not checked, since BEND_LIB lacks names/" ++
+        String.join(ask.hashes(h <> t), " names/") ++ " and doctor does not use the network"}
+
+# the lock, once every question the lock planner asks is known: when none is
+# left, its names, then what it decided; when some are, they are about
+# packages BEND_LIB does not hold, and doctor does not ask the network for
+# them
+def fresh.away(as: List<&2, W.Ask>, +lw: W.World, +text: String) -> Note:
+  match as:
+    case []:
+      fresh.named(P.wants.names(lw), lw, text)
     case h <> t:
       Note{True{}, DW.lockfile() ++ ": not checked, since BEND_LIB lacks " ++
         String.join(ask.hashes(h <> t), " ") ++ " and doctor does not use the network"}
 
 # the check over the sources git listed. Sources git could not list are the
 # drift report's to say.
-def fresh.listing(
-  ledger: Maybe<&2, String>,
-  listing: W.Listing,
-  +rs: List<&2, DW.Reply>,
-  +text: String
-) -> List<&2, Note>:
+def fresh.listing(+world: DW.World, listing: W.Listing, +text: String) -> List<&2, Note>:
   match listing:
     case W.Listed{fs}:
-      +lw = relock.world(ledger, W.Listed{fs}, rs)
+      +lw = relock(world, fs)
       [fresh.away(P.wants(lw), lw, text)]
     case W.Unlisted{_why}:
       []
 
 # the check, once the sources were heard. They are asked for only when the
 # ledger reads, so a ledger that does not is not checked against.
-def fresh.heard(got: DW.Heard, ledger: Maybe<&2, String>, +rs: List<&2, DW.Reply>, +text: String) -> List<&2, Note>:
+def fresh.heard(got: DW.Heard, +world: DW.World, +text: String) -> List<&2, Note>:
   match got:
     case DW.Heard{a}:
       match a:
         case DW.Listed{l}:
-          fresh.listing(ledger, l, rs, text)
+          fresh.listing(world, l, text)
         case _:
           []
     case DW.Open{}:
@@ -550,16 +709,16 @@ def fresh.heard(got: DW.Heard, ledger: Maybe<&2, String>, +rs: List<&2, DW.Reply
 
 # the check over a lock that is there. With no lock there is nothing to
 # compare, and the lock's own line says whether that is a problem.
-def fresh.notes(ledger: Maybe<&2, String>, lock: Maybe<&2, String>, +rs: List<&2, DW.Reply>) -> List<&2, Note>:
+def fresh.notes(lock: Maybe<&2, String>, +world: DW.World) -> List<&2, Note>:
   match lock:
     case None{}:
       []
     case Some{text}:
-      fresh.heard(DW.heard(rs, DW.Sources{}), ledger, rs, text)
+      fresh.heard(DW.sources(world), world, text)
 
 # what doctor says of the lock against the lock `ez lock` would write
 def checked(+world: DW.World) -> List<&2, Note>:
-  fresh.notes(DW.ledger(world), DW.lock(world), DW.replies(world))
+  fresh.notes(DW.lock(world), world)
 
 # each lock question, put to BEND_LIB
 def trees.asked(as: List<&2, W.Ask>) -> List<&2, DW.Ask>:
@@ -569,35 +728,62 @@ def trees.asked(as: List<&2, W.Ask>) -> List<&2, DW.Ask>:
     case h <> t:
       DW.Tree{h} <> trees.asked(t)
 
-# the lock questions over the sources git listed
-def trees.listing(ledger: Maybe<&2, String>, listing: W.Listing, rs: List<&2, DW.Reply>) -> List<&2, DW.Ask>:
+# each of the lock's name questions, put to BEND_LIB as the name's file. The
+# lock's own question never reaches here, since the World answers it.
+def names.asked(as: List<&2, W.Ask>) -> List<&2, DW.Ask>:
+  match as:
+    case []:
+      []
+    case h <> t:
+      DW.Name{W.ask.hash(h)} <> names.asked(t)
+
+# the lock questions over the sources git listed, packages and then names
+def trees.world(+lw: W.World) -> List<&2, DW.Ask>:
+  List.append(&2, DW.Ask, trees.asked(P.wants(lw)), names.asked(P.wants.names(lw)))
+
+def trees.listing(
+  ledger: Maybe<&2, String>,
+  lock: Maybe<&2, String>,
+  listing: W.Listing,
+  rs: List<&2, DW.Reply>
+) -> List<&2, DW.Ask>:
   match listing:
     case W.Listed{fs}:
-      trees.asked(P.wants(relock.world(ledger, W.Listed{fs}, rs)))
+      trees.world(relock.world(ledger, lock, W.Listed{fs}, rs))
     case W.Unlisted{_why}:
       []
 
 # the lock questions, once the sources were heard
-def trees.heard(got: DW.Heard, ledger: Maybe<&2, String>, rs: List<&2, DW.Reply>) -> List<&2, DW.Ask>:
+def trees.heard(
+  got: DW.Heard,
+  ledger: Maybe<&2, String>,
+  lock: Maybe<&2, String>,
+  rs: List<&2, DW.Reply>
+) -> List<&2, DW.Ask>:
   match got:
     case DW.Heard{a}:
       match a:
         case DW.Listed{l}:
-          trees.listing(ledger, l, rs)
+          trees.listing(ledger, lock, l, rs)
         case _:
           []
     case DW.Open{}:
       []
 
-# every package the lock planner asks about, while there is a lock to check.
-# These depend on the sources and on the trees already read, so they come in
-# rounds, as the lock's own do.
-def trees.of(ledger: Maybe<&2, String>, lock: Maybe<&2, String>, +rs: List<&2, DW.Reply>) -> List<&2, DW.Ask>:
+# every package and name the lock planner asks about, while there is a lock
+# to check. These depend on the sources and on the trees already read, so
+# they come in rounds, as the lock's own do.
+def trees.of(
+  ledger: Maybe<&2, String>,
+  lock: Maybe<&2, String>,
+  held: Maybe<&2, String>,
+  +rs: List<&2, DW.Reply>
+) -> List<&2, DW.Ask>:
   match lock:
     case None{}:
       []
     case Some{_text}:
-      trees.heard(DW.heard(rs, DW.Sources{}), ledger, rs)
+      trees.heard(DW.heard(rs, DW.Sources{}), ledger, held, rs)
 
 # ---------------------------------------------------------------------------
 # the plan
@@ -620,7 +806,7 @@ def head.notes(
   +ledger: M.Read,
   +cc: String,
   +lib: String,
-  lock: Maybe<&2, String>,
+  +lock: Maybe<&2, String>,
   +rs: List<&2, DW.Reply>,
   cs: List<&2, Note>
 ) -> List<&2, Note>:
@@ -628,7 +814,7 @@ def head.notes(
   List.append(&2, Note, probes(programs(cc), rs),
     List.append(&2, Note,
       [ledger.note(ledger), lock.note(deps.count(ledger), lk),
-        lib.note(lib.at(lib), locked.hashes(lk), rs)], cs))
+        lib.note(lib.at(lib), locked.hashes(lk), lock.names(lock), rs)], cs))
 
 # every line doctor says, in order: the toolchain, the ledger, the lock, the
 # library, the lock check, and last the drift report over the sources as they
@@ -753,11 +939,19 @@ def sources.asks(ledger: M.Read) -> List<&2, DW.Ask>:
     case M.Good{_m}:
       [DW.Sources{}]
 
+# a question for every name's file the lock records
+def names.asks(ns: List<&2, L.Name>) -> List<&2, DW.Ask>:
+  match ns:
+    case []:
+      []
+    case L.Name{nv, _hash} <> t:
+      DW.Name{nv} <> names.asks(t)
+
 # every question doctor asks on what a World read, besides the lock check's
-def asks.of(ledger: M.Read, +cc: String, +lib: String, lock: Maybe<&2, String>) -> List<&2, DW.Ask>:
+def asks.of(ledger: M.Read, +cc: String, +lib: String, +lock: Maybe<&2, String>) -> List<&2, DW.Ask>:
   List.append(&2, DW.Ask, probe.asks(programs(cc)),
     List.append(&2, DW.Ask, lib.asks(lib.at(lib), locked.hashes(locked.of(lock))),
-      sources.asks(ledger)))
+      List.append(&2, DW.Ask, names.asks(lock.names(lock)), sources.asks(ledger))))
 
 # the questions still open, or the plan once there are none
 type Step is Data:
@@ -799,14 +993,14 @@ def step.of(
 # what the interpreter does next on a World
 def step(+world: DW.World) -> Step:
   step.of(ledger.seen(DW.read(world)), DW.cc(world), DW.lib(world), DW.lock(world),
-    DW.replies(world), trees.of(DW.ledger(world), DW.lock(world), DW.replies(world)),
+    DW.replies(world), trees.of(DW.ledger(world), DW.lock(world), DW.lock(world), DW.replies(world)),
     checked(world))
 
 # the questions a World still leaves open
 def wants(+world: DW.World) -> List<&2, DW.Ask>:
   +ledger = ledger.seen(DW.read(world))
   open(List.append(&2, DW.Ask, asks.of(ledger, DW.cc(world), DW.lib(world), DW.lock(world)),
-    trees.of(DW.ledger(world), DW.lock(world), DW.replies(world))), DW.replies(world))
+    trees.of(DW.ledger(world), DW.lock(world), DW.lock(world), DW.replies(world))), DW.replies(world))
 
 # ---------------------------------------------------------------------------
 # law vocabulary: ez never calls these
@@ -821,6 +1015,8 @@ def said.one(effect: P.Effect, +line: String) -> Bool:
     case P.Lay{_place, _hash, _files}:
       False{}
     case P.Drop{_hash}:
+      False{}
+    case P.Name{_nv, _hash}:
       False{}
 
 # whether a list of effects says this line

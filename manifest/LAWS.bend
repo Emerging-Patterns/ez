@@ -69,7 +69,7 @@ law pairs_of_first:
 law source_of_hub:
   for +pairs: List<&2, T.Kv>
   for e: {True{} == String.is_empty(M.value(pairs, "git")) : Bool}
-  {M.source_of(pairs) == M.Hub{} : M.Source}
+  {M.source_of(pairs) == M.Hub{""} : M.Source}
 
 # LAW: a git section that names no root is the top of the checkout. A
 # ledger written before the `root` key existed can only have meant that,
@@ -213,7 +213,7 @@ law find_first:
 law dep_of_unread_is_blank:
   for why: String
   for name: String
-  {M.dep(M.Bad{why}, name) == M.Dep{"", "", "", M.Hub{}} : M.Dep}
+  {M.dep(M.Bad{why}, name) == M.Dep{"", "", "", M.Hub{""}} : M.Dep}
 
 # LAW: the commit a ledger pins a dependency to is the commit its git section
 # wrote. This and the law under it are what `ez lock` and `ez doctor` read,

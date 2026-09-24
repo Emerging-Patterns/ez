@@ -8,7 +8,8 @@
 # (`Run.answer.lib`), a hub package is fetched as the lock fetches one
 # (`Run.answer`), and a checkout is made as `ez add` makes one
 # (`Run.answer.up` of `Up.Clone`), in a scratch directory outside the project
-# and BEND_LIB that is removed whether or not the clone worked. So nothing is
+# and BEND_LIB that is removed whether or not the clone worked. A name's file
+# under `BEND_LIB/names` is read as it is. So nothing is
 # written while the questions are answered, and a refused fetch leaves
 # BEND_LIB as it found it. It decides nothing; that it reads and executes
 # faithfully is EZ-TRUST-2.
@@ -53,6 +54,10 @@ def answer(+lib: String, ask: FW.Ask) -> IO(FW.Answer):
       do IO<FW.Answer>:
         a : W.Answer <- Run.answer(lib, q)
         return FW.Read{a}
+    case FW.Named{nv}:
+      do IO<FW.Answer>:
+        m : Maybe<&2, String> <- F.read(lib ++ "/names/" ++ nv)
+        return FW.Held{m}
 
 # every question, answered
 def answer.all(+lib: String, asks: List<&2, FW.Ask>) -> IO(List<&2, FW.Reply>):

@@ -79,7 +79,7 @@ def aim.tag(bare: Bool, +tag: String) -> Aim:
 # a selected hub pin has nothing to follow
 def aim.src(source: M.Source) -> Aim:
   match source:
-    case M.Hub{}:
+    case M.Hub{_named}:
       Hold{}
     case M.Git{_url, _rev, +tag, _root, _nar, _vend}:
       aim.tag(String.is_empty(tag), tag)
@@ -157,8 +157,8 @@ def retarget.go(
   +nar: String
 ) -> M.Dep:
   match source:
-    case M.Hub{}:
-      M.Dep{name, hash, entry, M.Hub{}}
+    case M.Hub{named}:
+      M.Dep{name, hash, entry, M.Hub{named}}
     case M.Git{url, _rev, tag, _root, _nar, vend}:
       M.Dep{name, hash, entry, M.Git{url, rev, tag, root, nar, vend}}
 

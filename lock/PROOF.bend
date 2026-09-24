@@ -185,9 +185,9 @@ def blocks_sort_perm(ns, ps, dis):
 
 # The text is the sorted blocks under the `[lock]` table and before the
 # tools, so it follows.
-def Laws.lock_order_free(ns, ps, ts, hub, dis):
+def Laws.lock_order_free(ns, nms, ps, ts, hub, dis):
   Equal.cong(List<&2, K.File>, String,
-    bs => L.text.of(hub, bs, T.render.all(L.tool.sects(ts))),
+    bs => L.text.of(hub, bs, T.render.all(Laws.tail(nms, ts))),
     K.file.sort(L.pack.blocks(Laws.perm(ns, ps))), K.file.sort(L.pack.blocks(ps)),
     blocks_sort_perm(ns, ps, dis))
 
@@ -270,6 +270,8 @@ def pick_put(b, v, _pl, _h, _rest, _p):
           {==}
         case W.Ok{fs, ss}:
           {==}
+        case W.Named{_names}:
+          {==}
     case False{}:
       {==}
 
@@ -295,6 +297,36 @@ def lays_put(cs, vs, js, rest, p):
         pick_put(L.seen.holds(cs, h), v, P.place.of(L.seen.holds(vs, h)), h,
           P.lays(cs, vs, t, rest), p),
         lays_put(cs, vs, t, rest, p))
+
+# LAW: a names file laid leaves every path as it was: it is written under
+# BEND_LIB, which is no path of the project
+law names_put:
+  for ns: List<&2, L.Name>
+  for +rest: List<&2, P.Effect>
+  for +p: String
+  {P.put.in(P.names.lay(ns, rest), p) == P.put.in(rest, p) : P.Wrote}
+
+def names_put(ns, rest, p):
+  match ns:
+    case []:
+      {==}
+    case L.Name{_nv, _hash} <> t:
+      names_put(t, rest, p)
+
+# LAW: and so do the trees a lock lays with the names files after them
+law lays_names_put:
+  for +cs: List<&2, String>
+  for +vs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for +ns: List<&2, L.Name>
+  for +rest: List<&2, P.Effect>
+  for +p: String
+  {P.put.in(P.lays(cs, vs, js, P.names.lay(ns, rest)), p) == P.put.in(rest, p) : P.Wrote}
+
+def lays_names_put(cs, vs, js, ns, rest, p):
+  Equal.trans(P.Wrote, P.put.in(P.lays(cs, vs, js, P.names.lay(ns, rest)), p),
+    P.put.in(P.names.lay(ns, rest), p), P.put.in(rest, p),
+    lays_put(cs, vs, js, P.names.lay(ns, rest), p), names_put(ns, rest, p))
 
 # LAW: a line a person is told leaves every path as it was
 law says_put:
@@ -356,35 +388,35 @@ def made_put(nx, cs, js, d):
     case P.Doc{+text}:
       Equal.trans(P.Wrote,
         P.put.in(P.says.of(Up.next.says(nx),
-          P.lays(cs, Up.next.vends(nx), js,
+          P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(text),
+            P.edits.of(Up.next.edits(nx),
+              P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}])))))),
+          "ez.lock.toml"),
+        P.put.in(P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(text),
+          P.edits.of(Up.next.edits(nx),
+            P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}]))))),
+          "ez.lock.toml"),
+        P.Put{text},
+        says_put(Up.next.says(nx),
+          P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(text),
             P.edits.of(Up.next.edits(nx),
               P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
               P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}]))))),
           "ez.lock.toml"),
-        P.put.in(P.lays(cs, Up.next.vends(nx), js,
-          P.edits.of(Up.next.edits(nx),
-            P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
-              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}])))),
-          "ez.lock.toml"),
-        P.Put{text},
-        says_put(Up.next.says(nx),
-          P.lays(cs, Up.next.vends(nx), js,
-            P.edits.of(Up.next.edits(nx),
-              P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
-              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}])))),
-          "ez.lock.toml"),
         Equal.trans(P.Wrote,
-          P.put.in(P.lays(cs, Up.next.vends(nx), js,
+          P.put.in(P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(text),
             P.edits.of(Up.next.edits(nx),
               P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
-              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}])))),
+              P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}]))))),
             "ez.lock.toml"),
           P.put.in(P.edits.of(Up.next.edits(nx),
             P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
               P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}]))),
             "ez.lock.toml"),
           P.Put{text},
-          lays_put(cs, Up.next.vends(nx), js,
+          lays_names_put(cs, Up.next.vends(nx), js, L.names.read(text),
             P.edits.of(Up.next.edits(nx),
               P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
               P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), text}]))),
@@ -411,8 +443,8 @@ law made_keeps_ledger:
 
 def made_keeps_ledger(_led, cs, js, d):
   match d:
-    case P.Doc{text}:
-      lays_put(cs, [], js, [P.Write{P.lockfile(), text}], "ez.toml")
+    case P.Doc{+text}:
+      lays_names_put(cs, [], js, L.names.read(text), [P.Write{P.lockfile(), text}], "ez.toml")
     case P.Stop{_why}:
       {==}
 
@@ -507,6 +539,10 @@ def reclone.one_judged(orgs, _hub, hash, a):
       {==}
     case W.Got{how, manifest, ss}:
       reclone.how_judged(L.origin(orgs, hash), how, hash, manifest, ss)
+    case W.Said{_text}:
+      {==}
+    case W.Locked{_text}:
+      {==}
 
 # LAW: every answer, as a fresh clone would have it, is judged as it was
 law reclone_judged:
@@ -673,6 +709,7 @@ def Laws.plain_lock_ledger_next(w, e):
 
 # LAW: a package resolved by its verdict carries the ledger's source
 law verdict_pins:
+  for +ns: List<&2, L.Name>
   for v: W.Verdict
   for +orgs: List<&2, L.Origin>
   for +hash: String
@@ -681,12 +718,12 @@ law verdict_pins:
   for asks: List<&2, String>
   for bad: String
   for e: {Laws.pinned.all(orgs, packs) == packs : List<&2, L.Pack>}
-  {Laws.pinned.all(orgs, P.walk.packs(P.step.verdict(v, L.origin(orgs, hash),
+  {Laws.pinned.all(orgs, P.walk.packs(P.step.verdict(v, ns, L.origin(orgs, hash),
     hash, rest, packs, asks, bad)))
-    == P.walk.packs(P.step.verdict(v, L.origin(orgs, hash), hash, rest, packs,
+    == P.walk.packs(P.step.verdict(v, ns, L.origin(orgs, hash), hash, rest, packs,
       asks, bad)) : List<&2, L.Pack>}
 
-def verdict_pins(v, orgs, hash, _rest, packs, _asks, _bad, e):
+def verdict_pins(_ns, v, orgs, hash, _rest, packs, _asks, _bad, e):
   match v:
     case W.No{_why}:
       e
@@ -694,9 +731,12 @@ def verdict_pins(v, orgs, hash, _rest, packs, _asks, _bad, e):
       Equal.cong(List<&2, L.Pack>, List<&2, L.Pack>,
         ps => L.Pack{hash, L.origin(orgs, hash), fs} <> ps,
         Laws.pinned.all(orgs, packs), packs, e)
+    case W.Named{_names}:
+      e
 
 # LAW: and one looked up, whether it was answered or not
 law look_pins:
+  for +ns: List<&2, L.Name>
   for found: P.Look
   for +orgs: List<&2, L.Origin>
   for +hash: String
@@ -705,20 +745,21 @@ law look_pins:
   for asks: List<&2, String>
   for bad: String
   for e: {Laws.pinned.all(orgs, packs) == packs : List<&2, L.Pack>}
-  {Laws.pinned.all(orgs, P.walk.packs(P.step.look(found, L.origin(orgs, hash),
+  {Laws.pinned.all(orgs, P.walk.packs(P.step.look(found, ns, L.origin(orgs, hash),
     hash, rest, packs, asks, bad)))
-    == P.walk.packs(P.step.look(found, L.origin(orgs, hash), hash, rest, packs,
+    == P.walk.packs(P.step.look(found, ns, L.origin(orgs, hash), hash, rest, packs,
       asks, bad)) : List<&2, L.Pack>}
 
-def look_pins(found, orgs, hash, rest, packs, asks, bad, e):
+def look_pins(ns, found, orgs, hash, rest, packs, asks, bad, e):
   match found:
     case P.Absent{}:
       e
     case P.Found{v}:
-      verdict_pins(v, orgs, hash, rest, packs, asks, bad, e)
+      verdict_pins(ns, v, orgs, hash, rest, packs, asks, bad, e)
 
 # LAW: and one passed over, or picked
 law pick_pins:
+  for +ns: List<&2, L.Name>
   for seen: Bool
   for +orgs: List<&2, L.Origin>
   for +js: List<&2, W.Judged>
@@ -728,20 +769,21 @@ law pick_pins:
   for asks: List<&2, String>
   for bad: String
   for e: {Laws.pinned.all(orgs, packs) == packs : List<&2, L.Pack>}
-  {Laws.pinned.all(orgs, P.walk.packs(P.step.pick(seen, orgs, js, hash, rest,
+  {Laws.pinned.all(orgs, P.walk.packs(P.step.pick(seen, orgs, ns, js, hash, rest,
     packs, asks, bad)))
-    == P.walk.packs(P.step.pick(seen, orgs, js, hash, rest, packs, asks, bad))
+    == P.walk.packs(P.step.pick(seen, orgs, ns, js, hash, rest, packs, asks, bad))
     : List<&2, L.Pack>}
 
-def pick_pins(seen, orgs, js, hash, rest, packs, asks, bad, e):
+def pick_pins(ns, seen, orgs, js, hash, rest, packs, asks, bad, e):
   match seen:
     case True{}:
       e
     case False{}:
-      look_pins(P.look(js, hash), orgs, hash, rest, packs, asks, bad, e)
+      look_pins(ns, P.look(js, hash), orgs, hash, rest, packs, asks, bad, e)
 
 # LAW: and one step of the walk, whatever the queue held
 law pop_pins:
+  for +ns: List<&2, L.Name>
   for +orgs: List<&2, L.Origin>
   for +js: List<&2, W.Judged>
   for queue: List<&2, String>
@@ -749,33 +791,34 @@ law pop_pins:
   for +asks: List<&2, String>
   for bad: String
   for e: {Laws.pinned.all(orgs, packs) == packs : List<&2, L.Pack>}
-  {Laws.pinned.all(orgs, P.walk.packs(P.step.pop(orgs, js, queue, packs, asks,
+  {Laws.pinned.all(orgs, P.walk.packs(P.step.pop(orgs, ns, js, queue, packs, asks,
     bad)))
-    == P.walk.packs(P.step.pop(orgs, js, queue, packs, asks, bad))
+    == P.walk.packs(P.step.pop(orgs, ns, js, queue, packs, asks, bad))
     : List<&2, L.Pack>}
 
-def pop_pins(orgs, js, queue, packs, asks, bad, e):
+def pop_pins(ns, orgs, js, queue, packs, asks, bad, e):
   match queue:
     case []:
       e
     case +h <> t:
-      pick_pins(Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, js, h, t,
+      pick_pins(ns, Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, js, h, t,
         packs, asks, bad, e)
 
 # LAW: one step keeps every resolved package on the ledger's source
 law step_pins:
+  for +ns: List<&2, L.Name>
   for +orgs: List<&2, L.Origin>
   for +js: List<&2, W.Judged>
   for wk: P.Walk
   for e: {Laws.pinned.all(orgs, P.walk.packs(wk)) == P.walk.packs(wk)
     : List<&2, L.Pack>}
-  {Laws.pinned.all(orgs, P.walk.packs(P.walk.step(orgs, js, wk)))
-    == P.walk.packs(P.walk.step(orgs, js, wk)) : List<&2, L.Pack>}
+  {Laws.pinned.all(orgs, P.walk.packs(P.walk.step(orgs, ns, js, wk)))
+    == P.walk.packs(P.walk.step(orgs, ns, js, wk)) : List<&2, L.Pack>}
 
-def step_pins(orgs, js, wk, e):
+def step_pins(ns, orgs, js, wk, e):
   match wk:
     case P.Walk{queue, packs, asks, bad}:
-      pop_pins(orgs, js, queue, packs, asks, bad, e)
+      pop_pins(ns, orgs, js, queue, packs, asks, bad, e)
 
 # LAW: a walk that ran out of fuel keeps the packages it had
 law out_pins:
@@ -798,6 +841,7 @@ def out_pins(done, _orgs, wk, e):
 
 # LAW: a walk that is done is what it was, and one that is not goes on
 law more_pins:
+  for +ns: List<&2, L.Name>
   for done: Bool
   for +orgs: List<&2, L.Origin>
   for +js: List<&2, W.Judged>
@@ -805,30 +849,30 @@ law more_pins:
   for +wk: P.Walk
   for e: {Laws.pinned.all(orgs, P.walk.packs(wk)) == P.walk.packs(wk)
     : List<&2, L.Pack>}
-  for ih: {Laws.pinned.all(orgs, P.walk.packs(P.walk(f, orgs, js,
-    P.walk.step(orgs, js, wk))))
-    == P.walk.packs(P.walk(f, orgs, js, P.walk.step(orgs, js, wk)))
+  for ih: {Laws.pinned.all(orgs, P.walk.packs(P.walk(f, orgs, ns, js,
+    P.walk.step(orgs, ns, js, wk))))
+    == P.walk.packs(P.walk(f, orgs, ns, js, P.walk.step(orgs, ns, js, wk)))
     : List<&2, L.Pack>}
   {Laws.pinned.all(orgs, P.walk.packs(P.walk.more(done, wk,
-    now => P.walk(f, orgs, js, P.walk.step(orgs, js, now)))))
+    now => P.walk(f, orgs, ns, js, P.walk.step(orgs, ns, js, now)))))
     == P.walk.packs(P.walk.more(done, wk,
-      now => P.walk(f, orgs, js, P.walk.step(orgs, js, now)))) : List<&2, L.Pack>}
+      now => P.walk(f, orgs, ns, js, P.walk.step(orgs, ns, js, now)))) : List<&2, L.Pack>}
 
-def more_pins(done, _orgs, _js, _f, _wk, e, ih):
+def more_pins(_ns, done, _orgs, _js, _f, _wk, e, ih):
   match done:
     case True{}:
       e
     case False{}:
       ih
 
-def Laws.walk_pins_ledger_sources(fuel, orgs, js, wk, e):
+def Laws.walk_pins_ledger_sources(fuel, orgs, ns, js, wk, e):
   match fuel:
     case 0n:
       out_pins(P.walk.done(wk), orgs, wk, e)
     case 1n+f:
-      more_pins(P.walk.done(wk), orgs, js, f, wk, e,
-        Laws.walk_pins_ledger_sources(f, orgs, js, P.walk.step(orgs, js, wk),
-          step_pins(orgs, js, wk, e)))
+      more_pins(ns, P.walk.done(wk), orgs, js, f, wk, e,
+        Laws.walk_pins_ledger_sources(f, orgs, ns, js, P.walk.step(orgs, ns, js, wk),
+          step_pins(ns, orgs, js, wk, e)))
 
 def Laws.plain_lock_pins_ledger_sources(w, e):
   match w:
@@ -845,11 +889,14 @@ def Laws.plain_lock_pins_ledger_sources(w, e):
               match listing:
                 case W.Unlisted{why}:
                   {==}
-                case W.Listed{fs}:
+                case W.Listed{+fs}:
                   Laws.walk_pins_ledger_sources(U32.to_nat(100000),
                     L.ledger.read(W.parsed(ledger)),
+                    P.table(W.parsed(ledger), W.judge(W.origins(ledger), W.ledger.hub(ledger), replies)),
                     W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
-                    P.Walk{P.roots(fs), [], [], ""}, {==})
+                    P.Walk{List.append(&2, String, P.roots(fs),
+                      L.name.hashes(P.table(W.parsed(ledger), W.judge(W.origins(ledger),
+                        W.ledger.hub(ledger), replies)), P.roots.named(fs))), [], [], ""}, {==})
 
 # The walk's hashes, one step at a time, in the shape of its sources above. A
 # step resolves a hash only in the arm where `L.has` answered False, so the
@@ -946,6 +993,7 @@ def has_fresh(ps, x, e):
 
 # LAW: a package resolved by its verdict is one the walk did not have
 law verdict_distinct:
+  for +ns: List<&2, L.Name>
   for v: W.Verdict
   for src: L.Src
   for +hash: String
@@ -955,19 +1003,22 @@ law verdict_distinct:
   for bad: String
   for e: {Laws.distinct(packs) == True{} : Bool}
   for n: {L.has(packs, hash) == False{} : Bool}
-  {Laws.distinct(P.walk.packs(P.step.verdict(v, src, hash, rest, packs, asks,
+  {Laws.distinct(P.walk.packs(P.step.verdict(v, ns, src, hash, rest, packs, asks,
     bad))) == True{} : Bool}
 
-def verdict_distinct(v, _src, hash, _rest, packs, _asks, _bad, e, n):
+def verdict_distinct(_ns, v, _src, hash, _rest, packs, _asks, _bad, e, n):
   match v:
     case W.No{_why}:
       e
     case W.Ok{_fs, _ss}:
       and_true(Laws.hash.fresh(hash, packs), Laws.distinct(packs),
         has_fresh(packs, hash, n), e)
+    case W.Named{_names}:
+      e
 
 # LAW: and one looked up, whether it was answered or not
 law look_distinct:
+  for +ns: List<&2, L.Name>
   for found: P.Look
   for src: L.Src
   for +hash: String
@@ -977,18 +1028,19 @@ law look_distinct:
   for bad: String
   for e: {Laws.distinct(packs) == True{} : Bool}
   for n: {L.has(packs, hash) == False{} : Bool}
-  {Laws.distinct(P.walk.packs(P.step.look(found, src, hash, rest, packs, asks,
+  {Laws.distinct(P.walk.packs(P.step.look(found, ns, src, hash, rest, packs, asks,
     bad))) == True{} : Bool}
 
-def look_distinct(found, src, hash, rest, packs, asks, bad, e, n):
+def look_distinct(ns, found, src, hash, rest, packs, asks, bad, e, n):
   match found:
     case P.Absent{}:
       e
     case P.Found{v}:
-      verdict_distinct(v, src, hash, rest, packs, asks, bad, e, n)
+      verdict_distinct(ns, v, src, hash, rest, packs, asks, bad, e, n)
 
 # LAW: and one passed over, or picked because the walk did not have it
 law pick_distinct:
+  for +ns: List<&2, L.Name>
   for seen: Bool
   for +orgs: List<&2, L.Origin>
   for +js: List<&2, W.Judged>
@@ -999,20 +1051,21 @@ law pick_distinct:
   for bad: String
   for e: {Laws.distinct(packs) == True{} : Bool}
   for hs: {Bool.or(L.has(packs, hash), L.seen.holds(asks, hash)) == seen : Bool}
-  {Laws.distinct(P.walk.packs(P.step.pick(seen, orgs, js, hash, rest, packs,
+  {Laws.distinct(P.walk.packs(P.step.pick(seen, orgs, ns, js, hash, rest, packs,
     asks, bad))) == True{} : Bool}
 
-def pick_distinct(seen, orgs, js, hash, rest, packs, asks, bad, e, hs):
+def pick_distinct(ns, seen, orgs, js, hash, rest, packs, asks, bad, e, hs):
   match seen:
     case True{}:
       e
     case False{}:
-      look_distinct(P.look(js, hash), L.origin(orgs, hash), hash, rest, packs,
+      look_distinct(ns, P.look(js, hash), L.origin(orgs, hash), hash, rest, packs,
         asks, bad, e,
         or_left(L.has(packs, hash), L.seen.holds(asks, hash), hs))
 
 # LAW: and one step of the walk, whatever the queue held
 law pop_distinct:
+  for +ns: List<&2, L.Name>
   for +orgs: List<&2, L.Origin>
   for +js: List<&2, W.Judged>
   for queue: List<&2, String>
@@ -1020,29 +1073,30 @@ law pop_distinct:
   for +asks: List<&2, String>
   for bad: String
   for e: {Laws.distinct(packs) == True{} : Bool}
-  {Laws.distinct(P.walk.packs(P.step.pop(orgs, js, queue, packs, asks, bad)))
+  {Laws.distinct(P.walk.packs(P.step.pop(orgs, ns, js, queue, packs, asks, bad)))
     == True{} : Bool}
 
-def pop_distinct(orgs, js, queue, packs, asks, bad, e):
+def pop_distinct(ns, orgs, js, queue, packs, asks, bad, e):
   match queue:
     case []:
       e
     case +h <> t:
-      pick_distinct(Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, js,
+      pick_distinct(ns, Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, js,
         h, t, packs, asks, bad, e, {==})
 
 # LAW: one step keeps every resolved hash distinct
 law step_distinct:
+  for +ns: List<&2, L.Name>
   for +orgs: List<&2, L.Origin>
   for +js: List<&2, W.Judged>
   for wk: P.Walk
   for e: {Laws.distinct(P.walk.packs(wk)) == True{} : Bool}
-  {Laws.distinct(P.walk.packs(P.walk.step(orgs, js, wk))) == True{} : Bool}
+  {Laws.distinct(P.walk.packs(P.walk.step(orgs, ns, js, wk))) == True{} : Bool}
 
-def step_distinct(orgs, js, wk, e):
+def step_distinct(ns, orgs, js, wk, e):
   match wk:
     case P.Walk{queue, packs, asks, bad}:
-      pop_distinct(orgs, js, queue, packs, asks, bad, e)
+      pop_distinct(ns, orgs, js, queue, packs, asks, bad, e)
 
 # LAW: a walk that ran out of fuel keeps the packages it had
 law out_distinct:
@@ -1062,48 +1116,51 @@ def out_distinct(done, wk, e):
 
 # LAW: a walk that is done is what it was, and one that is not goes on
 law more_distinct:
+  for +ns: List<&2, L.Name>
   for done: Bool
   for +orgs: List<&2, L.Origin>
   for +js: List<&2, W.Judged>
   for f: Nat
   for +wk: P.Walk
   for e: {Laws.distinct(P.walk.packs(wk)) == True{} : Bool}
-  for ih: {Laws.distinct(P.walk.packs(P.walk(f, orgs, js,
-    P.walk.step(orgs, js, wk)))) == True{} : Bool}
+  for ih: {Laws.distinct(P.walk.packs(P.walk(f, orgs, ns, js,
+    P.walk.step(orgs, ns, js, wk)))) == True{} : Bool}
   {Laws.distinct(P.walk.packs(P.walk.more(done, wk,
-    now => P.walk(f, orgs, js, P.walk.step(orgs, js, now))))) == True{} : Bool}
+    now => P.walk(f, orgs, ns, js, P.walk.step(orgs, ns, js, now))))) == True{} : Bool}
 
-def more_distinct(done, _orgs, _js, _f, _wk, e, ih):
+def more_distinct(_ns, done, _orgs, _js, _f, _wk, e, ih):
   match done:
     case True{}:
       e
     case False{}:
       ih
 
-def Laws.walk_keeps_hashes_distinct(fuel, orgs, js, wk, e):
+def Laws.walk_keeps_hashes_distinct(fuel, orgs, ns, js, wk, e):
   match fuel:
     case 0n:
       out_distinct(P.walk.done(wk), wk, e)
     case 1n+f:
-      more_distinct(P.walk.done(wk), orgs, js, f, wk, e,
-        Laws.walk_keeps_hashes_distinct(f, orgs, js, P.walk.step(orgs, js, wk),
-          step_distinct(orgs, js, wk, e)))
+      more_distinct(ns, P.walk.done(wk), orgs, js, f, wk, e,
+        Laws.walk_keeps_hashes_distinct(f, orgs, ns, js, P.walk.step(orgs, ns, js, wk),
+          step_distinct(ns, orgs, js, wk, e)))
 
 # LAW: the walk from any listing, over any ledger and verdicts, resolves each
 # hash once
 law walk_of_distinct:
   for +led: M.Read
   for listing: W.Listing
+  for +ns: List<&2, L.Name>
   for +js: List<&2, W.Judged>
-  {Laws.distinct(P.walk.packs(P.walk.of(led, listing, js))) == True{} : Bool}
+  {Laws.distinct(P.walk.packs(P.walk.of(led, listing, ns, js))) == True{} : Bool}
 
-def walk_of_distinct(led, listing, js):
+def walk_of_distinct(led, listing, ns, js):
   match listing:
     case W.Unlisted{why}:
       {==}
-    case W.Listed{fs}:
-      Laws.walk_keeps_hashes_distinct(U32.to_nat(100000), L.ledger.read(led), js,
-        P.Walk{P.roots(fs), [], [], ""}, {==})
+    case W.Listed{+fs}:
+      Laws.walk_keeps_hashes_distinct(U32.to_nat(100000), L.ledger.read(led), ns, js,
+        P.Walk{List.append(&2, String, P.roots(fs), L.name.hashes(ns, P.roots.named(fs))),
+          [], [], ""}, {==})
 
 # The walk is the same for a plain lock and an upgrade; only the ledger, the
 # listing and the verdicts it walks over differ.
@@ -1112,6 +1169,7 @@ def Laws.plain_lock_hashes_distinct(w):
     case W.World{+args, +ledger, listing, +replies, +ups}:
       walk_of_distinct(Up.next.read(W.next(args, ledger, ups)),
         W.listing.of(W.next(args, ledger, ups), listing),
+        P.table(Up.next.read(W.next(args, ledger, ups)), W.judged.of(W.next(args, ledger, ups), replies)),
         W.judged.of(W.next(args, ledger, ups), replies))
 
 # `.ez/` is a prefix of anything appended to it, which `starts_append` holds,
@@ -1989,6 +2047,10 @@ def after.one_judged(orgs, hub, hash, a):
   match a:
     case W.Miss{_why}:
       {==}
+    case W.Said{_text}:
+      {==}
+    case W.Locked{_text}:
+      {==}
     case W.Got{how, +manifest, +ss}:
       match how:
         case W.Lib{}:
@@ -2128,6 +2190,10 @@ law fresh.one_after:
 def fresh.one_after(orgs, hub, hash, a):
   match a:
     case W.Miss{_why}:
+      {==}
+    case W.Said{_text}:
+      {==}
+    case W.Locked{_text}:
       {==}
     case W.Got{how, +manifest, +ss}:
       match how:
@@ -2413,43 +2479,43 @@ def blocks_join(qs, rest):
     case +q <> +t:
       blocks_join.cons(q, t, rest, blocks_join(t, rest))
 
-def Laws.render_is_doc(ts, hub, ps):
+def Laws.render_is_doc(nms, ts, hub, ps):
   b = Equal.sym(List<&2, K.File>, K.file.sort(L.pack.blocks(ps)),
     L.pack.blocks(L.pack.sort(ps)), blocks_sort(ps))
-  %b : {String.join.go(List.append(&2, String, L.block.texts(_), T.render.all(L.tool.sects(ts))),
-    T.render.sect(L.lock.sect(hub)), "\n") == T.render(Laws.lock.doc(ts, hub, ps)) : String}
+  %b : {String.join.go(List.append(&2, String, L.block.texts(_), T.render.all(Laws.tail(nms, ts))),
+    T.render.sect(L.lock.sect(hub)), "\n") == T.render(Laws.lock.doc(nms, ts, hub, ps)) : String}
   ra = Equal.sym(List<&2, String>,
-    T.render.all(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts))),
-    List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))),
-    Toml.render_all_append(L.pack.all(L.pack.sort(ps)), L.tool.sects(ts)))
+    T.render.all(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts))),
+    List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))),
+    Toml.render_all_append(L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts)))
   %ra : {String.join.go(List.append(&2, String, L.block.texts(L.pack.blocks(L.pack.sort(ps))),
-    T.render.all(L.tool.sects(ts))), T.render.sect(L.lock.sect(hub)), "\n")
+    T.render.all(Laws.tail(nms, ts))), T.render.sect(L.lock.sect(hub)), "\n")
     == String.join.go(_, T.render.sect(L.lock.sect(hub)), "\n") : String}
   f1 = Equal.sym(String, String.join.go(List.append(&2, String,
-      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))),
+      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))),
       T.render.sect(L.lock.sect(hub)), "\n"),
     String.append(T.render.sect(L.lock.sect(hub)), String.join.go(List.append(&2, String,
-      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))), "", "\n")),
+      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))), "", "\n")),
     Str.join_fold(List.append(&2, String, L.block.texts(L.pack.blocks(L.pack.sort(ps))),
-      T.render.all(L.tool.sects(ts))), T.render.sect(L.lock.sect(hub))))
+      T.render.all(Laws.tail(nms, ts))), T.render.sect(L.lock.sect(hub))))
   %f1 : {_ == String.join.go(List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))),
-    T.render.all(L.tool.sects(ts))), T.render.sect(L.lock.sect(hub)), "\n") : String}
+    T.render.all(Laws.tail(nms, ts))), T.render.sect(L.lock.sect(hub)), "\n") : String}
   f2 = Equal.sym(String, String.join.go(List.append(&2, String,
-      T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))),
+      T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))),
       T.render.sect(L.lock.sect(hub)), "\n"),
     String.append(T.render.sect(L.lock.sect(hub)), String.join.go(List.append(&2, String,
-      T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))), "", "\n")),
+      T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))), "", "\n")),
     Str.join_fold(List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))),
-      T.render.all(L.tool.sects(ts))), T.render.sect(L.lock.sect(hub))))
+      T.render.all(Laws.tail(nms, ts))), T.render.sect(L.lock.sect(hub))))
   %f2 : {String.append(T.render.sect(L.lock.sect(hub)), String.join.go(List.append(&2, String,
-      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(L.tool.sects(ts))), "", "\n"))
+      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))), "", "\n"))
     == _ : String}
   Equal.cong(String, String, x => String.append(T.render.sect(L.lock.sect(hub)), x),
     String.join.go(List.append(&2, String, L.block.texts(L.pack.blocks(L.pack.sort(ps))),
-      T.render.all(L.tool.sects(ts))), "", "\n"),
+      T.render.all(Laws.tail(nms, ts))), "", "\n"),
     String.join.go(List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))),
-      T.render.all(L.tool.sects(ts))), "", "\n"),
-    blocks_join(L.pack.sort(ps), T.render.all(L.tool.sects(ts))))
+      T.render.all(Laws.tail(nms, ts))), "", "\n"),
+    blocks_join(L.pack.sort(ps), T.render.all(Laws.tail(nms, ts))))
 
 # LAW: and the right half
 law or_right:
@@ -2857,7 +2923,7 @@ law tool_ok.src:
 
 def tool_ok.src(n, e, b, s, ev):
   match s:
-    case M.Hub{}:
+    case M.Hub{hv}:
       +e1 = Eq.and.right(P.clean(n), P.clean.all([e, b]), ev)
       and_true(Str.clear(n, '\n'),
         Toml.kvs.ok(List.concat(&2, T.Kv, [L.kv("entry", e), L.kv("bin", b)])),
@@ -2925,32 +2991,56 @@ def tools_ok(ts, e):
         tool_ok(h, Eq.and.left(P.clean.all(P.tool.values(h)), P.tools.ok(t), e)),
         tools_ok(t, Eq.and.right(P.clean.all(P.tool.values(h)), P.tools.ok(t), e)))
 
+# LAW: the `[names]` table reads back, when every name can be written as the
+# pair a package's file is written as
+law names_ok:
+  for +nms: List<&2, L.Name>
+  for +e: {P.names.ok(nms) == True{} : Bool}
+  {Toml.sects.ok(L.names.sects(nms)) == True{} : Bool}
+
+def names_ok(nms, e):
+  match nms:
+    case []:
+      {==}
+    case +h <> +t:
+      +fs = L.name.files(h <> t)
+      and_true(Toml.sect.ok(T.Sect{"names", L.file.pairs(K.files_of(fs))}), True{},
+        and_true(Str.clear("names", '\n'), fok(K.files_of(fs)), {==},
+          dedup_ok(K.file.sort(fs), fsort_ok(fs,
+            files_ok(fs, Eq.and.left(P.paths.ok(fs), P.clean.all(P.file.values(fs)), e),
+              Eq.and.right(P.paths.ok(fs), P.clean.all(P.file.values(fs)), e))))),
+        {==})
+
 # LAW: the document of a lock the planner lets through reads back
 law doc_ok:
+  for +nms: List<&2, L.Name>
   for +ps: List<&2, L.Pack>
   for +ts: List<&2, M.Tool>
   for +hub: String
+  for +en: {P.names.ok(nms) == True{} : Bool}
   for +e: {P.lockable(ps, ts, hub) == True{} : Bool}
-  {Toml.sects.ok(Laws.lock.doc(ts, hub, ps)) == True{} : Bool}
+  {Toml.sects.ok(Laws.lock.doc(nms, ts, hub, ps)) == True{} : Bool}
 
-def doc_ok(ps, ts, hub, e):
+def doc_ok(nms, ps, ts, hub, en, e):
   +er = Eq.and.right(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), e)
   and_true(Toml.sect.ok(L.lock.sect(hub)),
-    Toml.sects.ok(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts))),
+    Toml.sects.ok(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts))),
     and_true(Str.clear(hub, '\n'), True{},
       clean_nl(hub, Eq.and.left(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), e)),
       {==}),
-    Toml.sects_ok_append(L.pack.all(L.pack.sort(ps)), L.tool.sects(ts),
+    Toml.sects_ok_append(L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts),
       psort_ok(ps, packs_ok(ps, Eq.and.left(P.packs.ok(ps), P.tools.ok(ts), er))),
-      tools_ok(ts, Eq.and.right(P.packs.ok(ps), P.tools.ok(ts), er))))
+      Toml.sects_ok_append(L.names.sects(nms), L.tool.sects(ts), names_ok(nms, en),
+        tools_ok(ts, Eq.and.right(P.packs.ok(ps), P.tools.ok(ts), er)))))
 
-def Laws.lock_sections_read_back(ps, ts, hub, ok):
-  r = Equal.sym(String, L.render.tools(ts, hub, ps), T.render(Laws.lock.doc(ts, hub, ps)),
-    Laws.render_is_doc(ts, hub, ps))
-  %r : {T.sects(T.parse(_)) == Laws.lock.doc(ts, hub, ps) : List<&2, T.Sect>}
+def Laws.lock_sections_read_back(nms, ps, ts, hub, ok):
+  r = Equal.sym(String, L.render.names(nms, ts, hub, ps), T.render(Laws.lock.doc(nms, ts, hub, ps)),
+    Laws.render_is_doc(nms, ts, hub, ps))
+  %r : {T.sects(T.parse(_)) == Laws.lock.doc(nms, ts, hub, ps) : List<&2, T.Sect>}
   Toml.sections_read(L.lock.sect(hub),
-    List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts)),
-    doc_ok(ps, ts, hub, ok))
+    List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts)),
+    doc_ok(nms, ps, ts, hub, Eq.and.left(P.names.ok(nms), P.lockable(ps, ts, hub), ok),
+      Eq.and.right(P.names.ok(nms), P.lockable(ps, ts, hub), ok)))
 
 # the header of one of a package's tables. Proof vocabulary.
 def pack.name(h: String, x: String) -> String:
@@ -3449,14 +3539,14 @@ law tool_of.hub:
   for +n: String
   for +e: String
   for +b: String
-  {M.tool_of("tools." ++ n, kvs.of(["entry", "bin"], [e, b])) == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+  {M.tool_of("tools." ++ n, kvs.of(["entry", "bin"], [e, b])) == M.Tool{n, e, b, M.Hub{""}} : M.Tool}
 
 # as for a git tool, with no `git` to make it one
 def tool_of.hub(n, e, b):
   d = Equal.sym(String, String.drop(n, 0n), n, Str.drop_zero(n))
   %d : {M.Tool{_, T.value(kvs.of(["entry", "bin"], [e, b]), "entry"), T.value(kvs.of(["entry", "bin"], [e, b]),
       "bin"), M.source_of(kvs.of(["entry", "bin"], [e, b]))}
-    == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+    == M.Tool{n, e, b, M.Hub{""}} : M.Tool}
   t0 = Equal.sym(String, T.value(kvs.of(["entry", "bin"], [e, b]), "entry"),
     T.value(full.of(["entry", "bin"], [e, b]), "entry"), kvs_full(["entry", "bin"], [e, b], "entry", {==}))
   %t0 : {M.Tool{n, _, T.value(kvs.of(["entry", "bin"], [e, b]), "bin"),
@@ -3465,7 +3555,7 @@ def tool_of.hub(n, e, b):
               "tag"),
         M.root.or(T.value(kvs.of(["entry", "bin"], [e, b]), "root")), T.value(kvs.of(["entry", "bin"], [e, b]),
             "narHash"), M.flag(T.value(kvs.of(["entry", "bin"], [e, b]), "vendor")))}
-    == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+    == M.Tool{n, e, b, M.Hub{""}} : M.Tool}
   t1 = Equal.sym(String, T.value(kvs.of(["entry", "bin"], [e, b]), "bin"),
     T.value(full.of(["entry", "bin"], [e, b]), "bin"), kvs_full(["entry", "bin"], [e, b], "bin", {==}))
   %t1 : {M.Tool{n, T.value(full.of(["entry", "bin"], [e, b]), "entry"), _,
@@ -3474,7 +3564,7 @@ def tool_of.hub(n, e, b):
               "tag"),
         M.root.or(T.value(kvs.of(["entry", "bin"], [e, b]), "root")), T.value(kvs.of(["entry", "bin"], [e, b]),
             "narHash"), M.flag(T.value(kvs.of(["entry", "bin"], [e, b]), "vendor")))}
-    == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+    == M.Tool{n, e, b, M.Hub{""}} : M.Tool}
   t2 = Equal.sym(String, T.value(kvs.of(["entry", "bin"], [e, b]), "git"),
     T.value(full.of(["entry", "bin"], [e, b]), "git"), kvs_full(["entry", "bin"], [e, b], "git", {==}))
   %t2 : {M.Tool{n, T.value(full.of(["entry", "bin"], [e, b]), "entry"), T.value(full.of(["entry", "bin"], [e, b]),
@@ -3483,7 +3573,7 @@ def tool_of.hub(n, e, b):
           "bin"], [e, b]), "tag"),
         M.root.or(T.value(kvs.of(["entry", "bin"], [e, b]), "root")), T.value(kvs.of(["entry", "bin"], [e, b]),
             "narHash"), M.flag(T.value(kvs.of(["entry", "bin"], [e, b]), "vendor")))}
-    == M.Tool{n, e, b, M.Hub{}} : M.Tool}
+    == M.Tool{n, e, b, M.Hub{""}} : M.Tool}
   {==}
 
 # LAW: a tool's table, read, is the tool as the lock gives it back, with its
@@ -3499,13 +3589,13 @@ law tools_read.src:
 
 def tools_read.src(n, e, b, s, rest):
   match s:
-    case M.Hub{}:
+    case M.Hub{hv}:
       f = Equal.sym(Bool, String.starts_with(n, ""), True{}, Eq.starts_nil(n))
-      %f : {M.tools.put(_, L.tool.sect(M.Tool{n, e, b, M.Hub{}}), M.tools(rest))
-        == Laws.tool.canon(M.Tool{n, e, b, M.Hub{}}) <> M.tools(rest) : List<&2, M.Tool>}
+      %f : {M.tools.put(_, L.tool.sect(M.Tool{n, e, b, M.Hub{hv}}), M.tools(rest))
+        == Laws.tool.canon(M.Tool{n, e, b, M.Hub{hv}}) <> M.tools(rest) : List<&2, M.Tool>}
       Equal.cong(M.Tool, List<&2, M.Tool>, x => x <> M.tools(rest),
         M.tool_of("tools." ++ n, List.concat(&2, T.Kv, [L.kv("entry", e), L.kv("bin", b)])),
-        M.Tool{n, e, b, M.Hub{}}, tool_of.hub(n, e, b))
+        M.Tool{n, e, b, M.Hub{""}}, tool_of.hub(n, e, b))
     case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
       f = Equal.sym(Bool, String.starts_with(n, ""), True{}, Eq.starts_nil(n))
       %f : {M.tools.put(_, L.tool.sect(M.Tool{n, e, b, M.Git{url, rev, tag, root, nar, vend}}), M.tools(rest))
@@ -3575,26 +3665,43 @@ def tools_skip_packs(qs, rest):
 
 # LAW: the lock `ez lock` renders names the hub it was resolved against
 law lock_hub_read:
+  for +nms: List<&2, L.Name>
   for +ts: List<&2, M.Tool>
   for +hub: String
   for +ps: List<&2, L.Pack>
-  {L.lock.hub(Laws.lock.doc(ts, hub, ps)) == hub : String}
+  {L.lock.hub(Laws.lock.doc(nms, ts, hub, ps)) == hub : String}
 
-def lock_hub_read(_ts, _hub, _ps):
+def lock_hub_read(_nms, _ts, _hub, _ps):
   {==}
+
+# LAW: the `[names]` table is no tool's
+law tools_skip_names:
+  for nms: List<&2, L.Name>
+  for +rest: List<&2, T.Sect>
+  {M.tools(List.append(&2, T.Sect, L.names.sects(nms), rest)) == M.tools(rest) : List<&2, M.Tool>}
+
+def tools_skip_names(nms, _rest):
+  match nms:
+    case []:
+      {==}
+    case _h <> _t:
+      {==}
 
 # LAW: and gives back its tool pins, as the lock gives them back
 law lock_tools_read:
+  for +nms: List<&2, L.Name>
   for +ts: List<&2, M.Tool>
   for +hub: String
   for +ps: List<&2, L.Pack>
-  {M.tools(Laws.lock.doc(ts, hub, ps)) == Laws.tools.canon(ts) : List<&2, M.Tool>}
+  {M.tools(Laws.lock.doc(nms, ts, hub, ps)) == Laws.tools.canon(ts) : List<&2, M.Tool>}
 
-def lock_tools_read(ts, _hub, ps):
+def lock_tools_read(nms, ts, _hub, ps):
   Equal.trans(List<&2, M.Tool>,
-    M.tools(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts))),
-    M.tools(L.tool.sects(ts)), Laws.tools.canon(ts),
-    tools_skip_packs(L.pack.sort(ps), L.tool.sects(ts)), tools_read(ts))
+    M.tools(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts))),
+    M.tools(Laws.tail(nms, ts)), Laws.tools.canon(ts),
+    tools_skip_packs(L.pack.sort(ps), Laws.tail(nms, ts)),
+    Equal.trans(List<&2, M.Tool>, M.tools(Laws.tail(nms, ts)), M.tools(L.tool.sects(ts)),
+      Laws.tools.canon(ts), tools_skip_names(nms, L.tool.sects(ts)), tools_read(ts)))
 
 # ---------------------------------------------------------------------------
 # the packages a lock gives back
@@ -4201,19 +4308,35 @@ def packs_at_all(hub, qs, ys, ed, ec):
 
 # LAW: the hashes a lock's document names are its packages', in hash order
 law hashes_doc:
+  for +nms: List<&2, L.Name>
   for +ts: List<&2, M.Tool>
   for +hub: String
   for +ps: List<&2, L.Pack>
   for +e: {hashes.clean(L.pack.sort(ps)) == True{} : Bool}
-  {L.hashes(Laws.lock.doc(ts, hub, ps)) == hash.all(L.pack.sort(ps)) : List<&2, String>}
+  {L.hashes(Laws.lock.doc(nms, ts, hub, ps)) == hash.all(L.pack.sort(ps)) : List<&2, String>}
 
-def hashes_doc(ts, _hub, ps, e):
+# LAW: the `[names]` table names no hash
+law hashes_skip_names:
+  for nms: List<&2, L.Name>
+  for +rest: List<&2, T.Sect>
+  {L.hashes(List.append(&2, T.Sect, L.names.sects(nms), rest)) == L.hashes(rest) : List<&2, String>}
+
+def hashes_skip_names(nms, _rest):
+  match nms:
+    case []:
+      {==}
+    case _h <> _t:
+      {==}
+
+def hashes_doc(nms, ts, _hub, ps, e):
   h1 = Equal.sym(List<&2, String>,
-    L.hashes(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), L.tool.sects(ts))),
-    List.append(&2, String, hash.all(L.pack.sort(ps)), L.hashes(L.tool.sects(ts))),
-    hashes_packs(L.pack.sort(ps), L.tool.sects(ts), e))
+    L.hashes(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts))),
+    List.append(&2, String, hash.all(L.pack.sort(ps)), L.hashes(Laws.tail(nms, ts))),
+    hashes_packs(L.pack.sort(ps), Laws.tail(nms, ts), e))
   %h1 : {_ == hash.all(L.pack.sort(ps)) : List<&2, String>}
-  h2 = Equal.sym(List<&2, String>, L.hashes(L.tool.sects(ts)), [], hashes_tools(ts))
+  h2 = Equal.sym(List<&2, String>, L.hashes(Laws.tail(nms, ts)), [],
+    Equal.trans(List<&2, String>, L.hashes(Laws.tail(nms, ts)), L.hashes(L.tool.sects(ts)), [],
+      hashes_skip_names(nms, L.tool.sects(ts)), hashes_tools(ts)))
   %h2 : {List.append(&2, String, hash.all(L.pack.sort(ps)), _) == hash.all(L.pack.sort(ps))
     : List<&2, String>}
   Str.list_append_nil(String, hash.all(L.pack.sort(ps)))
@@ -4221,38 +4344,181 @@ def hashes_doc(ts, _hub, ps, e):
 # LAW: the packages a lockable lock's document gives back are its packages
 # as the lock gives them back
 law lock_packs_read:
+  for +nms: List<&2, L.Name>
   for +ts: List<&2, M.Tool>
   for +hub: String
   for +ps: List<&2, L.Pack>
   for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
-  {L.packs(Laws.lock.doc(ts, hub, ps)) == Laws.canon(ps) : List<&2, L.Pack>}
+  {L.packs(Laws.lock.doc(nms, ts, hub, ps)) == Laws.canon(ps) : List<&2, L.Pack>}
 
-def lock_packs_read(ts, hub, ps, ok):
+def lock_packs_read(nms, ts, hub, ps, ok):
   +pk = Eq.and.left(P.packs.ok(ps), P.tools.ok(ts),
     Eq.and.right(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), ok))
   +hc = hclean_sort(ps, hashes_clean_ok(ps, pk))
-  h = Equal.sym(List<&2, String>, L.hashes(Laws.lock.doc(ts, hub, ps)), hash.all(L.pack.sort(ps)),
-    hashes_doc(ts, hub, ps, hc))
-  %h : {L.packs.at(Laws.lock.doc(ts, hub, ps), _) == Laws.canon(ps) : List<&2, L.Pack>}
-  packs_at_all(hub, L.pack.sort(ps), L.tool.sects(ts), distinct_sort(ps, packs_distinct(ps, pk)), hc)
+  h = Equal.sym(List<&2, String>, L.hashes(Laws.lock.doc(nms, ts, hub, ps)), hash.all(L.pack.sort(ps)),
+    hashes_doc(nms, ts, hub, ps, hc))
+  %h : {L.packs.at(Laws.lock.doc(nms, ts, hub, ps), _) == Laws.canon(ps) : List<&2, L.Pack>}
+  packs_at_all(hub, L.pack.sort(ps), Laws.tail(nms, ts), distinct_sort(ps, packs_distinct(ps, pk)), hc)
 
-def Laws.lock_reads_back(ps, ts, hub, ok):
-  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.tools(ts, hub, ps))),
-    Laws.lock.doc(ts, hub, ps), Laws.lock_sections_read_back(ps, ts, hub, ok))
+def Laws.lock_reads_back(nms, ps, ts, hub, ok):
+  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.names(nms, ts, hub, ps))),
+    Laws.lock.doc(nms, ts, hub, ps), Laws.lock_sections_read_back(nms, ps, ts, hub, ok))
   %s : {L.packs(_) == Laws.canon(ps) : List<&2, L.Pack>}
-  lock_packs_read(ts, hub, ps, ok)
+  lock_packs_read(nms, ts, hub, ps, Eq.and.right(P.names.ok(nms), P.lockable(ps, ts, hub), ok))
 
-def Laws.lock_hub_reads_back(ps, ts, hub, ok):
-  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.tools(ts, hub, ps))),
-    Laws.lock.doc(ts, hub, ps), Laws.lock_sections_read_back(ps, ts, hub, ok))
+def Laws.lock_hub_reads_back(nms, ps, ts, hub, ok):
+  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.names(nms, ts, hub, ps))),
+    Laws.lock.doc(nms, ts, hub, ps), Laws.lock_sections_read_back(nms, ps, ts, hub, ok))
   %s : {L.lock.hub(_) == hub : String}
-  lock_hub_read(ts, hub, ps)
+  lock_hub_read(nms, ts, hub, ps)
 
-def Laws.lock_tools_read_back(ps, ts, hub, ok):
-  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.tools(ts, hub, ps))),
-    Laws.lock.doc(ts, hub, ps), Laws.lock_sections_read_back(ps, ts, hub, ok))
+def Laws.lock_tools_read_back(nms, ps, ts, hub, ok):
+  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.names(nms, ts, hub, ps))),
+    Laws.lock.doc(nms, ts, hub, ps), Laws.lock_sections_read_back(nms, ps, ts, hub, ok))
   %s : {M.tools(_) == Laws.tools.canon(ts) : List<&2, M.Tool>}
-  lock_tools_read(ts, hub, ps)
+  lock_tools_read(nms, ts, hub, ps)
+
+# ---------------------------------------------------------------------------
+# the names a lock gives back
+
+# LAW: the pairs of a names table, read as names, are the names written
+law pair_names_back:
+  for fs: List<&2, K.File>
+  {L.pair.names(L.file.pairs(fs)) == Laws.names.back(fs) : List<&2, L.Name>}
+
+def pair_names_back(fs):
+  match fs:
+    case []:
+      {==}
+    case K.File{at, sum} <> t:
+      Equal.cong(List<&2, L.Name>, List<&2, L.Name>, r => L.Name{at, sum} <> r,
+        L.pair.names(L.file.pairs(t)), Laws.names.back(t), pair_names_back(t))
+
+# LAW: a package's tables are not the names table, when its hash holds no
+# quote
+law names_skip_pack:
+  for +h: String
+  for +s: L.Src
+  for +f: List<&2, K.File>
+  for +rest: List<&2, T.Sect>
+  for +eh: {Str.clear(h, '"') == True{} : Bool}
+  {L.names.pairs(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), rest))
+    == L.names.pairs(rest) : List<&2, T.Kv>}
+
+def names_skip_pack(h, s, f, rest, eh):
+  g = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
+    seg_pack(h, "source", eh, {==}, {==}))
+  %g : {L.at.pick(L.named1(_, "names"), T.Sect{pack.name(h, "source"), L.src.pairs(s)},
+    L.names.pairs(T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))} <> rest))
+    == L.names.pairs(rest) : List<&2, T.Kv>}
+  g2 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
+    seg_pack(h, "files", eh, {==}, {==}))
+  %g2 : {L.at.pick(L.named1(_, "names"), T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))},
+    L.names.pairs(rest)) == L.names.pairs(rest) : List<&2, T.Kv>}
+  {==}
+
+# LAW: no package's table is the names table, when no hash holds a quote
+law names_skip_packs:
+  for +qs: List<&2, L.Pack>
+  for +rest: List<&2, T.Sect>
+  for +e: {hashes.clean(qs) == True{} : Bool}
+  {L.names.pairs(List.append(&2, T.Sect, L.pack.all(qs), rest)) == L.names.pairs(rest)
+    : List<&2, T.Kv>}
+
+def names_skip_packs(qs, rest, e):
+  match qs:
+    case []:
+      {==}
+    case +q <> +t:
+      match q:
+        case L.Pack{+h, +s, +f}:
+          Equal.trans(List<&2, T.Kv>,
+            L.names.pairs(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}),
+              List.append(&2, T.Sect, L.pack.all(t), rest))),
+            L.names.pairs(List.append(&2, T.Sect, L.pack.all(t), rest)),
+            L.names.pairs(rest),
+            names_skip_pack(h, s, f, List.append(&2, T.Sect, L.pack.all(t), rest),
+              Eq.and.left(Str.clear(h, '"'), hashes.clean(t), e)),
+            names_skip_packs(t, rest, Eq.and.right(Str.clear(h, '"'), hashes.clean(t), e)))
+
+# LAW: a lock that resolved no name has no names table, and its tools are
+# none
+law names_none:
+  for +ts: List<&2, M.Tool>
+  {L.pair.names(L.names.pairs(L.tool.sects(ts))) == [] : List<&2, L.Name>}
+
+def names_none(ts):
+  match ts:
+    case []:
+      {==}
+    case +h <> +t:
+      match h:
+        case M.Tool{+n, +e, +b, +s}:
+          w = Equal.sym(String, K.word(T.segments("tools." ++ n), 0n), "tools", seg_tools(n))
+          %w : {L.pair.names(L.at.pick(Bool.and(Nat.is_eq(List.length(&2, String,
+            T.segments("tools." ++ n)), 1n), String.eq(_, "names")),
+            L.tool.sect(M.Tool{n, e, b, s}), L.names.pairs(L.tool.sects(t)))) == []
+            : List<&2, L.Name>}
+          a = Equal.sym(Bool, Bool.and(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 1n),
+            False{}), False{}, and_false(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 1n)))
+          %a : {L.pair.names(L.at.pick(_, L.tool.sect(M.Tool{n, e, b, s}), L.names.pairs(L.tool.sects(t))))
+            == [] : List<&2, L.Name>}
+          names_none(t)
+
+# LAW: the lock writes each name as the law's file of it
+law name_files_as:
+  for nms: List<&2, L.Name>
+  {L.name.files(nms) == Laws.names.as.files(nms) : List<&2, K.File>}
+
+def name_files_as(nms):
+  match nms:
+    case []:
+      {==}
+    case L.Name{nv, hash} <> t:
+      Equal.cong(List<&2, K.File>, List<&2, K.File>, x => K.File{nv, hash} <> x,
+        L.name.files(t), Laws.names.as.files(t), name_files_as(t))
+
+# LAW: and the names table is the first of the tables after the packages
+law names_tail:
+  for nms: List<&2, L.Name>
+  for +ts: List<&2, M.Tool>
+  {L.pair.names(L.names.pairs(Laws.tail(nms, ts))) == Laws.names.canon(nms) : List<&2, L.Name>}
+
+def names_tail(nms, ts):
+  match nms:
+    case []:
+      names_none(ts)
+    case +h <> +t:
+      %name_files_as(h <> t)
+        : {L.pair.names(L.names.pairs(Laws.tail(h <> t, ts))) == Laws.names.back(K.files_of(_))
+          : List<&2, L.Name>}
+      pair_names_back(K.files_of(L.name.files(h <> t)))
+
+# LAW: the names table of a lock's document is the names it resolved, in
+# name order and each once
+law lock_names_read:
+  for +nms: List<&2, L.Name>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ps: List<&2, L.Pack>
+  for +e: {hashes.clean(L.pack.sort(ps)) == True{} : Bool}
+  {L.names(Laws.lock.doc(nms, ts, hub, ps)) == Laws.names.canon(nms) : List<&2, L.Name>}
+
+def lock_names_read(nms, ts, _hub, ps, e):
+  p = Equal.sym(List<&2, T.Kv>,
+    L.names.pairs(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts))),
+    L.names.pairs(Laws.tail(nms, ts)), names_skip_packs(L.pack.sort(ps), Laws.tail(nms, ts), e))
+  %p : {L.pair.names(_) == Laws.names.canon(nms) : List<&2, L.Name>}
+  names_tail(nms, ts)
+
+def Laws.lock_names_read_back(nms, ps, ts, hub, ok):
+  +lk = Eq.and.right(P.names.ok(nms), P.lockable(ps, ts, hub), ok)
+  +pk = Eq.and.left(P.packs.ok(ps), P.tools.ok(ts),
+    Eq.and.right(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), lk))
+  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.names(nms, ts, hub, ps))),
+    Laws.lock.doc(nms, ts, hub, ps), Laws.lock_sections_read_back(nms, ps, ts, hub, ok))
+  %s : {L.names(_) == Laws.names.canon(nms) : List<&2, L.Name>}
+  lock_names_read(nms, ts, hub, ps, hclean_sort(ps, hashes_clean_ok(ps, pk)))
 
 # The upgrade's decisions: what it keeps (EZ-RES-4, EZ-RES-6) and what it
 # asks (EZ-RES-6). The upgrade walks the ledger's dependencies and tools one
@@ -4355,12 +4621,13 @@ law hub_holds:
   for e: {M.source.is_git(s) == False{} : Bool}
   {U.aim(sel, s) == U.Hold{} : U.Aim}
 
-# LAW: a hub source is held, chosen or not
+# LAW: a hub source is held, chosen or not, by its name or by its hash
 law hub_source_holds:
   for sel: Bool
-  {U.aim(sel, M.Hub{}) == U.Hold{} : U.Aim}
+  for hv: String
+  {U.aim(sel, M.Hub{hv}) == U.Hold{} : U.Aim}
 
-def hub_source_holds(sel):
+def hub_source_holds(sel, _hv):
   match sel:
     case True{}:
       {==}
@@ -4369,8 +4636,8 @@ def hub_source_holds(sel):
 
 def hub_holds(sel, s, e):
   match s:
-    case M.Hub{}:
-      hub_source_holds(sel)
+    case M.Hub{hv}:
+      hub_source_holds(sel, hv)
     case M.Git{url, rev, tag, root, nar, vend}:
       Eq.bit.absurd2(&2, {U.aim(sel, M.Git{url, rev, tag, root, nar, vend}) == U.Hold{} : U.Aim}, e)
 
@@ -4399,7 +4666,7 @@ def retarget_name(dep, _rev, _hash, _root, _nar):
   match dep:
     case M.Dep{n, h, e, s}:
       match s:
-        case M.Hub{}:
+        case M.Hub{hv}:
           {==}
         case M.Git{url, r, tag, rt, nr, vend}:
           {==}
@@ -5062,7 +5329,7 @@ def set_name(tool, _rev, _tag, _nar):
   match tool:
     case M.Tool{n, e, b, s}:
       match s:
-        case M.Hub{}:
+        case M.Hub{hv}:
           {==}
         case M.Git{url, r, old, root, nr, vend}:
           {==}
@@ -6930,26 +7197,26 @@ law made_src:
 
 def made_src(nx, cs, js, lt, at, text, pre, post, ig, okn, efs, mp, mq, bend):
   Equal.trans(P.Wrote,
-    P.put.in(P.says.of(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+    P.put.in(P.says.of(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(lt),
       P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
-        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))))), at),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))))), at),
     P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
       Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), at),
     wrote.of(String.eq(U.reimport.many(Up.next.swaps(nx), text), text),
       U.reimport.many(Up.next.swaps(nx), text)),
     Equal.trans(P.Wrote,
-      P.put.in(P.says.of(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+      P.put.in(P.says.of(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(lt),
+        P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+          Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))))), at),
+      P.put.in(P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(lt),
         P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
           Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))))), at),
-      P.put.in(P.lays(cs, Up.next.vends(nx), js,
-        P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
-          Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))), at),
       P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
         Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), at),
-      says_put(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+      says_put(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(lt),
         P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
-          Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))), at),
-      lays_put(cs, Up.next.vends(nx), js,
+          Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))))), at),
+      lays_names_put(cs, Up.next.vends(nx), js, L.names.read(lt),
         P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
           Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), at)),
     Equal.trans(P.Wrote,
@@ -7168,18 +7435,18 @@ law made_edits:
 
 def made_edits(nx, cs, js, lt, p):
   Equal.trans(P.Wrote,
-    P.put.in(P.says.of(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+    P.put.in(P.says.of(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(lt),
+      P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))))), p),
+    P.put.in(P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(lt),
       P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
         Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))))), p),
-    P.put.in(P.lays(cs, Up.next.vends(nx), js,
-      P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
-        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))), p),
     P.put.in(P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
       Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), p),
-    says_put(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+    says_put(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(lt),
       P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
-        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))), p),
-    lays_put(cs, Up.next.vends(nx), js,
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))))), p),
+    lays_names_put(cs, Up.next.vends(nx), js, L.names.read(lt),
       P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
         Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))), p))
 
@@ -7489,7 +7756,7 @@ def mv.self_dep(t, rs, d, g):
   match d:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
-        case M.Hub{}:
+        case M.Hub{hv}:
           g
         case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
           mv.self(t, rs, hn, hh, he, url, rev, tag, root, nar, vend)
@@ -7504,7 +7771,7 @@ def mv.bare_git(d, bare):
   match d:
     case M.Dep{_hn, _hh, _he, src}:
       match src:
-        case M.Hub{}:
+        case M.Hub{hv}:
           bare
         case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
           {==}
@@ -7519,7 +7786,7 @@ def mv.named_git(d, named):
   match d:
     case M.Dep{_hn, _hh, _he, src}:
       match src:
-        case M.Hub{}:
+        case M.Hub{hv}:
           named
         case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
           {==}
@@ -7812,7 +8079,7 @@ def mv.fine_hub(hb, _hn, _hh, _he, src, _hash, _r, _root2, _nar2, _man, _srcs, _
   match hb:
     case Up.Clear{}:
       match src:
-        case M.Hub{}:
+        case M.Hub{hv}:
           {==}
         case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
           {==}
@@ -8029,9 +8296,9 @@ def mv.fwd_one(rs, only, hub, h, bare):
   match h:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
-        case M.Hub{}:
-          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
-            M.Dep{hn, hh, he, M.Hub{}}), Up.forward(rs, ""), rs, M.Dep{hn, hh, he, M.Hub{}})
+        case M.Hub{hv}:
+          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{hv}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{hv}}), Up.forward(rs, ""), rs, M.Dep{hn, hh, he, M.Hub{hv}})
             == True{} : Bool}, bare)
         case M.Git{+url, +rev, tag, +root, +nar, +vend}:
           match tag:
@@ -8087,9 +8354,9 @@ def mv.fol_one(rs, only, hub, h, named):
   match h:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
-        case M.Hub{}:
-          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
-            M.Dep{hn, hh, he, M.Hub{}}), Up.follow(rs, "", ""), rs, M.Dep{hn, hh, he, M.Hub{}})
+        case M.Hub{hv}:
+          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{hv}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{hv}}), Up.follow(rs, "", ""), rs, M.Dep{hn, hh, he, M.Hub{hv}})
             == True{} : Bool}, named)
         case M.Git{+url, +rev, tag, +root, +nar, +vend}:
           match tag:
@@ -8115,9 +8382,9 @@ law mv.walk_nil:
   for +only: String
   for +hub: String
   for +n: String
-  for pre: {mv.ok(Up.dep.one(U.aim(s, M.Hub{}), rs, only, hub, M.Dep{"", "", "", M.Hub{}}), t, rs,
-    M.Dep{"", "", "", M.Hub{}}) == True{} : Bool}
-  {mv.walk(t, rs, Up.deps.walk(rs, only, hub, []), M.Dep{"", "", "", M.Hub{}}, n) == True{} : Bool}
+  for pre: {mv.ok(Up.dep.one(U.aim(s, M.Hub{""}), rs, only, hub, M.Dep{"", "", "", M.Hub{""}}), t, rs,
+    M.Dep{"", "", "", M.Hub{""}}) == True{} : Bool}
+  {mv.walk(t, rs, Up.deps.walk(rs, only, hub, []), M.Dep{"", "", "", M.Hub{""}}, n) == True{} : Bool}
 
 def mv.walk_nil(s, _t, _rs, _only, _hub, _n, pre):
   match s:
@@ -8850,9 +9117,9 @@ def mv.fwd_off(rs, only, hub, h, tip, tg, br, bare, sel, head, moved, off):
   match h:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
-        case M.Hub{}:
-          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
-            M.Dep{hn, hh, he, M.Hub{}})) == True{} : Bool}, bare)
+        case M.Hub{hv}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{hv}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{hv}})) == True{} : Bool}, bare)
         case M.Git{+url, +rev, tag, +root, +nar, +vend}:
           match tag:
             case SNil{}:
@@ -8951,9 +9218,9 @@ def mv.fol_off(rs, only, hub, h, tip, tg, br, named, sel, refs, moved, off):
   match h:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
-        case M.Hub{}:
-          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
-            M.Dep{hn, hh, he, M.Hub{}})) == True{} : Bool}, named)
+        case M.Hub{hv}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{hv}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{hv}})) == True{} : Bool}, named)
         case M.Git{+url, +rev, tag, +root, +nar, +vend}:
           match tag:
             case SNil{}:
@@ -9086,9 +9353,9 @@ def mv.fol_drift(
   match h:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
-        case M.Hub{}:
-          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
-            M.Dep{hn, hh, he, M.Hub{}})) == True{} : Bool}, named)
+        case M.Hub{hv}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{hv}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{hv}})) == True{} : Bool}, named)
         case M.Git{+url, +rev, tag, +root, +nar, +vend}:
           match tag:
             case SNil{}:
@@ -9106,7 +9373,7 @@ law mv.halts_nil:
   for +rs: List<&2, Up.Reply>
   for +only: String
   for +hub: String
-  for hl: {mv.halts(Up.dep.one(U.aim(s, M.Hub{}), rs, only, hub, M.Dep{"", "", "", M.Hub{}}))
+  for hl: {mv.halts(Up.dep.one(U.aim(s, M.Hub{""}), rs, only, hub, M.Dep{"", "", "", M.Hub{""}}))
     == True{} : Bool}
   {String.is_empty(mv.bad(Up.deps.walk(rs, only, hub, []))) == False{} : Bool}
 
@@ -9746,9 +10013,9 @@ def mv.fwd_live(rs, only, hub, h, tip, tg, br, bare, sel, head):
   match h:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
-        case M.Hub{}:
-          Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
-            M.Dep{hn, hh, he, M.Hub{}}), tip, M.Dep{hn, hh, he, M.Hub{}}) == True{} : Bool}, bare)
+        case M.Hub{hv}:
+          Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{hv}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{hv}}), tip, M.Dep{hn, hh, he, M.Hub{hv}}) == True{} : Bool}, bare)
         case M.Git{+url, +rev, tag, +root, +nar, +vend}:
           match tag:
             case SNil{}:
@@ -9845,9 +10112,9 @@ def mv.fol_live(rs, only, hub, h, tip, tg, br, named, sel, refs):
   match h:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
-        case M.Hub{}:
-          Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{}), rs, only, hub,
-            M.Dep{hn, hh, he, M.Hub{}}), tip, M.Dep{hn, hh, he, M.Hub{}}) == True{} : Bool}, named)
+        case M.Hub{hv}:
+          Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn), M.Hub{hv}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Hub{hv}}), tip, M.Dep{hn, hh, he, M.Hub{hv}}) == True{} : Bool}, named)
         case M.Git{+url, +rev, tag, +root, +nar, +vend}:
           match tag:
             case SNil{}:
@@ -9868,9 +10135,9 @@ law mv.live_nil:
   for +hub: String
   for +n: String
   for +tip: String
-  for lv: {mv.live(Up.dep.one(U.aim(s, M.Hub{}), rs, only, hub, M.Dep{"", "", "", M.Hub{}}), tip,
-    M.Dep{"", "", "", M.Hub{}}) == True{} : Bool}
-  {mv.walk_live(tip, Up.deps.walk(rs, only, hub, []), M.Dep{"", "", "", M.Hub{}}, n) == True{} : Bool}
+  for lv: {mv.live(Up.dep.one(U.aim(s, M.Hub{""}), rs, only, hub, M.Dep{"", "", "", M.Hub{""}}), tip,
+    M.Dep{"", "", "", M.Hub{""}}) == True{} : Bool}
+  {mv.walk_live(tip, Up.deps.walk(rs, only, hub, []), M.Dep{"", "", "", M.Hub{""}}, n) == True{} : Bool}
 
 def mv.live_nil(s, _rs, _only, _hub, _n, _tip, lv):
   match s:
@@ -11294,25 +11561,26 @@ law a.hubsel:
   for +hn: String
   for +hh: String
   for +he: String
+  for +hv: String
   for ec: {U.chosen(only, hn) == sel : Bool}
-  {again(Up.dep.one(U.aim(sel, M.Hub{}), rs, only, hub, M.Dep{hn, hh, he, M.Hub{}}), g, rs, only, hub)
-    == still(Up.dep.one(U.aim(sel, M.Hub{}), rs, only, hub, M.Dep{hn, hh, he, M.Hub{}}),
-      fsays(again(Up.dep.one(U.aim(sel, M.Hub{}), rs, only, hub, M.Dep{hn, hh, he, M.Hub{}}), g, rs,
+  {again(Up.dep.one(U.aim(sel, M.Hub{hv}), rs, only, hub, M.Dep{hn, hh, he, M.Hub{hv}}), g, rs, only, hub)
+    == still(Up.dep.one(U.aim(sel, M.Hub{hv}), rs, only, hub, M.Dep{hn, hh, he, M.Hub{hv}}),
+      fsays(again(Up.dep.one(U.aim(sel, M.Hub{hv}), rs, only, hub, M.Dep{hn, hh, he, M.Hub{hv}}), g, rs,
         only, hub))) : Up.Fate}
 
-def a.hubsel(sel, g, rs, only, hub, hn, hh, he, ec):
+def a.hubsel(sel, g, rs, only, hub, hn, hh, he, hv, ec):
   match sel:
     case True{}:
       nec = Equal.sym(Bool, U.chosen(only, hn), True{}, ec)
-      %nec : {Up.dep.one(U.aim(_, M.Hub{}), re(g, rs), only, hub, M.Dep{hn, hh, he, M.Hub{}})
-        == kept(M.Dep{hn, hh, he, M.Hub{}}, fsays(Up.dep.one(U.aim(_, M.Hub{}), re(g, rs), only, hub,
-          M.Dep{hn, hh, he, M.Hub{}}))) : Up.Fate}
+      %nec : {Up.dep.one(U.aim(_, M.Hub{hv}), re(g, rs), only, hub, M.Dep{hn, hh, he, M.Hub{hv}})
+        == kept(M.Dep{hn, hh, he, M.Hub{hv}}, fsays(Up.dep.one(U.aim(_, M.Hub{hv}), re(g, rs), only, hub,
+          M.Dep{hn, hh, he, M.Hub{hv}}))) : Up.Fate}
       {==}
     case False{}:
       nec = Equal.sym(Bool, U.chosen(only, hn), False{}, ec)
-      %nec : {Up.dep.one(U.aim(_, M.Hub{}), re(g, rs), only, hub, M.Dep{hn, hh, he, M.Hub{}})
-        == kept(M.Dep{hn, hh, he, M.Hub{}}, fsays(Up.dep.one(U.aim(_, M.Hub{}), re(g, rs), only, hub,
-          M.Dep{hn, hh, he, M.Hub{}}))) : Up.Fate}
+      %nec : {Up.dep.one(U.aim(_, M.Hub{hv}), re(g, rs), only, hub, M.Dep{hn, hh, he, M.Hub{hv}})
+        == kept(M.Dep{hn, hh, he, M.Hub{hv}}, fsays(Up.dep.one(U.aim(_, M.Hub{hv}), re(g, rs), only, hub,
+          M.Dep{hn, hh, he, M.Hub{hv}}))) : Up.Fate}
       {==}
 
 # LAW: whatever the upgrade makes of a dependency, the next upgrade, against
@@ -11333,8 +11601,8 @@ def a.one(g, rs, only, hub, d):
   match d:
     case M.Dep{+hn, +hh, +he, src}:
       match src:
-        case M.Hub{}:
-          a.hubsel(U.chosen(only, hn), g, rs, only, hub, hn, hh, he, {==})
+        case M.Hub{hv}:
+          a.hubsel(U.chosen(only, hn), g, rs, only, hub, hn, hh, he, hv, {==})
         case M.Git{+url, +r0, +tg, +rt0, +nr0, +vd}:
           a.gsel(U.chosen(only, hn), g, rs, only, hub, hn, hh, he, url, r0, tg, rt0, nr0, vd, {==})
 
@@ -12714,7 +12982,7 @@ def t.sel(sel, g, rs, only, n, e, b, s, ec):
       {==}
     case True{}:
       match s:
-        case M.Hub{}:
+        case M.Hub{hv}:
           {==}
         case M.Git{+url, +r0, +tg, +rt0, +nr0, +vd}:
           t.short(Bool.or(String.is_empty(r0), String.is_empty(nr0)), g, rs, only, n, e, b, url, r0, tg,
@@ -14523,12 +14791,15 @@ def view_put(nx, cs, js, d, p):
       match d:
         case P.Doc{+text}:
           Equal.sym(P.Wrote,
-            P.put.in(P.says.of(sy, P.lays(cs, vs, js, P.edits.of(ed, P.edits.of(Up.edit.sources(fd, sw),
-              P.drops.of(dr, [P.Write{P.lockfile(), text}]))))), p),
-            P.put.in(P.lays(cs, vs, js, P.edits.of(ed, P.edits.of(Up.edit.sources(fd, sw),
-              P.drops.of(dr, [P.Write{P.lockfile(), text}])))), p),
-            says_put(sy, P.lays(cs, vs, js, P.edits.of(ed, P.edits.of(Up.edit.sources(fd, sw),
-              P.drops.of(dr, [P.Write{P.lockfile(), text}])))), p))
+            P.put.in(P.says.of(sy, P.lays(cs, vs, js, P.names.lay(L.names.read(text),
+              P.edits.of(ed, P.edits.of(Up.edit.sources(fd, sw),
+                P.drops.of(dr, [P.Write{P.lockfile(), text}])))))), p),
+            P.put.in(P.lays(cs, vs, js, P.names.lay(L.names.read(text),
+              P.edits.of(ed, P.edits.of(Up.edit.sources(fd, sw),
+                P.drops.of(dr, [P.Write{P.lockfile(), text}]))))), p),
+            says_put(sy, P.lays(cs, vs, js, P.names.lay(L.names.read(text),
+              P.edits.of(ed, P.edits.of(Up.edit.sources(fd, sw),
+                P.drops.of(dr, [P.Write{P.lockfile(), text}]))))), p))
         case P.Stop{_why}:
           {==}
 
@@ -14735,10 +15006,12 @@ def target_put(md, g, cs, js, d, p, ng, nl):
   match d:
     case P.Doc{+text}:
       Equal.trans(P.Wrote,
-        P.put.in(P.lays(cs, vends.of(md), js, P.edits.of(gi.of(md, g), [P.Write{P.lockfile(), text}])), p),
+        P.put.in(P.lays(cs, vends.of(md), js,
+          P.names.lay(L.names.read(text), P.edits.of(gi.of(md, g), [P.Write{P.lockfile(), text}]))), p),
         P.put.in(P.edits.of(gi.of(md, g), [P.Write{P.lockfile(), text}]), p),
         P.Kept{},
-        lays_put(cs, vends.of(md), js, P.edits.of(gi.of(md, g), [P.Write{P.lockfile(), text}]), p),
+        lays_names_put(cs, vends.of(md), js, L.names.read(text),
+          P.edits.of(gi.of(md, g), [P.Write{P.lockfile(), text}]), p),
         Equal.trans(P.Wrote,
           P.put.in(P.edits.of(gi.of(md, g), [P.Write{P.lockfile(), text}]), p),
           P.put.in([P.Write{P.lockfile(), text}], p),
@@ -14767,10 +15040,10 @@ def target_put.clean(md, g, cs, js, d, p, eg, nl):
       %neg : {P.put.plan(P.made(Up.Next{md, md, "", [], [], vends.of(md), [], _, [], [], []}, cs, js, P.Doc{text}), p)
         == P.Kept{} : P.Wrote}
       Equal.trans(P.Wrote,
-        P.put.in(P.lays(cs, vends.of(md), js, [P.Write{P.lockfile(), text}]), p),
+        P.put.in(P.lays(cs, vends.of(md), js, P.names.lay(L.names.read(text), [P.Write{P.lockfile(), text}])), p),
         P.put.in([P.Write{P.lockfile(), text}], p),
         P.Kept{},
-        lays_put(cs, vends.of(md), js, [P.Write{P.lockfile(), text}], p),
+        lays_names_put(cs, vends.of(md), js, L.names.read(text), [P.Write{P.lockfile(), text}], p),
         lock_put(text, p, nl))
     case P.Stop{_why}:
       {==}
@@ -15532,6 +15805,8 @@ def nv(+hash: String, v: W.Verdict) -> Bool:
       True{}
     case W.Ok{fs, ss}:
       String.eq(hash, W.named(W.laid(fs, ss)))
+    case W.Named{_names}:
+      True{}
 
 # whether every verdict is so
 def nv.all(js: List<&2, W.Judged>) -> Bool:
@@ -15716,12 +15991,31 @@ law nv.accept:
   for a: W.Answer
   {nv(hash, W.accept(orgs, hub, hash, a)) == True{} : Bool}
 
-def nv.accept(orgs, _hub, hash, a):
+# LAW: a name's answer lays nothing, whatever the hub said
+law nv.said:
+  for ok: Bool
+  for +name: String
+  for +hash: String
+  for +hub: String
+  {nv(name, W.said.ok(ok, name, hash, hub)) == True{} : Bool}
+
+def nv.said(ok, _name, _hash, _hub):
+  match ok:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def nv.accept(orgs, hub, hash, a):
   match a:
     case W.Miss{_why}:
       {==}
     case W.Got{how, +manifest, +ss}:
       nv.src(L.origin(orgs, hash), how, hash, manifest, ss)
+    case W.Said{+text}:
+      nv.said(L.hash.ok(String.trim(text)), hash, String.trim(text), hub)
+    case W.Locked{_text}:
+      {==}
 
 law nv.judge:
   for +orgs: List<&2, L.Origin>
@@ -15846,6 +16140,8 @@ def nv.verdict(v, _pl, h, rest, ev, er):
   match v:
     case W.No{_why}:
       er
+    case W.Named{_names}:
+      er
     case W.Ok{+fs, +ss}:
       %Equal.sym(Bool, P.lay.named(h, List.append(&2, W.Source, W.laid(fs, ss),
         [W.Source{"manifest", W.manifest(W.laid(fs, ss))}])), True{},
@@ -15872,6 +16168,21 @@ def nv.pick(b, v, pl, h, rest, ev, er):
       er
 
 # LAW: every tree the lock lays from verdicts that are named is named
+# LAW: a names file laid in front of trees that are named leaves them named:
+# it lays no tree
+law nv.names:
+  for ns: List<&2, L.Name>
+  for +rest: List<&2, P.Effect>
+  for er: {P.lays.named(rest) == True{} : Bool}
+  {P.lays.named(P.names.lay(ns, rest)) == True{} : Bool}
+
+def nv.names(ns, rest, er):
+  match ns:
+    case []:
+      er
+    case L.Name{_nv, _hash} <> t:
+      nv.names(t, rest, er)
+
 law nv.lays:
   for +cs: List<&2, String>
   for +vs: List<&2, String>
@@ -15944,18 +16255,20 @@ law nv.made:
 def nv.made(nx, cs, js, d, ej):
   match d:
     case P.Doc{+lt}:
-      nv.says(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js,
+      nv.says(Up.next.says(nx), P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(lt),
+          P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
+            Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))))),
+        nv.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(lt),
           P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
             Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])))),
-        nv.lays(cs, Up.next.vends(nx), js,
+          ej, nv.names(L.names.read(lt),
           P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
             Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]))),
-          ej,
           nv.edits(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx),
             Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}])),
             nv.edits(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
               P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), lt}]),
-              nv.drops(Up.next.drops(nx), [P.Write{P.lockfile(), lt}], {==})))))
+              nv.drops(Up.next.drops(nx), [P.Write{P.lockfile(), lt}], {==}))))))
     case P.Stop{_why}:
       {==}
 
@@ -16041,14 +16354,14 @@ law an.stop:
   for +here: String
   for +led: M.Read
   for listing: W.Listing
-  for js: List<&2, W.Judged>
+  for +js: List<&2, W.Judged>
   {Laws.pkgs.anchored(here, L.ledger.read(led), P.wants.stop(clean, here, led, listing, js))
     == True{} : Bool}
 
 def an.stop(clean, here, led, listing, js):
   match clean:
     case True{}:
-      an.gap(String.is_empty(P.need.why(led)), P.walk.of(led, listing, js), here,
+      an.gap(String.is_empty(P.need.why(led)), P.walk.of(led, listing, P.table(led, js), js), here,
         L.ledger.read(led), M.hub_of(led))
     case False{}:
       {==}
@@ -16056,19 +16369,24 @@ def an.stop(clean, here, led, listing, js):
 # LAW: a step that asks about packages asks the ones it was given
 law an.pkgs:
   for as: List<&2, W.Ask>
+  for names: List<&2, W.Ask>
   for +here: String
   for +orgs: List<&2, L.Origin>
   for +nx: Up.Next
   for listing: W.Listing
   for replies: List<&2, W.Reply>
   for e: {Laws.pkgs.anchored(here, orgs, as) == True{} : Bool}
-  {Laws.pkgs.anchored(here, orgs, Laws.step.pkgs(P.step.pkgs(as, nx, listing, replies)))
+  {Laws.pkgs.anchored(here, orgs, Laws.step.pkgs(P.step.pkgs(as, names, nx, listing, replies)))
     == True{} : Bool}
 
-def an.pkgs(as, _here, _orgs, _nx, _listing, _replies, e):
+def an.pkgs(as, names, _here, _orgs, _nx, _listing, _replies, e):
   match as:
     case []:
-      {==}
+      match names:
+        case []:
+          {==}
+        case _n <> _m:
+          {==}
     case _h <> _t:
       e
 
@@ -16084,8 +16402,8 @@ law an.ups:
 def an.ups(us, here, nx, listing, replies):
   match us:
     case []:
-      an.pkgs(P.wants.of(here, nx, listing, replies), here, W.next.origins(nx), nx, listing,
-        replies,
+      an.pkgs(P.wants.of(here, nx, listing, replies), P.names.wants.of(nx, listing, replies), here,
+        W.next.origins(nx), nx, listing, replies,
         an.stop(String.is_empty(Up.next.stop(nx)), here, Up.next.read(nx),
           W.listing.of(nx, listing), P.scan(W.replies.of(nx, replies))))
     case _h <> _t:
@@ -16130,15 +16448,20 @@ def an.qanch(as, here):
 # LAW: a step that asks about packages puts no query
 law an.pkgs.q:
   for as: List<&2, W.Ask>
+  for names: List<&2, W.Ask>
   for +nx: Up.Next
   for listing: W.Listing
   for replies: List<&2, W.Reply>
-  {Laws.step.queries(P.step.pkgs(as, nx, listing, replies)) == [] : List<&2, P.Query>}
+  {Laws.step.queries(P.step.pkgs(as, names, nx, listing, replies)) == [] : List<&2, P.Query>}
 
-def an.pkgs.q(as, _nx, _listing, _replies):
+def an.pkgs.q(as, names, _nx, _listing, _replies):
   match as:
     case []:
-      {==}
+      match names:
+        case []:
+          {==}
+        case _n <> _m:
+          {==}
     case _h <> _t:
       {==}
 
@@ -16155,9 +16478,10 @@ def an.ups.asks(us, here, nx, listing, replies):
   match us:
     case []:
       Equal.cong(List<&2, P.Query>, List<&2, Up.Ask>, qs => Laws.queries.asks(qs),
-        Laws.step.queries(P.step.pkgs(P.wants.of(here, nx, listing, replies), nx, listing,
-          replies)), [],
-        an.pkgs.q(P.wants.of(here, nx, listing, replies), nx, listing, replies))
+        Laws.step.queries(P.step.pkgs(P.wants.of(here, nx, listing, replies),
+          P.names.wants.of(nx, listing, replies), nx, listing, replies)), [],
+        an.pkgs.q(P.wants.of(here, nx, listing, replies), P.names.wants.of(nx, listing, replies),
+          nx, listing, replies))
     case +h <> +t:
       an.qasks(h <> t, here)
 
@@ -16174,9 +16498,10 @@ def an.ups.anch(us, here, nx, listing, replies):
   match us:
     case []:
       Equal.cong(List<&2, P.Query>, Bool, qs => Laws.queries.anchored(here, qs),
-        Laws.step.queries(P.step.pkgs(P.wants.of(here, nx, listing, replies), nx, listing,
-          replies)), [],
-        an.pkgs.q(P.wants.of(here, nx, listing, replies), nx, listing, replies))
+        Laws.step.queries(P.step.pkgs(P.wants.of(here, nx, listing, replies),
+          P.names.wants.of(nx, listing, replies), nx, listing, replies)), [],
+        an.pkgs.q(P.wants.of(here, nx, listing, replies), P.names.wants.of(nx, listing, replies),
+          nx, listing, replies))
     case +h <> +t:
       an.qanch(h <> t, here)
 
@@ -16198,16 +16523,17 @@ law an.recs:
   for +led: M.Read
   for listing: W.Listing
   for +js: List<&2, W.Judged>
-  {Laws.pinned.all(L.ledger.read(led), P.walk.packs(P.walk.of(led, listing, js)))
-    == P.walk.packs(P.walk.of(led, listing, js)) : List<&2, L.Pack>}
+  {Laws.pinned.all(L.ledger.read(led), P.walk.packs(P.walk.of(led, listing, P.table(led, js), js)))
+    == P.walk.packs(P.walk.of(led, listing, P.table(led, js), js)) : List<&2, L.Pack>}
 
 def an.recs(led, listing, js):
   match listing:
     case W.Unlisted{_why}:
       {==}
-    case W.Listed{fs}:
-      Laws.walk_pins_ledger_sources(U32.to_nat(100000), L.ledger.read(led), js,
-        P.Walk{P.roots(fs), [], [], ""}, {==})
+    case W.Listed{+fs}:
+      Laws.walk_pins_ledger_sources(U32.to_nat(100000), L.ledger.read(led), P.table(led, js), js,
+        P.Walk{List.append(&2, String, P.roots(fs), L.name.hashes(P.table(led, js), P.roots.named(fs))),
+          [], [], ""}, {==})
 
 def Laws.lock_records_as_given(w):
   match w:
@@ -16269,7 +16595,7 @@ def st.hub(hb, _hn, _hh, _he, src, _hash, _r, _root2, _nar2, _man, _srcs, _br):
   match hb:
     case Up.Clear{}:
       match src:
-        case M.Hub{}:
+        case M.Hub{hv}:
           ({==}, Unit{})
         case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
           ({==}, Unit{})
@@ -16586,7 +16912,7 @@ def st.set(t, _rev, _tag, _nar):
   match t:
     case M.Tool{_n, _e, _b, s}:
       match s:
-        case M.Hub{}:
+        case M.Hub{hv}:
           {==}
         case M.Git{_url, _r, _g, _root, _nr, _v}:
           {==}
@@ -17732,3 +18058,553 @@ def Laws.upgrade_named_without_license(pin, manifest, walked, bare):
     == Up.hash.of(K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))))
     : String}
   {==}
+
+# ---------------------------------------------------------------------------
+# named hub imports (EZ-HUB)
+
+def Laws.lock_reads_named(spec, e):
+  %e : {Bool.pick(List<&2, String>, _, [], [K.named.of(spec)]) == [K.named.of(spec)]
+    : List<&2, String>}
+  {==}
+
+# LAW: an empty string is the empty string
+law nm.empty_is:
+  for +s: String
+  for +e: {String.is_empty(s) == True{} : Bool}
+  {s == "" : String}
+
+def nm.empty_is(s, e):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{c, t}:
+      Eq.bit.absurd(&2, {SCon{c, t} == "" : String}, e)
+
+# LAW: one name of a list the table resolves, with whether it is the one
+# looked for decided
+law nm.queued.step:
+  for +c: Bool
+  for +ns: List<&2, L.Name>
+  for +h: String
+  for +t: List<&2, String>
+  for +nv: String
+  for +ec: {c == String.eq(h, nv) : Bool}
+  for +e: {L.any.step(c, _u => L.seen.holds(t, nv)) == True{} : Bool}
+  for +f: {False{} == String.is_empty(L.name.find(ns, nv)) : Bool}
+  for ih: {L.seen.holds(t, nv) == True{} : Bool}
+    -> {L.seen.holds(L.name.hashes(ns, t), L.name.find(ns, nv)) == True{} : Bool}
+  {L.seen.holds(List.append(&2, String, L.name.put(L.name.find(ns, h)), L.name.hashes(ns, t)),
+    L.name.find(ns, nv)) == True{} : Bool}
+
+def nm.queued.step(c, ns, h, t, nv, ec, e, f, ih):
+  match c:
+    case True{}:
+      +hn = Str.string_eq_true(h, nv, Equal.sym(Bool, True{}, String.eq(h, nv), ec))
+      %Equal.sym(String, h, nv, hn)
+        : {L.seen.holds(List.append(&2, String, L.name.put(L.name.find(ns, _)), L.name.hashes(ns, t)),
+          L.name.find(ns, nv)) == True{} : Bool}
+      %f : {L.seen.holds(List.append(&2, String,
+          Bool.pick(List<&2, String>, _, [], [L.name.find(ns, nv)]), L.name.hashes(ns, t)),
+          L.name.find(ns, nv)) == True{} : Bool}
+      %Equal.sym(Bool, String.eq(L.name.find(ns, nv), L.name.find(ns, nv)), True{},
+        Eq.string_eq_self(L.name.find(ns, nv)))
+        : {L.any.step(_, _u => L.seen.holds(L.name.hashes(ns, t), L.name.find(ns, nv))) == True{}
+          : Bool}
+      {==}
+    case False{}:
+      holds_right(L.name.put(L.name.find(ns, h)), L.name.hashes(ns, t), L.name.find(ns, nv), ih(e))
+
+def Laws.named_kid_queued(ns, nvs, nv, e, f):
+  match nvs:
+    case []:
+      Eq.bit.absurd(&2, {L.seen.holds(L.name.hashes(ns, []), L.name.find(ns, nv)) == True{} : Bool}, e)
+    case +h <> +t:
+      nm.queued.step(String.eq(h, nv), ns, h, t, nv, {==}, e, f,
+        z => Laws.named_kid_queued(ns, t, nv, z, f))
+
+# LAW: a name the table gives the hash of, as the lock records it, agrees
+# with the table, or is not recorded
+law nm.agree_pick:
+  for +b: Bool
+  for +ns: List<&2, L.Name>
+  for +h: String
+  {Laws.names.agree(ns, Bool.pick(List<&2, L.Name>, b, [], [L.Name{h, L.name.find(ns, h)}]))
+    == True{} : Bool}
+
+def nm.agree_pick(b, ns, h):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      and_true(String.eq(L.name.find(ns, h), L.name.find(ns, h)), True{},
+        Eq.string_eq_self(L.name.find(ns, h)), {==})
+
+# LAW: two lists that agree with a table, joined, agree with it
+law nm.agree_app:
+  for +ns: List<&2, L.Name>
+  for +xs: List<&2, L.Name>
+  for +ys: List<&2, L.Name>
+  for +ex: {Laws.names.agree(ns, xs) == True{} : Bool}
+  for +ey: {Laws.names.agree(ns, ys) == True{} : Bool}
+  {Laws.names.agree(ns, List.append(&2, L.Name, xs, ys)) == True{} : Bool}
+
+def nm.agree_app(ns, xs, ys, ex, ey):
+  match xs:
+    case []:
+      ey
+    case L.Name{+n, +h} <> +t:
+      and_true(String.eq(L.name.find(ns, n), h),
+        Laws.names.agree(ns, List.append(&2, L.Name, t, ys)),
+        Eq.and.left(String.eq(L.name.find(ns, n), h), Laws.names.agree(ns, t), ex),
+        nm.agree_app(ns, t, ys,
+          Eq.and.right(String.eq(L.name.find(ns, n), h), Laws.names.agree(ns, t), ex), ey))
+
+def Laws.lock_names_agree(ns, nvs):
+  match nvs:
+    case []:
+      {==}
+    case +h <> +t:
+      nm.agree_app(ns, L.name.one(h, L.name.find(ns, h)), L.name.pairs(ns, t),
+        nm.agree_pick(String.is_empty(L.name.find(ns, h)), ns, h),
+        Laws.lock_names_agree(ns, t))
+
+# LAW: one name of a table's front, with whether it is the one looked for
+# decided
+law nm.find_left.step:
+  for +c: Bool
+  for +h: String
+  for +t: List<&2, L.Name>
+  for +ys: List<&2, L.Name>
+  for +nv: String
+  for +f: {False{} == String.is_empty(L.name.at(c, h, _u => L.name.find(t, nv))) : Bool}
+  for ih: {False{} == String.is_empty(L.name.find(t, nv)) : Bool}
+    -> {L.name.find(List.append(&2, L.Name, t, ys), nv) == L.name.find(t, nv) : String}
+  {L.name.at(c, h, _u => L.name.find(List.append(&2, L.Name, t, ys), nv))
+    == L.name.at(c, h, _u => L.name.find(t, nv)) : String}
+
+def nm.find_left.step(c, _h, _t, _ys, _nv, f, ih):
+  match c:
+    case True{}:
+      {==}
+    case False{}:
+      ih(f)
+
+# LAW: a table's front answers for a name it resolves, whatever follows it
+law nm.find_left:
+  for +xs: List<&2, L.Name>
+  for +ys: List<&2, L.Name>
+  for +nv: String
+  for +f: {False{} == String.is_empty(L.name.find(xs, nv)) : Bool}
+  {L.name.find(List.append(&2, L.Name, xs, ys), nv) == L.name.find(xs, nv) : String}
+
+def nm.find_left(xs, ys, nv, f):
+  match xs:
+    case []:
+      Eq.bit.absurd(&2, {L.name.find(List.append(&2, L.Name, [], ys), nv) == L.name.find([], nv)
+        : String}, f)
+    case L.Name{+n, +h} <> +t:
+      nm.find_left.step(String.eq(n, nv), h, t, ys, nv, f, z => nm.find_left(t, ys, nv, z))
+
+def Laws.ledger_names_first(led, js, nv, f):
+  nm.find_left(L.ledger.names(led), W.names.of(js), nv, f)
+
+def Laws.lock_answer_names(_orgs, _hub, _key, _text):
+  {==}
+
+# The names put to the hub are the names still open, once and in order, so a
+# name the table resolves is none of them.
+
+# LAW: a list of names none of which is this one asks the hub nothing of it
+law nm.asked_none:
+  for +hub: String
+  for +xs: List<&2, String>
+  for +nv: String
+  for +e: {L.seen.holds(xs, nv) == False{} : Bool}
+  {Laws.asks.name(P.names.asked(hub, xs), nv) == False{} : Bool}
+
+def nm.asked_none(hub, xs, nv, e):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      %Equal.sym(Bool, String.eq(h, nv), False{},
+        any_head(String.eq(h, nv), _u => L.seen.holds(t, nv), e))
+        : {L.any.step(_, _u => Laws.asks.name(P.names.asked(hub, t), nv)) == False{} : Bool}
+      nm.asked_none(hub, t, nv, any_rest(String.eq(h, nv), _u => L.seen.holds(t, nv), e))
+
+# LAW: a name kept once, with whether it was seen already decided
+law nm.once.step:
+  for +b: Bool
+  for +h: String
+  for +rest: List<&2, String>
+  for +nv: String
+  for +eh: {String.eq(h, nv) == False{} : Bool}
+  for +er: {L.seen.holds(rest, nv) == False{} : Bool}
+  {L.seen.holds(P.names.once.put(b, h, rest), nv) == False{} : Bool}
+
+def nm.once.step(b, h, rest, nv, eh, er):
+  match b:
+    case True{}:
+      er
+    case False{}:
+      %Equal.sym(Bool, String.eq(h, nv), False{}, eh)
+        : {L.any.step(_, _u => L.seen.holds(rest, nv)) == False{} : Bool}
+      er
+
+# LAW: names kept once hold nothing the names did not
+law nm.once_none:
+  for +xs: List<&2, String>
+  for +seen: List<&2, String>
+  for +nv: String
+  for +e: {L.seen.holds(xs, nv) == False{} : Bool}
+  {L.seen.holds(P.names.once(xs, seen), nv) == False{} : Bool}
+
+def nm.once_none(xs, seen, nv, e):
+  match xs:
+    case []:
+      {==}
+    case +h <> +t:
+      nm.once.step(L.seen.holds(seen, h), h, P.names.once(t, h <> seen), nv,
+        any_head(String.eq(h, nv), _u => L.seen.holds(t, nv), e),
+        nm.once_none(t, h <> seen, nv, any_rest(String.eq(h, nv), _u => L.seen.holds(t, nv), e)))
+
+# LAW: an open name is not the one the table resolves: were it, the table
+# would resolve it
+law nm.open.hit:
+  for +c: Bool
+  for +ns: List<&2, L.Name>
+  for +js: List<&2, W.Judged>
+  for +roots: List<&2, String>
+  for +h: String
+  for +rest: List<&2, String>
+  for +nv: String
+  for +ec: {c == String.eq(h, nv) : Bool}
+  for +eb: {True{} == P.name.open(ns, js, roots, h) : Bool}
+  for +f: {False{} == String.is_empty(L.name.find(ns, nv)) : Bool}
+  for +er: {L.seen.holds(rest, nv) == False{} : Bool}
+  {L.any.step(c, _u => L.seen.holds(rest, nv)) == False{} : Bool}
+
+def nm.open.hit(c, ns, js, roots, h, rest, nv, ec, eb, f, er):
+  match c:
+    case False{}:
+      er
+    case True{}:
+      +hn = Str.string_eq_true(h, nv, Equal.sym(Bool, True{}, String.eq(h, nv), ec))
+      +o = Equal.trans(Bool, P.name.open(ns, js, roots, nv), P.name.open(ns, js, roots, h), True{},
+        Equal.cong(String, Bool, x => P.name.open(ns, js, roots, x), nv, h,
+          Equal.sym(String, h, nv, hn)),
+        Equal.sym(Bool, True{}, P.name.open(ns, js, roots, h), eb))
+      +emp = Eq.and.left(String.is_empty(L.name.find(ns, nv)),
+        Bool.and(Bool.not(L.seen.holds(roots, nv)), P.is.absent(P.look(js, nv))),
+        Eq.and.right(K.name.ok(nv), Bool.and(String.is_empty(L.name.find(ns, nv)),
+          Bool.and(Bool.not(L.seen.holds(roots, nv)), P.is.absent(P.look(js, nv)))), o))
+      Eq.bit.absurd(&2, {L.any.step(True{}, _u => L.seen.holds(rest, nv)) == False{} : Bool},
+        Equal.trans(Bool, False{}, String.is_empty(L.name.find(ns, nv)), True{}, f, emp))
+
+# LAW: one name kept open, with whether it is open decided: a name the table
+# resolves never is
+law nm.open.step:
+  for +b: Bool
+  for +ns: List<&2, L.Name>
+  for +js: List<&2, W.Judged>
+  for +roots: List<&2, String>
+  for +h: String
+  for +rest: List<&2, String>
+  for +nv: String
+  for +eb: {b == P.name.open(ns, js, roots, h) : Bool}
+  for +f: {False{} == String.is_empty(L.name.find(ns, nv)) : Bool}
+  for +er: {L.seen.holds(rest, nv) == False{} : Bool}
+  {L.seen.holds(P.names.open.put(b, h, rest), nv) == False{} : Bool}
+
+def nm.open.step(b, ns, js, roots, h, rest, nv, eb, f, er):
+  match b:
+    case False{}:
+      er
+    case True{}:
+      nm.open.hit(String.eq(h, nv), ns, js, roots, h, rest, nv, {==}, eb, f, er)
+
+# LAW: no name still open is one the table resolves
+law nm.open_none:
+  for +ns: List<&2, L.Name>
+  for +js: List<&2, W.Judged>
+  for +roots: List<&2, String>
+  for +nvs: List<&2, String>
+  for +nv: String
+  for +f: {False{} == String.is_empty(L.name.find(ns, nv)) : Bool}
+  {L.seen.holds(P.names.open(ns, js, roots, nvs), nv) == False{} : Bool}
+
+def nm.open_none(ns, js, roots, nvs, nv, f):
+  match nvs:
+    case []:
+      {==}
+    case +h <> +t:
+      nm.open.step(P.name.open(ns, js, roots, h), ns, js, roots, h, P.names.open(ns, js, roots, t),
+        nv, {==}, f, nm.open_none(ns, js, roots, t, nv, f))
+
+# LAW: the questions for names that do not hold this one ask nothing of it,
+# the lock's question included, with whether the lock was read decided
+law nm.ask.lock_none:
+  for +b: Bool
+  for +hub: String
+  for +nvs: List<&2, String>
+  for +nv: String
+  for +e: {L.seen.holds(nvs, nv) == False{} : Bool}
+  {Laws.asks.name(P.names.ask.lock(b, hub, nvs), nv) == False{} : Bool}
+
+def nm.ask.lock_none(b, hub, nvs, nv, e):
+  match b:
+    case True{}:
+      nm.asked_none(hub, P.names.once(nvs, []), nv, nm.once_none(nvs, [], nv, e))
+    case False{}:
+      {==}
+
+law nm.ask_none:
+  for +hub: String
+  for +js: List<&2, W.Judged>
+  for +nvs: List<&2, String>
+  for +nv: String
+  for +e: {L.seen.holds(nvs, nv) == False{} : Bool}
+  {Laws.asks.name(P.names.ask(hub, js, nvs), nv) == False{} : Bool}
+
+def nm.ask_none(hub, js, nvs, nv, e):
+  match nvs:
+    case []:
+      {==}
+    case +h <> +t:
+      nm.ask.lock_none(Bool.not(P.is.absent(P.look(js, W.lockfile()))), hub, h <> t, nv, e)
+
+law nm.bad_none:
+  for +clean: Bool
+  for +led: M.Read
+  for +listing: W.Listing
+  for +ns: List<&2, L.Name>
+  for +js: List<&2, W.Judged>
+  for +packs: List<&2, L.Pack>
+  for +nv: String
+  for +f: {False{} == String.is_empty(L.name.find(ns, nv)) : Bool}
+  {Laws.asks.name(P.names.wants.bad(clean, led, listing, ns, js, packs), nv) == False{} : Bool}
+
+def nm.bad_none(clean, led, listing, ns, js, packs, nv, f):
+  match clean:
+    case True{}:
+      nm.ask_none(M.hub_of(led), js,
+        P.names.open(ns, js, P.roots.named(P.listing.files(listing)), P.packs.named(js, packs)), nv,
+        nm.open_none(ns, js, P.roots.named(P.listing.files(listing)), P.packs.named(js, packs), nv, f))
+    case False{}:
+      {==}
+
+law nm.walk_none:
+  for +wk: P.Walk
+  for +led: M.Read
+  for +listing: W.Listing
+  for +ns: List<&2, L.Name>
+  for +js: List<&2, W.Judged>
+  for +nv: String
+  for +f: {False{} == String.is_empty(L.name.find(ns, nv)) : Bool}
+  {Laws.asks.name(P.names.wants.walk(wk, led, listing, ns, js), nv) == False{} : Bool}
+
+def nm.walk_none(wk, led, listing, ns, js, nv, f):
+  match wk:
+    case P.Walk{_q, packs, _a, +bad}:
+      nm.bad_none(String.is_empty(bad), led, listing, ns, js, packs, nv, f)
+
+law nm.gap_none:
+  for +clean: Bool
+  for +led: M.Read
+  for +listing: W.Listing
+  for +js: List<&2, W.Judged>
+  for +nv: String
+  for +f: {False{} == String.is_empty(L.name.find(P.table(led, js), nv)) : Bool}
+  {Laws.asks.name(P.names.wants.gap(clean, led, listing, js), nv) == False{} : Bool}
+
+def nm.gap_none(clean, led, listing, js, nv, f):
+  match clean:
+    case True{}:
+      nm.walk_none(P.walk.of(led, listing, P.table(led, js), js), led, listing, P.table(led, js), js,
+        nv, f)
+    case False{}:
+      {==}
+
+law nm.stop_none:
+  for +clean: Bool
+  for +led: M.Read
+  for +listing: W.Listing
+  for +js: List<&2, W.Judged>
+  for +nv: String
+  for +f: {False{} == String.is_empty(L.name.find(P.table(led, js), nv)) : Bool}
+  {Laws.asks.name(P.names.wants.stop(clean, led, listing, js), nv) == False{} : Bool}
+
+def nm.stop_none(clean, led, listing, js, nv, f):
+  match clean:
+    case True{}:
+      nm.gap_none(String.is_empty(P.need.why(led)), led, listing, js, nv, f)
+    case False{}:
+      {==}
+
+def Laws.resolved_not_asked(w, nv, r):
+  match w:
+    case W.World{+args, +ledger, +listing, +replies, +ups}:
+      nm.stop_none(String.is_empty(Up.next.stop(W.next(args, ledger, ups))),
+        Up.next.read(W.next(args, ledger, ups)), W.listing.of(W.next(args, ledger, ups), listing),
+        P.scan(W.replies.of(W.next(args, ledger, ups), replies)), nv, r)
+
+# The names files a made lock lays: a line said, a tree laid, a file
+# written and a tree removed lay none, and the names are laid from the lock's
+# own text.
+
+law nm.laid_says:
+  for +ss: List<&2, String>
+  for +rest: List<&2, P.Effect>
+  {Laws.names.laid(P.says.of(ss, rest)) == Laws.names.laid(rest) : List<&2, L.Name>}
+
+def nm.laid_says(ss, rest):
+  match ss:
+    case []:
+      {==}
+    case _h <> t:
+      nm.laid_says(t, rest)
+
+law nm.laid_pick:
+  for +b: Bool
+  for v: W.Verdict
+  for pl: P.Place
+  for +h: String
+  for +rest: List<&2, P.Effect>
+  {Laws.names.laid(P.lay.pick(b, v, pl, h, rest)) == Laws.names.laid(rest) : List<&2, L.Name>}
+
+def nm.laid_pick(b, v, _pl, _h, _rest):
+  match b:
+    case True{}:
+      match v:
+        case W.No{_why}:
+          {==}
+        case W.Ok{_fs, _ss}:
+          {==}
+        case W.Named{_names}:
+          {==}
+    case False{}:
+      {==}
+
+law nm.laid_lays:
+  for +cs: List<&2, String>
+  for +vs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for +rest: List<&2, P.Effect>
+  {Laws.names.laid(P.lays(cs, vs, js, rest)) == Laws.names.laid(rest) : List<&2, L.Name>}
+
+def nm.laid_lays(cs, vs, js, rest):
+  match js:
+    case []:
+      {==}
+    case W.Judged{+h, +v} <> +t:
+      Equal.trans(List<&2, L.Name>,
+        Laws.names.laid(P.lay.pick(L.seen.holds(cs, h), v, P.place.of(L.seen.holds(vs, h)), h,
+          P.lays(cs, vs, t, rest))),
+        Laws.names.laid(P.lays(cs, vs, t, rest)),
+        Laws.names.laid(rest),
+        nm.laid_pick(L.seen.holds(cs, h), v, P.place.of(L.seen.holds(vs, h)), h,
+          P.lays(cs, vs, t, rest)),
+        nm.laid_lays(cs, vs, t, rest))
+
+law nm.laid_names:
+  for +ns: List<&2, L.Name>
+  for +rest: List<&2, P.Effect>
+  {Laws.names.laid(P.names.lay(ns, rest)) == List.append(&2, L.Name, ns, Laws.names.laid(rest))
+    : List<&2, L.Name>}
+
+def nm.laid_names(ns, rest):
+  match ns:
+    case []:
+      {==}
+    case L.Name{+nv, +hash} <> t:
+      Equal.cong(List<&2, L.Name>, List<&2, L.Name>, r => L.Name{nv, hash} <> r,
+        Laws.names.laid(P.names.lay(t, rest)), List.append(&2, L.Name, t, Laws.names.laid(rest)),
+        nm.laid_names(t, rest))
+
+law nm.laid_edits:
+  for +es: List<&2, Up.Edit>
+  for +rest: List<&2, P.Effect>
+  {Laws.names.laid(P.edits.of(es, rest)) == Laws.names.laid(rest) : List<&2, L.Name>}
+
+def nm.laid_edits(es, rest):
+  match es:
+    case []:
+      {==}
+    case Up.Edit{_at, _text} <> t:
+      nm.laid_edits(t, rest)
+
+law nm.laid_drops:
+  for +ds: List<&2, String>
+  for +rest: List<&2, P.Effect>
+  {Laws.names.laid(P.drops.of(ds, rest)) == Laws.names.laid(rest) : List<&2, L.Name>}
+
+def nm.laid_drops(ds, rest):
+  match ds:
+    case []:
+      {==}
+    case _h <> t:
+      nm.laid_drops(t, rest)
+
+# LAW: the upgrade's files, the trees it removes and the lock lay no names
+# file
+law nm.laid_tail:
+  for +nx: Up.Next
+  for +t: String
+  {List.append(&2, L.Name, L.names.read(t), Laws.names.laid(P.edits.of(Up.next.edits(nx),
+    P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+      P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), t}])))))
+    == L.names.read(t) : List<&2, L.Name>}
+
+def nm.laid_tail(nx, t):
+  %Equal.sym(List<&2, L.Name>, Laws.names.laid(P.edits.of(Up.next.edits(nx),
+      P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+        P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), t}])))),
+      Laws.names.laid(P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+        P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), t}]))),
+      nm.laid_edits(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+        P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), t}]))))
+    : {List.append(&2, L.Name, L.names.read(t), _) == L.names.read(t) : List<&2, L.Name>}
+  %Equal.sym(List<&2, L.Name>, Laws.names.laid(P.edits.of(Up.edit.sources(Up.next.found(nx),
+        Up.next.swaps(nx)), P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), t}]))),
+      Laws.names.laid(P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), t}])),
+      nm.laid_edits(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+        P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), t}])))
+    : {List.append(&2, L.Name, L.names.read(t), _) == L.names.read(t) : List<&2, L.Name>}
+  %Equal.sym(List<&2, L.Name>, Laws.names.laid(P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), t}])),
+      Laws.names.laid([P.Write{P.lockfile(), t}]),
+      nm.laid_drops(Up.next.drops(nx), [P.Write{P.lockfile(), t}]))
+    : {List.append(&2, L.Name, L.names.read(t), _) == L.names.read(t) : List<&2, L.Name>}
+  Str.list_append_nil(L.Name, L.names.read(t))
+
+# LAW: a made lock lays the names of the lock it writes, and none other
+law nm.made:
+  for +nx: Up.Next
+  for +cs: List<&2, String>
+  for +js: List<&2, W.Judged>
+  for +t: String
+  {Laws.names.laid(P.effects(P.made(nx, cs, js, P.Doc{t}))) == L.names.read(t) : List<&2, L.Name>}
+
+def nm.made(nx, cs, js, t):
+  +tail = P.edits.of(Up.next.edits(nx), P.edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
+    P.drops.of(Up.next.drops(nx), [P.Write{P.lockfile(), t}])))
+  +lays = P.lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(t), tail))
+  Equal.trans(List<&2, L.Name>,
+    Laws.names.laid(P.says.of(Up.next.says(nx), lays)), Laws.names.laid(lays), L.names.read(t),
+    nm.laid_says(Up.next.says(nx), lays),
+    Equal.trans(List<&2, L.Name>,
+      Laws.names.laid(lays), Laws.names.laid(P.names.lay(L.names.read(t), tail)), L.names.read(t),
+      nm.laid_lays(cs, Up.next.vends(nx), js, P.names.lay(L.names.read(t), tail)),
+      Equal.trans(List<&2, L.Name>,
+        Laws.names.laid(P.names.lay(L.names.read(t), tail)),
+        List.append(&2, L.Name, L.names.read(t), Laws.names.laid(tail)), L.names.read(t),
+        nm.laid_names(L.names.read(t), tail),
+        nm.laid_tail(nx, t))))
+
+def Laws.lock_lays_its_names(w, t, d):
+  match w:
+    case W.World{+args, +ledger, listing, +replies, +ups}:
+      %d : {Laws.names.laid(P.effects(P.made(W.next(args, ledger, ups),
+          P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
+          W.judged.of(W.next(args, ledger, ups), replies), _))) == L.names.read(t) : List<&2, L.Name>}
+      nm.made(W.next(args, ledger, ups), P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
+        W.judged.of(W.next(args, ledger, ups), replies), t)

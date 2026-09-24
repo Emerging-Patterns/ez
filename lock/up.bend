@@ -841,8 +841,8 @@ def set.go(
   +nar: String
 ) -> M.Tool:
   match source:
-    case M.Hub{}:
-      M.Tool{name, entry, bin, M.Hub{}}
+    case M.Hub{named}:
+      M.Tool{name, entry, bin, M.Hub{named}}
     case M.Git{url, _rev, old, root, _nar, _vend}:
       M.Tool{name, entry, bin, M.Git{url, rev,
         Bool.pick(String, String.is_empty(tag), old, tag), M.root.or(root),

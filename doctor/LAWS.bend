@@ -10,12 +10,14 @@
 # interpreter asks for whenever the ledger reads.
 #
 # `DP.relock(w, fs)` is the World doctor puts to the lock planner over the
-# sources `fs`: a plain `ez lock` over the ledger's text, tools and all, and
-# every tree the World read from BEND_LIB. `P.wants` of it is what the lock
-# planner still asks, which once doctor has asked everything it can is the
-# packages BEND_LIB lacks, and `P.decide` of its inputs is the lock `ez lock`
-# would write, or why it would write none. `DP.checked(w)` is what doctor
-# says of the lock against it.
+# sources `fs`: a plain `ez lock` over the ledger's text, tools and all, the
+# lock as it is, every tree the World read from BEND_LIB, and every name's
+# file it read there. `P.wants` of it is what the lock planner still asks
+# about packages, which once doctor has asked everything it can is the
+# packages BEND_LIB lacks, `P.wants.names` what it still asks about names,
+# which is the names whose files BEND_LIB lacks, and `P.decide` of its inputs
+# is the lock `ez lock` would write, or why it would write none.
+# `DP.checked(w)` is what doctor says of the lock against it.
 import Base
 import ./world.bend as DW
 import ./plan.bend as DP
@@ -57,8 +59,9 @@ law doctor_reports_unrecorded:
   for u: {False{} == DP.has(DP.pinned(ds), h) : Bool}
   {DP.said(DP.plan(w), DP.unrecorded.line(h)) == True{} : Bool}
 
-# LAW: and every dependency of the ledger that no import line names is
-# reported, on its own line, wherever it stands in the ledger
+# LAW: and every dependency of the ledger that no import line names, by its
+# hash or by the name the ledger records it by, is reported, on its own line,
+# wherever it stands in the ledger
 # EZ-VEN-5
 law doctor_reports_unused:
   for +w: DW.World
@@ -74,7 +77,7 @@ law doctor_reports_unused:
   for g: {M.Good{M.Manifest{n, e, b, hub, List.append(&2, M.Dep, pre, d <> post), ts}}
     == DW.read(w) : M.Read}
   for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
-  for u: {False{} == DP.has(P.roots(fs), M.dep.hash(d)) : Bool}
+  for u: {False{} == DP.used(DP.imports(fs), d) : Bool}
   {DP.said(DP.plan(w), DP.unused.line(d)) == True{} : Bool}
 
 # LAW: and when the report holds any line, `ez doctor` fails, so it exits 1
@@ -161,7 +164,8 @@ law lock_names:
 
 # LAW: a lock the lock planner would write as it stands is not reported stale:
 # when a lock is there, the sources were listed, the lock planner has every
-# answer it asks for on the World doctor gathered, and the lock it decides on
+# answer it asks for on the World doctor gathered, about packages and about
+# names, and the lock it decides on
 # is the lock's text byte for byte, the check's one line is that the lock is
 # up to date, and it is not a problem
 # EZ-VEN-6
@@ -172,6 +176,7 @@ law doctor_passes_fresh_lock:
   for k: {Some{t} == DW.lock(w) : Maybe<&2, String>}
   for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
   for o: {[] == P.wants(DP.relock(w, fs)) : List<&2, W.Ask>}
+  for on: {[] == P.wants.names(DP.relock(w, fs)) : List<&2, W.Ask>}
   for d: {P.Doc{t} == P.decide(W.inputs(DP.relock(w, fs))) : P.Doc}
   {DP.checked(w) == [DP.Note{False{}, DP.fresh.line()}] : List<&2, DP.Note>}
 
@@ -184,6 +189,7 @@ law doctor_says_fresh_lock:
   for k: {Some{t} == DW.lock(w) : Maybe<&2, String>}
   for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
   for o: {[] == P.wants(DP.relock(w, fs)) : List<&2, W.Ask>}
+  for on: {[] == P.wants.names(DP.relock(w, fs)) : List<&2, W.Ask>}
   for d: {P.Doc{t} == P.decide(W.inputs(DP.relock(w, fs))) : P.Doc}
   {DP.said(DP.plan(w), DP.fresh.line()) == True{} : Bool}
 
@@ -198,6 +204,7 @@ law doctor_reports_stale_lock:
   for k: {Some{t} == DW.lock(w) : Maybe<&2, String>}
   for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
   for o: {[] == P.wants(DP.relock(w, fs)) : List<&2, W.Ask>}
+  for on: {[] == P.wants.names(DP.relock(w, fs)) : List<&2, W.Ask>}
   for d: {P.Doc{u} == P.decide(W.inputs(DP.relock(w, fs))) : P.Doc}
   for ne: {False{} == String.eq(u, t) : Bool}
   {DP.said(DP.plan(w), DP.stale.line()) == True{} : Bool}
@@ -212,6 +219,7 @@ law doctor_stale_lock_fails:
   for k: {Some{t} == DW.lock(w) : Maybe<&2, String>}
   for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
   for o: {[] == P.wants(DP.relock(w, fs)) : List<&2, W.Ask>}
+  for on: {[] == P.wants.names(DP.relock(w, fs)) : List<&2, W.Ask>}
   for d: {P.Doc{u} == P.decide(W.inputs(DP.relock(w, fs))) : P.Doc}
   for ne: {False{} == String.eq(u, t) : Bool}
   {DP.refuses(w) == True{} : Bool}
@@ -229,4 +237,31 @@ law doctor_unchecked_lock_fails:
   for k: {Some{t} == DW.lock(w) : Maybe<&2, String>}
   for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
   for o: {a <> as == P.wants(DP.relock(w, fs)) : List<&2, W.Ask>}
+  {DP.refuses(w) == True{} : Bool}
+
+# LAW: and so does one it cannot judge because the lock planner still asks
+# what a name names, whose file BEND_LIB does not hold: doctor never asks the
+# hub, so it never judges a name by the network
+# EZ-VEN-6
+law doctor_unchecked_names_fail:
+  for +w: DW.World
+  for +t: String
+  for +fs: List<&2, W.Source>
+  for +a: W.Ask
+  for +as: List<&2, W.Ask>
+  for k: {Some{t} == DW.lock(w) : Maybe<&2, String>}
+  for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
+  for o: {[] == P.wants(DP.relock(w, fs)) : List<&2, W.Ask>}
+  for on: {a <> as == P.wants.names(DP.relock(w, fs)) : List<&2, W.Ask>}
+  {DP.refuses(w) == True{} : Bool}
+
+# LAW: a name the lock records whose file under BEND_LIB is missing, or names
+# another hash than the lock does, fails `ez doctor`: bend reads that file
+# before it would ask the hub, so a wrong one builds another package
+# EZ-HUB-4
+law doctor_wrong_name_fails:
+  for +w: DW.World
+  for x: String
+  for xs: List<&2, String>
+  for b: {x <> xs == DP.names.wrong(DP.lock.names(DW.lock(w)), DW.replies(w)) : List<&2, String>}
   {DP.refuses(w) == True{} : Bool}

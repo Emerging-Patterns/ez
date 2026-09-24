@@ -998,6 +998,8 @@ def fixed_go(stop, entry, out):
       {==}
     case K.Spent{}:
       {==}
+    case K.Unnamed{_nv}:
+      {==}
 
 law fixed_made:
   for +entry: String

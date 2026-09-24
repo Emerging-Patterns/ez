@@ -10,9 +10,9 @@
 # its versions. The library is listed with `ls`, the sources are read as
 # `ez lock` reads them (`Run.read.listing`), and a package's tree is read
 # from under BEND_LIB as `ez lock` reads one there (`Run.disk.all`), and
-# never fetched. None of these writes anything, and the plan writes nothing
-# either. It decides nothing; that it reads and executes faithfully is
-# EZ-TRUST-2.
+# never fetched, and a name's file under `BEND_LIB/names` is read as it
+# is. None of these writes anything, and the plan writes nothing either. It
+# decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../run/bend.bend as Bend
@@ -72,6 +72,10 @@ def answer(+lib: String, ask: DW.Ask) -> IO(DW.Answer):
         return DW.Listed{l}
     case DW.Tree{a}:
       tree(lib ++ "/" ++ W.ask.hash(a))
+    case DW.Name{nv}:
+      do IO<DW.Answer>:
+        m : Maybe<&2, String> <- F.read(lib ++ "/names/" ++ nv)
+        return DW.Held{m}
 
 # every question, answered
 def answer.all(+lib: String, asks: List<&2, DW.Ask>) -> IO(List<&2, DW.Reply>):

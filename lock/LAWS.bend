@@ -157,11 +157,12 @@ def distinct(ps: List<&2, L.Pack>) -> Bool:
 # EZ-DOC-2
 law lock_order_free:
   for +ns: List<&2, Nat>
+  for +nms: List<&2, L.Name>
   for +ps: List<&2, L.Pack>
   for +ts: List<&2, M.Tool>
   for +hub: String
   for dis: {distinct(ps) == True{} : Bool}
-  {L.render.tools(ts, hub, perm(ns, ps)) == L.render.tools(ts, hub, ps) : String}
+  {L.render.names(nms, ts, hub, perm(ns, ps)) == L.render.names(nms, ts, hub, ps) : String}
 
 # LAW: and a package's block, the text the lock holds for it, does not depend
 # on the order its files were found in. Files are written in path order, so
@@ -446,22 +447,24 @@ law lib_judged_as_clone:
 law walk_pins_ledger_sources:
   for +fuel: Nat
   for +orgs: List<&2, L.Origin>
+  for +ns: List<&2, L.Name>
   for +js: List<&2, W.Judged>
   for +wk: P.Walk
   for +e: {pinned.all(orgs, P.walk.packs(wk)) == P.walk.packs(wk)
     : List<&2, L.Pack>}
-  {pinned.all(orgs, P.walk.packs(P.walk(fuel, orgs, js, wk)))
-    == P.walk.packs(P.walk(fuel, orgs, js, wk)) : List<&2, L.Pack>}
+  {pinned.all(orgs, P.walk.packs(P.walk(fuel, orgs, ns, js, wk)))
+    == P.walk.packs(P.walk(fuel, orgs, ns, js, wk)) : List<&2, L.Pack>}
 
 # LAW: the walk resolves each hash at most once, one step at a time: a step
 # passes over a hash it has already resolved
 law walk_keeps_hashes_distinct:
   for +fuel: Nat
   for +orgs: List<&2, L.Origin>
+  for +ns: List<&2, L.Name>
   for +js: List<&2, W.Judged>
   for +wk: P.Walk
   for +e: {distinct(P.walk.packs(wk)) == True{} : Bool}
-  {distinct(P.walk.packs(P.walk(fuel, orgs, js, wk))) == True{} : Bool}
+  {distinct(P.walk.packs(P.walk(fuel, orgs, ns, js, wk))) == True{} : Bool}
 
 # LAW: so every package list plain `ez lock` resolves, which is the list its
 # lock renders, names each hash once. That is `lock_order_free`'s premise,
@@ -585,6 +588,8 @@ def passed(verdict: W.Verdict) -> Bool:
       True{}
     case W.No{_why}:
       False{}
+    case W.Named{_names}:
+      False{}
 
 # a cloned tree as the next lock reads it: from BEND_LIB when it was laid,
 # cloned again when it was not
@@ -620,6 +625,10 @@ def after.one(+orgs: List<&2, L.Origin>, +hub: String, +hash: String, answer: W.
       W.Miss{why}
     case W.Got{how, manifest, ss}:
       after.how(how, orgs, hub, hash, manifest, ss)
+    case W.Said{text}:
+      W.Said{text}
+    case W.Locked{text}:
+      W.Locked{text}
 
 # every answer, so
 def after.all(+orgs: List<&2, L.Origin>, +hub: String, rs: List<&2, W.Reply>) -> List<&2, W.Reply>:
@@ -768,6 +777,10 @@ def fresh.one(+orgs: List<&2, L.Origin>, +hub: String, +hash: String, answer: W.
       []
     case W.Got{how, manifest, ss}:
       fresh.how(how, orgs, hub, hash, manifest, ss)
+    case W.Said{_text}:
+      []
+    case W.Locked{_text}:
+      []
 
 def fresh.all(+orgs: List<&2, L.Origin>, +hub: String, rs: List<&2, W.Reply>) -> List<&2, String>:
   match rs:
@@ -1038,18 +1051,55 @@ law upgrade_writes_only_hits:
 # once, which is `canon`, and the lock does not write a tool's `vendor`,
 # which is `tools.canon`. Law vocabulary: ez never calls these.
 
+# the tables a lock renders after its packages: the `[names]` table, when it
+# resolved a name, then every tool's table. Law vocabulary.
+def tail(nms: List<&2, L.Name>, ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
+  List.append(&2, T.Sect, L.names.sects(nms), L.tool.sects(ts))
+
 # the document a lock renders: the `[lock]` table, every package's two tables
-# in hash order, then every tool's table. Law vocabulary.
-def lock.doc(ts: List<&2, M.Tool>, hub: String, ps: List<&2, L.Pack>) -> List<&2, T.Sect>:
-  List.append(&2, T.Sect, L.doc(hub, ps), L.tool.sects(ts))
+# in hash order, then its names and every tool's table. Law vocabulary.
+def lock.doc(nms: List<&2, L.Name>, ts: List<&2, M.Tool>, hub: String, ps: List<&2, L.Pack>) -> List<&2, T.Sect>:
+  List.append(&2, T.Sect, L.doc(hub, ps), tail(nms, ts))
+
+# a name as a lock gives it back, from the pair it is written as
+def name.back(item: K.File) -> L.Name:
+  K.File{at, sum} = item
+  L.Name{at, sum}
+
+# every name, so
+def names.back(fs: List<&2, K.File>) -> List<&2, L.Name>:
+  match fs:
+    case []:
+      []
+    case h <> t:
+      name.back(h) <> names.back(t)
+
+# a name as a file of a package: its `<name>@<version>` as the path and its
+# hash as the sum. Law vocabulary.
+def name.as.file(nm: L.Name) -> K.File:
+  L.Name{nv, hash} = nm
+  K.File{nv, hash}
+
+# every name, so. Law vocabulary.
+def names.as.files(nms: List<&2, L.Name>) -> List<&2, K.File>:
+  match nms:
+    case []:
+      []
+    case h <> t:
+      name.as.file(h) <> names.as.files(t)
+
+# the names a lock gives back: in name order, each once, as the `[names]`
+# table sorts them the way a package's files are sorted
+def names.canon(nms: List<&2, L.Name>) -> List<&2, L.Name>:
+  names.back(K.files_of(names.as.files(nms)))
 
 # a tool's source as the lock gives it back: the lock does not write
-# `vendor`, and eztoml reads a git source with no root as rooted at `.` and
-# one with no url as the hub. Law vocabulary.
+# `vendor` or a hub name, and eztoml reads a git source with no root as rooted
+# at `.` and one with no url as the hub. Law vocabulary.
 def source.canon(source: M.Source) -> M.Source:
   match source:
-    case M.Hub{}:
-      M.Hub{}
+    case M.Hub{_named}:
+      M.Hub{""}
     case M.Git{url, rev, tag, root, nar, _vend}:
       +u = url
       M.source.go(String.is_empty(u), u, rev, tag, M.root.or(root), nar, False{})
@@ -1090,49 +1140,66 @@ def canon(ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
 # each package as a block of text and sorts the blocks; that is the text of
 # the packages sorted, one table after another.
 law render_is_doc:
+  for +nms: List<&2, L.Name>
   for +ts: List<&2, M.Tool>
   for +hub: String
   for +ps: List<&2, L.Pack>
-  {L.render.tools(ts, hub, ps) == T.render(lock.doc(ts, hub, ps)) : String}
+  {L.render.names(nms, ts, hub, ps) == T.render(lock.doc(nms, ts, hub, ps)) : String}
 
 # LAW: parsing the lock `ez lock` renders gives back the tables it rendered:
-# the `[lock]` table, every package's two tables in hash order, and every
-# tool's table
+# the `[lock]` table, every package's two tables in hash order, its names and
+# every tool's table
 law lock_sections_read_back:
+  for +nms: List<&2, L.Name>
   for +ps: List<&2, L.Pack>
   for +ts: List<&2, M.Tool>
   for +hub: String
-  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
-  {T.sects(T.parse(L.render.tools(ts, hub, ps))) == lock.doc(ts, hub, ps)
+  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
+  {T.sects(T.parse(L.render.names(nms, ts, hub, ps))) == lock.doc(nms, ts, hub, ps)
     : List<&2, T.Sect>}
 
 # LAW: parsing the lock `ez lock` renders gives back its packages, in hash
 # order with their files in path order, whatever order they were given in
 # EZ-DOC-1
 law lock_reads_back:
+  for +nms: List<&2, L.Name>
   for +ps: List<&2, L.Pack>
   for +ts: List<&2, M.Tool>
   for +hub: String
-  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
-  {L.packs(T.sects(T.parse(L.render.tools(ts, hub, ps)))) == canon(ps) : List<&2, L.Pack>}
+  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
+  {L.packs(T.sects(T.parse(L.render.names(nms, ts, hub, ps)))) == canon(ps) : List<&2, L.Pack>}
 
 # LAW: and the hub it was resolved against
 # EZ-DOC-1
 law lock_hub_reads_back:
+  for +nms: List<&2, L.Name>
   for +ps: List<&2, L.Pack>
   for +ts: List<&2, M.Tool>
   for +hub: String
-  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
-  {L.lock.hub(T.sects(T.parse(L.render.tools(ts, hub, ps)))) == hub : String}
+  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
+  {L.lock.hub(T.sects(T.parse(L.render.names(nms, ts, hub, ps)))) == hub : String}
 
 # LAW: and its tool pins, as the lock gives them back
 # EZ-DOC-1
 law lock_tools_read_back:
+  for +nms: List<&2, L.Name>
   for +ps: List<&2, L.Pack>
   for +ts: List<&2, M.Tool>
   for +hub: String
-  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
-  {M.tools(T.sects(T.parse(L.render.tools(ts, hub, ps)))) == tools.canon(ts) : List<&2, M.Tool>}
+  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
+  {M.tools(T.sects(T.parse(L.render.names(nms, ts, hub, ps)))) == tools.canon(ts) : List<&2, M.Tool>}
+
+# LAW: and every name it resolved, with the hash it names, in name order and
+# each once
+# EZ-DOC-1
+law lock_names_read_back:
+  for +nms: List<&2, L.Name>
+  for +ps: List<&2, L.Pack>
+  for +ts: List<&2, M.Tool>
+  for +hub: String
+  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
+  {L.names(T.sects(T.parse(L.render.names(nms, ts, hub, ps)))) == names.canon(nms)
+    : List<&2, L.Name>}
 
 # The upgrade's moves. `ez lock --upgrade` asks the remote about each selected
 # pin with a commit: one with a tag re-resolves the tag (a `Refs` answer, read
@@ -1158,7 +1225,7 @@ def pin(world: W.World, name: String) -> M.Source:
 # whether a source is pinned by its commit alone, with no tag
 def rev_only.src(src: M.Source) -> Bool:
   match src:
-    case M.Hub{}:
+    case M.Hub{_named}:
       False{}
     case M.Git{_url, _rev, tag, _root, _nar, _vend}:
       String.is_empty(tag)
@@ -1170,7 +1237,7 @@ def rev_only(dep: M.Dep) -> Bool:
 # whether a source is pinned through a tag
 def tagged.src(src: M.Source) -> Bool:
   match src:
-    case M.Hub{}:
+    case M.Hub{_named}:
       False{}
     case M.Git{_url, _rev, tag, _root, _nar, _vend}:
       Bool.not(String.is_empty(tag))
@@ -1466,7 +1533,7 @@ def origins(world: W.World) -> List<&2, L.Origin>:
 # the package questions a step asks, none when it runs its plan
 def step.pkgs(st: P.Step) -> List<&2, W.Ask>:
   match st:
-    case P.Asking{asks, _ups}:
+    case P.Asking{asks, _ups, _names}:
       asks
     case P.Run{_plan}:
       []
@@ -1474,7 +1541,7 @@ def step.pkgs(st: P.Step) -> List<&2, W.Ask>:
 # the upgrade's queries a step asks, none when it runs its plan
 def step.queries(st: P.Step) -> List<&2, P.Query>:
   match st:
-    case P.Asking{_asks, ups}:
+    case P.Asking{_asks, ups, _names}:
       ups
     case P.Run{_plan}:
       []
@@ -1482,8 +1549,11 @@ def step.queries(st: P.Step) -> List<&2, P.Query>:
 # whether a package question names the source `orgs` records for its hash,
 # anchored at `here`
 def pkg.anchored(+here: String, +orgs: List<&2, L.Origin>, ask: W.Ask) -> Bool:
-  W.Pkg{+h, src, _hub} = ask
-  String.eq(L.src.url(src), L.src.url(P.anchor.src(here, L.origin(orgs, h))))
+  match ask:
+    case W.Pkg{+h, src, _hub}:
+      String.eq(L.src.url(src), L.src.url(P.anchor.src(here, L.origin(orgs, h))))
+    case _:
+      True{}
 
 # whether every package question does
 def pkgs.anchored(+here: String, +orgs: List<&2, L.Origin>, as: List<&2, W.Ask>) -> Bool:
@@ -1692,3 +1762,125 @@ law upgrade_named_without_license:
   {Up.hash.kept(pin, manifest)
     == Up.hash.of(K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))))
     : String}
+
+# ---------------------------------------------------------------------------
+# Named hub imports (EZ-HUB). A `<name>@<version>` import is a hub package:
+# the lock reads it by its name, resolves the name by a table of names, walks
+# the package the table gives it, and records the pair under `[names]`. The
+# table is the names ez.toml records, each with the hash beside it, first,
+# then those the answers resolve: the lock being rewritten's, then the hub's.
+# A name is put to the hub only when nothing before it resolves it, and a
+# lock that is made lays, for every name it records, the file bend reads the
+# name's hash from.
+
+# the names files a list of effects lays, in order. Law vocabulary.
+def names.laid(es: List<&2, P.Effect>) -> List<&2, L.Name>:
+  match es:
+    case []:
+      []
+    case e <> t:
+      match e:
+        case P.Name{nv, hash}:
+          L.Name{nv, hash} <> names.laid(t)
+        case _:
+          names.laid(t)
+
+# whether every name of a list is recorded with the hash a table gives it.
+# Law vocabulary.
+def names.agree(+ns: List<&2, L.Name>, ps: List<&2, L.Name>) -> Bool:
+  match ps:
+    case []:
+      True{}
+    case L.Name{+n, h} <> t:
+      +rest = names.agree(ns, t)
+      Bool.and(String.eq(L.name.find(ns, n), h), rest)
+
+# whether a question puts this name to the hub. Law vocabulary.
+def ask.named(ask: W.Ask, +nv: String) -> Bool:
+  match ask:
+    case W.Name{n, _hub}:
+      String.eq(n, nv)
+    case _:
+      False{}
+
+# whether a list of questions puts this name to the hub. Law vocabulary.
+def asks.name(as: List<&2, W.Ask>, +nv: String) -> Bool:
+  match as:
+    case []:
+      False{}
+    case h <> t:
+      L.any.step(ask.named(h, nv), _u => asks.name(t, nv))
+
+# the table of names the lock resolves names by on a World, as its questions
+# are asked: ez.toml's names first, then those the answers resolve. Law
+# vocabulary.
+def names.table(world: W.World) -> List<&2, L.Name>:
+  W.World{+args, +ledger, _listing, replies, +ups} = world
+  P.table(Up.next.read(W.next(args, ledger, ups)),
+    P.scan(W.replies.of(W.next(args, ledger, ups), replies)))
+
+# LAW: the lock reads a named import as the package its name names, never as
+# a module of the project, whether or not the hub rules the name in
+# EZ-HUB-3
+law lock_reads_named:
+  for +spec: String
+  for e: {False{} == String.is_empty(K.named.of(spec)) : Bool}
+  {L.named.put(spec) == [K.named.of(spec)] : List<&2, String>}
+
+# LAW: a package's named import queues the package the table gives its name,
+# so the walk reaches, and checks against its manifest, the hash the name
+# resolves to
+# EZ-HUB-1
+law named_kid_queued:
+  for +ns: List<&2, L.Name>
+  for +nvs: List<&2, String>
+  for +nv: String
+  for e: {L.seen.holds(nvs, nv) == True{} : Bool}
+  for +f: {False{} == String.is_empty(L.name.find(ns, nv)) : Bool}
+  {L.seen.holds(L.name.hashes(ns, nvs), L.name.find(ns, nv)) == True{} : Bool}
+
+# LAW: and every name the lock records, it records with the hash the table
+# gives it, the same hash
+# EZ-HUB-1
+law lock_names_agree:
+  for +ns: List<&2, L.Name>
+  for nvs: List<&2, String>
+  {names.agree(ns, L.name.pairs(ns, nvs)) == True{} : Bool}
+
+# LAW: a name ez.toml records resolves to the hash ez.toml records beside
+# it, whatever the answers say
+# EZ-HUB-1
+law ledger_names_first:
+  for +led: M.Read
+  for +js: List<&2, W.Judged>
+  for +nv: String
+  for f: {False{} == String.is_empty(L.name.find(L.ledger.names(led), nv)) : Bool}
+  {L.name.find(P.table(led, js), nv) == L.name.find(L.ledger.names(led), nv) : String}
+
+# LAW: the lock being rewritten, read, resolves every name it records that
+# bend would read back, so those names join the table without the hub
+# EZ-HUB-2
+law lock_answer_names:
+  for +orgs: List<&2, L.Origin>
+  for +hub: String
+  for +key: String
+  for text: String
+  {W.accept(orgs, hub, key, W.Locked{text}) == W.Named{L.names.read(text)} : W.Verdict}
+
+# LAW: a name the table resolves, because ez.toml records it or the lock
+# being rewritten does, is never put to the hub
+# EZ-HUB-2
+law resolved_not_asked:
+  for +w: W.World
+  for +nv: String
+  for r: {False{} == String.is_empty(L.name.find(names.table(w), nv)) : Bool}
+  {asks.name(P.wants.names(w), nv) == False{} : Bool}
+
+# LAW: a lock that is made lays a names file for every name the lock it
+# writes records, with the hash it records, and none other
+# EZ-HUB-4
+law lock_lays_its_names:
+  for +w: W.World
+  for +t: String
+  for d: {P.Doc{t} == P.decide(W.inputs(w)) : P.Doc}
+  {names.laid(P.effects(P.plan(w))) == L.names.read(t) : List<&2, L.Name>}
