@@ -410,7 +410,7 @@ EZ-TOOL-5 is stated over the planner's outcome, not over a real process. The pla
 | EZ-PUB-1 | `ez publish` refuses, and sends nothing, when `git status --porcelain --untracked-files=normal` names any path, when git cannot answer it, or when a file of the package is one git does not track as unchanged (`git ls-files -v` tag `H`), an ignored file included. | Proved | proved |
 | EZ-PUB-2 | `ez publish` succeeds only when bend exits 0, a line of its output is exactly a `0x` name, and every such line equals ez's own hash; it then prints that hash and the import line for the entry's path inside the package. Any other answer exits 1. | Proved | proved |
 
-Both are new, and both are proved over the plan `ez publish` runs (`pub/plan.bend`), beside the decision functions they rest on (`clean_is_all_blank`, `unread_never_agrees`, `differs_never_agrees`, `ours_agrees`). EZ-PUB-2 describes the verdict, not the ordering, and the comparison runs after bend has uploaded. We looked for a way to compare first and found none: bend 2.0.25 has no option that stops `--publish` between computing the hash and posting it, and the only workaround, pointing `BEND_HUB` at a dead address and reading the hash from a progress line, depends on output bend does not promise and mines the proof of work twice. The check stays after the upload. EZ-PUB-2 promises that a disagreement exits 1 and prints no import line, not that nothing was sent.
+Both are new, and both are proved over the plan `ez publish` runs (`pub/plan.bend`), beside the decision functions they rest on (`clean_is_all_blank`, `unread_never_agrees`, `differs_never_agrees`, `ours_agrees`). EZ-PUB-2 describes the verdict, not the ordering, and the comparison runs after bend has uploaded. We looked for a way to compare first and found none: bend has no option that stops `--publish` between computing the hash and posting it (2.0.25 had none when we looked, and 2.0.27 has none either), and the only workaround, pointing `BEND_HUB` at a dead address and reading the hash from a progress line, depends on output bend does not promise and mines the proof of work twice. The check stays after the upload. EZ-PUB-2 promises that a disagreement exits 1 and prints no import line, not that nothing was sent.
 
 ### Outcomes and incidental output
 
@@ -517,7 +517,7 @@ Three more for EZ-VEN, found while proving WP7 of the phase-three design and sho
 
 For EZ-TOOL-2, the tool cache records the built file and the bend version beside the commit.
 
-For EZ-PUB-2, nothing changes. bend 2.0.25 cannot report a package's hash without uploading, so the check stays after the upload.
+For EZ-PUB-2, nothing changes. bend 2.0.27 cannot report a package's hash without uploading, so the check stays after the upload.
 
 For the proof gate, a new `ez prove` command runs `bend` on every PROOF.bend and applies the exact `All terms check.` rule, and `mkProofs` runs it instead of `ez test`.
 
@@ -559,7 +559,7 @@ The Bend native runtime takes `--help`, `--threads` and `--gpu` anywhere on the 
 
 EZ-HASH-5 can still diverge from nix for bytes that are not UTF-8. The file effect reads a file as text, so a file whose bytes are not valid UTF-8 is serialized with its invalid bytes replaced and hashes differently from nix, the same bytes for every ez, so `ez lock` and `ez fetch` agree with each other and not with the nix build. A name that is not valid UTF-8 cannot be read back from the listing and stops the walk. Neither can be fixed from ez until Base can read a file's bytes.
 
-Bend 2.0.26 adds named hub imports, and issue #84 tracks what ez does about them. `ez publish` builds the words it uploads with by a pure function (`PP.upload.line`), so a bend that publishes `<name>@<version>` changes that function and the Upload question's fields and no law, but the package walk, the import scan and the lock have not been looked at for named imports.
+Bend 2.0.26 adds named hub imports, and issue #84 tracks what ez does about them. ez runs on Bend 2.0.27 but does not read named imports yet: the package walk takes `import <name>@<version>/…` for a module of the package and refuses it as not there, and the lock's import scan, which follows only `0x` names, leaves it out. `ez publish` builds the words it uploads with by a pure function (`PP.upload.line`), so a bend that publishes `<name>@<version>` changes that function and the Upload question's fields and no law, but the package walk, the import scan and the lock have not been looked at for named imports.
 
 ### How we will know it worked
 
