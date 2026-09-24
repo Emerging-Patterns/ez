@@ -12,6 +12,7 @@ import ../manifest/manifest.bend as M
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/LAWS.bend as KL
+import ../hub/hub.bend as Web
 import ../manifest/upgrade.bend as U
 import ../manifest/ignore.bend as I
 import ../manifest/LAWS.bend as ML
@@ -1229,7 +1230,8 @@ law upgrade_tag_refuses_drift:
   for same: {String.eq(M.source.rev(pin(w, n)), tip) == True{} : Bool}
   for co: {Up.checkout(ups(w), Up.Tree{M.source.url(pin(w, n)), M.source.rev(pin(w, n)),
     M.dep.entry(W.dep(w, n))}) == Up.Co{nar, root, manifest, srcs} : Up.Co}
-  for drift: {U.agree(M.dep.hash(W.dep(w, n)), Up.hash.of(manifest), M.source.nar(pin(w, n)),
+  for drift: {U.agree(M.dep.hash(W.dep(w, n)), Up.hash.kept(M.dep.hash(W.dep(w, n)), manifest),
+    M.source.nar(pin(w, n)),
     nar, M.source.root(pin(w, n)), root) == False{} : Bool}
   {P.refuses(w) == True{} : Bool}
 
@@ -1562,3 +1564,34 @@ law upgrade_origins_skip_tools:
   for ts: List<&2, M.Tool>
   for g: {M.Good{M.Manifest{n, e, b, h, ds, ts}} == Up.next.read(nx) : M.Read}
   {W.next.origins(nx) == L.ledger.origins(ds) : List<&2, L.Origin>}
+
+# A ledger written before bend 2.0.27 names a git package without the LICENSE
+# files 2.0.27 takes along, and the walk of the same checkout now carries them.
+# The name decides which package it is: `ez lock` and `ez lock --upgrade` take
+# the checkout as it was named, and `ez add` names a new pin with them.
+
+# LAW: a git package whose walked manifest is not the one its name is the
+# digest of is judged without its LICENSE files, so a ledger written before
+# bend 2.0.27 locks the same checkout as it did
+law git_named_without_license:
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  for unnamed: {False{} == Web.matches(L.want(hash), manifest) : Bool}
+  {W.git.weighed("", hash, manifest, ss)
+    == W.git.body(List.is_empty(&2, K.File, K.bare(L.manifest.files(String.lines(manifest)))),
+      hash, K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))),
+      K.bare.srcs(L.manifest.files(String.lines(manifest)), ss)) : W.Verdict}
+
+# LAW: and `ez lock --upgrade` weighs a pinned commit the same way: when the
+# walk's hash is not the pin, the pin is compared with the checkout's hash
+# without its LICENSE files, which is the pin exactly when it was taken so
+law upgrade_named_without_license:
+  for +pin: String
+  for +manifest: String
+  for walked: {False{} == String.eq(Up.hash.of(manifest), pin) : Bool}
+  for bare: {True{} == String.eq(Up.hash.of(K.manifest.lines(K.bare(L.manifest.files(
+    String.lines(manifest))))), pin) : Bool}
+  {Up.hash.kept(pin, manifest)
+    == Up.hash.of(K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))))
+    : String}

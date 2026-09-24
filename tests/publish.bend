@@ -16,10 +16,16 @@ import ../check/world.bend as W
 # the shape that makes the file walk worth checking. One comment is not ASCII,
 # with characters two, three and four bytes long in UTF-8, because bend hashes
 # a file's UTF-8 bytes: a digest over anything else, such as each character
-# cut to its low byte, agrees with bend on ASCII and nowhere else.
+# cut to its low byte, agrees with bend on ASCII and nowhere else. Since bend
+# 2.0.27 a file named LICENSE beside a published file goes along: the one in
+# `src/util` sits beside `math.bend` and is published, and the one at the
+# top sits beside no published file and is not.
 def repo(+at: String) -> IO(Unit):
   do IO<Unit>:
     W.mkdir(at ++ "/src/util")
+    _u : Bool <- F.write(at ++ "/src/util/LICENSE",
+      "SPDX-License-Identifier: MIT\n\nPermission is hereby granted.\n")
+    _t : Bool <- F.write(at ++ "/LICENSE", "SPDX-License-Identifier: Apache-2.0\n")
     _m : Bool <- F.write(at ++ "/src/util/math.bend",
       "import Base\n\n# double the number: x → 2·x — naïve 🙂\n" ++
       "def double(+x: U32) -> U32:\n" ++

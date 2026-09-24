@@ -2344,3 +2344,74 @@ def Laws.walked_manifest_of_texts(pre, out):
   Equal.cong(List<&2, P.File>, String, fs => P.manifest_of(fs),
     P.placed(pre, P.hit.sums(out)), P.laid.sums(P.laid(pre, out)),
     placed_is_laid(pre, out))
+
+def Laws.license_goes_along(tree, sc, text, file, ns, eb, seen, out, rest, lic, here):
+  %here : {P.State{file <> seen,
+      P.Hit{P.raw_of(ns, eb), text} <> List.append(&2, P.Hit,
+        P.license.put(_, P.beside(P.raw_of(ns, eb))),
+        List.append(&2, P.Hit,
+          P.foreigns(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(sc)), out)),
+      P.Going{},
+      List.append(&2, P.Task, P.tasks(Path.dir(file), P.nsdir(ns), P.scan.mods(sc)), rest)}
+    == P.State{file <> seen,
+      P.Hit{P.raw_of(ns, eb), text} <> P.Hit{P.beside(P.raw_of(ns, eb)), lic}
+        <> List.append(&2, P.Hit,
+          P.foreigns(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(sc)), out),
+      P.Going{},
+      List.append(&2, P.Task, P.tasks(Path.dir(file), P.nsdir(ns), P.scan.mods(sc)), rest)}
+    : P.State}
+  {==}
+
+def Laws.no_license_as_before(tree, sc, text, file, ns, eb, seen, out, rest, none):
+  %none : {P.State{file <> seen,
+      P.Hit{P.raw_of(ns, eb), text} <> List.append(&2, P.Hit,
+        P.license.put(_, P.beside(P.raw_of(ns, eb))),
+        List.append(&2, P.Hit,
+          P.foreigns(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(sc)), out)),
+      P.Going{},
+      List.append(&2, P.Task, P.tasks(Path.dir(file), P.nsdir(ns), P.scan.mods(sc)), rest)}
+    == P.State{file <> seen,
+      P.Hit{P.raw_of(ns, eb), text} <> List.append(&2, P.Hit,
+        P.foreigns(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(sc)), out),
+      P.Going{},
+      List.append(&2, P.Task, P.tasks(Path.dir(file), P.nsdir(ns), P.scan.mods(sc)), rest)}
+    : P.State}
+  {==}
+
+def Laws.license_asked(tree, text, file, ns, eb, seen, out, rest, unasked):
+  %unasked : {P.visit.put(P.asked(_, P.beside(file),
+        _u => P.foreign.check(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(P.scan(text)))),
+      tree, P.scan(text), text, file, ns, eb, seen, out, rest)
+    == P.State{seen, out, P.Asking{P.beside(file)}, P.Task{file, ns} <> rest}
+    : P.State}
+  {==}
+
+def Laws.foreign_license_goes_along(_tree, _at, raw, text, lic, here):
+  %here : {P.Hit{raw, text} <> P.license.put(_, P.beside(raw))
+    == [P.Hit{raw, text}, P.Hit{P.beside(raw), lic}] : List<&2, P.Hit>}
+  {==}
+
+def Laws.licensed_names(pre, raw, _text, t, under):
+  %under : {P.licensed.step(_, Path.join(pre, raw), _u => P.licensed(pre, t))
+    == Path.join(pre, raw) : String}
+  {==}
+
+def Laws.license_dir_refused(root, pre, out, some):
+  %some : {P.made.lic(_, P.licensed(pre, out), root, pre, out)
+    == P.Refused{"ez: " ++ P.licensed(pre, out)
+      ++ " is in a directory named license, which clashes with a LICENSE file"}
+    : P.Walked}
+  {==}
+
+def Laws.license_dir_passes(root, pre, out, none):
+  %none : {P.made.lic(_, P.licensed(pre, out), root, pre, out)
+    == P.made.placed(root, pre, out) : P.Walked}
+  {==}
+
+def Laws.bare_drops_license(h, t, lic):
+  %lic : {P.bare.pick(_, h, P.bare(t)) == P.bare(t) : List<&2, P.File>}
+  {==}
+
+def Laws.bare_keeps_sources(h, t, src):
+  %src : {P.bare.pick(_, h, P.bare(t)) == h <> P.bare(t) : List<&2, P.File>}
+  {==}
