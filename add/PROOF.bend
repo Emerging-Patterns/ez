@@ -1447,7 +1447,7 @@ law name_fit:
   for s: {win(AP.outcome.name(b, f, w)) == True{} : Bool}
   {f == True{} : Bool}
 
-def name_fit(b, f, w, s):
+def name_fit(b, f, _w, s):
   match b f:
     case True{} True{}:
       {==}
@@ -1467,7 +1467,7 @@ law entry_fit:
   for s: {win(AP.outcome.entry(g, K.Walked{h, r, fs, ss}, w)) == True{} : Bool}
   {Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.dep.of(h, r, w))) == True{} : Bool}
 
-def entry_fit(g, h, r, fs, ss, w, s):
+def entry_fit(g, h, r, _fs, _ss, w, s):
   match g:
     case None{}:
       Eq.bit.absurd(&2, {Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.dep.of(h, r, w)))

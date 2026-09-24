@@ -5550,7 +5550,7 @@ law value_at_row:
   {T.value.at(row.kv(r), rest, k) == Bool.pick(String, String.eq(row.key(r), k), row.val(r), rest)
     : String}
 
-def value_at_row(r, rest, k):
+def value_at_row(r, _rest, _k):
   match r:
     case Q{_k, _v}:
       {==}
@@ -5885,7 +5885,8 @@ def dep_read(n, h, en, s, ok):
               Eq.and.right(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root)), ne)))))
         : {M.Dep{String.drop(n, 0n), h, en, _} == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
       %Equal.sym(String, String.drop(n, 0n), n, drop_zero(n))
-        : {M.Dep{_, h, en, M.Git{url, rev, tag, root, nar, vend}} == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
+        : {M.Dep{_, h, en, M.Git{url, rev, tag, root, nar, vend}}
+          == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
       {==}
 
 # LAW: a pinned CLI's table, as it reads back, is read as the pin
@@ -5940,7 +5941,8 @@ def tool_read(n, en, b, s, ok):
               Eq.and.right(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root)), ne)))))
         : {M.Tool{String.drop(n, 0n), en, b, _} == M.Tool{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Tool}
       %Equal.sym(String, String.drop(n, 0n), n, drop_zero(n))
-        : {M.Tool{_, en, b, M.Git{url, rev, tag, root, nar, vend}} == M.Tool{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Tool}
+        : {M.Tool{_, en, b, M.Git{url, rev, tag, root, nar, vend}}
+          == M.Tool{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Tool}
       {==}
 
 # LAW: pinned CLIs' tables hold no dependency
@@ -6036,7 +6038,7 @@ law once_hash:
   for +s: M.Source
   {rows.once(dep.rows(h, en, s), "hash") == True{} : Bool}
 
-def once_hash(h, en, s):
+def once_hash(_h, _en, s):
   match s:
     case M.Hub{}:
       {==}
@@ -6121,8 +6123,6 @@ def read_ledger(n, en, b, h, ds, ts, edk, etk):
 def Laws.ledger_reads_back(m, e):
   match m:
     case M.Manifest{+n, +en, +b, +h, +ds, +ts}:
-      +p = pkg.rows(n, en, b, h)
-      +d = dsects(ds, tsects(ts))
       +s = sects.of(lsects(M.Manifest{n, en, b, h, ds, ts}))
       +r = Eq.and.right(Bool.and(Bool.and(R.clean(n), R.clean(en)), Bool.and(R.clean(b), R.clean(h))),
         Bool.and(R.deps.ok(ds), R.tools.ok(ts)), e)

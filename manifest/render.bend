@@ -135,13 +135,13 @@ def add.keep(manifest: M.Manifest, dependency: M.Dep) -> M.Manifest:
 # what a ledger may hold to be written
 
 # whether a text holds no copy of a char
-def clear(text: String, +c: Char) -> Bool:
+def clear(text: String, +ch: Char) -> Bool:
   match text:
     case SNil{}:
       True{}
     case SCon{h, t}:
-      rest = clear(t, c)
-      Bool.and(Bool.not(Char.is_eq(h, c)), rest)
+      rest = clear(t, ch)
+      Bool.and(Bool.not(Char.is_eq(h, ch)), rest)
 
 # whether a name or value can be written as it is: it holds no `"`, no `\`
 # and no newline. The pinned eztoml reader (v0.1.0) neither writes nor reads

@@ -255,7 +255,7 @@ law has_ok:
   for ok: {RP.refuses.plan(RP.plan.has(h, m, name, ignore)) == False{} : Bool}
   {h == True{} : Bool}
 
-def has_ok(h, m, name, ignore, ok):
+def has_ok(h, _m, _name, _ignore, ok):
   match h:
     case True{}:
       {==}

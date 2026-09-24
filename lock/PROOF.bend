@@ -14874,7 +14874,7 @@ law rm.fit:
   for se: {String.is_empty(Up.fit.why(moved, next)) == True{} : Bool}
   {Up.read.next(moved, Rend.show(next), old) == Up.model.next(moved, next, old) : M.Read}
 
-def rm.fit(moved, next, old, se):
+def rm.fit(moved, next, _old, se):
   match moved:
     case True{}:
       rm.ren(Rend.renderable(next), next, {==}, se)
@@ -14891,7 +14891,7 @@ law rm.done:
   for se: {String.is_empty(Up.next.stop(Up.done(old, dd, tt, ig, fs))) == True{} : Bool}
   {Up.next.read(Up.done(old, dd, tt, ig, fs)) == Up.next.model(Up.done(old, dd, tt, ig, fs)) : M.Read}
 
-def rm.done(old, dd, tt, ig, fs, se):
+def rm.done(old, dd, tt, _ig, _fs, se):
   match old dd tt:
     case M.Manifest{+n, +e, +b, +h, ods, ots} Up.Deps{+ds, _ss, _es, dm, _dsy, _dtr, _da, _db}
       Up.Tools{+ts, tm, _tsy, _ta, _tb}:
@@ -14969,7 +14969,7 @@ law rm.bad:
   {Up.next.read(Up.pins.bad(clean, bad, asks, rs, old, dd, tt))
     == Up.next.model(Up.pins.bad(clean, bad, asks, rs, old, dd, tt)) : M.Read}
 
-def rm.bad(clean, bad, asks, rs, old, dd, tt, se):
+def rm.bad(clean, _bad, asks, rs, old, dd, tt, se):
   match clean:
     case True{}:
       rm.asks(asks, rs, old, dd, tt, se)
@@ -15496,7 +15496,8 @@ def Laws.reupgrade_lays_nothing(w, u, ok):
               Eq.bit.absurd(&2, {Laws.fresh(Laws.after(W.World{W.Args{False{}, only, here}, ledger, listing, replies,
                 ups})) == [] : List<&2, String>}, u)
             case True{}:
-              u.fresh(only, here, ledger, listing, replies, ups, ok, u.rb0(only, here, ledger, listing, replies, ups, ok))
+              u.fresh(only, here, ledger, listing, replies, ups, ok,
+                u.rb0(only, here, ledger, listing, replies, ups, ok))
 
 # No ledger reads as a `Bad`, which a plain lock takes as it is and an
 # upgrade leaves as it is, and `need.why` refuses it.
