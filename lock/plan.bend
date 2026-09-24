@@ -691,7 +691,7 @@ def packs(world: W.World) -> List<&2, L.Pack>:
 # the ledger model an upgrade renders into ez.toml; ez.toml as it was when
 # the upgrade refuses, still asks, or moves nothing, and for a plain lock. The
 # upgrade's decisions (EZ-RES-4 to 6 and 8) are stated over it, and hold of
-# ez.toml's bytes relative to EZ-LED-4.
+# ez.toml's bytes, which read back as it (EZ-LED-4).
 def ledger.next(world: W.World) -> M.Read:
   W.World{args, +ledger, _listing, _replies, ups} = world
   Up.next.model(W.next(args, ledger, ups))

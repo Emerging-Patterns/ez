@@ -394,19 +394,35 @@ def decide(+world: A.World) -> Verdict:
 # ---------------------------------------------------------------------------
 # the walk and the name
 
-# the name, once the walk made a package
-def outcome.name(ok: Bool, +world: A.World) -> P.Outcome:
-  match ok:
+# the dependency recorded, from the walk's hash and root
+def dep.of(+hash: String, +root: String, +world: A.World) -> M.Dep:
+  M.Dep{name(world), hash, entry(world),
+    M.Git{A.url(world), rev(world), tag(world), root, nar(world), False{}}}
+
+# the ledger with the package added, once it is known to read back. A
+# ledger that could not be written so that it reads back, such as one whose
+# source or entry holds a quote, is refused (EZ-LED-4).
+def outcome.fit(fit: Bool) -> P.Outcome:
+  match fit:
     case True{}:
       P.Success{}
+    case False{}:
+      P.Refused{Rend.unrenderable()}
+
+# the name, once the walk made a package, then the ledger it leaves
+def outcome.name(ok: Bool, fit: Bool, +world: A.World) -> P.Outcome:
+  match ok:
+    case True{}:
+      outcome.fit(fit)
     case False{}:
       P.Refused{why(world)}
 
 # the walk's verdict: a package, or why there is none
 def outcome.walk(walk: K.Walked, +world: A.World) -> P.Outcome:
   match walk:
-    case K.Walked{_h, _root, _fs, _ss}:
-      outcome.name(String.is_empty(why(world)), world)
+    case K.Walked{+h, +root, _fs, _ss}:
+      outcome.name(String.is_empty(why(world)),
+        Rend.renderable(Rend.add.keep(A.manifest.of(A.read(world)), dep.of(h, root, world))), world)
     case K.Asks{at}:
       P.Refused{"ez: " ++ at ++ " was never read"}
     case K.Refused{why}:
@@ -427,11 +443,6 @@ def outcome.k(walk: K.Walked, +world: A.World) -> P.Outcome:
 
 # ---------------------------------------------------------------------------
 # the effects
-
-# the dependency recorded, from the walk's hash and root
-def dep.of(+hash: String, +root: String, +world: A.World) -> M.Dep:
-  M.Dep{name(world), hash, entry(world),
-    M.Git{A.url(world), rev(world), tag(world), root, nar(world), False{}}}
 
 # the dependency the plan records: the one `dep.of` makes from the walk, or
 # an empty one when the walk made none, which no plan writes

@@ -5,6 +5,7 @@
 import Base
 import ./plan.bend as IP
 import ../lock/plan.bend as P
+import ../manifest/manifest.bend as M
 
 # LAW: `ez init` that refuses writes nothing: not ez.toml, not `.gitignore`,
 # and no entry. Its plan has no effect at all; the reason is how it ends.
@@ -32,3 +33,18 @@ law init_keeps_ledger:
   for ignore: Maybe<&2, String>
   for main: Maybe<&2, String>
   {P.writes(IP.plan(IP.World{name, entry, Some{s}, ignore, main})) == False{} : Bool}
+
+# LAW: the ledger `ez init` writes reads back as the one it made: the package
+# and entry asked for, or `app` and `main.bend`, and nothing else. A name or
+# entry the ledger cannot carry is refused, with no effect, rather than
+# written as a file that reads back as something else.
+# EZ-LED-4
+law init_ledger_reads_back:
+  for +n: String
+  for +e: String
+  for led: Maybe<&2, String>
+  for ig: Maybe<&2, String>
+  for mn: Maybe<&2, String>
+  for +text: String
+  for put: {P.put.plan(IP.plan(IP.World{n, e, led, ig, mn}), "ez.toml") == P.Put{text} : P.Wrote}
+  {M.parse(text) == M.Good{IP.model(IP.name.or(n), IP.entry.or(e))} : M.Read}

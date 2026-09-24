@@ -130,3 +130,77 @@ def readd(ds: List<&2, M.Dep>, dependency: M.Dep) -> M.Dep:
 def add.keep(manifest: M.Manifest, dependency: M.Dep) -> M.Manifest:
   M.Manifest{n, e, b, h, +ds, ts} = manifest
   add(M.Manifest{n, e, b, h, ds, ts}, readd(ds, dependency))
+
+# ---------------------------------------------------------------------------
+# what a ledger may hold to be written
+
+# whether a text holds no copy of a char
+def clear(text: String, +ch: Char) -> Bool:
+  match text:
+    case SNil{}:
+      True{}
+    case SCon{h, t}:
+      rest = clear(t, ch)
+      Bool.and(Bool.not(Char.is_eq(h, ch)), rest)
+
+# whether a name or value can be written as it is: it holds no `"`, no `\`
+# and no newline. The pinned eztoml reader (v0.1.0) neither writes nor reads
+# escapes, a newline would end the line, and a quote or a backslash would make
+# the file mean something else to every other TOML reader, nix's among them.
+def clean(+text: String) -> Bool:
+  Bool.and(clear(text, '"'), Bool.and(clear(text, '\\'), clear(text, '\n')))
+
+# whether a source reads back as itself. A git source names its repo and the
+# directory its paths are written from: the reader takes a section with no
+# `git` for a hub package and one with no `root` for the top of the checkout.
+def source.ok(src: M.Source) -> Bool:
+  match src:
+    case M.Hub{}:
+      True{}
+    case M.Git{+url, rev, tag, +root, nar, _vend}:
+      Bool.and(Bool.and(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root))),
+        Bool.and(Bool.and(clean(url), clean(rev)),
+          Bool.and(clean(tag), Bool.and(clean(root), clean(nar)))))
+
+# whether a dependency does: it has a hash, which the reader asks every
+# dependency for, and every name and value is clean
+def dep.ok(dependency: M.Dep) -> Bool:
+  M.Dep{+n, +h, +e, s} = dependency
+  Bool.and(Bool.and(clean(n), Bool.and(Bool.not(String.is_empty(h)), clean(h))),
+    Bool.and(clean(e), source.ok(s)))
+
+# whether every dependency does
+def deps.ok(ds: List<&2, M.Dep>) -> Bool:
+  match ds:
+    case []:
+      True{}
+    case h <> t:
+      rest = deps.ok(t)
+      Bool.and(dep.ok(h), rest)
+
+# whether a pinned CLI does
+def tool.ok(pin: M.Tool) -> Bool:
+  M.Tool{+n, +e, +b, s} = pin
+  Bool.and(clean(n), Bool.and(Bool.and(clean(e), clean(b)), source.ok(s)))
+
+# whether every pinned CLI does
+def tools.ok(ts: List<&2, M.Tool>) -> Bool:
+  match ts:
+    case []:
+      True{}
+    case h <> t:
+      rest = tools.ok(t)
+      Bool.and(tool.ok(h), rest)
+
+# whether a ledger can be written so that it reads back as itself (EZ-LED-4):
+# every name and value is clean, every dependency has a hash, and every git
+# source names its repo and its root. Every command that writes ez.toml
+# refuses a ledger that is not, so every ledger ez writes is one of these.
+def renderable(manifest: M.Manifest) -> Bool:
+  M.Manifest{+n, +e, +b, +h, ds, ts} = manifest
+  Bool.and(Bool.and(Bool.and(clean(n), clean(e)), Bool.and(clean(b), clean(h))),
+    Bool.and(deps.ok(ds), tools.ok(ts)))
+
+# why a ledger that is not renderable is not written
+def unrenderable() -> String:
+  "ez: ez.toml cannot be written: a name or value holds a quote, a backslash or a newline, a dependency has no hash, or a git source names no repo or no root"
