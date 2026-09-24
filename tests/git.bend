@@ -82,11 +82,6 @@ def vendor(+repo: String, +app: String, +url: String, +rev: String) -> IO(String
     +same : String <- R.exec(["diff", "-r", app ++ "/.ez/lib/" ++ hash,
       app ++ "/.ez/tag/" ++ hash])
     yes("a tag vendors the same package as its commit", R.ok(same))
-    +ats : String <- W.only(app ++ "/.ez", "origins.*")
-    +org : Maybe<&2, String> <- F.read(ats)
-    yes("the lock keeps the tag beside the rev",
-      String.contains(
-        W.containing(String.lines(F.text_of(org)), "tag"), "v1.0"))
     return hash
 
 # the vendored package built with no hub at all, and the lock that records
@@ -107,6 +102,8 @@ def local(+repo: String, +app: String, +hash: String, +rev: String) -> IO(Unit):
     yes("the lock records the git rev, not the hub",
       Bool.and(String.contains(F.text_of(txt), "git"),
         String.contains(F.text_of(txt), rev)))
+    Check.eq_str("the lock keeps the tag beside the rev",
+      W.value(F.text_of(txt), "tag"), "v1.0")
 
 # nix rebuilding the package from the rev alone. The store path is the last
 # line of the build that names one, since the build's log shares the stream.
@@ -150,8 +147,8 @@ def main() -> IO(Unit):
 #|ok add says the import line the package is reachable by
 #|ok the tag it resolved through is written down
 #|ok a tag vendors the same package as its commit
-#|ok the lock keeps the tag beside the rev
 #|ok the vendored package builds, with no hub at all
 #|ok the lock records the git rev, not the hub
+#|ok the lock keeps the tag beside the rev
 #|ok nix rebuilds the package byte for byte
 #|ok the nix tree builds with no hub
