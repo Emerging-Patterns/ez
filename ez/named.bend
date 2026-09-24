@@ -91,7 +91,7 @@ def bare(text: String) -> Bool:
 # whether a source is this git url
 def from(src: M.Source, +url: String) -> Bool:
   match src:
-    case M.Hub{}:
+    case M.Hub{_named}:
       False{}
     case M.Git{u, _rev, _tag, _root, _nar, _vend}:
       String.eq(u, url)

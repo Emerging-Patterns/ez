@@ -12,7 +12,9 @@
 # judges the import lines `ez lock` judges. A tree is asked about with the
 # lock's own question (`W.Ask`) and answered only from BEND_LIB: the manifest
 # there and the text of each file it names, or that there is none. Doctor
-# never asks the network, so this is all it can know of a package.
+# never asks the network, so this is all it can know of a package. A name the
+# lock records is asked about as the file bend reads its hash from,
+# `$BEND_LIB/names/<nv>`, as it is.
 import Base
 import ../lock/world.bend as W
 import ../manifest/manifest.bend as M
@@ -23,6 +25,7 @@ type Ask is Data:
   Lib{dir: String}      # the names under the library directory, as `ls` prints them
   Sources{}             # every `.bend` file git tracks, with its text
   Tree{ask: W.Ask}      # the lock's question about a package, put to BEND_LIB
+  Name{nv: String}      # the file BEND_LIB/names/<nv>, as it is
 
 # the answer to one: what a program printed, and whether it ran; or the
 # sources as the lock lists them; or a package's tree as BEND_LIB holds it,
@@ -32,6 +35,7 @@ type Answer is Data:
   Listed{listing: W.Listing}                       # Sources
   Laid{manifest: String, srcs: List<&2, String>}   # Tree, there
   Away{}                                           # Tree, not there
+  Held{got: Maybe<&2, String>}                     # Name: the file's text, None when it is not there
 
 # one question, answered
 type Reply is Data:
@@ -100,6 +104,8 @@ def key(ask: Ask) -> String:
       "sources"
     case Tree{ask}:
       "tree\n" ++ W.ask.hash(ask)
+    case Name{nv}:
+      "name\n" ++ nv
 
 # an answer looked up, or none yet
 type Heard is Data:

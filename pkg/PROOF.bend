@@ -2380,7 +2380,8 @@ def Laws.no_license_as_before(tree, sc, text, file, ns, eb, seen, out, rest, non
 
 def Laws.license_asked(tree, text, file, ns, eb, seen, out, rest, unasked):
   %unasked : {P.visit.put(P.asked(_, P.beside(file),
-        _u => P.foreign.check(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(P.scan(text)))),
+        _u => P.named.check(P.unnamed(P.scan.mods(P.scan(text))),
+          _v => P.foreign.check(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(P.scan(text))))),
       tree, P.scan(text), text, file, ns, eb, seen, out, rest)
     == P.State{seen, out, P.Asking{P.beside(file)}, P.Task{file, ns} <> rest}
     : P.State}
@@ -2414,4 +2415,74 @@ def Laws.bare_drops_license(h, t, lic):
 
 def Laws.bare_keeps_sources(h, t, src):
   %src : {P.bare.pick(_, h, P.bare(t)) == h <> P.bare(t) : List<&2, P.File>}
+  {==}
+
+# ---------------------------------------------------------------------------
+# named hub imports (EZ-HUB-3)
+
+# LAW: an `or` with True on the right picks the first arm
+law or_true_pick:
+  for a: Bool
+  for +xs: List<&2, P.Task>
+  {Bool.pick(List<&2, P.Task>, Bool.or(a, True{}), [], xs) == [] : List<&2, P.Task>}
+
+def or_true_pick(a, _xs):
+  match a:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.named_is_no_module(dir, nd, spec, e):
+  %e : {Bool.pick(List<&2, P.Task>, Bool.or(P.is_hub(spec), _), [],
+    [P.Task{Path.join(dir, spec), Path.unbend(Path.join(nd, spec))}]) == [] : List<&2, P.Task>}
+  or_true_pick(P.is_hub(spec), [P.Task{Path.join(dir, spec), Path.unbend(Path.join(nd, spec))}])
+
+# LAW: the walk stops at a name the hub rules out, whatever it was given of
+# the LICENSE, so long as it was given it
+law unnamed_at:
+  for l: P.Look
+  for +tree: P.Tree
+  for +text: String
+  for +file: String
+  for +ns: String
+  for eb: String
+  for seen: List<&2, String>
+  for out: List<&2, P.Hit>
+  for rest: List<&2, P.Task>
+  for g: {True{} == Laws.given(l) : Bool}
+  for n: {False{} == String.is_empty(P.unnamed(P.scan.mods(P.scan(text)))) : Bool}
+  {P.visit.put(P.asked(l, P.beside(file),
+      _u => P.named.check(P.unnamed(P.scan.mods(P.scan(text))),
+        _v => P.foreign.check(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(P.scan(text))))),
+      tree, P.scan(text), text, file, ns, eb, seen, out, rest)
+    == P.State{seen, out, P.Unnamed{P.unnamed(P.scan.mods(P.scan(text)))}, P.Task{file, ns} <> rest}
+    : P.State}
+
+def unnamed_at(l, tree, text, file, ns, eb, seen, out, rest, g, n):
+  match l:
+    case P.Here{_x}:
+      %n : {P.visit.put(P.named.check.at(_, P.unnamed(P.scan.mods(P.scan(text))),
+          _v => P.foreign.check(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(P.scan(text)))),
+        tree, P.scan(text), text, file, ns, eb, seen, out, rest)
+        == P.State{seen, out, P.Unnamed{P.unnamed(P.scan.mods(P.scan(text)))}, P.Task{file, ns} <> rest}
+        : P.State}
+      {==}
+    case P.Absent{}:
+      %n : {P.visit.put(P.named.check.at(_, P.unnamed(P.scan.mods(P.scan(text))),
+          _v => P.foreign.check(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(P.scan(text)))),
+        tree, P.scan(text), text, file, ns, eb, seen, out, rest)
+        == P.State{seen, out, P.Unnamed{P.unnamed(P.scan.mods(P.scan(text)))}, P.Task{file, ns} <> rest}
+        : P.State}
+      {==}
+    case P.Unasked{}:
+      Eq.bit.absurd2(&2, {P.visit.put(P.Asking{P.beside(file)}, tree, P.scan(text), text, file, ns,
+        eb, seen, out, rest)
+        == P.State{seen, out, P.Unnamed{P.unnamed(P.scan.mods(P.scan(text)))}, P.Task{file, ns} <> rest}
+        : P.State}, g)
+
+def Laws.unnamed_stops(tree, text, file, ns, eb, seen, out, rest, g, n):
+  unnamed_at(P.find(tree, P.beside(file)), tree, text, file, ns, eb, seen, out, rest, g, n)
+
+def Laws.unnamed_refused(_entry, _nv, _out):
   {==}

@@ -17,6 +17,14 @@
 # than the lock needs, which costs a fetch and changes nothing, since `plan`
 # refuses it.
 #
+# A named import, `import <name>@<version>/...`, is a hub package too
+# (EZ-HUB-3). One the project's own sources import must be a dependency
+# ez.toml records by that name, and resolves to the hash ez.toml records
+# beside it; one a package imports resolves the same way when ez.toml names
+# it, then by the lock being rewritten, and only then by asking the hub, once
+# (EZ-HUB-2). The package it resolves to is walked and checked like any hub
+# package, and the lock records every name it resolved under `[names]`.
+#
 # What a lock decides depends on a World only through `W.inputs`: the ledger
 # it is made from, the upgrade's refusal if any, the committed sources, and
 # the verdict on every answer. How a tree arrived only decides whether it is
@@ -66,9 +74,11 @@ type Walk is Data:
 def first(+bad: String, why: String) -> String:
   Bool.pick(String, String.is_empty(bad), why, bad)
 
-# one package, by its verdict
+# one package, by its verdict. Its imports are queued by hash, and by the
+# hash the table of names gives each name it imports.
 def step.verdict(
   verdict: W.Verdict,
+  +ns: List<&2, L.Name>,
   +src: L.Src,
   +hash: String,
   rest: List<&2, String>,
@@ -80,12 +90,15 @@ def step.verdict(
     case W.No{why}:
       Walk{rest, packs, asks, first(bad, why)}
     case W.Ok{fs, ss}:
-      Walk{List.append(&2, String, rest, L.kids(ss)), L.Pack{hash, src, fs} <> packs,
+      Walk{List.append(&2, String, rest, L.kids.in(ns, ss)), L.Pack{hash, src, fs} <> packs,
         asks, bad}
+    case W.Named{_names}:
+      Walk{rest, packs, asks, first(bad, "ez: " ++ hash ++ " is imported as a package, and it is not one")}
 
 # one package, asked about when nothing has answered for it yet
 def step.look(
   found: Look,
+  +ns: List<&2, L.Name>,
   +src: L.Src,
   +hash: String,
   rest: List<&2, String>,
@@ -97,12 +110,13 @@ def step.look(
     case Absent{}:
       Walk{rest, packs, hash <> asks, bad}
     case Found{v}:
-      step.verdict(v, src, hash, rest, packs, asks, bad)
+      step.verdict(v, ns, src, hash, rest, packs, asks, bad)
 
 # a hash already resolved, or already asked about, is passed over
 def step.pick(
   seen: Bool,
   +orgs: List<&2, L.Origin>,
+  +ns: List<&2, L.Name>,
   +js: List<&2, W.Judged>,
   +hash: String,
   rest: List<&2, String>,
@@ -114,11 +128,12 @@ def step.pick(
     case True{}:
       Walk{rest, packs, asks, bad}
     case False{}:
-      step.look(look(js, hash), L.origin(orgs, hash), hash, rest, packs, asks, bad)
+      step.look(look(js, hash), ns, L.origin(orgs, hash), hash, rest, packs, asks, bad)
 
 # the next hash of the queue, or the walk as it is when the queue is empty
 def step.pop(
   +orgs: List<&2, L.Origin>,
+  +ns: List<&2, L.Name>,
   +js: List<&2, W.Judged>,
   queue: List<&2, String>,
   +packs: List<&2, L.Pack>,
@@ -129,13 +144,13 @@ def step.pop(
     case []:
       Walk{[], packs, asks, bad}
     case +h <> t:
-      step.pick(Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, js, h, t,
+      step.pick(Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, ns, js, h, t,
         packs, asks, bad)
 
 # one step of the walk
-def walk.step(+orgs: List<&2, L.Origin>, +js: List<&2, W.Judged>, wk: Walk) -> Walk:
+def walk.step(+orgs: List<&2, L.Origin>, +ns: List<&2, L.Name>, +js: List<&2, W.Judged>, wk: Walk) -> Walk:
   Walk{queue, packs, asks, bad} = wk
-  step.pop(orgs, js, queue, packs, asks, bad)
+  step.pop(orgs, ns, js, queue, packs, asks, bad)
 
 # whether a walk has nothing left in its queue
 def walk.done(+wk: Walk) -> Bool:
@@ -167,12 +182,12 @@ def walk.out(done: Bool, wk: Walk) -> Walk:
 
 # every package the queue reaches, each one once. A walk that runs out of fuel
 # with the queue not empty is a refusal, never a lock of what it had so far.
-def walk(fuel: Nat, +orgs: List<&2, L.Origin>, +js: List<&2, W.Judged>, +wk: Walk) -> Walk:
+def walk(fuel: Nat, +orgs: List<&2, L.Origin>, +ns: List<&2, L.Name>, +js: List<&2, W.Judged>, +wk: Walk) -> Walk:
   match fuel:
     case 0n:
       walk.out(walk.done(wk), wk)
     case 1n+f:
-      walk.more(walk.done(wk), wk, now => walk(f, orgs, js, walk.step(orgs, js, now)))
+      walk.more(walk.done(wk), wk, now => walk(f, orgs, ns, js, walk.step(orgs, ns, js, now)))
 
 # the packages a walk has resolved
 def walk.packs(wk: Walk) -> List<&2, L.Pack>:
@@ -196,14 +211,71 @@ def roots(fs: List<&2, W.Source>) -> List<&2, String>:
     case +h <> t:
       List.append(&2, String, roots.one(h), roots(t))
 
-# the walk from every committed source. A listing git could not give is a
-# walk refused before its first step.
-def walk.of(+led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> Walk:
+# every name one committed source imports, outside `.ez/`
+def roots.named.one(+src: W.Source) -> List<&2, String>:
+  W.Source{at, text} = src
+  Bool.pick(List<&2, String>, String.starts_with(at, ".ez/"), [],
+    L.named(K.scan.mods(K.scan(text))))
+
+# every name the committed sources import. Each must be one ez.toml records
+# a dependency by.
+def roots.named(fs: List<&2, W.Source>) -> List<&2, String>:
+  match fs:
+    case []:
+      []
+    case +h <> t:
+      List.append(&2, String, roots.named.one(h), roots.named(t))
+
+# the table of names a lock resolves names by: those ez.toml records, each
+# with the hash beside it, first, then those the answers resolve, the lock
+# being rewritten's before the hub's
+def table(+led: M.Read, js: List<&2, W.Judged>) -> List<&2, L.Name>:
+  List.append(&2, L.Name, L.ledger.names(led), W.names.of(js))
+
+# the walk from every committed source: every package they import by hash,
+# and every one they import by a name the table resolves. A listing git
+# could not give is a walk refused before its first step.
+def walk.of(+led: M.Read, listing: W.Listing, +ns: List<&2, L.Name>, +js: List<&2, W.Judged>) -> Walk:
   match listing:
     case W.Unlisted{why}:
       Walk{[], [], [], why}
+    case W.Listed{+fs}:
+      walk(U32.to_nat(100000), L.ledger.read(led), ns, js,
+        Walk{List.append(&2, String, roots(fs), L.name.hashes(ns, roots.named(fs))), [], [], ""})
+
+# the committed sources a listing holds, none when git could not list them
+def listing.files(listing: W.Listing) -> List<&2, W.Source>:
+  match listing:
+    case W.Unlisted{_why}:
+      []
     case W.Listed{fs}:
-      walk(U32.to_nat(100000), L.ledger.read(led), js, Walk{roots(fs), [], [], ""})
+      fs
+
+# the texts of a package the walk resolved, as its verdict holds them
+def pack.srcs(found: Look) -> List<&2, String>:
+  match found:
+    case Absent{}:
+      []
+    case Found{v}:
+      match v:
+        case W.Ok{_fs, ss}:
+          ss
+        case _:
+          []
+
+# every name the packages a walk resolved import
+def packs.named(+js: List<&2, W.Judged>, ps: List<&2, L.Pack>) -> List<&2, String>:
+  match ps:
+    case []:
+      []
+    case +h <> t:
+      List.append(&2, String, L.kids.named(pack.srcs(look(js, L.pack.hash(h)))),
+        packs.named(js, t))
+
+# every name a lock needs resolved: those the committed sources import, then
+# those the packages it reaches import
+def needed(listing: W.Listing, +js: List<&2, W.Judged>, ps: List<&2, L.Pack>) -> List<&2, String>:
+  List.append(&2, String, roots.named(listing.files(listing)), packs.named(js, ps))
 
 # why a plain lock cannot copy the ledger's tool pins, or "" when it can. A
 # ledger that does not parse is refused here too.
@@ -300,7 +372,7 @@ def packs.ok(ps: List<&2, L.Pack>) -> Bool:
 def tool.values(pin: M.Tool) -> List<&2, String>:
   M.Tool{n, e, b, s} = pin
   match s:
-    case M.Hub{}:
+    case M.Hub{_named}:
       [n, e, b]
     case M.Git{url, rev, tag, root, nar, _vend}:
       [n, e, b, url, rev, tag, root, nar]
@@ -374,6 +446,114 @@ def lockable.why(ps: List<&2, L.Pack>) -> String:
   +why = packs.eq(ps)
   lockable.pick(String.is_empty(why), why)
 
+# whether every name the lock records can be written so that it reads back:
+# a name is written as a quoted key and its hash as a value, the way a
+# package's file is, so it is held to what a file is held to
+def names.ok(ns: List<&2, L.Name>) -> Bool:
+  +fs = L.name.files(ns)
+  Bool.and(paths.ok(fs), clean.all(file.values(fs)))
+
+# whether a lock with names can be written so that it reads back
+def lockable.named(ns: List<&2, L.Name>, ps: List<&2, L.Pack>, ts: List<&2, M.Tool>, hub: String) -> Bool:
+  Bool.and(names.ok(ns), lockable(ps, ts, hub))
+
+# the reason a lock with names that is not lockable gives
+def lockable.why.pick(ok: Bool, ps: List<&2, L.Pack>) -> String:
+  match ok:
+    case True{}:
+      lockable.why(ps)
+    case False{}:
+      "ez: ez.lock.toml cannot be written: a name, or the hash ez.toml records for it, holds `=`, a quote, a backslash or a newline"
+
+def lockable.why.named(ns: List<&2, L.Name>, ps: List<&2, L.Pack>) -> String:
+  lockable.why.pick(names.ok(ns), ps)
+
+# ---------------------------------------------------------------------------
+# the names a lock needs
+
+# a name, when it is the first the search wants, or the rest's
+def names.missing.pick(gone: Bool, +nv: String, rest: Unit -> String) -> String:
+  match gone:
+    case True{}:
+      nv
+    case False{}:
+      rest(Unit{})
+
+# the first name of a list the hub rules out, or "" when it rules them all in
+def names.ruled(nvs: List<&2, String>) -> String:
+  match nvs:
+    case []:
+      ""
+    case +h <> t:
+      names.missing.pick(Bool.not(K.name.ok(h)), h, _u => names.ruled(t))
+
+# the first name of a list the table does not resolve, or "" when it
+# resolves them all
+def names.missing(+ns: List<&2, L.Name>, nvs: List<&2, String>) -> String:
+  match nvs:
+    case []:
+      ""
+    case +h <> t:
+      names.missing.pick(String.is_empty(L.name.find(ns, h)), h, _u => names.missing(ns, t))
+
+# why a name nothing resolved stops the lock: what its answer said, or that
+# it was never asked
+def names.open.why(found: Look, +nv: String) -> String:
+  match found:
+    case Found{v}:
+      match v:
+        case W.No{why}:
+          why
+        case _:
+          "ez: " ++ nv ++ " was never resolved, so there is nothing to lock it from"
+    case Absent{}:
+      "ez: " ++ nv ++ " was never resolved, so there is nothing to lock it from"
+
+# why a name the project imports and ez.toml does not record stops the lock
+def names.unledgered.why(+nv: String) -> String:
+  "ez: " ++ nv ++ " is imported, and ez.toml records no dependency by that name; " ++
+    "a named package is recorded as `hub = \"" ++ nv ++ "\"` beside the hash it names"
+
+# a reason, or when there is none the next one, looked at only then
+def why.then.at(none: Bool, why: String, rest: Unit -> String) -> String:
+  match none:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      why
+
+def why.then(+why: String, rest: Unit -> String) -> String:
+  why.then.at(String.is_empty(why), why, rest)
+
+# no reason when no name is at fault, and the fault's otherwise
+def why.missing.at(none: Bool, reason: Unit -> String) -> String:
+  match none:
+    case True{}:
+      ""
+    case False{}:
+      reason(Unit{})
+
+def why.missing(+nv: String, reason: Unit -> String) -> String:
+  why.missing.at(String.is_empty(nv), reason)
+
+# why the names a lock needs stop it, or "" when they do not: a name the hub
+# rules out, as bend refuses it; a name the project imports that ez.toml does
+# not record, which is the lock's own rule, since only a dependency ez.toml
+# records vouches for where a name came from; and a name nothing resolved
+def names.why(
+  +lns: List<&2, L.Name>,
+  +ns: List<&2, L.Name>,
+  +js: List<&2, W.Judged>,
+  +roots: List<&2, String>,
+  +need: List<&2, String>
+) -> String:
+  +bad = names.ruled(need)
+  why.then(why.missing(bad, _u => K.unnamed.why(bad)), _v =>
+    why.then(why.missing(names.missing(lns, roots), _w =>
+        names.unledgered.why(names.missing(lns, roots))), _x =>
+      why.missing(names.missing(ns, need), _y =>
+        names.open.why(look(js, names.missing(ns, need)), names.missing(ns, need)))))
+
 # ---------------------------------------------------------------------------
 # the lock's text, or why there is none
 
@@ -382,57 +562,101 @@ type Doc is Data:
   Doc{text: String}
   Stop{why: String}
 
-# a lock that can be written, written
-def doc.lockable(ok: Bool, +hub: String, packs: List<&2, L.Pack>, ts: List<&2, M.Tool>) -> Doc:
+# a lock that can be written, written, with the names it resolved
+def doc.lockable(
+  ok: Bool,
+  +ns: List<&2, L.Name>,
+  +hub: String,
+  packs: List<&2, L.Pack>,
+  ts: List<&2, M.Tool>
+) -> Doc:
   match ok:
     case True{}:
-      Doc{L.render.tools(ts, hub, packs)}
+      Doc{L.render.names(ns, ts, hub, packs)}
     case False{}:
-      Stop{lockable.why(packs)}
+      Stop{lockable.why.named(ns, packs)}
 
 # a walk with nothing left to ask is the lock. One that still has a question
 # is a World the interpreter did not finish, and is refused rather than
 # guessed at.
-def doc.asks(asks: List<&2, String>, +hub: String, +packs: List<&2, L.Pack>, +ts: List<&2, M.Tool>) -> Doc:
+def doc.asks(
+  asks: List<&2, String>,
+  +ns: List<&2, L.Name>,
+  +hub: String,
+  +packs: List<&2, L.Pack>,
+  +ts: List<&2, M.Tool>
+) -> Doc:
   match asks:
     case []:
-      doc.lockable(lockable(packs, ts, hub), hub, packs, ts)
+      doc.lockable(lockable.named(ns, packs, ts, hub), ns, hub, packs, ts)
     case h <> _t:
       Stop{"ez: " ++ h ++ " was never read, so there is nothing to lock it from"}
 
-# a refusal wins over everything after it
-def doc.bad(
+# the names settled: a name that stops the lock stops it, and otherwise the
+# lock records each name it needed with the hash the table gives it
+def doc.named(
   clean: Bool,
-  +bad: String,
+  why: String,
   asks: List<&2, String>,
+  +ns: List<&2, L.Name>,
+  +need: List<&2, String>,
   +hub: String,
   packs: List<&2, L.Pack>,
   ts: List<&2, M.Tool>
 ) -> Doc:
   match clean:
     case True{}:
-      doc.asks(asks, hub, packs, ts)
+      doc.asks(asks, L.name.pairs(ns, need), hub, packs, ts)
+    case False{}:
+      Stop{why}
+
+# a refusal wins over everything after it
+def doc.bad(
+  clean: Bool,
+  +bad: String,
+  asks: List<&2, String>,
+  +led: M.Read,
+  listing: W.Listing,
+  +ns: List<&2, L.Name>,
+  +js: List<&2, W.Judged>,
+  +packs: List<&2, L.Pack>
+) -> Doc:
+  match clean:
+    case True{}:
+      +fs = listing.files(listing)
+      +need = List.append(&2, String, roots.named(fs), packs.named(js, packs))
+      +why = names.why(L.ledger.names(led), ns, js, roots.named(fs), need)
+      doc.named(String.is_empty(why), why, asks, ns, need, M.hub_of(led), packs,
+        M.tools_of(led))
     case False{}:
       Stop{bad}
 
 # the walk's result
-def doc.walk(wk: Walk, +hub: String, ts: List<&2, M.Tool>) -> Doc:
+def doc.walk(wk: Walk, +led: M.Read, listing: W.Listing, +ns: List<&2, L.Name>, +js: List<&2, W.Judged>) -> Doc:
   Walk{_queue, packs, asks, +bad} = wk
-  doc.bad(String.is_empty(bad), bad, asks, hub, packs, ts)
+  doc.bad(String.is_empty(bad), bad, asks, led, listing, ns, js, packs)
 
 # a tool pin a plain lock would have to fill stops it before the walk counts
-def doc.gap(clean: Bool, +gap: String, wk: Walk, +hub: String, ts: List<&2, M.Tool>) -> Doc:
+def doc.gap(
+  clean: Bool,
+  +gap: String,
+  wk: Walk,
+  +led: M.Read,
+  listing: W.Listing,
+  +ns: List<&2, L.Name>,
+  +js: List<&2, W.Judged>
+) -> Doc:
   match clean:
     case True{}:
-      doc.walk(wk, hub, ts)
+      doc.walk(wk, led, listing, ns, js)
     case False{}:
       Stop{gap}
 
 # plain `ez lock` over a parsed ledger
-def decide.led(+led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> Doc:
+def decide.led(+led: M.Read, +listing: W.Listing, +js: List<&2, W.Judged>) -> Doc:
   +gap = need.why(led)
-  doc.gap(String.is_empty(gap), gap, walk.of(led, listing, js), M.hub_of(led),
-    M.tools_of(led))
+  +ns = table(led, js)
+  doc.gap(String.is_empty(gap), gap, walk.of(led, listing, ns, js), led, listing, ns, js)
 
 # an upgrade that refused, or still asks, stops the lock before anything else
 def decide.stop(clean: Bool, +stop: String, +led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> Doc:
@@ -459,12 +683,15 @@ type Place is Data:
 # one thing the interpreter does. A `Lay` writes each file under
 # `<place>/<hash>`, in order; the manifest comes last, so a tree that has one
 # is a tree that finished. A `Drop` removes `.ez/lib/<hash>`, a committed tree
-# an upgrade moved off. A `Say` is a line a person is told.
+# an upgrade moved off. A `Name` writes `$BEND_LIB/names/<nv>` holding the
+# hash and a newline, the file bend reads a name's hash from before it would
+# ask the hub (EZ-HUB-4). A `Say` is a line a person is told.
 type Effect is Data:
   Write{path: String, text: String}
   Lay{place: Place, hash: String, files: List<&2, W.Source>}
   Drop{hash: String}
   Say{text: String}
+  Name{nv: String, hash: String}
 
 # how the command ends: exit 0, or exit 1 with the reason
 type Outcome is Data:
@@ -512,9 +739,10 @@ type Query is Data:
   Query{ask: Up.Ask, git: Up.Ask}
 
 # the questions still open, the lock's and the upgrade's, or the plan once
-# there are none
+# there are none. The lock's are about packages, and, apart from them, about
+# names: the lock being rewritten, and what the hub says a name names.
 type Step is Data:
-  Asking{asks: List<&2, W.Ask>, ups: List<&2, Query>}
+  Asking{asks: List<&2, W.Ask>, ups: List<&2, Query>, names: List<&2, W.Ask>}
   Run{plan: Plan}
 
 # what a plan leaves at one path: nothing written, or this text
@@ -543,6 +771,10 @@ def cloned.one(+hash: String, answer: W.Answer) -> List<&2, String>:
       []
     case W.Got{how, _manifest, _ss}:
       cloned.how(how, hash)
+    case W.Said{_text}:
+      []
+    case W.Locked{_text}:
+      []
 
 # every hash a clone answered, in the order they were answered
 def cloned(rs: List<&2, W.Reply>) -> List<&2, String>:
@@ -572,6 +804,8 @@ def lay.verdict(verdict: W.Verdict, place: Place, +hash: String, rest: List<&2, 
       +ls = W.laid(fs, ss)
       Lay{place, hash, List.append(&2, W.Source, ls,
         [W.Source{"manifest", W.manifest(ls)}])} <> rest
+    case W.Named{_ns}:
+      rest
 
 def lay.pick(hit: Bool, verdict: W.Verdict, place: Place, +hash: String, rest: List<&2, Effect>) -> List<&2, Effect>:
   match hit:
@@ -595,6 +829,15 @@ def lays(
     case W.Judged{+h, v} <> t:
       lay.pick(L.seen.holds(cs, h), v, place.of(L.seen.holds(vs, h)), h,
         lays(cs, vs, t, rest))
+
+# a names file for every name a lock records, ahead of what follows, so bend
+# reads each name's hash from BEND_LIB and never asks the hub for it
+def names.lay(ns: List<&2, L.Name>, rest: List<&2, Effect>) -> List<&2, Effect>:
+  match ns:
+    case []:
+      rest
+    case L.Name{nv, hash} <> t:
+      Name{nv, hash} <> names.lay(t, rest)
 
 # the lines a person is told, ahead of what follows
 def says.of(ss: List<&2, String>, rest: List<&2, Effect>) -> List<&2, Effect>:
@@ -640,17 +883,19 @@ def drops.of(ds: List<&2, String>, rest: List<&2, Effect>) -> List<&2, Effect>:
 # the plan for what was decided. A refusal has no effect at all, so a refused
 # lock, plain or upgrade, writes nothing, lays nothing and removes nothing; its
 # reason is how it ends. A lock that is made runs, in order: what a person is
-# told, the trees laid, the upgrade's files (ez.toml once, `.gitignore`, the
-# rewritten sources), the committed trees removed, and the lock last. A plain
-# lock has only the trees and the lock.
+# told, the trees laid, a names file for every name the lock records (read
+# back from the lock's own text, so the files and the lock never disagree),
+# the upgrade's files (ez.toml once, `.gitignore`, the rewritten sources), the
+# committed trees removed, and the lock last. A plain lock has only the
+# trees, the names and the lock.
 def made(+nx: Up.Next, cs: List<&2, String>, js: List<&2, W.Judged>, doc: Doc) -> Plan:
   match doc:
-    case Doc{text}:
+    case Doc{+text}:
       Plan{says.of(Up.next.says(nx),
-        lays(cs, Up.next.vends(nx), js,
+        lays(cs, Up.next.vends(nx), js, names.lay(L.names.read(text),
           edits.of(Up.next.edits(nx),
             edits.of(Up.edit.sources(Up.next.found(nx), Up.next.swaps(nx)),
-              drops.of(Up.next.drops(nx), [Write{lockfile(), text}]))))), Success{}}
+              drops.of(Up.next.drops(nx), [Write{lockfile(), text}])))))), Success{}}
     case Stop{why}:
       Plan{[], Refused{why}}
 
@@ -679,8 +924,9 @@ def refuses(world: W.World) -> Bool:
 
 # the packages `ez lock` resolves once the upgrade decided
 def packs.of(+nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> List<&2, L.Pack>:
+  +js = W.judged.of(nx, replies)
   walk.packs(walk.of(Up.next.read(nx), W.listing.of(nx, listing),
-    W.judged.of(nx, replies)))
+    table(Up.next.read(nx), js), js))
 
 # the packages `ez lock` resolves on a World, which are the packages its lock
 # renders when it writes one
@@ -715,6 +961,8 @@ def put.one(effect: Effect, +path: String, rest: Wrote) -> Wrote:
       rest
     case Say{_text}:
       rest
+    case Name{_nv, _hash}:
+      rest
 
 # what a list of effects leaves at a path
 def put.in(es: List<&2, Effect>, +path: String) -> Wrote:
@@ -745,6 +993,8 @@ def writes.one(effect: Effect) -> Bool:
       True{}
     case Say{_text}:
       False{}
+    case Name{_nv, _hash}:
+      True{}
 
 # whether a plan writes, lays or removes anything
 def writes.in(es: List<&2, Effect>) -> Bool:
@@ -827,20 +1077,34 @@ def effects(pl: Plan) -> List<&2, Effect>:
 
 # an answer as far as `wants` needs it: the texts it may import from, taken
 # as they are and not checked, or the miss
-def scan.one(answer: W.Answer) -> W.Verdict:
+def scan.one(+hash: String, +hub: String, answer: W.Answer) -> W.Verdict:
   match answer:
     case W.Miss{why}:
       W.No{why}
     case W.Got{_how, _manifest, ss}:
       W.Ok{[], ss}
+    case W.Said{text}:
+      W.said(hash, hub, text)
+    case W.Locked{text}:
+      W.locked(text)
+
+# the hub a question names, "" for the lock's
+def ask.hub(ask: W.Ask) -> String:
+  match ask:
+    case W.Pkg{_hash, _src, hub}:
+      hub
+    case W.Name{_nv, hub}:
+      hub
+    case W.Lock{}:
+      ""
 
 # every reply, scanned
 def scan(rs: List<&2, W.Reply>) -> List<&2, W.Judged>:
   match rs:
     case []:
       []
-    case W.Reply{ask, answer} <> t:
-      W.Judged{W.ask.hash(ask), scan.one(answer)} <> scan(t)
+    case W.Reply{+ask, answer} <> t:
+      W.Judged{W.ask.hash(ask), scan.one(W.ask.hash(ask), ask.hub(ask), answer)} <> scan(t)
 
 # a package's source as git is to read it: a path anchored at the directory
 # the lock runs in (`Path.anchor`), and a URL or an absolute path as it is. A
@@ -888,7 +1152,7 @@ def wants.gap(clean: Bool, wk: Walk, +here: String, +orgs: List<&2, L.Origin>, +
       []
 
 def wants.led(+here: String, +led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> List<&2, W.Ask>:
-  wants.gap(String.is_empty(need.why(led)), walk.of(led, listing, js), here,
+  wants.gap(String.is_empty(need.why(led)), walk.of(led, listing, table(led, js), js), here,
     L.ledger.read(led), M.hub_of(led))
 
 # nothing is asked about packages while the upgrade refuses or still asks
@@ -928,13 +1192,161 @@ def queries(+here: String, as: List<&2, Up.Ask>) -> List<&2, Query>:
     case +h <> t:
       Query{h, Up.anchor(here, h)} <> queries(here, t)
 
-# the package questions still open, or the plan once there are none
-def step.pkgs(asks: List<&2, W.Ask>, +nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> Step:
-  match asks:
+# ---------------------------------------------------------------------------
+# the names still to resolve
+
+# a name kept among the ones to ask about when it is not one already kept
+def names.once.put(dup: Bool, +nv: String, rest: List<&2, String>) -> List<&2, String>:
+  match dup:
+    case True{}:
+      rest
+    case False{}:
+      nv <> rest
+
+# every name of a list once, each where it first stands
+def names.once(nvs: List<&2, String>, +seen: List<&2, String>) -> List<&2, String>:
+  match nvs:
+    case []:
+      []
+    case +h <> t:
+      names.once.put(L.seen.holds(seen, h), h, names.once(t, h <> seen))
+
+# whether nothing has answered for a key
+def is.absent(found: Look) -> Bool:
+  match found:
+    case Absent{}:
+      True{}
+    case Found{_v}:
+      False{}
+
+# whether a name is still to be resolved: the hub rules it in, the table does
+# not resolve it, the project does not import it (that one ez.toml must
+# record, and the lock refuses it), and nothing has answered for it yet
+def name.open(+ns: List<&2, L.Name>, +js: List<&2, W.Judged>, +roots: List<&2, String>, +nv: String) -> Bool:
+  Bool.and(K.name.ok(nv), Bool.and(String.is_empty(L.name.find(ns, nv)),
+    Bool.and(Bool.not(L.seen.holds(roots, nv)), is.absent(look(js, nv)))))
+
+def names.open.put(open: Bool, +nv: String, rest: List<&2, String>) -> List<&2, String>:
+  match open:
+    case True{}:
+      nv <> rest
+    case False{}:
+      rest
+
+# every name of a list still to be resolved
+def names.open(
+  +ns: List<&2, L.Name>,
+  +js: List<&2, W.Judged>,
+  +roots: List<&2, String>,
+  nvs: List<&2, String>
+) -> List<&2, String>:
+  match nvs:
+    case []:
+      []
+    case +h <> t:
+      names.open.put(name.open(ns, js, roots, h), h, names.open(ns, js, roots, t))
+
+# each name as the question the hub is asked about it
+def names.asked(+hub: String, nvs: List<&2, String>) -> List<&2, W.Ask>:
+  match nvs:
+    case []:
+      []
+    case h <> t:
+      W.Name{h, hub} <> names.asked(hub, t)
+
+# the questions for the names still open: none when there are none; the lock
+# being rewritten first, since a name it records is not put to the hub
+# (EZ-HUB-2); and then each name the lock does not record, once
+def names.ask.lock(read: Bool, +hub: String, nvs: List<&2, String>) -> List<&2, W.Ask>:
+  match read:
+    case True{}:
+      names.asked(hub, names.once(nvs, []))
+    case False{}:
+      [W.Lock{}]
+
+def names.ask(+hub: String, +js: List<&2, W.Judged>, nvs: List<&2, String>) -> List<&2, W.Ask>:
+  match nvs:
+    case []:
+      []
+    case h <> t:
+      names.ask.lock(Bool.not(is.absent(look(js, W.lockfile()))), hub, h <> t)
+
+def names.wants.bad(
+  clean: Bool,
+  +led: M.Read,
+  listing: W.Listing,
+  +ns: List<&2, L.Name>,
+  +js: List<&2, W.Judged>,
+  packs: List<&2, L.Pack>
+) -> List<&2, W.Ask>:
+  match clean:
+    case True{}:
+      names.ask(M.hub_of(led), js,
+        names.open(ns, js, roots.named(listing.files(listing)), packs.named(js, packs)))
+    case False{}:
+      []
+
+# the name questions of a walk, which ask nothing once the lock is known to
+# refuse
+def names.wants.walk(
+  wk: Walk,
+  +led: M.Read,
+  +listing: W.Listing,
+  +ns: List<&2, L.Name>,
+  +js: List<&2, W.Judged>
+) -> List<&2, W.Ask>:
+  Walk{_queue, packs, _asks, +bad} = wk
+  names.wants.bad(String.is_empty(bad), led, listing, ns, js, packs)
+
+def names.wants.gap(clean: Bool, +led: M.Read, +listing: W.Listing, +js: List<&2, W.Judged>) -> List<&2, W.Ask>:
+  match clean:
+    case True{}:
+      +ns = table(led, js)
+      names.wants.walk(walk.of(led, listing, ns, js), led, listing, ns, js)
+    case False{}:
+      []
+
+def names.wants.stop(clean: Bool, +led: M.Read, listing: W.Listing, +js: List<&2, W.Judged>) -> List<&2, W.Ask>:
+  match clean:
+    case True{}:
+      names.wants.gap(String.is_empty(need.why(led)), led, listing, js)
+    case False{}:
+      []
+
+# the name questions still open once the upgrade decided, over the answers
+# scanned as `wants` scans them
+def names.wants.of(+nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> List<&2, W.Ask>:
+  names.wants.stop(String.is_empty(Up.next.stop(nx)), Up.next.read(nx),
+    W.listing.of(nx, listing), scan(W.replies.of(nx, replies)))
+
+# the name questions a World still leaves open: for every name a package the
+# walk reaches imports, that ez.toml does not record and nothing has
+# answered for yet, the lock being rewritten, and once it is read, the hub
+def wants.names(world: W.World) -> List<&2, W.Ask>:
+  W.World{+args, +ledger, listing, replies, ups} = world
+  names.wants.of(W.next(args, ledger, ups), listing, replies)
+
+# the package questions still open, or the name questions, or the plan once
+# there are none
+def step.names(names: List<&2, W.Ask>, +nx: Up.Next, listing: W.Listing, replies: List<&2, W.Reply>) -> Step:
+  match names:
     case []:
       Run{plan.of(nx, listing, replies)}
     case h <> t:
-      Asking{h <> t, []}
+      Asking{[], [], h <> t}
+
+def step.pkgs(
+  asks: List<&2, W.Ask>,
+  names: List<&2, W.Ask>,
+  +nx: Up.Next,
+  listing: W.Listing,
+  replies: List<&2, W.Reply>
+) -> Step:
+  match asks:
+    case []:
+      step.names(names, nx, listing, replies)
+    case h <> t:
+      Asking{h <> t, [], names}
 
 # the upgrade's questions first, since the packages the lock reads depend on
 # where the pins move
@@ -947,9 +1359,10 @@ def step.ups(
 ) -> Step:
   match ups:
     case []:
-      step.pkgs(wants.of(here, nx, listing, replies), nx, listing, replies)
+      step.pkgs(wants.of(here, nx, listing, replies), names.wants.of(nx, listing, replies), nx,
+        listing, replies)
     case h <> t:
-      Asking{[], queries(here, h <> t)}
+      Asking{[], queries(here, h <> t), []}
 
 # what the interpreter does next on a World. The upgrade is decided once per
 # round, and every answer of the round is read from that one decision.

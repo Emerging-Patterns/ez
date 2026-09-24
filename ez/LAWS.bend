@@ -481,7 +481,7 @@ law had_skips_hub:
   for +url: String
   for t: List<&2, M.Dep>
   for fresh: String
-  {Named.had(M.Dep{n, h, en, M.Hub{}} <> t, url, fresh)
+  {Named.had(M.Dep{n, h, en, M.Hub{""}} <> t, url, fresh)
     == Named.had(t, url, fresh) : String}
 
 # LAW: an empty ledger clashes with no name
@@ -546,7 +546,7 @@ law clash_hub:
   for en: String
   for +url: String
   for t: List<&2, M.Dep>
-  {Named.clash(M.Dep{n, h, en, M.Hub{}} <> t, n, url) == True{} : Bool}
+  {Named.clash(M.Dep{n, h, en, M.Hub{""}} <> t, n, url) == True{} : Bool}
 
 # pin: a plain `ez lock` copies every `[tools.*]` pin as the ledger has it,
 # and refuses one it would have to fill. Filling is `--upgrade`'s alone.

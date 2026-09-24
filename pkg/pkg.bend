@@ -326,6 +326,125 @@ def scan.foreign(scanned: Scan) -> List<&2, String>:
 def is_hub(+spec: String) -> Bool:
   Bool.and(String.starts_with(spec, "0x"), String.contains(spec, "/"))
 
+# ---------------------------------------------------------------------------
+# named hub imports
+
+# Since 2.0.26 bend also reads `import <name>@<version>/<path> as P`. Its
+# loader normalises the path, and when the first component holds an `@` it is
+# a package's name and version, which bend looks up in `$BEND_LIB/names`, or
+# asks the hub for once, and then loads by the hash it names. A name the hub
+# rules out, bend refuses. `named.of` and `name.ok` are those two readings,
+# the one ez's walk, lock, fetch and doctor share.
+
+# a character a hub name holds after its first: a-z, 0-9 and -
+def name.char(+ch: Char) -> Bool:
+  Bool.or(Char.is_lower(ch), Bool.or(Char.is_digit(ch), Char.is_eq(ch, '-')))
+
+# whether every character is one a hub name holds
+def name.chars(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      +rest = name.chars(t)
+      Bool.and(name.char(h), rest)
+
+# whether a name opens with a letter
+def name.first(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      False{}
+    case SCon{+h, _t}:
+      Char.is_lower(h)
+
+# a hub name: a letter, then a-z, 0-9 and -, 12 to 64 characters in all
+def name.part(+text: String) -> Bool:
+  +n = String.length(text)
+  Bool.and(Bool.and(Nat.is_ge(n, 12n), Nat.is_le(n, 64n)),
+    Bool.and(name.first(text), name.chars(text)))
+
+# whether every character is a digit
+def digits(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      +rest = digits(t)
+      Bool.and(Char.is_digit(h), rest)
+
+# one number of a version: digits, and no leading zero unless it is `0`
+def ver.num(+text: String) -> Bool:
+  Bool.and(Bool.not(String.is_empty(text)),
+    Bool.and(digits(text),
+      Bool.or(String.eq(text, "0"), Bool.not(String.starts_with(text, "0")))))
+
+# whether every number of a version is one
+def ver.nums(ps: List<&2, String>) -> Bool:
+  match ps:
+    case []:
+      True{}
+    case +h <> t:
+      +rest = ver.nums(t)
+      Bool.and(ver.num(h), rest)
+
+# a version: four numbers, like 1.0.0.0
+def ver.ok(+text: String) -> Bool:
+  +ps = String.split(text, '.')
+  Bool.and(Nat.is_eq(List.length(&2, String, ps), 4n), ver.nums(ps))
+
+# whether a `<name>@<version>` is one the hub rules in, as bend's `NAMED`
+# pattern reads it
+def name.ok(+nv: String) -> Bool:
+  +ps = String.split(nv, '@')
+  Bool.and(Nat.is_eq(List.length(&2, String, ps), 2n),
+    Bool.and(name.part(word(ps, 0n)), ver.ok(word(ps, 1n))))
+
+# the first component, when it is a name, and "" when it is not
+def named.pick(named: Bool, +first: String) -> String:
+  match named:
+    case True{}:
+      first
+    case False{}:
+      ""
+
+# the `<name>@<version>` an import names, or "" when it names none: the first
+# component of its normalised path, when that holds an `@` and a `/` follows
+# it, as bend's loader reads it
+def named.of(+spec: String) -> String:
+  +n = P.norm(spec)
+  +first = word(String.split(n, '/'), 0n)
+  named.pick(Bool.and(String.contains(n, "/"), String.contains(first, "@")), first)
+
+# an import of a named hub package, which is a dependency rather than a module
+# of this package, whether or not the hub rules its name in (EZ-HUB-3)
+def is_named(+spec: String) -> Bool:
+  Bool.not(String.is_empty(named.of(spec)))
+
+# why a name the hub rules out stops a walk, a lock or a fetch, in bend's own
+# words
+def unnamed.why(+nv: String) -> String:
+  "ez: " ++ nv ++ " is not a package as <name>@<version>: a-z, 0-9 and -, " ++
+    "12 to 64 characters, at four numbers like 1.0.0.0"
+
+# the name when the hub rules it out, the rest's otherwise
+def unnamed.pick(bad: Bool, +nv: String, rest: Unit -> String) -> String:
+  match bad:
+    case True{}:
+      nv
+    case False{}:
+      rest(Unit{})
+
+# the first named import of a list whose name the hub rules out, or "" when
+# there is none
+def unnamed(ms: List<&2, String>) -> String:
+  match ms:
+    case []:
+      ""
+    case +h <> t:
+      +nv = named.of(h)
+      unnamed.pick(Bool.and(Bool.not(String.is_empty(nv)), Bool.not(name.ok(nv))), nv,
+        _u => unnamed(t))
+
 # a file to visit: where it is on disk, and the module name bend gives it,
 # which is the path it was reached through with the `.bend` dropped
 type Task is Data:
@@ -337,9 +456,9 @@ type Found is Data:
   Found{raw: String, sum: String}
 
 # a module import as the file to visit next, or nothing when it names a hub
-# package
+# package, by its `0x` name or by its `<name>@<version>`
 def task_of(+dir: String, +nd: String, +spec: String) -> List<&2, Task>:
-  Bool.pick(List<&2, Task>, is_hub(spec), [],
+  Bool.pick(List<&2, Task>, Bool.or(is_hub(spec), is_named(spec)), [],
     [Task{P.join(dir, spec), P.unbend(P.join(nd, spec))}])
 
 # every module a file imports, as the files to visit next
@@ -578,13 +697,15 @@ type Hit is Data:
 
 # why the walk stopped, or that it has not: a module imported and not there,
 # an import that climbs out of the checkout, a file the walk was not given,
-# or fuel run out with files still queued
+# fuel run out with files still queued, or an import of a name the hub rules
+# out
 type Stop is Data:
   Going{}
   Missing{at: String}
   Climbs{at: String}
   Asking{at: String}
   Spent{}
+  Unnamed{nv: String}
 
 # the walk so far: the files already visited, what was found, whether it has
 # stopped, and the files still to visit
@@ -779,9 +900,23 @@ def visit.put(
       State{seen, out, Asking{at}, Task{file, ns} <> rest}
     case Spent{}:
       State{seen, out, Spent{}, Task{file, ns} <> rest}
+    case Unnamed{nv}:
+      State{seen, out, Unnamed{nv}, Task{file, ns} <> rest}
 
-# a file that is in the tree, scanned, with the LICENSE beside it and its
-# foreign bodies checked first
+# a file that imports a name the hub rules out stops the walk, naming it, as
+# bend refuses to load it; any other goes on to its foreign bodies
+def named.check.at(none: Bool, nv: String, rest: Unit -> Stop) -> Stop:
+  match none:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      Unnamed{nv}
+
+def named.check(+nv: String, rest: Unit -> Stop) -> Stop:
+  named.check.at(String.is_empty(nv), nv, rest)
+
+# a file that is in the tree, scanned, with the LICENSE beside it, its named
+# imports and its foreign bodies checked first
 def visit.found(
   +tree: Tree,
   +text: String,
@@ -794,7 +929,8 @@ def visit.found(
 ) -> State:
   +sc = scan(text)
   visit.put(asked(find(tree, beside(file)), beside(file),
-      _u => foreign.check(tree, P.dir(file), nsdir(ns), scan.foreign(sc))),
+      _u => named.check(unnamed(scan.mods(sc)),
+        _v => foreign.check(tree, P.dir(file), nsdir(ns), scan.foreign(sc)))),
     tree, sc, text, file, ns, eb, seen, out, rest)
 
 # a module that is imported and not there stops the walk, since a package
@@ -892,6 +1028,8 @@ def stop.going(stop: Stop) -> Bool:
     case Asking{_at}:
       False{}
     case Spent{}:
+      False{}
+    case Unnamed{_nv}:
       False{}
 
 # whether the walk is over: its queue is empty, or it has stopped
@@ -1111,6 +1249,8 @@ def made.go(stop: Stop, +entry: String, +out: List<&2, Hit>) -> Walked:
       Asks{at}
     case Spent{}:
       Refused{"ez: the walk from " ++ entry ++ " ran out of fuel"}
+    case Unnamed{nv}:
+      Refused{unnamed.why(nv)}
 
 # the walk's end, judged
 def made(+entry: String, st: State) -> Walked:
@@ -1193,6 +1333,8 @@ def pkg.next(
     case Climbs{_at}:
       pkg.made(top, made(entry, st))
     case Spent{}:
+      pkg.made(top, made(entry, st))
+    case Unnamed{_nv}:
       pkg.made(top, made(entry, st))
 
 # the walk over what has been read so far, and each file it asks for read

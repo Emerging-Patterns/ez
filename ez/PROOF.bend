@@ -1436,7 +1436,7 @@ def Laws.clash_other(n, h, en, u, url, rev, tag, root, nar, vend, t, ne):
 
 def Laws.clash_hub(n, _h, _en, url, t):
   %Equal.sym(Bool, String.eq(n, n), True{}, Eq.string_eq_self(n)) :
-    {Named.clash.at(_, M.Hub{}, url, Named.clash(t, n, url)) == True{} : Bool}
+    {Named.clash.at(_, M.Hub{""}, url, Named.clash(t, n, url)) == True{} : Bool}
   {==}
 
 # LAW: a given `--rename` is the name

@@ -31,6 +31,13 @@ type Pack is Data:
 type Origin is Data:
   Origin{hash: String, src: Src}
 
+# a `<name>@<version>` and the `0x` name it names. The hub rules that a
+# version never moves (EZ-TRUST-6), so once a name has named a hash the pair
+# is a fact, and the lock records it under `[names]` beside the package it
+# names, which is recorded under its hash like any hub package.
+type Name is Data:
+  Name{nv: String, hash: String}
+
 # the `0x` name an import carries, which is everything before its first `/`
 def spec.hash(spec: String) -> String:
   K.word(String.split(spec, '/'), 0n)
@@ -54,6 +61,120 @@ def kids(srcs: List<&2, String>) -> List<&2, String>:
       []
     case h <> t:
       List.append(&2, String, specs(K.scan.mods(K.scan(h))), kids(t))
+
+# an import's `<name>@<version>`, or nothing when it names no package by
+# name. A named import is a dependency, never a module of this project
+# (EZ-HUB-3), whether or not the hub rules its name in.
+def named.put(+spec: String) -> List<&2, String>:
+  +nv = K.named.of(spec)
+  Bool.pick(List<&2, String>, String.is_empty(nv), [], [nv])
+
+# every name a list of imports names
+def named(ms: List<&2, String>) -> List<&2, String>:
+  match ms:
+    case []:
+      []
+    case h <> t:
+      List.append(&2, String, named.put(h), named(t))
+
+# every name the sources of one package import
+def kids.named(srcs: List<&2, String>) -> List<&2, String>:
+  match srcs:
+    case []:
+      []
+    case h <> t:
+      List.append(&2, String, named(K.scan.mods(K.scan(h))), kids.named(t))
+
+# the hash this name names when it is the one looked for, otherwise the
+# rest's. The rest arrives as a thunk, so the first hit ends the scan.
+def name.at(hit: Bool, hash: String, rest: Unit -> String) -> String:
+  match hit:
+    case True{}:
+      hash
+    case False{}:
+      rest(Unit{})
+
+# the hash a table of names gives a name, the first it records for it, or ""
+# when it records none
+def name.find(ns: List<&2, Name>, +nv: String) -> String:
+  match ns:
+    case []:
+      ""
+    case Name{+n, h} <> t:
+      name.at(String.eq(n, nv), h, _u => name.find(t, nv))
+
+# a name's hash, or nothing when the table does not resolve it
+def name.put(+hash: String) -> List<&2, String>:
+  Bool.pick(List<&2, String>, String.is_empty(hash), [], [hash])
+
+# the hashes a table gives a list of names, leaving out the ones it does not
+# resolve
+def name.hashes(+ns: List<&2, Name>, nvs: List<&2, String>) -> List<&2, String>:
+  match nvs:
+    case []:
+      []
+    case +h <> t:
+      List.append(&2, String, name.put(name.find(ns, h)), name.hashes(ns, t))
+
+# every package the sources of one package import, by hash and by a name the
+# table resolves
+def kids.in(+ns: List<&2, Name>, +srcs: List<&2, String>) -> List<&2, String>:
+  List.append(&2, String, kids(srcs), name.hashes(ns, kids.named(srcs)))
+
+# a name with the hash the table gives it, or nothing when it gives none
+def name.one(+nv: String, +hash: String) -> List<&2, Name>:
+  Bool.pick(List<&2, Name>, String.is_empty(hash), [], [Name{nv, hash}])
+
+# each name the table resolves, with its hash; one it does not is left out
+def name.pairs(+ns: List<&2, Name>, nvs: List<&2, String>) -> List<&2, Name>:
+  match nvs:
+    case []:
+      []
+    case +h <> t:
+      List.append(&2, Name, name.one(h, name.find(ns, h)), name.pairs(ns, t))
+
+# whether a hash is a package's `0x` name as bend reads one out of a names
+# file: `0x` and 32 lowercase hex digits
+def hex.char(+ch: Char) -> Bool:
+  +x = Char.to_u32(ch)
+  Bool.or(Char.is_digit(ch), Bool.and(U32.is_ge(x, 97), U32.is_le(x, 102)))
+
+def hex.all(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      +rest = hex.all(t)
+      Bool.and(hex.char(h), rest)
+
+def hash.ok(+hash: String) -> Bool:
+  Bool.and(Nat.is_eq(String.length(hash), 34n),
+    Bool.and(String.starts_with(hash, "0x"), hex.all(String.drop(hash, 2n))))
+
+# the text of the file bend reads a name's hash from, `$BEND_LIB/names/<nv>`
+def name.text(+hash: String) -> String:
+  hash ++ "\n"
+
+# a name kept when the hub rules it in and it names a `0x` hash, since that
+# is the only pair bend would read back
+def name.valid(name: Name) -> Bool:
+  Name{+nv, +hash} = name
+  Bool.and(K.name.ok(nv), hash.ok(hash))
+
+def names.valid.pick(ok: Bool, +name: Name, rest: List<&2, Name>) -> List<&2, Name>:
+  match ok:
+    case True{}:
+      name <> rest
+    case False{}:
+      rest
+
+# the names of a list that bend would read back
+def names.valid(ns: List<&2, Name>) -> List<&2, Name>:
+  match ns:
+    case []:
+      []
+    case +h <> t:
+      names.valid.pick(name.valid(h), h, names.valid(t))
 
 # a table's path, as segments
 def segs(sect: T.Sect) -> List<&2, String>:
@@ -138,6 +259,29 @@ def ledger.read(parsed: M.Read) -> List<&2, Origin>:
     case M.Good{m}:
       M.Manifest{_n, _e, _b, _h, ds, _ts} = m
       ledger.origins(ds)
+
+# a dependency's name, when the ledger records it by one
+def ledger.name(+dep: M.Dep) -> List<&2, Name>:
+  +nv = M.source.nv(M.source.dep(dep))
+  Bool.pick(List<&2, Name>, String.is_empty(nv), [], [Name{nv, M.dep.hash(dep)}])
+
+# every name a ledger's dependencies record, each with the hash it named when
+# it was added
+def ledger.names.of(ds: List<&2, M.Dep>) -> List<&2, Name>:
+  match ds:
+    case []:
+      []
+    case +h <> t:
+      List.append(&2, Name, ledger.name(h), ledger.names.of(t))
+
+# every name a ledger records. One that would not parse records none.
+def ledger.names(parsed: M.Read) -> List<&2, Name>:
+  match parsed:
+    case M.Bad{_why}:
+      []
+    case M.Good{m}:
+      M.Manifest{_n, _e, _b, _h, ds, _ts} = m
+      ledger.names.of(ds)
 
 # this origin's source when the hash matches, otherwise whatever the rest gave
 def origin.at(known: Origin, rest: Src, wanted: String) -> Src:
@@ -390,7 +534,7 @@ def render(hub: String, ps: List<&2, Pack>) -> String:
 # uses in ez.toml, and not the `[packages.*]` source table.
 def tool.pairs(+entry: String, +binary: String, source: M.Source) -> List<&2, T.Kv>:
   match source:
-    case M.Hub{}:
+    case M.Hub{_named}:
       List.concat(&2, T.Kv, [kv("entry", entry), kv("bin", binary)])
     case M.Git{url, rev, tag, root, nar, _vend}:
       List.concat(&2, T.Kv,
@@ -415,6 +559,37 @@ def tool.sects(ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
 def render.tools(ts: List<&2, M.Tool>, hub: String, ps: List<&2, Pack>) -> String:
   text.of(hub, K.file.sort(pack.blocks(ps)), T.render.all(tool.sects(ts)))
 
+# a name as the pair the `[names]` table writes it as, which is the shape a
+# file of a package is written in: its `<name>@<version>` as a quoted key and
+# its hash as the value
+def name.file(name: Name) -> K.File:
+  Name{nv, hash} = name
+  K.File{nv, hash}
+
+# every name, so
+def name.files(ns: List<&2, Name>) -> List<&2, K.File>:
+  match ns:
+    case []:
+      []
+    case h <> t:
+      name.file(h) <> name.files(t)
+
+# the `[names]` table: every name the lock resolved, in name order and each
+# once, sorted and deduplicated the way a package's files are. A lock that
+# resolved no name has no such table, so a project with no named import
+# locks to the text it always did.
+def names.sects(ns: List<&2, Name>) -> List<&2, T.Sect>:
+  match ns:
+    case []:
+      []
+    case +h <> +t:
+      [T.Sect{"names", file.pairs(K.files_of(name.files(h <> t)))}]
+
+# the lock with its names and then its tools after the packages
+def render.names(ns: List<&2, Name>, ts: List<&2, M.Tool>, hub: String, ps: List<&2, Pack>) -> String:
+  text.of(hub, K.file.sort(pack.blocks(ps)),
+    T.render.all(List.append(&2, T.Sect, names.sects(ns), tool.sects(ts))))
+
 # the same, told whether the tool list is empty
 def render.pick(empty: Bool, hub: String, ps: List<&2, Pack>, ts: List<&2, M.Tool>) -> String:
   match empty:
@@ -434,6 +609,36 @@ def lock.pairs(ss: List<&2, T.Sect>) -> List<&2, T.Kv>:
 # the hub a lock was resolved against
 def lock.hub(ss: List<&2, T.Sect>) -> String:
   T.value(lock.pairs(ss), "hub")
+
+# the `[names]` table of a lock that was read
+def names.pairs(ss: List<&2, T.Sect>) -> List<&2, T.Kv>:
+  match ss:
+    case []:
+      []
+    case +h <> t:
+      at.pick(named1(segs(h), "names"), h, names.pairs(t))
+
+# a pair of the `[names]` table as a name
+def pair.name(kv: T.Kv) -> Name:
+  T.Kv{k, v} = kv
+  Name{k, v}
+
+# every pair of the `[names]` table, as names
+def pair.names(ps: List<&2, T.Kv>) -> List<&2, Name>:
+  match ps:
+    case []:
+      []
+    case h <> t:
+      pair.name(h) <> pair.names(t)
+
+# every name a lock records, in the order its table holds them
+def names(+ss: List<&2, T.Sect>) -> List<&2, Name>:
+  pair.names(names.pairs(ss))
+
+# every name a lock's text records that bend would read back. A lock that
+# does not parse records none.
+def names.read(text: String) -> List<&2, Name>:
+  names.valid(names(T.sects(T.parse(text))))
 
 # every hash a lock records, one per `[packages."<hash>".files]` table
 def hash.put(hit: Bool, sect: T.Sect, rest: List<&2, String>) -> List<&2, String>:

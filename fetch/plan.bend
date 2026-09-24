@@ -23,8 +23,17 @@
 # pins, the tree nix rebuilds from the same pin. Only then is the tree laid
 # under BEND_LIB, the files the lock names and their manifest last.
 #
-# The plan of a fetch that succeeds lays every tree that was fetched, and
-# nothing else: no ledger, no lock. A fetch that refuses, for any package,
+# Every name the lock records is laid too, as the file bend reads the name's
+# hash from, `$BEND_LIB/names/<nv>` holding the hash and a newline, so bend
+# never asks the hub for it (EZ-HUB-4). A names file that already holds the
+# lock's hash is kept; any other is written, and one that held another hash
+# is said to have been rewritten, since the lock wins over it as it wins over
+# a tree that fails its checks. A name the lock records that bend would not
+# read back, one the hub rules out or a hash that is not a `0x` name, refuses
+# the fetch, since its file would not be the one bend reads.
+#
+# The plan of a fetch that succeeds lays every tree that was fetched and every
+# names file that is not already right, and nothing else: no ledger, no lock. A fetch that refuses, for any package,
 # has no effect at all, so a package fetched before the one that failed is
 # not laid either, and a tree already under BEND_LIB is never removed
 # (EZ-OUT-2).
@@ -84,6 +93,8 @@ def tree.read(answer: W.Answer) -> Tree:
       Tree{"", zip(L.manifest.files(String.lines(manifest)), ss)}
     case W.Miss{why}:
       Gone{why}
+    case _:
+      Gone{"ez: a tree was not answered with one"}
 
 # a checkout at the pinned rev, whose paths are the lock's from `root`
 def tree.said(answer: Up.Answer, +root: String) -> Tree:
@@ -102,6 +113,8 @@ def tree.of(answer: F.Answer, +root: String) -> Tree:
       tree.read(a)
     case F.Said{a}:
       tree.said(a, root)
+    case F.Held{_got}:
+      Gone{"ez: a tree was not answered with one"}
 
 # a text looked up, "" when it is not there
 def text.or(got: Maybe<&2, String>) -> String:
@@ -370,6 +383,8 @@ def weighed.answer(answer: F.Answer, +hash: String, +nar: String, +url: String, 
       weighed.up(a, hash, nar, url, rev)
     case F.Read{_a}:
       unweighed(hash)
+    case F.Held{_got}:
+      unweighed(hash)
 
 def weighed.heard(got: F.Heard, +hash: String, +nar: String, +url: String, +rev: String) -> String:
   match got:
@@ -438,6 +453,141 @@ def parts(
       +fs = L.pack.files(pk)
       Pt{h, src, fs, weigh.part(weighed(ss, rs, here, h), part(rs, src, fs, here, hub, h))}
         <> parts(ss, rs, here, hub, t)
+
+# ---------------------------------------------------------------------------
+# the names
+
+# where one name of the lock stands: its names file still to read, a file
+# that already holds the lock's hash, a file to write, with the hash the one
+# there held ("" when there was none), or why the name refuses the fetch
+type Nm is Data:
+  NmAsk{nv: String}
+  NmKeep{}
+  NmPut{nv: String, hash: String, was: String}
+  NmStop{why: String}
+
+# a names file that was there, against the lock's hash. bend trims the file
+# before it reads the hash, and so does this.
+def name.held(same: Bool, +nv: String, +hash: String, +was: String) -> Nm:
+  match same:
+    case True{}:
+      NmKeep{}
+    case False{}:
+      NmPut{nv, hash, was}
+
+# what BEND_LIB holds for a name
+def name.got(got: Maybe<&2, String>, +nv: String, +hash: String) -> Nm:
+  match got:
+    case None{}:
+      NmPut{nv, hash, ""}
+    case Some{text}:
+      +was = String.trim(text)
+      name.held(String.eq(was, hash), nv, hash, was)
+
+# a names file, once it is read
+def name.answer(answer: F.Answer, +nv: String, +hash: String) -> Nm:
+  match answer:
+    case F.Held{got}:
+      name.got(got, nv, hash)
+    case _:
+      NmStop{"ez: " ++ nv ++ ": its names file was not read"}
+
+def name.heard(got: F.Heard, +nv: String, +hash: String) -> Nm:
+  match got:
+    case F.Open{}:
+      NmAsk{nv}
+    case F.Heard{a}:
+      name.answer(a, nv, hash)
+
+# a name bend would read back is looked for under BEND_LIB; any other stops
+# the fetch, since the file laid for it would not be the one bend reads
+def name.valid(ok: Bool, +rs: List<&2, F.Reply>, +nv: String, +hash: String) -> Nm:
+  match ok:
+    case True{}:
+      name.heard(F.heard(rs, F.Named{nv}), nv, hash)
+    case False{}:
+      NmStop{"ez: the lock names " ++ nv ++ " as " ++ hash ++
+        ", which bend would not read back; run ez lock"}
+
+# where one name of the lock stands
+def name.part(+rs: List<&2, F.Reply>, name: L.Name) -> Nm:
+  L.Name{+nv, +hash} = name
+  name.valid(L.name.valid(L.Name{nv, hash}), rs, nv, hash)
+
+# where every name of the lock stands
+def name.parts(+rs: List<&2, F.Reply>, ns: List<&2, L.Name>) -> List<&2, Nm>:
+  match ns:
+    case []:
+      []
+    case h <> t:
+      name.part(rs, h) <> name.parts(rs, t)
+
+# how a rewritten names file is said to have been rewritten
+def name.rewrote(+nv: String, +hash: String, +was: String) -> String:
+  "ez: BEND_LIB/names/" ++ nv ++ " named " ++ was ++ ", and the lock names " ++ hash ++
+    "; rewrote it"
+
+# a names file written, said first when it held another hash
+def name.put.at(none: Bool, +nv: String, +hash: String, was: String, rest: List<&2, P.Effect>) -> List<&2, P.Effect>:
+  match none:
+    case True{}:
+      P.Name{nv, hash} <> rest
+    case False{}:
+      P.Say{name.rewrote(nv, hash, was)} <> P.Name{nv, hash} <> rest
+
+def name.put(+nv: String, +hash: String, +was: String, rest: List<&2, P.Effect>) -> List<&2, P.Effect>:
+  name.put.at(String.is_empty(was), nv, hash, was, rest)
+
+# every names file a fetch writes, ahead of what follows
+def names.lay(ms: List<&2, Nm>, rest: List<&2, P.Effect>) -> List<&2, P.Effect>:
+  match ms:
+    case []:
+      rest
+    case m <> t:
+      match m:
+        case NmPut{nv, hash, was}:
+          name.put(nv, hash, was, names.lay(t, rest))
+        case _:
+          names.lay(t, rest)
+
+# how the names end the fetch: the first that refuses, or `o`, how the
+# packages ended it, which comes first
+def names.outcome(ms: List<&2, Nm>) -> P.Outcome:
+  match ms:
+    case []:
+      P.Success{}
+    case m <> t:
+      match m:
+        case NmStop{why}:
+          P.Refused{why}
+        case NmAsk{nv}:
+          P.Refused{"ez: " ++ nv ++ " was never looked for under BEND_LIB"}
+        case _:
+          names.outcome(t)
+
+# the packages' end, or, when they succeed, the names'
+def outcome.then(first: P.Outcome, then: P.Outcome) -> P.Outcome:
+  match first:
+    case P.Success{}:
+      then
+    case P.Refused{why}:
+      P.Refused{why}
+
+# the names still to read under BEND_LIB
+def names.asks(ms: List<&2, Nm>) -> List<&2, F.Ask>:
+  match ms:
+    case []:
+      []
+    case m <> t:
+      match m:
+        case NmAsk{nv}:
+          F.Named{nv} <> names.asks(t)
+        case _:
+          names.asks(t)
+
+# every name the lock records, and where each stands
+def name.parts.of(+ss: List<&2, T.Sect>, +world: F.World) -> List<&2, Nm>:
+  name.parts(F.replies(world), L.names(ss))
 
 # ---------------------------------------------------------------------------
 # the verdict
@@ -521,11 +671,12 @@ def seal(es: List<&2, P.Effect>, outcome: P.Outcome) -> P.Plan:
     case P.Refused{why}:
       P.Plan{[], P.Refused{why}}
 
-# the plan once every package stands somewhere. Each verdict is made once
+# the plan once every package and every name stands somewhere: the names
+# files, then the trees, and how the command ends. Each verdict is made once
 # and read by both halves.
-def plan.parts(ps: List<&2, Pt>) -> P.Plan:
+def plan.parts(ps: List<&2, Pt>, +ms: List<&2, Nm>) -> P.Plan:
   +vs = judged(ps)
-  seal(effects.of(vs), outcome.of(vs))
+  seal(names.lay(ms, effects.of(vs)), outcome.then(outcome.of(vs), names.outcome(ms)))
 
 # ---------------------------------------------------------------------------
 # the plan
@@ -549,7 +700,8 @@ def plan.lock(got: Maybe<&2, String>, +world: F.World) -> P.Plan:
     case None{}:
       P.Plan{[], P.Refused{need.lock()}}
     case Some{_text}:
-      plan.parts(parts.of(F.sects(world), world))
+      +ss = F.sects(world)
+      plan.parts(parts.of(ss, world), name.parts.of(ss, world))
 
 # the plan: a missing ledger, then a missing lock, refused before the rest
 def plan.led(led: Bool, got: Maybe<&2, String>, +world: F.World) -> P.Plan:
@@ -605,7 +757,8 @@ def wants.lock(got: Maybe<&2, String>, +world: F.World) -> List<&2, F.Ask>:
       []
     case Some{_text}:
       +ss = F.sects(world)
-      asks.of(parts.of(ss, world), F.here(world), L.lock.hub(ss))
+      List.append(&2, F.Ask, asks.of(parts.of(ss, world), F.here(world), L.lock.hub(ss)),
+        names.asks(name.parts.of(ss, world)))
 
 def wants.led(led: Bool, got: Maybe<&2, String>, +world: F.World) -> List<&2, F.Ask>:
   match led:
@@ -625,10 +778,10 @@ type Step is Data:
   Asking{asks: List<&2, F.Ask>}
   Run{plan: P.Plan}
 
-def step.asks(asks: List<&2, F.Ask>, ps: List<&2, Pt>) -> Step:
+def step.asks(asks: List<&2, F.Ask>, ps: List<&2, Pt>, ms: List<&2, Nm>) -> Step:
   match asks:
     case []:
-      Run{plan.parts(ps)}
+      Run{plan.parts(ps, ms)}
     case h <> t:
       Asking{h <> t}
 
@@ -639,7 +792,9 @@ def step.lock(got: Maybe<&2, String>, +world: F.World) -> Step:
     case Some{_text}:
       +ss = F.sects(world)
       +ps = parts.of(ss, world)
-      step.asks(asks.of(ps, F.here(world), L.lock.hub(ss)), ps)
+      +ms = name.parts.of(ss, world)
+      step.asks(List.append(&2, F.Ask, asks.of(ps, F.here(world), L.lock.hub(ss)), names.asks(ms)),
+        ps, ms)
 
 def step.led(led: Bool, got: Maybe<&2, String>, +world: F.World) -> Step:
   match led:
@@ -712,6 +867,8 @@ def ask.hash(ask: F.Ask) -> String:
       hash
     case F.Hub{q}:
       W.ask.hash(q)
+    case F.Named{nv}:
+      nv
 
 # whether a git question asks for the source the lock records for its
 # package, taken from the project: the lock's url anchored at `here`

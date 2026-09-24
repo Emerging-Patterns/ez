@@ -323,6 +323,63 @@ law hub_named:
   for +rest: String
   {P.is_hub(("0x" ++ h) ++ ("/" ++ rest)) == True{} : Bool}
 
+# Named hub imports, `import <name>@<version>/<path> as P`, which bend 2.0.26
+# added. The name is the first component of the normalised path when it
+# holds an `@` (`P.named.of`), and the hub rules which names there are
+# (`P.name.ok`, bend's `NAMED`).
+
+# whether the walk was given what it holds of the LICENSE beside a file,
+# there or not: a LICENSE it was not given is asked for first. Law
+# vocabulary.
+def given(look: P.Look) -> Bool:
+  match look:
+    case P.Here{_text}:
+      True{}
+    case P.Absent{}:
+      True{}
+    case P.Unasked{}:
+      False{}
+
+# LAW: an import of a named hub package is a dependency, never a module of
+# the package: the walk queues no file for it, whether or not the hub rules
+# its name in
+# EZ-HUB-3
+law named_is_no_module:
+  for +dir: String
+  for +nd: String
+  for +spec: String
+  for e: {True{} == P.is_named(spec) : Bool}
+  {P.task_of(dir, nd, spec) == [] : List<&2, P.Task>}
+
+# LAW: and a file that imports a name the hub rules out stops the walk,
+# naming it, with the file still queued, as bend refuses to load the file:
+# no package is hashed around an import bend would not load
+# EZ-HUB-3
+law unnamed_stops:
+  for +tree: P.Tree
+  for +text: String
+  for +file: String
+  for +ns: String
+  for eb: String
+  for seen: List<&2, String>
+  for out: List<&2, P.Hit>
+  for rest: List<&2, P.Task>
+  for g: {True{} == given(P.find(tree, P.beside(file))) : Bool}
+  for n: {False{} == String.is_empty(P.unnamed(P.scan.mods(P.scan(text)))) : Bool}
+  {P.visit.found(tree, text, file, ns, eb, seen, out, rest)
+    == P.State{seen, out, P.Unnamed{P.unnamed(P.scan.mods(P.scan(text)))}, P.Task{file, ns} <> rest}
+    : P.State}
+
+# LAW: and such a walk is refused in bend's words
+# EZ-HUB-3
+law unnamed_refused:
+  for +entry: String
+  for +nv: String
+  for +out: List<&2, P.Hit>
+  {P.made.go(P.Unnamed{nv}, entry, out)
+    == P.Refused{"ez: " ++ nv ++ " is not a package as <name>@<version>: a-z, 0-9 and -, " ++
+      "12 to 64 characters, at four numbers like 1.0.0.0"} : P.Walked}
+
 # LAW: a module named after the header has ended is dropped. The walk
 # does not follow it.
 law late_mod:

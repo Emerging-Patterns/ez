@@ -23,6 +23,7 @@ import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../sha/sha.bend as Sha
 import ../check/eq.bend as Eq
+import ../check/str.bend as Str
 import ./LAWS.bend as Laws
 
 # ---------------------------------------------------------------------------
@@ -59,8 +60,11 @@ def led_quiet(b, g, w, r):
         case None{}:
           {==}
         case Some{_t}:
-          seal_quiet(FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w))),
-            FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))), r)
+          seal_quiet(FP.names.lay(FP.name.parts.of(F.sects(w), w),
+            FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w)))),
+            FP.outcome.then(FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))),
+              FP.names.outcome(FP.name.parts.of(F.sects(w), w))),
+            r)
 
 def Laws.fetch_refusal_writes_nothing(w, r):
   led_quiet(F.ledger(w), F.lock(w), w, r)
@@ -196,6 +200,53 @@ def locked_all(ss, rs, here, hub, hs):
         FP.effects.of(FP.judged(FP.parts(ss, rs, here, hub, t))),
         locked_all(ss, rs, here, hub, t))
 
+# The names files a fetch lays go ahead of its trees. A names file is no
+# tree and no path of the project, so each law about what a fetch lays holds
+# of the trees behind them as it held of the trees alone.
+
+# LAW: one names file written, with or without the line that says it was
+# rewritten, in front of trees the lock records
+law locked_put:
+  for b: Bool
+  for +ss: List<&2, T.Sect>
+  for +nv: String
+  for +hash: String
+  for was: String
+  for +rest: List<&2, P.Effect>
+  for e: {FP.lays.locked(ss, rest) == True{} : Bool}
+  {FP.lays.locked(ss, FP.name.put.at(b, nv, hash, was, rest)) == True{} : Bool}
+
+def locked_put(b, _ss, _nv, _hash, _was, _rest, e):
+  match b:
+    case True{}:
+      e
+    case False{}:
+      e
+
+# LAW: every names file, so
+law locked_names:
+  for +ss: List<&2, T.Sect>
+  for ms: List<&2, FP.Nm>
+  for +rest: List<&2, P.Effect>
+  for e: {FP.lays.locked(ss, rest) == True{} : Bool}
+  {FP.lays.locked(ss, FP.names.lay(ms, rest)) == True{} : Bool}
+
+def locked_names(ss, ms, rest, e):
+  match ms:
+    case []:
+      e
+    case m <> +t:
+      match m:
+        case FP.NmPut{+nv, +hash, +was}:
+          locked_put(String.is_empty(was), ss, nv, hash, was, FP.names.lay(t, rest),
+            locked_names(ss, t, rest, e))
+        case FP.NmAsk{_nv}:
+          locked_names(ss, t, rest, e)
+        case FP.NmKeep{}:
+          locked_names(ss, t, rest, e)
+        case FP.NmStop{_why}:
+          locked_names(ss, t, rest, e)
+
 law locked_led:
   for b: Bool
   for g: Maybe<&2, String>
@@ -212,10 +263,13 @@ def locked_led(b, g, w):
           {==}
         case Some{_t}:
           locked_seal(F.sects(w),
-            FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w))),
-            FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))),
-            locked_all(F.sects(w), F.replies(w), F.here(w), L.lock.hub(F.sects(w)),
-              L.hashes(F.sects(w))))
+            FP.names.lay(FP.name.parts.of(F.sects(w), w), FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w)))),
+            FP.outcome.then(FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))),
+              FP.names.outcome(FP.name.parts.of(F.sects(w), w))),
+            locked_names(F.sects(w), FP.name.parts.of(F.sects(w), w),
+              FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w))),
+              locked_all(F.sects(w), F.replies(w), F.here(w), L.lock.hub(F.sects(w)),
+                L.hashes(F.sects(w)))))
 
 def Laws.fetch_lays_the_lock(w):
   locked_led(F.ledger(w), F.lock(w), w)
@@ -327,6 +381,46 @@ def named_all(ps):
     case FP.Pt{h, _src, fs, p} <> +t:
       named_one(fs, h, p, FP.effects.of(FP.judged(t)), named_all(t))
 
+# LAW: one names file, in front of trees that are named
+law named_put:
+  for b: Bool
+  for +nv: String
+  for +hash: String
+  for was: String
+  for +rest: List<&2, P.Effect>
+  for e: {P.lays.named(rest) == True{} : Bool}
+  {P.lays.named(FP.name.put.at(b, nv, hash, was, rest)) == True{} : Bool}
+
+def named_put(b, _nv, _hash, _was, _rest, e):
+  match b:
+    case True{}:
+      e
+    case False{}:
+      e
+
+# LAW: every names file, so
+law named_names:
+  for ms: List<&2, FP.Nm>
+  for +rest: List<&2, P.Effect>
+  for e: {P.lays.named(rest) == True{} : Bool}
+  {P.lays.named(FP.names.lay(ms, rest)) == True{} : Bool}
+
+def named_names(ms, rest, e):
+  match ms:
+    case []:
+      e
+    case m <> +t:
+      match m:
+        case FP.NmPut{+nv, +hash, +was}:
+          named_put(String.is_empty(was), nv, hash, was, FP.names.lay(t, rest),
+            named_names(t, rest, e))
+        case FP.NmAsk{_nv}:
+          named_names(t, rest, e)
+        case FP.NmKeep{}:
+          named_names(t, rest, e)
+        case FP.NmStop{_why}:
+          named_names(t, rest, e)
+
 law named_led:
   for b: Bool
   for g: Maybe<&2, String>
@@ -342,9 +436,12 @@ def named_led(b, g, w):
         case None{}:
           {==}
         case Some{_t}:
-          named_seal(FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w))),
-            FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))),
-            named_all(FP.parts.of(F.sects(w), w)))
+          named_seal(FP.names.lay(FP.name.parts.of(F.sects(w), w),
+            FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w)))),
+            FP.outcome.then(FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))),
+              FP.names.outcome(FP.name.parts.of(F.sects(w), w))),
+            named_names(FP.name.parts.of(F.sects(w), w), FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w))),
+              named_all(FP.parts.of(F.sects(w), w))))
 
 def Laws.fetch_lays_named(w):
   named_led(F.ledger(w), F.lock(w), w)
@@ -369,6 +466,48 @@ def kept_all(vs, path):
           kept_all(t, path)
         case FP.Stop{_why}:
           kept_all(t, path)
+
+# LAW: one names file writes no path of the project
+law kept_put:
+  for b: Bool
+  for +nv: String
+  for +hash: String
+  for was: String
+  for +rest: List<&2, P.Effect>
+  for +path: String
+  for e: {P.put.in(rest, path) == P.Kept{} : P.Wrote}
+  {P.put.in(FP.name.put.at(b, nv, hash, was, rest), path) == P.Kept{} : P.Wrote}
+
+def kept_put(b, _nv, _hash, _was, _rest, _path, e):
+  match b:
+    case True{}:
+      e
+    case False{}:
+      e
+
+# LAW: and neither does any of them
+law kept_names:
+  for ms: List<&2, FP.Nm>
+  for +rest: List<&2, P.Effect>
+  for +path: String
+  for e: {P.put.in(rest, path) == P.Kept{} : P.Wrote}
+  {P.put.in(FP.names.lay(ms, rest), path) == P.Kept{} : P.Wrote}
+
+def kept_names(ms, rest, path, e):
+  match ms:
+    case []:
+      e
+    case m <> +t:
+      match m:
+        case FP.NmPut{+nv, +hash, +was}:
+          kept_put(String.is_empty(was), nv, hash, was, FP.names.lay(t, rest), path,
+            kept_names(t, rest, path, e))
+        case FP.NmAsk{_nv}:
+          kept_names(t, rest, path, e)
+        case FP.NmKeep{}:
+          kept_names(t, rest, path, e)
+        case FP.NmStop{_why}:
+          kept_names(t, rest, path, e)
 
 law kept_seal:
   for es: List<&2, P.Effect>
@@ -400,9 +539,11 @@ def kept_led(b, g, w, path):
         case None{}:
           {==}
         case Some{_t}:
-          kept_seal(FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w))),
-            FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))), path,
-            kept_all(FP.judged(FP.parts.of(F.sects(w), w)), path))
+          kept_seal(FP.names.lay(FP.name.parts.of(F.sects(w), w), FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w)))),
+            FP.outcome.then(FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))),
+              FP.names.outcome(FP.name.parts.of(F.sects(w), w))), path,
+            kept_names(FP.name.parts.of(F.sects(w), w), FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w))), path,
+              kept_all(FP.judged(FP.parts.of(F.sects(w), w)), path)))
 
 def Laws.fetch_keeps_records(w, path):
   kept_led(F.ledger(w), F.lock(w), w, path)
@@ -486,6 +627,51 @@ def asks_all(ss, rs, here, hub, hs):
         FP.asks.of(FP.parts(ss, rs, here, hub, t), here, hub),
         asks_all(ss, rs, here, hub, t))
 
+# LAW: the questions of two lists are anchored when each list's are
+law asks_app:
+  for +here: String
+  for +ss: List<&2, T.Sect>
+  for xs: List<&2, F.Ask>
+  for +ys: List<&2, F.Ask>
+  for +ex: {FP.asks.anchored(here, ss, xs) == True{} : Bool}
+  for ey: {FP.asks.anchored(here, ss, ys) == True{} : Bool}
+  {FP.asks.anchored(here, ss, List.append(&2, F.Ask, xs, ys)) == True{} : Bool}
+
+def asks_app(here, ss, xs, ys, ex, ey):
+  match xs:
+    case []:
+      ey
+    case +h <> +t:
+      Str.and_true(FP.ask.anchored(here, L.pack.src(L.pack_of(ss, FP.ask.hash(h))), h),
+        FP.asks.anchored(here, ss, List.append(&2, F.Ask, t, ys)),
+        Eq.and.left(FP.ask.anchored(here, L.pack.src(L.pack_of(ss, FP.ask.hash(h))), h),
+          FP.asks.anchored(here, ss, t), ex),
+        asks_app(here, ss, t, ys,
+          Eq.and.right(FP.ask.anchored(here, L.pack.src(L.pack_of(ss, FP.ask.hash(h))), h),
+            FP.asks.anchored(here, ss, t), ex), ey))
+
+# LAW: a names file's question asks no checkout, so it is anchored
+law asks_names:
+  for +here: String
+  for +ss: List<&2, T.Sect>
+  for ms: List<&2, FP.Nm>
+  {FP.asks.anchored(here, ss, FP.names.asks(ms)) == True{} : Bool}
+
+def asks_names(here, ss, ms):
+  match ms:
+    case []:
+      {==}
+    case m <> t:
+      match m:
+        case FP.NmAsk{_nv}:
+          asks_names(here, ss, t)
+        case FP.NmKeep{}:
+          asks_names(here, ss, t)
+        case FP.NmPut{_nv, _hash, _was}:
+          asks_names(here, ss, t)
+        case FP.NmStop{_why}:
+          asks_names(here, ss, t)
+
 law asks_led:
   for b: Bool
   for g: Maybe<&2, String>
@@ -501,8 +687,12 @@ def asks_led(b, g, w):
         case None{}:
           {==}
         case Some{_t}:
-          asks_all(F.sects(w), F.replies(w), F.here(w), L.lock.hub(F.sects(w)),
-            L.hashes(F.sects(w)))
+          asks_app(F.here(w), F.sects(w),
+            FP.asks.of(FP.parts.of(F.sects(w), w), F.here(w), L.lock.hub(F.sects(w))),
+            FP.names.asks(FP.name.parts.of(F.sects(w), w)),
+            asks_all(F.sects(w), F.replies(w), F.here(w), L.lock.hub(F.sects(w)),
+              L.hashes(F.sects(w))),
+            asks_names(F.here(w), F.sects(w), FP.name.parts.of(F.sects(w), w)))
 
 def Laws.fetch_asks_anchored(w):
   asks_led(F.ledger(w), F.lock(w), w)
@@ -643,6 +833,52 @@ def weighed_all(ss, rs, here, hub, hs):
         FP.effects.of(FP.judged(FP.parts(ss, rs, here, hub, t))),
         weighed_all(ss, rs, here, hub, t))
 
+# LAW: one names file, in front of trees whose checkouts weighed right
+law weighed_put:
+  for b: Bool
+  for +ss: List<&2, T.Sect>
+  for +rs: List<&2, F.Reply>
+  for +here: String
+  for +nv: String
+  for +hash: String
+  for was: String
+  for +rest: List<&2, P.Effect>
+  for e: {FP.lays.weighed(ss, rs, here, rest) == True{} : Bool}
+  {FP.lays.weighed(ss, rs, here, FP.name.put.at(b, nv, hash, was, rest)) == True{} : Bool}
+
+def weighed_put(b, _ss, _rs, _here, _nv, _hash, _was, _rest, e):
+  match b:
+    case True{}:
+      e
+    case False{}:
+      e
+
+# LAW: every names file, so
+law weighed_names:
+  for +ss: List<&2, T.Sect>
+  for +rs: List<&2, F.Reply>
+  for +here: String
+  for ms: List<&2, FP.Nm>
+  for +rest: List<&2, P.Effect>
+  for e: {FP.lays.weighed(ss, rs, here, rest) == True{} : Bool}
+  {FP.lays.weighed(ss, rs, here, FP.names.lay(ms, rest)) == True{} : Bool}
+
+def weighed_names(ss, rs, here, ms, rest, e):
+  match ms:
+    case []:
+      e
+    case m <> +t:
+      match m:
+        case FP.NmPut{+nv, +hash, +was}:
+          weighed_put(String.is_empty(was), ss, rs, here, nv, hash, was, FP.names.lay(t, rest),
+            weighed_names(ss, rs, here, t, rest, e))
+        case FP.NmAsk{_nv}:
+          weighed_names(ss, rs, here, t, rest, e)
+        case FP.NmKeep{}:
+          weighed_names(ss, rs, here, t, rest, e)
+        case FP.NmStop{_why}:
+          weighed_names(ss, rs, here, t, rest, e)
+
 law weighed_led:
   for b: Bool
   for g: Maybe<&2, String>
@@ -660,10 +896,13 @@ def weighed_led(b, g, w):
           {==}
         case Some{_t}:
           weighed_seal(F.sects(w), F.replies(w), F.here(w),
-            FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w))),
-            FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))),
-            weighed_all(F.sects(w), F.replies(w), F.here(w), L.lock.hub(F.sects(w)),
-              L.hashes(F.sects(w))))
+            FP.names.lay(FP.name.parts.of(F.sects(w), w), FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w)))),
+            FP.outcome.then(FP.outcome.of(FP.judged(FP.parts.of(F.sects(w), w))),
+              FP.names.outcome(FP.name.parts.of(F.sects(w), w))),
+            weighed_names(F.sects(w), F.replies(w), F.here(w), FP.name.parts.of(F.sects(w), w),
+              FP.effects.of(FP.judged(FP.parts.of(F.sects(w), w))),
+              weighed_all(F.sects(w), F.replies(w), F.here(w), L.lock.hub(F.sects(w)),
+                L.hashes(F.sects(w)))))
 
 def Laws.fetch_lays_weighed(w):
   weighed_led(F.ledger(w), F.lock(w), w)
@@ -722,3 +961,216 @@ def unweighed_stops(k, _fs, _h, _why, _ls, n):
 
 def Laws.fetch_refuses_unweighed(fs, h, why, ls, n):
   unweighed_stops(String.is_empty(why), fs, h, why, ls, n)
+
+# ---------------------------------------------------------------------------
+# names (EZ-HUB)
+
+law nm.agree_held:
+  for same: Bool
+  for +nv: String
+  for +hash: String
+  for +was: String
+  {Laws.put.agrees(nv, hash, FP.name.held(same, nv, hash, was)) == True{} : Bool}
+
+def nm.agree_held(same, nv, hash, _was):
+  match same:
+    case True{}:
+      {==}
+    case False{}:
+      Str.and_true(String.eq(nv, nv), String.eq(hash, hash), Eq.string_eq_self(nv),
+        Eq.string_eq_self(hash))
+
+law nm.agree_got:
+  for got: Maybe<&2, String>
+  for +nv: String
+  for +hash: String
+  {Laws.put.agrees(nv, hash, FP.name.got(got, nv, hash)) == True{} : Bool}
+
+def nm.agree_got(got, nv, hash):
+  match got:
+    case None{}:
+      Str.and_true(String.eq(nv, nv), String.eq(hash, hash), Eq.string_eq_self(nv),
+        Eq.string_eq_self(hash))
+    case Some{+text}:
+      nm.agree_held(String.eq(String.trim(text), hash), nv, hash, String.trim(text))
+
+law nm.agree_answer:
+  for a: F.Answer
+  for +nv: String
+  for +hash: String
+  {Laws.put.agrees(nv, hash, FP.name.answer(a, nv, hash)) == True{} : Bool}
+
+def nm.agree_answer(a, nv, hash):
+  match a:
+    case F.Held{got}:
+      nm.agree_got(got, nv, hash)
+    case F.Read{_x}:
+      {==}
+    case F.Said{_x}:
+      {==}
+
+law nm.agree_heard:
+  for g: F.Heard
+  for +nv: String
+  for +hash: String
+  {Laws.put.agrees(nv, hash, FP.name.heard(g, nv, hash)) == True{} : Bool}
+
+def nm.agree_heard(g, nv, hash):
+  match g:
+    case F.Open{}:
+      {==}
+    case F.Heard{a}:
+      nm.agree_answer(a, nv, hash)
+
+law nm.agree_valid:
+  for b: Bool
+  for +rs: List<&2, F.Reply>
+  for +nv: String
+  for +hash: String
+  {Laws.put.agrees(nv, hash, FP.name.valid(b, rs, nv, hash)) == True{} : Bool}
+
+def nm.agree_valid(b, rs, nv, hash):
+  match b:
+    case True{}:
+      nm.agree_heard(F.heard(rs, F.Named{nv}), nv, hash)
+    case False{}:
+      {==}
+
+def Laws.fetch_names_the_lock(rs, nv, hash):
+  nm.agree_valid(L.name.valid(L.Name{nv, hash}), rs, nv, hash)
+
+def Laws.fetch_lays_missing_name(rs, nv, hash, v, g):
+  %v : {FP.name.valid(_, rs, nv, hash) == FP.NmPut{nv, hash, ""} : FP.Nm}
+  %g : {FP.name.heard(_, nv, hash) == FP.NmPut{nv, hash, ""} : FP.Nm}
+  {==}
+
+def Laws.fetch_rewrites_name(rs, nv, hash, x, v, g, ne):
+  %v : {FP.name.valid(_, rs, nv, hash) == FP.NmPut{nv, hash, String.trim(x)} : FP.Nm}
+  %g : {FP.name.heard(_, nv, hash) == FP.NmPut{nv, hash, String.trim(x)} : FP.Nm}
+  %ne : {FP.name.held(_, nv, hash, String.trim(x)) == FP.NmPut{nv, hash, String.trim(x)} : FP.Nm}
+  {==}
+
+def Laws.fetch_refuses_unread_name(rs, nv, hash, v):
+  %v : {FP.names.outcome([FP.name.valid(_, rs, nv, hash)])
+    == P.Refused{"ez: the lock names " ++ nv ++ " as " ++ hash ++
+      ", which bend would not read back; run ez lock"} : P.Outcome}
+  {==}
+
+# LAW: one names file, said or not, lays its name
+law nm.laid_put:
+  for b: Bool
+  for +nv: String
+  for +hash: String
+  for was: String
+  for +rest: List<&2, P.Effect>
+  {Laws.names.laid(FP.name.put.at(b, nv, hash, was, rest))
+    == L.Name{nv, hash} <> Laws.names.laid(rest) : List<&2, L.Name>}
+
+def nm.laid_put(b, _nv, _hash, _was, _rest):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# LAW: the names files laid ahead of the trees are the names the parts lay
+law nm.laid_names:
+  for ms: List<&2, FP.Nm>
+  for +rest: List<&2, P.Effect>
+  {Laws.names.laid(FP.names.lay(ms, rest))
+    == List.append(&2, L.Name, Laws.puts(ms), Laws.names.laid(rest)) : List<&2, L.Name>}
+
+def nm.laid_names(ms, rest):
+  match ms:
+    case []:
+      {==}
+    case m <> +t:
+      match m:
+        case FP.NmPut{+nv, +hash, +was}:
+          Equal.trans(List<&2, L.Name>,
+            Laws.names.laid(FP.name.put.at(String.is_empty(was), nv, hash, was, FP.names.lay(t, rest))),
+            L.Name{nv, hash} <> Laws.names.laid(FP.names.lay(t, rest)),
+            L.Name{nv, hash} <> List.append(&2, L.Name, Laws.puts(t), Laws.names.laid(rest)),
+            nm.laid_put(String.is_empty(was), nv, hash, was, FP.names.lay(t, rest)),
+            Equal.cong(List<&2, L.Name>, List<&2, L.Name>, r => L.Name{nv, hash} <> r,
+              Laws.names.laid(FP.names.lay(t, rest)),
+              List.append(&2, L.Name, Laws.puts(t), Laws.names.laid(rest)), nm.laid_names(t, rest)))
+        case FP.NmAsk{_nv}:
+          nm.laid_names(t, rest)
+        case FP.NmKeep{}:
+          nm.laid_names(t, rest)
+        case FP.NmStop{_why}:
+          nm.laid_names(t, rest)
+
+# LAW: the trees a fetch lays lay no names file
+law nm.laid_trees:
+  for vs: List<&2, FP.Verdict>
+  {Laws.names.laid(FP.effects.of(vs)) == [] : List<&2, L.Name>}
+
+def nm.laid_trees(vs):
+  match vs:
+    case []:
+      {==}
+    case v <> +t:
+      match v:
+        case FP.Keep{}:
+          nm.laid_trees(t)
+        case FP.Put{_hash, _ls}:
+          nm.laid_trees(t)
+        case FP.Stop{_why}:
+          nm.laid_trees(t)
+
+# LAW: a sealed plan that does not refuse holds the effects it was given
+law nm.seal_es:
+  for +es: List<&2, P.Effect>
+  for o: P.Outcome
+  for ok: {FP.refuses.plan(FP.seal(es, o)) == False{} : Bool}
+  {FP.effects(FP.seal(es, o)) == es : List<&2, P.Effect>}
+
+def nm.seal_es(es, o, ok):
+  match o:
+    case P.Success{}:
+      {==}
+    case P.Refused{_why}:
+      Eq.bit.absurd2(&2, {FP.effects(FP.seal(es, P.Refused{_why})) == es : List<&2, P.Effect>}, ok)
+
+law nm.lays_led:
+  for b: Bool
+  for g: Maybe<&2, String>
+  for +w: F.World
+  for ok: {FP.refuses.plan(FP.plan.led(b, g, w)) == False{} : Bool}
+  {Laws.names.laid(FP.effects(FP.plan.led(b, g, w))) == Laws.puts(FP.name.parts.of(F.sects(w), w))
+    : List<&2, L.Name>}
+
+def nm.lays_led(b, g, w, ok):
+  match b:
+    case False{}:
+      Eq.bit.absurd2(&2, {Laws.names.laid(FP.effects(FP.plan.led(False{}, g, w)))
+        == Laws.puts(FP.name.parts.of(F.sects(w), w)) : List<&2, L.Name>}, ok)
+    case True{}:
+      match g:
+        case None{}:
+          Eq.bit.absurd2(&2, {Laws.names.laid(FP.effects(FP.plan.led(True{}, None{}, w)))
+            == Laws.puts(FP.name.parts.of(F.sects(w), w)) : List<&2, L.Name>}, ok)
+        case Some{_t}:
+          +ms = FP.name.parts.of(F.sects(w), w)
+          +vs = FP.judged(FP.parts.of(F.sects(w), w))
+          +es = FP.names.lay(ms, FP.effects.of(vs))
+          +o = FP.outcome.then(FP.outcome.of(vs), FP.names.outcome(ms))
+          Equal.trans(List<&2, L.Name>,
+            Laws.names.laid(FP.effects(FP.seal(es, o))), Laws.names.laid(es), Laws.puts(ms),
+            Equal.cong(List<&2, P.Effect>, List<&2, L.Name>, x => Laws.names.laid(x),
+              FP.effects(FP.seal(es, o)), es, nm.seal_es(es, o, ok)),
+            Equal.trans(List<&2, L.Name>,
+              Laws.names.laid(es), List.append(&2, L.Name, Laws.puts(ms), Laws.names.laid(FP.effects.of(vs))),
+              Laws.puts(ms),
+              nm.laid_names(ms, FP.effects.of(vs)),
+              Equal.trans(List<&2, L.Name>,
+                List.append(&2, L.Name, Laws.puts(ms), Laws.names.laid(FP.effects.of(vs))),
+                List.append(&2, L.Name, Laws.puts(ms), []), Laws.puts(ms),
+                Equal.cong(List<&2, L.Name>, List<&2, L.Name>, x => List.append(&2, L.Name, Laws.puts(ms), x),
+                  Laws.names.laid(FP.effects.of(vs)), [], nm.laid_trees(vs)),
+                Str.list_append_nil(L.Name, Laws.puts(ms)))))
+
+def Laws.fetch_lays_the_names(w, ok):
+  nm.lays_led(F.ledger(w), F.lock(w), w, ok)

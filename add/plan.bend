@@ -451,9 +451,9 @@ def added.k(walk: K.Walked, +world: A.World) -> M.Dep:
     case K.Walked{h, root, _fs, _ss}:
       dep.of(h, root, world)
     case K.Asks{_at}:
-      M.Dep{"", "", "", M.Hub{}}
+      M.Dep{"", "", "", M.Hub{""}}
     case K.Refused{_why}:
-      M.Dep{"", "", "", M.Hub{}}
+      M.Dep{"", "", "", M.Hub{""}}
 
 # the dependency `ez add` records on a World
 def added(+world: A.World) -> M.Dep:

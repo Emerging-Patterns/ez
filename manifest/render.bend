@@ -28,8 +28,8 @@ def vendor.word(vend: Bool) -> String:
 # the keys a source contributes
 def source(src: M.Source) -> String:
   match src:
-    case M.Hub{}:
-      ""
+    case M.Hub{named}:
+      line("hub", named)
     case M.Git{url, rev, tag, root, nar, vend}:
       line("git", url) ++ line("rev", rev) ++ line("tag", tag) ++
       line("root", root) ++ line("narHash", nar) ++ line.bare("vendor", vendor.word(vend))
@@ -105,8 +105,8 @@ def remove(manifest: M.Manifest, name: String) -> M.Manifest:
 # a git source with its tree committed
 def vendored(src: M.Source) -> M.Source:
   match src:
-    case M.Hub{}:
-      M.Hub{}
+    case M.Hub{named}:
+      M.Hub{named}
     case M.Git{url, rev, tag, root, nar, _vend}:
       M.Git{url, rev, tag, root, nar, True{}}
 
@@ -155,8 +155,8 @@ def clean(+text: String) -> Bool:
 # `git` for a hub package and one with no `root` for the top of the checkout.
 def source.ok(src: M.Source) -> Bool:
   match src:
-    case M.Hub{}:
-      True{}
+    case M.Hub{+named}:
+      clean(named)
     case M.Git{+url, rev, tag, +root, nar, _vend}:
       Bool.and(Bool.and(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root))),
         Bool.and(Bool.and(clean(url), clean(rev)),
@@ -178,10 +178,20 @@ def deps.ok(ds: List<&2, M.Dep>) -> Bool:
       rest = deps.ok(t)
       Bool.and(dep.ok(h), rest)
 
+# whether a pinned CLI's source does. A tool is never imported, so the reader
+# keeps no hub name for one, and one written with a name would read back
+# without it.
+def tool.src.ok(src: M.Source) -> Bool:
+  match src:
+    case M.Hub{named}:
+      String.is_empty(named)
+    case M.Git{url, rev, tag, root, nar, vend}:
+      source.ok(M.Git{url, rev, tag, root, nar, vend})
+
 # whether a pinned CLI does
 def tool.ok(pin: M.Tool) -> Bool:
   M.Tool{+n, +e, +b, s} = pin
-  Bool.and(clean(n), Bool.and(Bool.and(clean(e), clean(b)), source.ok(s)))
+  Bool.and(clean(n), Bool.and(Bool.and(clean(e), clean(b)), tool.src.ok(s)))
 
 # whether every pinned CLI does
 def tools.ok(ts: List<&2, M.Tool>) -> Bool:

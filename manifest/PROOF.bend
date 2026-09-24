@@ -110,7 +110,7 @@ def Laws.source_of_hub(pairs, e):
   %e : {M.source.go(_, M.value(pairs, "git"), M.value(pairs, "rev"),
     M.value(pairs, "tag"), M.root.or(M.value(pairs, "root")),
     M.value(pairs, "narHash"), M.flag(M.value(pairs, "vendor")))
-    == M.Hub{} : M.Source}
+    == M.Hub{""} : M.Source}
   {==}
 
 def Laws.source_of_absent_root(pairs, e0, e1):
@@ -1054,7 +1054,7 @@ def find_last(ds, n, h, e, s):
   match ds:
     case []:
       Equal.cong(Bool, M.Dep,
-        c => M.find.pick(c, M.Dep{n, h, e, s}, M.Dep{"", "", "", M.Hub{}}),
+        c => M.find.pick(c, M.Dep{n, h, e, s}, M.Dep{"", "", "", M.Hub{""}}),
         String.eq(n, n), True{}, Eq.string_eq_self(n))
     case +d <> t:
       find_last.arm(d, R.without(t, n), n, M.Dep{n, h, e, s},
@@ -1072,13 +1072,13 @@ def revend_again(k, s):
   match k:
     case True{}:
       match s:
-        case M.Hub{}:
+        case M.Hub{_named}:
           {==}
         case M.Git{url, rev, tag, root, nar, vend}:
           {==}
     case False{}:
       match s:
-        case M.Hub{}:
+        case M.Hub{_named}:
           {==}
         case M.Git{url, rev, tag, root, nar, vend}:
           match vend:
@@ -4994,8 +4994,8 @@ def pkg.rows(n: String, e: String, b: String, h: String) -> List<&2, Row>:
 # the rows a source writes
 def src.rows(s: M.Source) -> List<&2, Row>:
   match s:
-    case M.Hub{}:
-      []
+    case M.Hub{named}:
+      [Q{"hub", named}]
     case M.Git{url, rev, tag, root, nar, vend}:
       [Q{"git", url}, Q{"rev", rev}, Q{"tag", tag}, Q{"root", root}, Q{"narHash", nar},
         B{"vendor", R.vendor.word(vend)}]
@@ -5059,8 +5059,8 @@ law src_text:
 
 def src_text(s):
   match s:
-    case M.Hub{}:
-      {==}
+    case M.Hub{+named}:
+      Str.append_nil(R.line("hub", named))
     case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
       Equal.cong(String, String,
         y => String.append(R.line("git", url), String.append(R.line("rev", rev),
@@ -5357,8 +5357,8 @@ law src_rows_ok:
 
 def src_rows_ok(s, rest, es, er):
   match s:
-    case M.Hub{}:
-      er
+    case M.Hub{+named}:
+      Str.and_true(Str.clear(named, '\n'), rows.ok(rest), clean_nl(named, es), er)
     case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
       +cs = Eq.and.right(Bool.and(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root))),
         Bool.and(Bool.and(R.clean(url), R.clean(rev)),
@@ -5411,6 +5411,33 @@ def dep_sect_ok(d, e):
             Str.and_true(Str.clear(en, '\n'), True{},
               clean_nl(en, Eq.and.left(R.clean(en), R.source.ok(s), r)), {==}))))
 
+# LAW: an empty string is the empty string
+law empty_is:
+  for +s: String
+  for e: {String.is_empty(s) == True{} : Bool}
+  {s == "" : String}
+
+def empty_is(s, e):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{c, t}:
+      Eq.bit.absurd(&2, {SCon{c, t} == "" : String}, e)
+
+# LAW: a pinned CLI's source that can be written is a source that can
+law tool_src_ok:
+  for +s: M.Source
+  for e: {R.tool.src.ok(s) == True{} : Bool}
+  {R.source.ok(s) == True{} : Bool}
+
+def tool_src_ok(s, e):
+  match s:
+    case M.Hub{+named}:
+      %Equal.sym(String, named, "", empty_is(named, e)) : {R.clean(_) == True{} : Bool}
+      {==}
+    case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+      e
+
 # LAW: and so does a pinned CLI that can be written
 law tool_sect_ok:
   for +pin: M.Tool
@@ -5420,13 +5447,13 @@ law tool_sect_ok:
 def tool_sect_ok(pin, e):
   match pin:
     case M.Tool{+n, +en, +b, +s}:
-      +r = Eq.and.right(R.clean(n), Bool.and(Bool.and(R.clean(en), R.clean(b)), R.source.ok(s)), e)
-      +eb = Eq.and.left(Bool.and(R.clean(en), R.clean(b)), R.source.ok(s), r)
+      +r = Eq.and.right(R.clean(n), Bool.and(Bool.and(R.clean(en), R.clean(b)), R.tool.src.ok(s)), e)
+      +eb = Eq.and.left(Bool.and(R.clean(en), R.clean(b)), R.tool.src.ok(s), r)
       Str.and_true(Str.clear(n, '\n'), rows.ok(tool.rows(en, b, s)),
         clean_nl(n, Eq.and.left(R.clean(n), Bool.and(Bool.and(R.clean(en), R.clean(b)),
-          R.source.ok(s)), e)),
+          R.tool.src.ok(s)), e)),
         src_rows_ok(s, [Q{"entry", en}, Q{"bin", b}],
-          Eq.and.right(Bool.and(R.clean(en), R.clean(b)), R.source.ok(s), r),
+          tool_src_ok(s, Eq.and.right(Bool.and(R.clean(en), R.clean(b)), R.tool.src.ok(s), r)),
           Str.and_true(Str.clear(en, '\n'), rows.ok([Q{"bin", b}]),
             clean_nl(en, Eq.and.left(R.clean(en), R.clean(b), eb)),
             Str.and_true(Str.clear(b, '\n'), True{},
@@ -5528,19 +5555,6 @@ def rows.once(rs: List<&2, Row>, +k: String) -> Bool:
       True{}
     case r <> +t:
       Bool.pick(Bool, String.eq(row.key(r), k), rows.none(t, k), rows.once(t, k))
-
-# LAW: an empty string is the empty string
-law empty_is:
-  for +s: String
-  for e: {String.is_empty(s) == True{} : Bool}
-  {s == "" : String}
-
-def empty_is(s, e):
-  match s:
-    case SNil{}:
-      {==}
-    case SCon{c, t}:
-      Eq.bit.absurd(&2, {SCon{c, t} == "" : String}, e)
 
 # LAW: a row's pair answers a lookup with its value when the key is its own
 law value_at_row:
@@ -5806,34 +5820,6 @@ def git_source(url, rev, tag, root, nar, vend, eu, er):
       == M.Git{url, rev, tag, root, nar, vend} : M.Source}
   {==}
 
-# LAW: a clean source is read from its rows, whatever follows them, as itself
-law src_reads:
-  for +s: M.Source
-  for +rest: List<&2, Row>
-  for es: {R.source.ok(s) == True{} : Bool}
-  for er: {M.source_of(rows.kvs(List.append(&2, Row, src.rows(s), rest))) == M.source_of(rows.kvs(src.rows(s)))
-    : M.Source}
-  {M.source_of(rows.kvs(List.append(&2, Row, src.rows(s), rest))) == s : M.Source}
-
-def src_reads(s, rest, es, er):
-  match s:
-    case M.Hub{}:
-      er
-    case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
-      +ne = Eq.and.left(Bool.and(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root))),
-        Bool.and(Bool.and(R.clean(url), R.clean(rev)),
-          Bool.and(R.clean(tag), Bool.and(R.clean(root), R.clean(nar)))), es)
-      Equal.trans(M.Source,
-        M.source_of(rows.kvs(List.append(&2, Row, src.rows(M.Git{url, rev, tag, root, nar, vend}), rest))),
-        M.source_of(rows.kvs(src.rows(M.Git{url, rev, tag, root, nar, vend}))),
-        M.Git{url, rev, tag, root, nar, vend},
-        er,
-        git_source(url, rev, tag, root, nar, vend,
-          Eq.not.true(String.is_empty(url),
-            Eq.and.left(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root)), ne)),
-          Eq.not.true(String.is_empty(root),
-            Eq.and.right(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root)), ne))))
-
 # LAW: a dependency's table, as it reads back, is read as the dependency
 law dep_read:
   for +n: String
@@ -5845,20 +5831,27 @@ law dep_read:
 
 def dep_read(n, h, en, s, ok):
   match s:
-    case M.Hub{}:
-      +rs = dep.rows(h, en, M.Hub{})
+    case M.Hub{+named}:
+      +rs = dep.rows(h, en, M.Hub{named})
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(rs), "hash"),
         value_keep(rs, "hash", {==}))
-        : {M.Dep{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "entry"), M.source_of(rows.kvs(keep(rs)))}
-          == M.Dep{n, h, en, M.Hub{}} : M.Dep}
+        : {M.Dep{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "entry"),
+          M.source.named(M.value(rows.kvs(keep(rs)), "hub"), M.source_of(rows.kvs(keep(rs))))}
+          == M.Dep{n, h, en, M.Hub{named}} : M.Dep}
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "entry"), M.value(rows.kvs(rs), "entry"),
         value_keep(rs, "entry", {==}))
-        : {M.Dep{String.drop(n, 0n), h, _, M.source_of(rows.kvs(keep(rs)))} == M.Dep{n, h, en, M.Hub{}} : M.Dep}
-      %Equal.sym(M.Source, M.source_of(rows.kvs(keep(rs))), M.Hub{},
-        src_keep(rs, M.Hub{}, {==}, {==}, {==}, {==}, {==}, {==}, {==}))
-        : {M.Dep{String.drop(n, 0n), h, en, _} == M.Dep{n, h, en, M.Hub{}} : M.Dep}
+        : {M.Dep{String.drop(n, 0n), h, _,
+          M.source.named(M.value(rows.kvs(keep(rs)), "hub"), M.source_of(rows.kvs(keep(rs))))}
+          == M.Dep{n, h, en, M.Hub{named}} : M.Dep}
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hub"), M.value(rows.kvs(rs), "hub"),
+        value_keep(rs, "hub", {==}))
+        : {M.Dep{String.drop(n, 0n), h, en, M.source.named(_, M.source_of(rows.kvs(keep(rs))))}
+          == M.Dep{n, h, en, M.Hub{named}} : M.Dep}
+      %Equal.sym(M.Source, M.source_of(rows.kvs(keep(rs))), M.Hub{""},
+        src_keep(rs, M.Hub{""}, {==}, {==}, {==}, {==}, {==}, {==}, {==}))
+        : {M.Dep{String.drop(n, 0n), h, en, M.source.named(named, _)} == M.Dep{n, h, en, M.Hub{named}} : M.Dep}
       %Equal.sym(String, String.drop(n, 0n), n, drop_zero(n))
-        : {M.Dep{_, h, en, M.Hub{}} == M.Dep{n, h, en, M.Hub{}} : M.Dep}
+        : {M.Dep{_, h, en, M.Hub{named}} == M.Dep{n, h, en, M.Hub{named}} : M.Dep}
       {==}
     case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
       +rs = dep.rows(h, en, M.Git{url, rev, tag, root, nar, vend})
@@ -5870,11 +5863,13 @@ def dep_read(n, h, en, s, ok):
           Bool.and(R.clean(tag), Bool.and(R.clean(root), R.clean(nar)))), es)
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(rs), "hash"),
         value_keep(rs, "hash", {==}))
-        : {M.Dep{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "entry"), M.source_of(rows.kvs(keep(rs)))}
+        : {M.Dep{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "entry"),
+          M.source.named(M.value(rows.kvs(keep(rs)), "hub"), M.source_of(rows.kvs(keep(rs))))}
           == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "entry"), M.value(rows.kvs(rs), "entry"),
         value_keep(rs, "entry", {==}))
-        : {M.Dep{String.drop(n, 0n), h, _, M.source_of(rows.kvs(keep(rs)))}
+        : {M.Dep{String.drop(n, 0n), h, _,
+          M.source.named(M.value(rows.kvs(keep(rs)), "hub"), M.source_of(rows.kvs(keep(rs))))}
           == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
       %Equal.sym(M.Source, M.source_of(rows.kvs(keep(rs))), M.Git{url, rev, tag, root, nar, vend},
         src_keep(rs, M.Git{url, rev, tag, root, nar, vend}, {==}, {==}, {==}, {==}, {==}, {==},
@@ -5883,7 +5878,8 @@ def dep_read(n, h, en, s, ok):
               Eq.and.left(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root)), ne)),
             Eq.not.true(String.is_empty(root),
               Eq.and.right(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root)), ne)))))
-        : {M.Dep{String.drop(n, 0n), h, en, _} == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
+        : {M.Dep{String.drop(n, 0n), h, en, M.source.named(M.value(rows.kvs(keep(rs)), "hub"), _)}
+          == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
       %Equal.sym(String, String.drop(n, 0n), n, drop_zero(n))
         : {M.Dep{_, h, en, M.Git{url, rev, tag, root, nar, vend}}
           == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
@@ -5900,20 +5896,26 @@ law tool_read:
 
 def tool_read(n, en, b, s, ok):
   match s:
-    case M.Hub{}:
-      +rs = tool.rows(en, b, M.Hub{})
+    case M.Hub{+named}:
+      %Equal.sym(String, named, "", empty_is(named,
+        Eq.and.right(Bool.and(R.clean(en), R.clean(b)), String.is_empty(named),
+          Eq.and.right(R.clean(n), Bool.and(Bool.and(R.clean(en), R.clean(b)),
+            String.is_empty(named)), ok))))
+        : {M.tool_of("tools." ++ n, rows.kvs(keep(tool.rows(en, b, M.Hub{_}))))
+          == M.Tool{n, en, b, M.Hub{_}} : M.Tool}
+      +rs = tool.rows(en, b, M.Hub{""})
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "entry"), M.value(rows.kvs(rs), "entry"),
         value_keep(rs, "entry", {==}))
         : {M.Tool{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "bin"), M.source_of(rows.kvs(keep(rs)))}
-          == M.Tool{n, en, b, M.Hub{}} : M.Tool}
+          == M.Tool{n, en, b, M.Hub{""}} : M.Tool}
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "bin"), M.value(rows.kvs(rs), "bin"),
         value_keep(rs, "bin", {==}))
-        : {M.Tool{String.drop(n, 0n), en, _, M.source_of(rows.kvs(keep(rs)))} == M.Tool{n, en, b, M.Hub{}} : M.Tool}
-      %Equal.sym(M.Source, M.source_of(rows.kvs(keep(rs))), M.Hub{},
-        src_keep(rs, M.Hub{}, {==}, {==}, {==}, {==}, {==}, {==}, {==}))
-        : {M.Tool{String.drop(n, 0n), en, b, _} == M.Tool{n, en, b, M.Hub{}} : M.Tool}
+        : {M.Tool{String.drop(n, 0n), en, _, M.source_of(rows.kvs(keep(rs)))} == M.Tool{n, en, b, M.Hub{""}} : M.Tool}
+      %Equal.sym(M.Source, M.source_of(rows.kvs(keep(rs))), M.Hub{""},
+        src_keep(rs, M.Hub{""}, {==}, {==}, {==}, {==}, {==}, {==}, {==}))
+        : {M.Tool{String.drop(n, 0n), en, b, _} == M.Tool{n, en, b, M.Hub{""}} : M.Tool}
       %Equal.sym(String, String.drop(n, 0n), n, drop_zero(n))
-        : {M.Tool{_, en, b, M.Hub{}} == M.Tool{n, en, b, M.Hub{}} : M.Tool}
+        : {M.Tool{_, en, b, M.Hub{""}} == M.Tool{n, en, b, M.Hub{""}} : M.Tool}
       {==}
     case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
       +rs = tool.rows(en, b, M.Git{url, rev, tag, root, nar, vend})
@@ -6040,7 +6042,7 @@ law once_hash:
 
 def once_hash(_h, _en, s):
   match s:
-    case M.Hub{}:
+    case M.Hub{_named}:
       {==}
     case M.Git{_u, _r, _t, _o, _n, _v}:
       {==}

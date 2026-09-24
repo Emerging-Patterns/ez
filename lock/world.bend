@@ -7,8 +7,13 @@
 # A World is the ledger's text, the committed `.bend` files, one answer per
 # package the planner asked about, and, under `--upgrade`, one answer per
 # question the upgrade asked (lock/up.bend). There is no field for the
-# environment, the clock, the old lock, untracked files, `.ez/origins.toml` or
-# BEND_LIB's path, because the lock reads none of them.
+# environment, the clock, untracked files, `.ez/origins.toml` or BEND_LIB's
+# path, because the lock reads none of them. A package a dependency imports
+# by `<name>@<version>` adds two questions, asked only when the ledger does
+# not name it: the lock being rewritten, which already records every name it
+# resolved, and, for a name it does not record, what the hub says the name
+# names. Both are answers like any other, and enter the lock through their
+# verdicts.
 import Base
 import ./lock.bend as L
 import ./up.bend as Up
@@ -47,16 +52,23 @@ type How is Data:
   Served{}
 
 # a question the planner asks, answered by one IO action: a package's
-# manifest and the text of each file it names. The source says where to read
-# it from, and the hub is where a hub package is served.
+# manifest and the text of each file it names, where the source says to read
+# it from, and the hub is where a hub package is served; the hash the hub
+# says a `<name>@<version>` names, `GET <hub>/name/<nv>`; or the lock being
+# rewritten, ez.lock.toml as it is.
 type Ask is Data:
   Pkg{hash: String, src: L.Src, hub: String}
+  Name{nv: String, hub: String}
+  Lock{}
 
 # the answer to one question: the manifest found and the text of each file it
-# names, in the manifest's order, or why IO could not answer
+# names, in the manifest's order; what the hub said a name names, as it said
+# it; the lock's text, "" when there is none; or why IO could not answer
 type Answer is Data:
   Got{how: How, manifest: String, srcs: List<&2, String>}
   Miss{why: String}
+  Said{text: String}
+  Locked{text: String}
 
 # one question, answered
 type Reply is Data:
@@ -70,10 +82,12 @@ type World is Data:
     replies: List<&2, Reply>, ups: List<&2, Up.Reply>}
 
 # what the planner makes of one answer: the files and their texts, once every
-# check passed, or why it refused them
+# check passed, or why it refused them; or, for a name or the lock, the names
+# it resolves, each to its hash
 type Verdict is Data:
   Ok{files: List<&2, K.File>, srcs: List<&2, String>}
   No{why: String}
+  Named{names: List<&2, L.Name>}
 
 # one package hash and its verdict
 type Judged is Data:
@@ -115,10 +129,21 @@ def ledger.of(world: World) -> Maybe<&2, String>:
   World{_args, ledger, _listing, _replies, _ups} = world
   ledger
 
-# the hash a question asks about
+# the lock's path, which is fixed
+def lockfile() -> String:
+  "ez.lock.toml"
+
+# what a question asks about, which is the key its answer is judged and
+# looked up under: a package's hash, a name, or the lock's path. A `0x` name,
+# a `<name>@<version>` and the lock's path are three different strings.
 def ask.hash(ask: Ask) -> String:
-  Pkg{hash, _src, _hub} = ask
-  hash
+  match ask:
+    case Pkg{hash, _src, _hub}:
+      hash
+    case Name{nv, _hub}:
+      nv
+    case Lock{}:
+      lockfile()
 
 # ---------------------------------------------------------------------------
 # judging one answer
@@ -317,6 +342,26 @@ def miss.src(src: L.Src, named: Bool, +hash: String, +hub: String, +why: String)
     case L.Git{_url, _rev, _entry, _root, _nar, _tag}:
       why
 
+# what the hub said a name names, once it is known whether the answer is a
+# `0x` name
+def said.ok(ok: Bool, +nv: String, +hash: String, +hub: String) -> Verdict:
+  match ok:
+    case True{}:
+      Named{[L.Name{nv, hash}]}
+    case False{}:
+      No{"ez: the hub at " ++ hub ++ " names no package " ++ nv ++ " (it answered `" ++
+        hash ++ "`)"}
+
+# the hub's answer for a name: the `0x` name it gives, trimmed as bend trims
+# it, or a refusal when it gives none
+def said(+nv: String, +hub: String, +text: String) -> Verdict:
+  +hash = String.trim(text)
+  said.ok(L.hash.ok(hash), nv, hash, hub)
+
+# the lock being rewritten: every name it records that bend would read back
+def locked(text: String) -> Verdict:
+  Named{L.names.read(text)}
+
 # one answer judged
 def accept(+orgs: List<&2, L.Origin>, +hub: String, +hash: String, answer: Answer) -> Verdict:
   match answer:
@@ -324,6 +369,10 @@ def accept(+orgs: List<&2, L.Origin>, +hub: String, +hash: String, answer: Answe
       No{miss.src(L.origin(orgs, hash), L.known(orgs, hash), hash, hub, why)}
     case Got{how, manifest, ss}:
       accept.src(L.origin(orgs, hash), how, hash, manifest, ss)
+    case Said{text}:
+      said(hash, hub, text)
+    case Locked{text}:
+      locked(text)
 
 # every reply judged, in the order they were given
 def judge(+orgs: List<&2, L.Origin>, +hub: String, rs: List<&2, Reply>) -> List<&2, Judged>:
@@ -333,6 +382,27 @@ def judge(+orgs: List<&2, L.Origin>, +hub: String, rs: List<&2, Reply>) -> List<
     case Reply{ask, answer} <> t:
       +hash = ask.hash(ask)
       Judged{hash, accept(orgs, hub, hash, answer)} <> judge(orgs, hub, t)
+
+# the names a verdict resolves: those of a name's or the lock's answer, and
+# none for a package
+def verdict.names(verdict: Verdict) -> List<&2, L.Name>:
+  match verdict:
+    case Ok{_fs, _ss}:
+      []
+    case No{_why}:
+      []
+    case Named{ns}:
+      ns
+
+# every name the answers resolve, in the order they were given. The lock's
+# answer is asked for before any name's, so a name it records is never put
+# to the hub.
+def names.of(js: List<&2, Judged>) -> List<&2, L.Name>:
+  match js:
+    case []:
+      []
+    case Judged{_h, v} <> t:
+      List.append(&2, L.Name, verdict.names(v), names.of(t))
 
 # the ledger, read. A missing one is refused as a ledger that does not
 # parse: only `ez init` makes a ledger, and a lock of none is not a lock.
@@ -467,6 +537,10 @@ def reclone.one(+orgs: List<&2, L.Origin>, +hash: String, answer: Answer) -> Ans
       Miss{why}
     case Got{how, manifest, ss}:
       Got{reclone.how(how, L.origin(orgs, hash)), manifest, ss}
+    case Said{text}:
+      Said{text}
+    case Locked{text}:
+      Locked{text}
 
 # every answer as a fresh clone would have it. A tree the upgrade checked
 # out is a clone already.

@@ -15,23 +15,29 @@
 # answered the way the lock answers its questions, with a manifest and the
 # texts of the files it names, and a clone the way the upgrade answers
 # `Clone`.
+#
+# A name the lock records is asked about too: the file bend reads its hash
+# from, `$BEND_LIB/names/<nv>` (`Named`), as it is, or that there is none.
 import Base
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../lock/lock.bend as L
 import ../lock/world.bend as W
 import ../lock/up.bend as Up
 
-# a question about one package of the lock
+# a question about one package of the lock, or one name it records
 type Ask is Data:
   Laid{hash: String}               # the tree under BEND_LIB/<hash>, as its manifest names it
   Git{hash: String, ask: Up.Ask}   # a checkout at the pinned rev (`Up.Clone`)
   Hub{ask: W.Ask}                  # the hub's manifest and every file it names (`W.Pkg`)
+  Named{nv: String}                # the file BEND_LIB/names/<nv>, as it is
 
 # the answer to one question: a manifest and the texts of the files it
-# names, or what a clone answered
+# names, what a clone answered, or a names file's text, None when there is
+# none
 type Answer is Data:
-  Read{answer: W.Answer}    # Laid, Hub
-  Said{answer: Up.Answer}   # Git
+  Read{answer: W.Answer}           # Laid, Hub
+  Said{answer: Up.Answer}          # Git
+  Held{got: Maybe<&2, String>}     # Named
 
 # one question, answered
 type Reply is Data:
@@ -84,8 +90,13 @@ def sects(world: World) -> List<&2, T.Sect>:
 
 # a hub question as a key
 def hub.key(ask: W.Ask) -> String:
-  W.Pkg{hash, _src, hub} = ask
-  "hub\n" ++ hash ++ "\n" ++ hub
+  match ask:
+    case W.Pkg{hash, _src, hub}:
+      "hub\n" ++ hash ++ "\n" ++ hub
+    case W.Name{nv, hub}:
+      "hubname\n" ++ nv ++ "\n" ++ hub
+    case W.Lock{}:
+      "hublock"
 
 # a question as a key. A lock's value never holds a newline, so the fields
 # are kept apart by one.
@@ -97,6 +108,8 @@ def key(ask: Ask) -> String:
       "git\n" ++ hash ++ "\n" ++ Up.key(q)
     case Hub{q}:
       hub.key(q)
+    case Named{nv}:
+      "named\n" ++ nv
 
 # an answer looked up, or none yet
 type Heard is Data:

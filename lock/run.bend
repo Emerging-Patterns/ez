@@ -5,10 +5,11 @@
 # planner's plan. It decides nothing: which packages to read, whether their
 # bytes are the ones the ledger names, where an upgrade moves a pin, and what
 # is written are the planner's. That it reads and executes faithfully is
-# EZ-TRUST-2. Under `--upgrade` it also answers the upgrade's questions
-# (lock/up.bend): what git prints for refs, the default branch and tags,
-# ancestry, checkouts at a rev, the hub's manifest for a moved hash,
-# `.gitignore`, and the project's sources. A new checkout's package is walked
+# EZ-TRUST-2. It answers a name's question by asking the hub once, and the
+# lock's by reading ez.lock.toml. Under `--upgrade` it also answers the
+# upgrade's questions (lock/up.bend): what git prints for refs, the default
+# branch and tags, ancestry, checkouts at a rev, the hub's manifest for a
+# moved hash, `.gitignore`, and the project's sources. A new checkout's package is walked
 # from its entry here, by `K.pkg_of`, which is interpreter code under
 # EZ-TRUST-2 until `ez add` is converted.
 import Base
@@ -239,14 +240,46 @@ def answer.git(+lib: String, +hash: String, +url: String, +rev: String, +entry: 
     m : Maybe<&2, String> <- F.read(lib ++ "/" ++ hash ++ "/manifest")
     git.seen(m, lib, hash, url, rev, entry)
 
-# one question, answered
-def answer(+lib: String, ask: W.Ask) -> IO(W.Answer):
-  W.Pkg{+hash, src, +hub} = ask
+# a package, from where its source says
+def answer.pkg(+lib: String, +hash: String, src: L.Src, +hub: String) -> IO(W.Answer):
   match src:
     case L.Hub{}:
       answer.hub(hub, hash)
     case L.Git{url, rev, entry, _root, _nar, _tag}:
       answer.git(lib, hash, url, rev, entry)
+
+# what the hub says a name names, as it said it; the planner reads the hash
+# out of it
+def said(got: Web.Got) -> W.Answer:
+  match got:
+    case Web.Miss{why}:
+      W.Miss{"ez: " ++ why}
+    case Web.Have{body}:
+      W.Said{body}
+
+# a name, asked of the hub once: `GET <hub>/name/<nv>`
+def answer.name(+hub: String, +nv: String) -> IO(W.Answer):
+  do IO<W.Answer>:
+    +s : Say.Spin <- Say.hold(Say.dep.hub(nv))
+    g : Web.Got <- Web.fetch(hub ++ "/name/" ++ nv, "")
+    Say.done(s)
+    return said(g)
+
+# the lock being rewritten, "" when there is none
+def answer.lock() -> IO(W.Answer):
+  do IO<W.Answer>:
+    m : Maybe<&2, String> <- F.read(W.lockfile())
+    return W.Locked{F.text_of(m)}
+
+# one question, answered
+def answer(+lib: String, ask: W.Ask) -> IO(W.Answer):
+  match ask:
+    case W.Pkg{+hash, src, +hub}:
+      answer.pkg(lib, hash, src, hub)
+    case W.Name{+nv, +hub}:
+      answer.name(hub, nv)
+    case W.Lock{}:
+      answer.lock()
 
 # every question, answered
 def answer.all(+lib: String, asks: List<&2, W.Ask>) -> IO(List<&2, W.Reply>):
@@ -575,6 +608,8 @@ def exec(+lib: String, effect: Plan.Effect) -> IO(Unit):
         return Unit{}
     case Plan.Say{text}:
       IO.print(text)
+    case Plan.Name{nv, hash}:
+      write(lib ++ "/names/" ++ nv, L.name.text(hash))
 
 # every effect, in order
 def exec.all(+lib: String, es: List<&2, Plan.Effect>) -> IO(Unit):
@@ -615,11 +650,12 @@ def exec.plan(+lib: String, pl: Plan.Plan) -> IO(Unit):
 # or its plan run
 def loop.step(st: Plan.Step, +lib: String, world: W.World, go: W.World -> IO(Unit)) -> IO(Unit):
   match st:
-    case Plan.Asking{asks, ups}:
+    case Plan.Asking{asks, ups, names}:
       do IO<Unit>:
         rs : List<&2, W.Reply> <- answer.all(lib, asks)
         us : List<&2, Up.Reply> <- answer.queries(lib, ups)
-        go(more(world, rs, us))
+        ns : List<&2, W.Reply> <- answer.all(lib, names)
+        go(more(world, List.append(&2, W.Reply, rs, ns), us))
     case Plan.Run{pl}:
       exec.plan(lib, pl)
 
