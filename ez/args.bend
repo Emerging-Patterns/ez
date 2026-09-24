@@ -88,16 +88,40 @@ def undash(xs: List<&2, String>) -> List<&2, String>:
     case Con{+h, +t}:
       Bool.pick(List<&2, String>, String.eq(h, "--"), t, h <> t)
 
+# the words after `tool run` with a leading `--entry <file>` taken off. The
+# flag comes before the target, as uvx takes its own options before the
+# command, so every word after the target is the program's.
+def tool.lead(xs: List<&2, String>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Bool.pick(List<&2, String>, String.eq(h, "--entry"), rest(t), h <> t)
+
 # the words `ez tool run` forwards: everything after the target, with one
 # leading `--` taken off
 def tool.rest(as: List<&2, String>) -> List<&2, String>:
-  undash(drop(as, 3n))
+  undash(rest(tool.lead(drop(as, 2n))))
 
 # `tool run` with its target, and without the words the program is given.
 # A missing target is left missing, so the parse can say so.
 def tool.line(+target: String) -> List<&2, String>:
   Bool.pick(List<&2, String>, String.is_empty(target), ["tool", "run"],
     ["tool", "run", target])
+
+# `tool run` with its `--entry <file>` and target, when it has the flag
+def tool.flagged(+file: String, +target: String) -> List<&2, String>:
+  Bool.pick(List<&2, String>, String.is_empty(target), ["tool", "run", "--entry", file],
+    ["tool", "run", "--entry", file, target])
+
+# the words of `tool run` the parse reads: the flag when it leads, and the
+# target
+def tool.parse(lead: Bool, +as: List<&2, String>) -> List<&2, String>:
+  match lead:
+    case True{}:
+      tool.flagged(at(as, 3n), at(as, 4n))
+    case False{}:
+      tool.line(at(as, 2n))
 
 # whether this line is `tool run`
 def is.tool.run(+as: List<&2, String>) -> Bool:
@@ -107,7 +131,7 @@ def is.tool.run(+as: List<&2, String>) -> Bool:
 def argv.tool(hit: Bool, +as: List<&2, String>) -> List<&2, String>:
   match hit:
     case True{}:
-      tool.line(at(as, 2n))
+      tool.parse(String.eq(at(as, 2n), "--entry"), as)
     case False{}:
       as
 

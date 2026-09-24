@@ -26,6 +26,14 @@ law tool_refusal_writes_nothing:
   for r: {TP.refuses(w) == True{} : Bool}
   {TP.writes(TP.plan(w)) == False{} : Bool}
 
+# LAW: a file to build that is not in the checkout is refused, so it too
+# leaves nothing behind
+# EZ-OUT-2
+law tool_missing_entry_writes_nothing:
+  for +w: TW.World
+  for miss: {TP.present(w) == False{} : Bool}
+  {TP.writes(TP.plan(w)) == False{} : Bool}
+
 # LAW: `ez tool sync` that refuses installs nothing
 # EZ-OUT-2
 law sync_refusal_installs_nothing:
@@ -204,6 +212,35 @@ law tool_pin_over:
   for s: {TP.src(w) == TP.Pin{n, u, r, o} : TP.Src}
   {TP.over(w) == o : String}
 
+# LAW: a plain repository is built with no lock fetched
+# EZ-TOOL-4
+law tool_plain_no_lock:
+  for +w: TW.World
+  for ok: {TP.refuses(w) == False{} : Bool}
+  for miss: {TP.reuse(w) == False{} : Bool}
+  for p: {TP.plain(w) == True{} : Bool}
+  {TP.fetches(TP.plan(w)) == False{} : Bool}
+
+# LAW: with BEND_LIB at a library of its own under the cache, beside its
+# binaries, for bend to fetch its hub imports into
+# EZ-TOOL-4
+law tool_plain_lib:
+  for +w: TW.World
+  for ok: {TP.refuses(w) == False{} : Bool}
+  for miss: {TP.reuse(w) == False{} : Bool}
+  for p: {TP.plain(w) == True{} : Bool}
+  {TP.built.lib(TP.plan(w)) == TP.dir(w) ++ "/lib" : String}
+
+# LAW: while an ez project whose checkout has no ez.lock.toml is refused
+# when its binary is to be built
+# EZ-TOOL-4
+law tool_ledger_needs_lock:
+  for +w: TW.World
+  for miss: {TP.reuse(w) == False{} : Bool}
+  for p: {TP.plain(w) == False{} : Bool}
+  for none: {TP.co.lock(TP.co(w)) == None{} : Maybe<&2, String>}
+  {TP.refuses(w) == True{} : Bool}
+
 # LAW: any other word is a free target, where its word names
 # EZ-TOOL-4
 law tool_free_src:
@@ -381,7 +418,82 @@ law tool_builds_file:
   for ok: {TP.refuses(w) == False{} : Bool}
   for miss: {TP.reuse(w) == False{} : Bool}
   {TP.built(TP.plan(w))
-    == Path.join(TP.top(w), TP.chosen(TP.over(w), TP.bin(w), TP.entry(w))) : String}
+    == Path.join(TP.top(w), TP.chosen(TP.wish(TP.over(w), TW.want(w)), TP.bin(w), TP.entry(w)))
+    : String}
+
+# LAW: `--entry` wins over the checkout's `bin` and `entry`, as cargo's
+# `--bin` wins over Cargo.toml
+# EZ-TOOL-7
+law file_flag_over_ledger:
+  for +f: String
+  for +b: String
+  for +e: String
+  for ne: {False{} == String.is_empty(f) : Bool}
+  {TP.chosen(TP.wish("", f), b, e) == f : String}
+
+# LAW: and a pin's `bin` or `entry` wins over `--entry`, since the project
+# decided it
+# EZ-TOOL-7
+law file_pin_over_flag:
+  for +o: String
+  for +f: String
+  for +b: String
+  for +e: String
+  for +ne: {False{} == String.is_empty(o) : Bool}
+  {TP.chosen(TP.wish(o, f), b, e) == o : String}
+
+# LAW: a checkout with no ez.toml is a plain Bend repository, and a build of
+# one that no pin names a file for builds its `main.bend`
+# EZ-TOOL-7
+law tool_plain_builds_main:
+  for +w: TW.World
+  for ok: {TP.refuses(w) == False{} : Bool}
+  for miss: {TP.reuse(w) == False{} : Bool}
+  for p: {TP.plain(w) == True{} : Bool}
+  for free: {TP.over(w) == "" : String}
+  for flag: {TW.want(w) == "" : String}
+  {TP.built(TP.plan(w)) == Path.join(TP.top(w), "main.bend") : String}
+
+# LAW: or the file `--entry` names
+# EZ-TOOL-7
+law tool_plain_builds_entry:
+  for +w: TW.World
+  for ok: {TP.refuses(w) == False{} : Bool}
+  for miss: {TP.reuse(w) == False{} : Bool}
+  for p: {TP.plain(w) == True{} : Bool}
+  for free: {TP.over(w) == "" : String}
+  for ne: {False{} == String.is_empty(TW.want(w)) : Bool}
+  {TP.built(TP.plan(w)) == Path.join(TP.top(w), TW.want(w)) : String}
+
+# LAW: a file to build that is not in the checkout is refused
+# EZ-TOOL-7
+law tool_refuses_missing_entry:
+  for +w: TW.World
+  for miss: {TP.present(w) == False{} : Bool}
+  {TP.refuses(w) == True{} : Bool}
+
+# LAW: a plain repository is linked under the stem of the file built
+# EZ-TOOL-7
+law plain_name_stem:
+  for +f: String
+  for +u: String
+  for ne: {False{} == String.eq(TP.stem(f), "main") : Bool}
+  {TP.plain.name(f, u) == TP.stem(f) : String}
+
+# LAW: or under the repository's name, when that stem is `main`
+# EZ-TOOL-7
+law plain_name_repo:
+  for +f: String
+  for +u: String
+  for m: {True{} == String.eq(TP.stem(f), "main") : Bool}
+  {TP.plain.name(f, u) == TP.repo.name(u) : String}
+
+# LAW: which is the name a plain repository's binary and link are given
+# EZ-TOOL-7
+law tool_plain_named:
+  for +w: TW.World
+  for p: {TP.plain(w) == True{} : Bool}
+  {TP.name.raw(w) == TP.plain.name(TP.choice(w), TP.origin(w)) : String}
 
 # LAW: the link is named after the package
 # EZ-TOOL-7
@@ -457,6 +569,7 @@ law tool_rest_dash:
   for +b: String
   for +t: String
   for +ws: List<&2, String>
+  for nt: {False{} == String.eq(t, "--entry") : Bool}
   {Args.tool.rest(a <> (b <> (t <> ("--" <> ws)))) == ws : List<&2, String>}
 
 # LAW: and every word after the target when the first is not `--`
@@ -467,6 +580,7 @@ law tool_rest_word:
   for +t: String
   for +h: String
   for +ws: List<&2, String>
+  for nt: {False{} == String.eq(t, "--entry") : Bool}
   for ne: {False{} == String.eq(h, "--") : Bool}
   {Args.tool.rest(a <> (b <> (t <> (h <> ws)))) == h <> ws : List<&2, String>}
 
@@ -476,7 +590,19 @@ law tool_rest_none:
   for +a: String
   for +b: String
   for +t: String
+  for nt: {False{} == String.eq(t, "--entry") : Bool}
   {Args.tool.rest(a <> (b <> (t <> []))) == [] : List<&2, String>}
+
+# LAW: and after `--entry <file>`, the words after the target that follows
+# EZ-TOOL-9
+law tool_rest_entry:
+  for +a: String
+  for +b: String
+  for +f: String
+  for +t: String
+  for +ws: List<&2, String>
+  {Args.tool.rest(a <> (b <> ("--entry" <> (f <> (t <> ws))))) == Args.undash(ws)
+    : List<&2, String>}
 
 # LAW: which the program is started with
 # EZ-TOOL-9

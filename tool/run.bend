@@ -100,8 +100,8 @@ def answer.all(asks: List<&2, TW.Ask>) -> IO(List<&2, TW.Reply>):
 
 # the World with more answers in it
 def more(world: TW.World, rs: List<&2, TW.Reply>, us: List<&2, Up.Reply>) -> TW.World:
-  TW.World{a, t, here, env, bend, ledger, lock, replies, ups} = world
-  TW.World{a, t, here, env, bend, ledger, lock, List.append(&2, TW.Reply, replies, rs),
+  TW.World{a, t, want, here, env, bend, ledger, lock, replies, ups} = world
+  TW.World{a, t, want, here, env, bend, ledger, lock, List.append(&2, TW.Reply, replies, rs),
     List.append(&2, Up.Reply, ups, us)}
 
 # ---------------------------------------------------------------------------
@@ -139,18 +139,29 @@ def compile(+lib: String, +file: String, +out: String) -> IO(Unit):
     +bin : String <- R.exec(Cap.argv(on, g, lib, ["bend", file, "-o", out]))
     compile.said(R.ok(bin), Cap.why(bin, g), R.text(bin))
 
-# the binary: the checkout's lock fetched as `ez fetch` fetches one, with
-# every relative path in it read from the checkout, the file built, the
-# record written; or the one there reused
+# the library a build reads: an ez project's lock fetched into it as `ez
+# fetch` fetches one, with every relative path in it read from the
+# checkout; a plain repository's made, for bend to fetch its hub imports into
+def exec.lib(fetch: Bool, +top: String, +lib: String) -> IO(Unit):
+  match fetch:
+    case True{}:
+      FetchRun.fill(top, lib)
+    case False{}:
+      do IO<Unit>:
+        _mk : String <- R.exec(["mkdir", "-p", lib])
+        return Unit{}
+
+# the binary: its library filled, the file built, the record written; or the
+# one there reused
 def exec.make(making: TP.Make) -> IO(Unit):
   match making:
     case TP.Skip{}:
       IO.pure(Unit, Unit{})
     case TP.Reuse{name}:
       IO.print_err(Say.reused(name))
-    case TP.Make{top, +lib, file, out, at, key, +name}:
+    case TP.Make{+top, +lib, fetch, file, out, at, key, +name}:
       do IO<Unit>:
-        FetchRun.fill(top, lib)
+        exec.lib(fetch, top, lib)
         +s : Say.Spin <- Say.hold(Say.building(name))
         compile(lib, file, out)
         Say.done(s)
@@ -249,27 +260,29 @@ def env() -> IO(TW.Env):
     +p : String <- var("PATH")
     return TW.Env{b, x, c, h, p}
 
-# one target, run, installed or upgraded, over the project's ledger and lock
+# one target, run, installed or upgraded, over the project's ledger and lock,
+# building the file `want` names when it names one
 def go(
   act: TW.Act,
   +target: String,
+  +want: String,
   +here: String,
   +vars: TW.Env,
   +bend: String,
   +led: Maybe<&2, String>,
   +lock: Maybe<&2, String>
 ) -> IO(Unit):
-  loop(U32.to_nat(100), TW.World{act, target, here, vars, bend, led, lock, [], []})
+  loop(U32.to_nat(100), TW.World{act, target, want, here, vars, bend, led, lock, [], []})
 
-# `ez tool run <target> [-- args…]`, `install` and `upgrade`
-def run(act: TW.Act, +target: String) -> IO(Unit):
+# `ez tool run [--entry <file>] <target> [-- args…]`, `install` and `upgrade`
+def run(act: TW.Act, +target: String, +want: String) -> IO(Unit):
   do IO<Unit>:
     +pwd : String <- R.exec(["pwd"])
     +vars : TW.Env <- env()
     +bend : String <- bend.is()
     led : Maybe<&2, String> <- F.read("ez.toml")
     lock : Maybe<&2, String> <- F.read("ez.lock.toml")
-    go(act, target, String.trim(R.text(pwd)), vars, bend, led, lock)
+    go(act, target, want, String.trim(R.text(pwd)), vars, bend, led, lock)
 
 # every name a sync installs, in turn
 def sync.all(
@@ -285,7 +298,7 @@ def sync.all(
       IO.pure(Unit, Unit{})
     case +h <> t:
       do IO<Unit>:
-        go(TW.Install{}, h, here, vars, bend, led, lock)
+        go(TW.Install{}, h, "", here, vars, bend, led, lock)
         sync.all(t, here, vars, bend, led, lock)
 
 # a sync's names installed in turn, none when it refuses, and then its end

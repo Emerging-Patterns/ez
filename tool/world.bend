@@ -2,9 +2,10 @@
 # the target they were given; the directory they run in (`here`), which a
 # relative cache root is taken from; the variables that place the cache and
 # the link (`EZ_TOOL_BIN`, `XDG_BIN_HOME`, `XDG_CACHE_HOME`, `HOME`, `PATH`);
-# the bend on the PATH, as its banner's first line; the project's ledger and
-# lock, None when there is none; and the answers to the questions the planner
-# (tool/plan.bend) asked. `ez tool sync` reads only the ledger and the lock.
+# the bend on the PATH, as its banner's first line; the file `--entry` names,
+# "" when it names none; the project's ledger and lock, None when there is
+# none; and the answers to the questions the planner (tool/plan.bend)
+# asked. `ez tool sync` reads only the ledger and the lock.
 #
 # A question is a file's text, whether a binary is there, what git says of a
 # local path, or one of the upgrade's (lock/up.bend): `Head` for the commit a
@@ -51,53 +52,58 @@ type Reply is Data:
 
 # everything `ez tool run`, `install` and `upgrade` read
 type World is Data:
-  World{act: Act, target: String, here: String, env: Env, bend: String,
+  World{act: Act, target: String, want: String, here: String, env: Env, bend: String,
     ledger: Maybe<&2, String>, lock: Maybe<&2, String>, replies: List<&2, Reply>,
     ups: List<&2, Up.Reply>}
 
 # the act
 def act(world: World) -> Act:
-  World{a, _t, _here, _env, _bend, _ledger, _lock, _rs, _ups} = world
+  World{a, _t, _want, _here, _env, _bend, _ledger, _lock, _rs, _ups} = world
   a
 
 # the target asked for
 def target(world: World) -> String:
-  World{_a, t, _here, _env, _bend, _ledger, _lock, _rs, _ups} = world
+  World{_a, t, _want, _here, _env, _bend, _ledger, _lock, _rs, _ups} = world
   t
+
+# the file `--entry` names, "" when it names none
+def want(world: World) -> String:
+  World{_a, _t, w, _here, _env, _bend, _ledger, _lock, _rs, _ups} = world
+  w
 
 # the directory ez runs in
 def here(world: World) -> String:
-  World{_a, _t, h, _env, _bend, _ledger, _lock, _rs, _ups} = world
+  World{_a, _t, _want, h, _env, _bend, _ledger, _lock, _rs, _ups} = world
   h
 
 # the variables
 def env(world: World) -> Env:
-  World{_a, _t, _here, e, _bend, _ledger, _lock, _rs, _ups} = world
+  World{_a, _t, _want, _here, e, _bend, _ledger, _lock, _rs, _ups} = world
   e
 
 # the bend on the PATH, "" when it did not answer
 def bend(world: World) -> String:
-  World{_a, _t, _here, _env, b, _ledger, _lock, _rs, _ups} = world
+  World{_a, _t, _want, _here, _env, b, _ledger, _lock, _rs, _ups} = world
   b
 
 # the project's ez.toml, None when there is none
 def ledger(world: World) -> Maybe<&2, String>:
-  World{_a, _t, _here, _env, _bend, l, _lock, _rs, _ups} = world
+  World{_a, _t, _want, _here, _env, _bend, l, _lock, _rs, _ups} = world
   l
 
 # the project's ez.lock.toml, None when there is none
 def lock(world: World) -> Maybe<&2, String>:
-  World{_a, _t, _here, _env, _bend, _ledger, l, _rs, _ups} = world
+  World{_a, _t, _want, _here, _env, _bend, _ledger, l, _rs, _ups} = world
   l
 
 # every question of ours answered so far
 def replies(world: World) -> List<&2, Reply>:
-  World{_a, _t, _here, _env, _bend, _ledger, _lock, rs, _ups} = world
+  World{_a, _t, _want, _here, _env, _bend, _ledger, _lock, rs, _ups} = world
   rs
 
 # every one of the upgrade's questions answered so far
 def ups(world: World) -> List<&2, Up.Reply>:
-  World{_a, _t, _here, _env, _bend, _ledger, _lock, _rs, us} = world
+  World{_a, _t, _want, _here, _env, _bend, _ledger, _lock, _rs, us} = world
   us
 
 def env.tool_bin(vars: Env) -> String:
@@ -159,7 +165,7 @@ def cache.dir(+here: String, +xdg: String, +home: String) -> Maybe<&2, String>:
 
 # the cache root of a World
 def cache.of(world: World) -> Maybe<&2, String>:
-  World{_a, _t, +here, vars, _bend, _ledger, _lock, _rs, _ups} = world
+  World{_a, _t, _want, +here, vars, _bend, _ledger, _lock, _rs, _ups} = world
   Env{_b, _x, +c, +h, _p} = vars
   cache.dir(here, c, h)
 

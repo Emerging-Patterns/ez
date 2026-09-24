@@ -16,15 +16,20 @@
 # cached per commit and read from there when its record says it finished,
 # otherwise asked of git with every file's text; a path is read where it is.
 # Then its ledger, which names the file built (EZ-TOOL-7) and the link, and
-# a name that is not a TOML bare key is refused. Then the binary's record:
+# a name that is not a TOML bare key is refused. A checkout with no ez.toml
+# is a plain Bend repository: it builds `main.bend`, or the file `--entry`
+# names, needs no lock, and is linked under that file's stem, or under the
+# repository's name when the stem is `main`. A file to build that is not in
+# the checkout is refused. Then the binary's record:
 # the binary is reused only when it is there and its record is this commit,
 # this file and this bend (EZ-TOOL-2). Every binary lives in a directory
 # named by its record, so no two records share one, and a link made by an
 # install is never rebuilt under it by a run of another commit or file.
 #
 # The plan of a command that goes on, in order: the checkout laid under the
-# cache when it was cloned, with its record written last; the lock fetched
-# and the binary built with its record, unless it is reused; then the
+# cache when it was cloned, with its record written last; the lock fetched,
+# for an ez project, and the binary built with its record, unless it is
+# reused; then the
 # program started, for `run`, or the link written, for `install` and
 # `upgrade`. A refusal has no effect at all. The program is started only as
 # the last thing, so its status is the command's (EZ-TOOL-5), and `install`
@@ -350,10 +355,6 @@ def lib.of(pl: Tgt.Place, +world: TW.World) -> String:
     case Tgt.Remote{_url, _slug}:
       top(world) ++ "/.ez/lib"
 
-# where the checkout's lock is fetched
-def lib(+world: TW.World) -> String:
-  lib.of(place(world), world)
-
 # ---------------------------------------------------------------------------
 # answers read
 
@@ -454,10 +455,11 @@ def co.fresh(fresh: Bool, +url: String, +world: TW.World) -> Co:
     case False{}:
       co.clone(Up.heard(TW.ups(world), clone.ask(world, url)), clone.ask(world, url))
 
-# whether the cached checkout's record names this commit, and it has a ledger
+# whether the cached checkout's record names this commit. The record is
+# written after every file, so a checkout it names is whole, with or without
+# a ledger.
 def fresh(+world: TW.World) -> Bool:
-  Bool.and(Key.checkout(String.trim(TW.text.or(read.got(world, stamp.at(world)))), rev(world)),
-    Bool.not(none(read.got(world, top(world) ++ "/ez.toml"))))
+  Key.checkout(String.trim(TW.text.or(read.got(world, stamp.at(world)))), rev(world))
 
 # a remote's cached checkout, once its three files are read
 def co.remote(open: List<&2, TW.Ask>, +url: String, +world: TW.World) -> Co:
@@ -531,17 +533,30 @@ def label.of(pl: Tgt.Place, +world: TW.World) -> String:
 def label(+world: TW.World) -> String:
   label.of(place(world), world)
 
-# the checkout's ledger as read, or why there is none
-def led.of(got: Maybe<&2, String>, +label: String) -> M.Read:
+# the checkout's ledger as read. A checkout with no ez.toml is a plain Bend
+# repository, whose ledger names nothing: no package, no entry, no deps.
+def led.of(got: Maybe<&2, String>) -> M.Read:
   match got:
     case None{}:
-      M.Bad{label ++ " has no ez.toml"}
+      M.Good{M.Manifest{"", "", "", "", [], []}}
     case Some{text}:
       M.parse(text)
 
 # the checkout's ledger, read
 def led(+world: TW.World) -> M.Read:
-  led.of(co.toml(co(world)), label(world))
+  led.of(co.toml(co(world)))
+
+# whether the checkout is a plain Bend repository: it has no ez.toml, so no
+# git dependencies and no lock. Its program's hub imports are bend's to
+# fetch, into a library of its own under the cache.
+def plain(+world: TW.World) -> Bool:
+  none(co.toml(co(world)))
+
+# where the checkout's lock is fetched, or, for a plain repository, where
+# bend fetches its hub imports: a library of the target's own under the
+# cache, beside its binaries
+def lib(+world: TW.World) -> String:
+  Bool.pick(String, plain(world), dir(world) ++ "/lib", lib.of(place(world), world))
 
 # the model of a ledger that read, an empty one otherwise
 def man.of(parsed: M.Read) -> M.Manifest:
@@ -570,8 +585,34 @@ def man.entry(manifest: M.Manifest) -> String:
   M.Manifest{_n, e, _b, _h, _ds, _ts} = manifest
   e
 
-def name.raw(+world: TW.World) -> String:
-  man.name(man(world))
+# a file's last component without its `.bend`: `src/cli.bend` is `cli`
+def stem(+file: String) -> String:
+  Path.unbend(Path.base(file))
+
+# a repository's name: the last component of its URL or path, a trailing
+# slash and `.git` taken off, so `https://github.com/o/bolt.git` is `bolt`
+def repo.name(+url: String) -> String:
+  Path.base(Tgt.ungit(Tgt.unslash(url)))
+
+# the link's name for a plain repository: the stem of the file built, or the
+# repository's name when that is `main`, since every plain repository has one
+def plain.name(+file: String, +url: String) -> String:
+  Bool.pick(String, String.eq(stem(file), "main"), repo.name(url), stem(file))
+
+# where the checkout came from, as a person named it: a remote's URL, or a
+# path's real path
+def origin.of(pl: Tgt.Place, +world: TW.World) -> String:
+  match pl:
+    case Tgt.Bad{_why}:
+      ""
+    case Tgt.Local{_p}:
+      top(world)
+    case Tgt.Remote{url, _slug}:
+      url
+
+# where the checkout came from
+def origin(+world: TW.World) -> String:
+  origin.of(place(world), world)
 
 # the checkout's `bin`
 def bin(+world: TW.World) -> String:
@@ -586,18 +627,82 @@ def entry(+world: TW.World) -> String:
 def name.ok(+name: String) -> Bool:
   Bool.or(String.is_empty(name), Named.bare(name))
 
-# the link's name: the package's, or `app` (EZ-TOOL-7)
-def name(+world: TW.World) -> String:
-  Tgt.out.name(name.raw(world))
-
 # the file built: the pin's `bin`, then its `entry`, then the checkout's
 # `bin`, then its `entry`, then `main.bend` (EZ-TOOL-7)
 def chosen(+over: String, +binary: String, +entry: String) -> String:
   Bool.pick(String, String.is_empty(over), Tgt.file.of(binary, entry), over)
 
+# the file asked for ahead of the checkout's own: the pin's `bin` or
+# `entry`, else the file `--entry` names, else "" so the checkout chooses. A
+# pin is what the project decided, so a flag does not move it; over a
+# checkout's ledger the flag wins, as cargo's `--bin` does.
+def wish(+over: String, +want: String) -> String:
+  Bool.pick(String, String.is_empty(over), want, over)
+
+# the file built, relative to the checkout: `main.bend` for a plain
+# repository unless `--entry` names another (EZ-TOOL-7)
+def choice(+world: TW.World) -> String:
+  chosen(wish(over(world), TW.want(world)), bin(world), entry(world))
+
 # the file built, in the checkout
 def file(+world: TW.World) -> String:
-  Path.join(top(world), chosen(over(world), bin(world), entry(world)))
+  Path.join(top(world), choice(world))
+
+# a path's part under a directory, "" when it is not under it
+def inside(+dir: String, +path: String) -> String:
+  Bool.pick(String, String.starts_with(path, dir ++ "/"),
+    String.drop(path, Nat.add(String.length(dir), 1n)), "")
+
+# whether the file built is in the checkout: among the files git gave, or
+# read where the checkout is. A file outside the checkout is not in it.
+def present.of(checkout: Co, +world: TW.World) -> Bool:
+  match checkout:
+    case Laid{fs}:
+      Bool.not(none(K.look(fs, inside(top(world), file(world)))))
+    case Kept{_t, _l}:
+      Bool.and(Bool.not(String.is_empty(inside(top(world), file(world)))),
+        Bool.not(none(read.got(world, file(world)))))
+    case CoWait{_as, _us}:
+      False{}
+    case CoNo{_why}:
+      False{}
+
+# whether the file built is there
+def present(+world: TW.World) -> Bool:
+  present.of(co(world), world)
+
+# the question whether the file built is there, for a checkout read where it
+# is; git gave every file of one cloned now
+def file.asks.of(checkout: Co, +world: TW.World) -> List<&2, TW.Ask>:
+  match checkout:
+    case Kept{_t, _l}:
+      opens(world, [TW.Read{file(world)}])
+    case Laid{_fs}:
+      []
+    case CoWait{_as, _us}:
+      []
+    case CoNo{_why}:
+      []
+
+def file.asks(+world: TW.World) -> List<&2, TW.Ask>:
+  file.asks.of(co(world), world)
+
+# the name the link and the binary are given: for a plain repository the
+# one `plain.name` gives it, and the package's for an ez project
+def name.of(bare: Bool, +world: TW.World) -> String:
+  match bare:
+    case True{}:
+      plain.name(choice(world), origin(world))
+    case False{}:
+      man.name(man(world))
+
+# the name the link and the binary are given
+def name.raw(+world: TW.World) -> String:
+  name.of(plain(world), world)
+
+# the link's name: the package's, or `app` (EZ-TOOL-7)
+def name(+world: TW.World) -> String:
+  Tgt.out.name(name.raw(world))
 
 # what the binary is made from: the commit, the file and the bend (EZ-TOOL-2)
 def key(+world: TW.World) -> Key.Key:
@@ -638,12 +743,13 @@ type Lay is Data:
   Lay{dir: String, writes: List<&2, P.Effect>}
   Still{}
 
-# the binary: the lock of the checkout at `top` fetched into the library,
-# the file built into `out` and the record written at `at`; or the one there
-# reused; or nothing, for a command that refuses
+# the binary: the lock of the checkout at `top` fetched into the library
+# when `fetch` says it has one, the file built into `out` with that library
+# as BEND_LIB, and the record written at `at`; or the one there reused; or
+# nothing, for a command that refuses
 type Make is Data:
-  Make{top: String, lib: String, file: String, out: String, at: String, key: String,
-    name: String}
+  Make{top: String, lib: String, fetch: Bool, file: String, out: String, at: String,
+    key: String, name: String}
   Reuse{name: String}
   Skip{}
 
@@ -689,8 +795,8 @@ def make.of(reused: Bool, +world: TW.World) -> Make:
     case True{}:
       Reuse{name(world)}
     case False{}:
-      Make{top(world), lib(world), file(world), out(world), key.at(world),
-        Key.show(key(world)), name(world)}
+      Make{top(world), lib(world), Bool.not(plain(world)), file(world), out(world),
+        key.at(world), Key.show(key(world)), name(world)}
 
 # the binary built, or reused
 def make(+world: TW.World) -> Make:
@@ -761,13 +867,20 @@ type Verdict is Data:
   Wait{asks: List<&2, TW.Ask>, ups: List<&2, Up.Ask>}
   Stop{why: String}
 
-# a lock is needed only for a binary that is built
+# a lock is needed only for a binary that is built, and only by an ez
+# project: a plain repository has none to have
 def decide.lock(missing: Bool, +world: TW.World) -> Verdict:
   match missing:
     case True{}:
-      Stop{"ez: " ++ label(world) ++ " has no ez.lock.toml"}
+      Stop{"ez: " ++ label(world) ++ " has an ez.toml but no ez.lock.toml; its author " ++
+        "runs ez lock to write one"}
     case False{}:
       Go{}
+
+# whether the binary is to be built from an ez project with no lock
+def unlocked(+world: TW.World) -> Bool:
+  Bool.and(Bool.not(reuse(world)),
+    Bool.and(Bool.not(plain(world)), none(co.lock(co(world)))))
 
 # the binary's record and whether it is there, asked together
 def cache.asks(+world: TW.World) -> List<&2, TW.Ask>:
@@ -777,17 +890,45 @@ def cache.asks(+world: TW.World) -> List<&2, TW.Ask>:
 def decide.cache(open: List<&2, TW.Ask>, +world: TW.World) -> Verdict:
   match open:
     case []:
-      decide.lock(Bool.and(Bool.not(reuse(world)), none(co.lock(co(world)))), world)
+      decide.lock(unlocked(world), world)
     case h <> t:
       Wait{h <> t, []}
 
-# a package name that could not name a file is refused
-def decide.name(ok: Bool, +world: TW.World) -> Verdict:
+# why a missing file is refused: a file a pin names is the project's to fix,
+# and any other can be named with `--entry`
+def missing.why(+world: TW.World) -> String:
+  +why = "ez: " ++ label(world) ++ " has no " ++ choice(world)
+  Bool.pick(String, String.is_empty(over(world)),
+    why ++ "; name the file to build with --entry <path.bend>", why)
+
+# a file to build that is not in the checkout is refused
+def decide.present(ok: Bool, +world: TW.World) -> Verdict:
   match ok:
     case True{}:
       decide.cache(cache.asks(world), world)
     case False{}:
-      Stop{"ez: " ++ label(world) ++ " names its package " ++ name.raw(world) ++
+      Stop{missing.why(world)}
+
+# whether the file to build is there, still to ask
+def decide.file(open: List<&2, TW.Ask>, +world: TW.World) -> Verdict:
+  match open:
+    case []:
+      decide.present(present(world), world)
+    case h <> t:
+      Wait{h <> t, []}
+
+# what a name that could not name a file is: a package's, or the one a
+# plain repository would be linked as
+def name.what(+world: TW.World) -> String:
+  Bool.pick(String, plain(world), " would be linked as ", " names its package ")
+
+# a name that could not name a file is refused
+def decide.name(ok: Bool, +world: TW.World) -> Verdict:
+  match ok:
+    case True{}:
+      decide.file(file.asks(world), world)
+    case False{}:
+      Stop{"ez: " ++ label(world) ++ name.what(world) ++ name.raw(world) ++
         ", which is not a TOML bare key"}
 
 # a checkout ledger that does not parse is refused
@@ -1069,7 +1210,7 @@ def lays(layout: Lay) -> Bool:
 # whether a binary is built
 def makes(making: Make) -> Bool:
   match making:
-    case Make{_lk, _lb, _f, _o, _at, _k, _n}:
+    case Make{_lk, _lb, _fe, _f, _o, _at, _k, _n}:
       True{}
     case Reuse{_n}:
       False{}
@@ -1100,8 +1241,30 @@ def builds(pl: Plan) -> Bool:
 def built(pl: Plan) -> String:
   Plan{_l, m, _f, _o} = pl
   match m:
-    case Make{_lk, _lb, f, _o, _at, _k, _n}:
+    case Make{_lk, _lb, _fe, f, _o, _at, _k, _n}:
       f
+    case Reuse{_n}:
+      ""
+    case Skip{}:
+      ""
+
+# whether a plan fetches a lock before it builds
+def fetches(pl: Plan) -> Bool:
+  Plan{_l, m, _f, _o} = pl
+  match m:
+    case Make{_lk, _lb, fe, _f, _o, _at, _k, _n}:
+      fe
+    case Reuse{_n}:
+      False{}
+    case Skip{}:
+      False{}
+
+# the library a plan builds with, "" when it builds nothing
+def built.lib(pl: Plan) -> String:
+  Plan{_l, m, _f, _o} = pl
+  match m:
+    case Make{_lk, lb, _fe, _f, _o, _at, _k, _n}:
+      lb
     case Reuse{_n}:
       ""
     case Skip{}:
