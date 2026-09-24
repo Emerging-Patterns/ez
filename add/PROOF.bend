@@ -923,6 +923,32 @@ def fixed_placed(root, pre, out):
   fixed_judge(String.is_empty(K.escaped(K.files_of(K.placed(pre, K.hit.sums(out))))),
     K.escaped(K.files_of(K.placed(pre, K.hit.sums(out)))), root, pre, out)
 
+# LAW: a package the license check judged is its texts' own too: a refusal
+# names no texts, and a pass is the placed package
+law fixed_lic:
+  for ok: Bool
+  for +bad: String
+  for +root: String
+  for +pre: String
+  for +out: List<&2, K.Hit>
+  {fix(K.made.lic(ok, bad, root, pre, out)) == K.made.lic(ok, bad, root, pre, out) : K.Walked}
+
+def fixed_lic(ok, _bad, root, pre, out):
+  match ok:
+    case True{}:
+      fixed_placed(root, pre, out)
+    case False{}:
+      {==}
+
+law fixed_checked:
+  for +root: String
+  for +pre: String
+  for +out: List<&2, K.Hit>
+  {fix(K.made.checked(root, pre, out)) == K.made.checked(root, pre, out) : K.Walked}
+
+def fixed_checked(root, pre, out):
+  fixed_lic(String.is_empty(K.licensed(pre, out)), K.licensed(pre, out), root, pre, out)
+
 law fixed_anc:
   for far: Bool
   for +levels: Nat
@@ -935,7 +961,7 @@ def fixed_anc(far, levels, dir, out):
     case True{}:
       {==}
     case False{}:
-      fixed_placed(Path.climb(levels, dir), Path.tail(dir, levels), out)
+      fixed_checked(Path.climb(levels, dir), Path.tail(dir, levels), out)
 
 law fixed_climb:
   for levels: Nat
@@ -946,7 +972,7 @@ law fixed_climb:
 def fixed_climb(levels, dir, out):
   match levels:
     case 0n:
-      fixed_placed(Path.norm(dir), "", out)
+      fixed_checked(Path.norm(dir), "", out)
     case 1n+ +p:
       fixed_anc(Nat.is_gt((1n + p : Nat), K.comps(dir)), (1n + p : Nat), dir, out)
 

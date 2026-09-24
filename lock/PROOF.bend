@@ -4500,9 +4500,9 @@ def kept_name(co, rs, hub, dep, tip, tag):
   match co:
     case Up.Co{nar, root, +manifest, _srcs}:
       verdict_name(U.judge(True{}, True{},
-        U.agree(M.dep.hash(dep), Up.hash.of(manifest), M.source.nar(M.source.dep(dep)), nar,
+        U.agree(M.dep.hash(dep), Up.hash.kept(M.dep.hash(dep), manifest), M.source.nar(M.source.dep(dep)), nar,
           M.source.root(M.source.dep(dep)), root), tip, tag), rs, hub, dep, tip, "",
-        Up.hash.of(manifest))
+        Up.hash.kept(M.dep.hash(dep), manifest))
     case Up.CoWait{_ask}:
       {==}
     case Up.CoNo{_why}:
@@ -7725,8 +7725,8 @@ law mv.ok_kept:
 def mv.ok_kept(co, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, r, tg, br):
   match co:
     case Up.Co{nar2, root2, +man, _srcs}:
-      mv.ok_agree(U.agree(hh, Up.hash.of(man), nar, nar2, root, root2), rs, hub, hn, hh, he,
-        url, rev, tag, root, nar, vend, r, tg, br, Up.hash.of(man))
+      mv.ok_agree(U.agree(hh, Up.hash.kept(hh, man), nar, nar2, root, root2), rs, hub, hn, hh, he,
+        url, rev, tag, root, nar, vend, r, tg, br, Up.hash.kept(hh, man))
     case Up.CoWait{_ask}:
       {==}
     case Up.CoNo{_why}:
@@ -7891,9 +7891,9 @@ law mv.fine_kept:
 def mv.fine_kept(co, rs, hub, hn, hh, he, src, tip, tg):
   match co:
     case Up.Co{nar2, root2, +man, _srcs}:
-      mv.fine_verdict(U.judge(True{}, True{}, U.agree(hh, Up.hash.of(man), M.source.nar(src),
+      mv.fine_verdict(U.judge(True{}, True{}, U.agree(hh, Up.hash.kept(hh, man), M.source.nar(src),
         nar2, M.source.root(src), root2), tip, tg), rs, hub, hn, hh, he, src, tip, "",
-        Up.hash.of(man))
+        Up.hash.kept(hh, man))
     case Up.CoWait{_ask}:
       {==}
     case Up.CoNo{_why}:
@@ -8719,7 +8719,7 @@ law mv.tip_drift:
   for +srcs: List<&2, String>
   for same: {String.eq(rev, tip) == True{} : Bool}
   for co: {Up.checkout(rs, Up.Tree{url, rev, he}) == Up.Co{nar2, root2, man, srcs} : Up.Co}
-  for drift: {U.agree(hh, Up.hash.of(man), nar, nar2, root, root2) == False{} : Bool}
+  for drift: {U.agree(hh, Up.hash.kept(hh, man), nar, nar2, root, root2) == False{} : Bool}
   {mv.halts(Up.dep.tip(Up.At{tip, tg, br}, rs, hub,
     mv.git(hn, hh, he, url, rev, tag, root, nar, vend))) == True{} : Bool}
 
@@ -8765,8 +8765,8 @@ def mv.tip_drift(
         mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, tg)),
         Up.checkout(rs, Up.Tree{url, rev, he}), Up.Co{nar2, root2, man, srcs}, co),
       Equal.cong(Bool, Bool, g => mv.halts(Up.dep.verdict(U.judge(True{}, True{}, g, tip, tg), rs,
-        hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, "", Up.hash.of(man))),
-        U.agree(hh, Up.hash.of(man), nar, nar2, root, root2), False{}, drift)))
+        hub, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), tip, "", Up.hash.kept(hh, man))),
+        U.agree(hh, Up.hash.kept(hh, man), nar, nar2, root, root2), False{}, drift)))
 
 # LAW: a pin by its commit alone that is asked about, whose default branch
 # tip is another commit not descended from it, is refused
@@ -8992,7 +8992,7 @@ law mv.fol_drift_sel:
   for refs: {Up.follow(rs, url, SCon{c, ct}) == Up.At{tip, tg, br} : Up.Tip}
   for same: {String.eq(rev, tip) == True{} : Bool}
   for co: {Up.checkout(rs, Up.Tree{url, rev, he}) == Up.Co{nar2, root2, man, srcs} : Up.Co}
-  for drift: {U.agree(hh, Up.hash.of(man), nar, nar2, root, root2) == False{} : Bool}
+  for drift: {U.agree(hh, Up.hash.kept(hh, man), nar, nar2, root, root2) == False{} : Bool}
   {mv.halts(Up.dep.one(U.aim(s, M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
     mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}
 
@@ -9059,7 +9059,7 @@ law mv.fol_drift:
   for same: {String.eq(M.source.rev(M.source.dep(h)), tip) == True{} : Bool}
   for co: {Up.checkout(rs, Up.Tree{M.source.url(M.source.dep(h)), M.source.rev(M.source.dep(h)),
     M.dep.entry(h)}) == Up.Co{nar2, root2, man, srcs} : Up.Co}
-  for drift: {U.agree(M.dep.hash(h), Up.hash.of(man), M.source.nar(M.source.dep(h)), nar2,
+  for drift: {U.agree(M.dep.hash(h), Up.hash.kept(M.dep.hash(h), man), M.source.nar(M.source.dep(h)), nar2,
     M.source.root(M.source.dep(h)), root2) == False{} : Bool}
   {mv.halts(Up.dep.one(U.aim(U.chosen(only, M.dep.name(h)), M.source.dep(h)), rs, only, hub, h))
     == True{} : Bool}
@@ -9623,8 +9623,8 @@ law mv.live_kept:
 def mv.live_kept(co, rs, hub, hn, hh, he, url, rev, tag, root, nar, vend, tip, tg, e):
   match co:
     case Up.Co{nar2, root2, +man, _srcs}:
-      mv.live_agree(U.agree(hh, Up.hash.of(man), nar, nar2, root, root2), rs, hub, hn, hh, he, url,
-        rev, tag, root, nar, vend, tip, tg, Up.hash.of(man), e)
+      mv.live_agree(U.agree(hh, Up.hash.kept(hh, man), nar, nar2, root, root2), rs, hub, hn, hh, he, url,
+        rev, tag, root, nar, vend, tip, tg, Up.hash.kept(hh, man), e)
     case Up.CoWait{_ask}:
       {==}
     case Up.CoNo{_why}:
@@ -10597,6 +10597,29 @@ def agree_self(h, nar, root):
   %en : {U.agree.go(True{}, _, String.eq(root, root)) == True{} : Bool}
   Eq.string_eq_self(root)
 
+# LAW: a checkout's own hash is kept as it is: the pin is the walk's
+law kept_self:
+  for +m: String
+  {Up.hash.kept(Up.hash.of(m), m) == Up.hash.of(m) : String}
+
+def kept_self(m):
+  eh = Equal.sym(Bool, String.eq(Up.hash.of(m), Up.hash.of(m)), True{},
+    Eq.string_eq_self(Up.hash.of(m)))
+  %eh : {Up.hash.kept.pick(_, Up.hash.of(m), Up.hash.of(m), m) == Up.hash.of(m) : String}
+  {==}
+
+# LAW: and so a pin that is a checkout's own hash agrees with that checkout
+law agree_kept_self:
+  for +m: String
+  for +nar: String
+  for +root: String
+  {U.agree(Up.hash.of(m), Up.hash.kept(Up.hash.of(m), m), nar, nar, root, root) == True{} : Bool}
+
+def agree_kept_self(m, nar, root):
+  ek = Equal.sym(String, Up.hash.kept(Up.hash.of(m), m), Up.hash.of(m), kept_self(m))
+  %ek : {U.agree(Up.hash.of(m), _, nar, nar, root, root) == True{} : Bool}
+  agree_self(Up.hash.of(m), nar, root)
+
 # LAW: a pin at its own tip, whose checkout there agrees with it, is kept.
 # This is the key step of the upgrade's idempotence.
 law kp.same:
@@ -10621,7 +10644,7 @@ law kp.same:
   for +srcs1: List<&2, String>
   for es: {String.eq(r, tip) == True{} : Bool}
   for eco: {Up.checkout(rs, Up.Tree{url, r, he}) == Up.Co{nar1, root1, man1, srcs1} : Up.Co}
-  for eag: {U.agree(hh, Up.hash.of(man1), nr, nar1, rt, root1) == True{} : Bool}
+  for eag: {U.agree(hh, Up.hash.kept(hh, man1), nr, nar1, rt, root1) == True{} : Bool}
   {Up.dep.same(String.eq(r, tip), re(g, rs), hub, M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}},
     tip, tag, br)
     == kept(M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}},
@@ -10641,12 +10664,12 @@ def kp.same(g, rs, hub, hn, hh, he, url, r, tg, rt, nr, vd, tip, tag, br, nar1, 
     == kept(M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}},
       fsays(Up.dep.kept(_, re(g, rs), hub, M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}}, tip, tag)))
     : Up.Fate}
-  nag = Equal.sym(Bool, U.agree(hh, Up.hash.of(man1), nr, nar1, rt, root1), True{}, eag)
+  nag = Equal.sym(Bool, U.agree(hh, Up.hash.kept(hh, man1), nr, nar1, rt, root1), True{}, eag)
   %nag : {Up.dep.verdict(U.judge(True{}, True{}, _, tip, tag), re(g, rs), hub,
-      M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}}, tip, "", Up.hash.of(man1))
+      M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}}, tip, "", Up.hash.kept(hh, man1))
     == kept(M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}},
       fsays(Up.dep.verdict(U.judge(True{}, True{}, _, tip, tag), re(g, rs), hub,
-        M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}}, tip, "", Up.hash.of(man1)))) : Up.Fate}
+        M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}}, tip, "", Up.hash.kept(hh, man1)))) : Up.Fate}
   {==}
 
 # LAW: a tip is not a commit's absence
@@ -10687,7 +10710,7 @@ law kp.aim:
   for et: {up.tip(am, rs, url) == Up.At{tip, tag, br} : Up.Tip}
   for es: {String.eq(r, tip) == True{} : Bool}
   for eco: {Up.checkout(rs, Up.Tree{url, r, he}) == Up.Co{nar1, root1, man1, srcs1} : Up.Co}
-  for eag: {U.agree(hh, Up.hash.of(man1), nr, nar1, rt, root1) == True{} : Bool}
+  for eag: {U.agree(hh, Up.hash.kept(hh, man1), nr, nar1, rt, root1) == True{} : Bool}
   {Up.dep.one(am, re(g, rs), only, hub, M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}})
     == kept(M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}},
       fsays(Up.dep.one(am, re(g, rs), only, hub, M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}})))
@@ -10782,7 +10805,7 @@ law kp.again:
   for et: {up.tip(am, rs, url) == Up.At{tip, tag, br} : Up.Tip}
   for es: {String.eq(r, tip) == True{} : Bool}
   for eco: {Up.checkout(rs, Up.Tree{url, r, he}) == Up.Co{nar1, root1, man1, srcs1} : Up.Co}
-  for eag: {U.agree(hh, Up.hash.of(man1), nr, nar1, rt, root1) == True{} : Bool}
+  for eag: {U.agree(hh, Up.hash.kept(hh, man1), nr, nar1, rt, root1) == True{} : Bool}
   {again.d(M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}}, g, rs, only, hub)
     == kept(M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}},
       fsays(again.d(M.Dep{hn, hh, he, M.Git{url, r, tg, rt, nr, vd}}, g, rs, only, hub))) : Up.Fate}
@@ -10901,7 +10924,7 @@ def a.hub(
     case Up.Clear{}:
       kp.again(am, g, rs, only, hub, hn, Up.hash.of(man1), he, url, tip, tg, root1, nar1, vd, r0, rt0,
         nr0, tip, tag, br, nar1, root1, man1, srcs1, ec, ea, et, Eq.string_eq_self(tip), eco,
-        agree_self(Up.hash.of(man1), nar1, root1))
+        agree_kept_self(man1, nar1, root1))
     case Up.Clash{}:
       {==}
     case Up.HubWait{_ask}:
@@ -11021,13 +11044,13 @@ law a.agree:
   for et: {up.tip(am, rs, url) == Up.At{tip, tag, br} : Up.Tip}
   for es: {String.eq(r0, tip) == True{} : Bool}
   for eco: {Up.checkout(rs, Up.Tree{url, r0, he}) == Up.Co{nar1, root1, man1, srcs1} : Up.Co}
-  for eag: {U.agree(hh, Up.hash.of(man1), nr0, nar1, rt0, root1) == ag : Bool}
+  for eag: {U.agree(hh, Up.hash.kept(hh, man1), nr0, nar1, rt0, root1) == ag : Bool}
   {again(Up.dep.verdict(U.judge(True{}, True{}, ag, tip, tag), rs, hub, M.Dep{hn, hh, he, M.Git{url, r0, tg, rt0, nr0,
-    vd}}, tip, "", Up.hash.of(man1)), g, rs, only, hub)
+    vd}}, tip, "", Up.hash.kept(hh, man1)), g, rs, only, hub)
     == still(Up.dep.verdict(U.judge(True{}, True{}, ag, tip, tag), rs, hub, M.Dep{hn, hh, he, M.Git{url, r0, tg, rt0,
-      nr0, vd}}, tip, "", Up.hash.of(man1)),
+      nr0, vd}}, tip, "", Up.hash.kept(hh, man1)),
       fsays(again(Up.dep.verdict(U.judge(True{}, True{}, ag, tip, tag), rs, hub, M.Dep{hn, hh, he, M.Git{url, r0, tg,
-        rt0, nr0, vd}}, tip, "", Up.hash.of(man1)), g, rs, only, hub))) : Up.Fate}
+        rt0, nr0, vd}}, tip, "", Up.hash.kept(hh, man1)), g, rs, only, hub))) : Up.Fate}
 
 def a.agree(
   ag,
@@ -11099,8 +11122,8 @@ law a.kept:
 def a.kept(co, g, rs, only, hub, hn, hh, he, url, r0, tg, rt0, nr0, vd, am, tip, tag, br, ec, ea, et, es, eco):
   match co:
     case Up.Co{+nar1, +root1, +man1, +srcs1}:
-      a.agree(U.agree(hh, Up.hash.of(man1), nr0, nar1, rt0, root1), g, rs, only, hub, hn, hh, he, url, r0, tg, rt0,
-        nr0, vd, am, tip, tag, br, nar1, root1,
+      a.agree(U.agree(hh, Up.hash.kept(hh, man1), nr0, nar1, rt0, root1), g, rs, only, hub, hn, hh, he,
+        url, r0, tg, rt0, nr0, vd, am, tip, tag, br, nar1, root1,
         man1, srcs1, ec, ea, et, es, eco, {==})
     case Up.CoWait{_ask}:
       {==}
@@ -11419,9 +11442,9 @@ def kept_back(co, rs, hub, dep, tip, tag):
   match co:
     case Up.Co{nar, root, +manifest, _srcs}:
       verdict_back(U.judge(True{}, True{},
-        U.agree(M.dep.hash(dep), Up.hash.of(manifest), M.source.nar(M.source.dep(dep)), nar,
+        U.agree(M.dep.hash(dep), Up.hash.kept(M.dep.hash(dep), manifest), M.source.nar(M.source.dep(dep)), nar,
           M.source.root(M.source.dep(dep)), root), tip, tag), rs, hub, dep, tip, "",
-        Up.hash.of(manifest))
+        Up.hash.kept(M.dep.hash(dep), manifest))
     case Up.CoWait{_ask}:
       {==}
     case Up.CoNo{_why}:
@@ -15385,6 +15408,23 @@ def nv.git.body(empty, hash, manifest, ss):
     case False{}:
       nv.body(hash, manifest, ss)
 
+law nv.rule:
+  for named: Bool
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  {nv(hash, W.git.rule(named, hash, manifest, ss)) == True{} : Bool}
+
+def nv.rule(named, hash, manifest, ss):
+  match named:
+    case True{}:
+      nv.git.body(List.is_empty(&2, K.File, L.manifest.files(String.lines(manifest))),
+        hash, manifest, ss)
+    case False{}:
+      nv.git.body(List.is_empty(&2, K.File, K.bare(L.manifest.files(String.lines(manifest)))),
+        hash, K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))),
+        K.bare.srcs(L.manifest.files(String.lines(manifest)), ss))
+
 law nv.weighed:
   for same: Bool
   for +why: String
@@ -15396,8 +15436,7 @@ law nv.weighed:
 def nv.weighed(same, _why, hash, manifest, ss):
   match same:
     case True{}:
-      nv.git.body(List.is_empty(&2, K.File, L.manifest.files(String.lines(manifest))),
-        hash, manifest, ss)
+      nv.rule(Web.matches(L.want(hash), manifest), hash, manifest, ss)
     case False{}:
       {==}
 
@@ -16087,9 +16126,9 @@ law st.kept:
 def st.kept(co, rs, hub, hn, hh, he, src, tip, tg):
   match co:
     case Up.Co{nar2, root2, +man, _srcs}:
-      st.verdict(U.judge(True{}, True{}, U.agree(hh, Up.hash.of(man), M.source.nar(src),
+      st.verdict(U.judge(True{}, True{}, U.agree(hh, Up.hash.kept(hh, man), M.source.nar(src),
         nar2, M.source.root(src), root2), tip, tg), rs, hub, hn, hh, he, src, tip, "",
-        Up.hash.of(man))
+        Up.hash.kept(hh, man))
     case Up.CoWait{_ask}:
       Unit{}
     case Up.CoNo{_why}:
@@ -17442,4 +17481,22 @@ def Laws.lock_origins_skip_tools(_s, _n, _e, _b, _h, ds, _ts, g):
 
 def Laws.upgrade_origins_skip_tools(_nx, _n, _e, _b, _h, ds, _ts, g):
   %g : {L.ledger.read(_) == L.ledger.origins(ds) : List<&2, L.Origin>}
+  {==}
+
+def Laws.git_named_without_license(hash, manifest, ss, unnamed):
+  %unnamed : {W.git.rule(_, hash, manifest, ss)
+    == W.git.body(List.is_empty(&2, K.File, K.bare(L.manifest.files(String.lines(manifest)))),
+      hash, K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))),
+      K.bare.srcs(L.manifest.files(String.lines(manifest)), ss)) : W.Verdict}
+  {==}
+
+def Laws.upgrade_named_without_license(pin, manifest, walked, bare):
+  %walked : {Up.hash.kept.pick(_, pin, Up.hash.of(manifest), manifest)
+    == Up.hash.of(K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))))
+    : String}
+  %bare : {Up.hash.kept.or(_,
+      Up.hash.of(K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest))))),
+      Up.hash.of(manifest))
+    == Up.hash.of(K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))))
+    : String}
   {==}

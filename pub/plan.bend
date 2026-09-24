@@ -41,11 +41,12 @@ def name.length() -> Nat:
 # a lowercase hex digest may hold. `git/git.bend` already walks a hex string
 # for `is_rev`, and its walk stops at the first character that is not hex.
 #
-# Both other lines bend prints around its answer fail this, and
-# `pub/LAWS.bend` says so rather than leaving it to a reading of bend's
-# source: `publishing N files, ... as 0x... (mining its proof of work)` and
-# `import 0x.../entry.bend as Name` each start with something that is not
-# `0x`.
+# The lines bend prints around its answer fail this, and `pub/LAWS.bend` says
+# so for the two that hold the name, rather than leaving it to a reading of
+# bend's source: `publishing N files, ... as 0x... (mining its proof of work)`
+# and `import 0x.../entry.bend as Name` each start with something that is not
+# `0x`. The terms notice and the license line bend 2.0.27 prints first
+# (`Publishing to BendHub: ...`, `License: ...`) start with a word too.
 def is_name(+word: String) -> Bool:
   Bool.and(String.starts_with(word, "0x"),
     Bool.and(Nat.is_eq(String.length(word), name.length()),

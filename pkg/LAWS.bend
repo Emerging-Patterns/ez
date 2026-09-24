@@ -427,3 +427,126 @@ law walked_manifest_of_texts:
   for +out: List<&2, P.Hit>
   {P.manifest_of(P.placed(pre, P.hit.sums(out)))
     == P.manifest_of(P.laid.sums(P.laid(pre, out))) : String}
+
+# What a package holds besides its sources. bend 2.0.27 takes along every
+# file named exactly `LICENSE` beside a file it publishes, at the same path in
+# the package, and hashes it with the rest; it refuses a file under a
+# directory named license in any case. That ez's walk and bend's publish agree
+# is EZ-HASH-4, which is trusted; these laws say what ez's side of it is.
+
+# LAW: a file whose directory holds a LICENSE publishes it beside the file,
+# at the file's own directory in the package
+law license_goes_along:
+  for +tree: P.Tree
+  for +sc: P.Scan
+  for +text: String
+  for +file: String
+  for +ns: String
+  for +eb: String
+  for seen: List<&2, String>
+  for out: List<&2, P.Hit>
+  for rest: List<&2, P.Task>
+  for lic: String
+  for here: {P.Here{lic} == P.find(tree, P.beside(file)) : P.Look}
+  {P.visit.put(P.Going{}, tree, sc, text, file, ns, eb, seen, out, rest)
+    == P.State{file <> seen,
+      P.Hit{P.raw_of(ns, eb), text} <> P.Hit{P.beside(P.raw_of(ns, eb)), lic}
+        <> List.append(&2, P.Hit,
+          P.foreigns(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(sc)), out),
+      P.Going{},
+      List.append(&2, P.Task, P.tasks(Path.dir(file), P.nsdir(ns), P.scan.mods(sc)), rest)}
+    : P.State}
+
+# LAW: and a file whose directory holds none is found as it was before bend
+# took licenses along, so a package without a LICENSE keeps its hash
+law no_license_as_before:
+  for +tree: P.Tree
+  for +sc: P.Scan
+  for +text: String
+  for +file: String
+  for +ns: String
+  for +eb: String
+  for seen: List<&2, String>
+  for out: List<&2, P.Hit>
+  for rest: List<&2, P.Task>
+  for none: {P.Absent{} == P.find(tree, P.beside(file)) : P.Look}
+  {P.visit.put(P.Going{}, tree, sc, text, file, ns, eb, seen, out, rest)
+    == P.State{file <> seen,
+      P.Hit{P.raw_of(ns, eb), text} <> List.append(&2, P.Hit,
+        P.foreigns(tree, Path.dir(file), P.nsdir(ns), P.scan.foreign(sc)), out),
+      P.Going{},
+      List.append(&2, P.Task, P.tasks(Path.dir(file), P.nsdir(ns), P.scan.mods(sc)), rest)}
+    : P.State}
+
+# LAW: a file whose LICENSE the walk was not given stops the walk, asking for
+# it, with the file still queued, so no package is hashed without a LICENSE
+# it may hold
+law license_asked:
+  for +tree: P.Tree
+  for +text: String
+  for +file: String
+  for +ns: String
+  for eb: String
+  for seen: List<&2, String>
+  for out: List<&2, P.Hit>
+  for rest: List<&2, P.Task>
+  for unasked: {P.Unasked{} == P.find(tree, P.beside(file)) : P.Look}
+  {P.visit.found(tree, text, file, ns, eb, seen, out, rest)
+    == P.State{seen, out, P.Asking{P.beside(file)}, P.Task{file, ns} <> rest}
+    : P.State}
+
+# LAW: a foreign body takes the LICENSE beside it along too, beside its own
+# name in the package
+law foreign_license_goes_along:
+  for +tree: P.Tree
+  for +at: String
+  for +raw: String
+  for text: String
+  for lic: String
+  for here: {P.Here{lic} == P.find(tree, P.beside(at)) : P.Look}
+  {P.foreign.put(P.Here{text}, tree, at, raw)
+    == [P.Hit{raw, text}, P.Hit{P.beside(raw), lic}] : List<&2, P.Hit>}
+
+# LAW: a found file placed under a directory named license is the one the
+# check names
+law licensed_names:
+  for +pre: String
+  for +raw: String
+  for text: String
+  for t: List<&2, P.Hit>
+  for under: {True{} == P.license.under(Path.join(pre, raw)) : Bool}
+  {P.licensed(pre, P.Hit{raw, text} <> t) == Path.join(pre, raw) : String}
+
+# LAW: a package with a file under a directory named license is refused,
+# naming it, and nothing is weighed
+law license_dir_refused:
+  for +root: String
+  for +pre: String
+  for +out: List<&2, P.Hit>
+  for some: {False{} == String.is_empty(P.licensed(pre, out)) : Bool}
+  {P.made.checked(root, pre, out)
+    == P.Refused{"ez: " ++ P.licensed(pre, out)
+      ++ " is in a directory named license, which clashes with a LICENSE file"}
+    : P.Walked}
+
+# LAW: and a package with none is placed and weighed as before
+law license_dir_passes:
+  for +root: String
+  for +pre: String
+  for +out: List<&2, P.Hit>
+  for none: {True{} == String.is_empty(P.licensed(pre, out)) : Bool}
+  {P.made.checked(root, pre, out) == P.made.placed(root, pre, out) : P.Walked}
+
+# LAW: a package as bend named it before 2.0.27 leaves a LICENSE out
+law bare_drops_license:
+  for +h: P.File
+  for t: List<&2, P.File>
+  for lic: {True{} == P.file.lic(h) : Bool}
+  {P.bare(h <> t) == P.bare(t) : List<&2, P.File>}
+
+# LAW: and keeps every other file, in its place
+law bare_keeps_sources:
+  for +h: P.File
+  for t: List<&2, P.File>
+  for src: {False{} == P.file.lic(h) : Bool}
+  {P.bare(h <> t) == h <> P.bare(t) : List<&2, P.File>}
