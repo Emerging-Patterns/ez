@@ -248,7 +248,7 @@ law pub_needs_agreement:
 law pub_reports_ours:
   for +w: PW.World
   for ok: {PP.succeeds(w) == True{} : Bool}
-  {PP.said(PP.plan(w)) == [PP.hash(w), PP.import.line(PP.hash(w), PP.at(w))]
+  {P.said(PP.plan(w)) == [PP.hash(w), G.import.line(PP.hash(w), PP.at(w))]
     : List<&2, String>}
 
 # LAW: `ez publish` that refuses writes nothing: its plan has no effect but

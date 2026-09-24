@@ -232,14 +232,30 @@ def git.body(empty: Bool, +hash: String, +manifest: String, +ss: List<&2, String
     case False{}:
       body(hash, manifest, ss)
 
+# a git package's bytes under the rule its name was taken by. Since bend
+# 2.0.27 a package holds the LICENSE files beside its sources, and the walk
+# takes them along. A ledger written before names the same checkout without
+# them, and that package is the checkout's too: when the walk's manifest does
+# not hash to the name, the package without its LICENSE files is judged
+# instead, and locked when that is the one the name is the digest of.
+def git.rule(named: Bool, +hash: String, +manifest: String, +ss: List<&2, String>) -> Verdict:
+  match named:
+    case True{}:
+      git.body(List.is_empty(&2, K.File, L.manifest.files(String.lines(manifest))),
+        hash, manifest, ss)
+    case False{}:
+      +fs = L.manifest.files(String.lines(manifest))
+      +bs = K.bare(fs)
+      git.body(List.is_empty(&2, K.File, bs), hash, K.manifest.lines(bs),
+        K.bare.srcs(fs, ss))
+
 # a git package's bytes once its checkout was weighed. A tree read from
 # BEND_LIB is judged as a clone that weighed to the narHash the ledger
 # records, so the same bytes lock the same way whichever way they came.
 def git.weighed.go(same: Bool, +why: String, +hash: String, +manifest: String, +ss: List<&2, String>) -> Verdict:
   match same:
     case True{}:
-      git.body(List.is_empty(&2, K.File, L.manifest.files(String.lines(manifest))),
-        hash, manifest, ss)
+      git.rule(Web.matches(L.want(hash), manifest), hash, manifest, ss)
     case False{}:
       No{why}
 

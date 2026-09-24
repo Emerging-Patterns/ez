@@ -182,6 +182,17 @@ law add_entry_absent:
   for miss: {None{} == K.look(AP.files(w), Path.norm(AP.entry(w))) : Maybe<&2, String>}
   {AP.refuses(w) == True{} : Bool}
 
+# LAW: `ez add` that does not refuse ends what it says with the import line
+# for the entry's path inside the package it walked, which is where the hub
+# serves the entry: its name alone, or, when an import climbs out of its
+# directory, the entry under the directories the package re-rooted above it.
+# `Git.import.line` is the line `ez publish` prints for a package too.
+# EZ-RES-2
+law add_says_import:
+  for +w: A.World
+  for +ok: {AP.refuses(w) == False{} : Bool}
+  {AP.last(AP.plan(w)) == Git.import.line(AP.hash(w), AP.at(w)) : String}
+
 # LAW: a walk that refuses, such as one whose imports climb out of the
 # checkout, refuses the add
 law add_walk_refused:

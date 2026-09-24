@@ -549,6 +549,30 @@ def say.move(+name: String, +old: String, +new: String, +branch: String) -> Stri
 def hash.of(+manifest: String) -> String:
   "0x" ++ String.take(Sha.hex(manifest), 32n)
 
+# the bare checkout's hash when it is the pin's, and the walk's otherwise
+def hash.kept.or(same: Bool, +bare: String, +full: String) -> String:
+  match same:
+    case True{}:
+      bare
+    case False{}:
+      full
+
+def hash.kept.pick(same: Bool, +pin: String, +full: String, +manifest: String) -> String:
+  match same:
+    case True{}:
+      full
+    case False{}:
+      +bare = hash.of(K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))))
+      hash.kept.or(String.eq(bare, pin), bare, full)
+
+# the hash a pinned commit's checkout has, by the rule the pin was taken by:
+# the walk's, or, for a pin written before bend 2.0.27 took the LICENSE files
+# along, the same checkout's without them. A pin that is neither is a drift,
+# and names the walk's hash.
+def hash.kept(+pin: String, +manifest: String) -> String:
+  +full = hash.of(manifest)
+  hash.kept.pick(String.eq(full, pin), pin, full, manifest)
+
 # ---------------------------------------------------------------------------
 # one dependency
 
@@ -676,9 +700,9 @@ def dep.verdict(
 # the same hash, NAR hash and root. One that does not is a drift.
 def dep.kept(co: Co, +rs: List<&2, Reply>, +hub: String, +dep: M.Dep, +tip: String, +tag: String) -> Fate:
   match co:
-    case Co{nar, root, manifest, _srcs}:
+    case Co{nar, root, +manifest, _srcs}:
       +src = M.source.dep(dep)
-      +hash = hash.of(manifest)
+      +hash = hash.kept(M.dep.hash(dep), manifest)
       dep.verdict(U.judge(True{}, True{},
         U.agree(M.dep.hash(dep), hash, M.source.nar(src), nar, M.source.root(src), root),
         tip, tag), rs, hub, dep, tip, "", hash)

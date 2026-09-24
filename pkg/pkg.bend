@@ -56,6 +56,104 @@ def words.keep(ws: List<&2, String>) -> List<&2, String>:
 def words(line: String) -> List<&2, String>:
   words.keep(String.split(line, ' '))
 
+# a character bend's loader reads as white space in an import line. The
+# loader trims each line of a file's header and splits an import on `\s+`,
+# JavaScript's white space: tab, line feed, vertical tab, form feed, carriage
+# return and space, the no-break space, and the Unicode space separators, the
+# line and paragraph separators and the byte order mark. A zero-width space
+# or a next-line character is not one, and bend refuses an import it holds.
+def blank(+ch: Char) -> Bool:
+  match ch:
+    case Chr{+x}:
+      Bool.or(Bool.or(U32.is_eq(x, 32), Bool.and(U32.is_ge(x, 9), U32.is_le(x, 13))),
+        Bool.or(Bool.or(U32.is_eq(x, 160), U32.is_eq(x, 5760)),
+          Bool.or(Bool.and(U32.is_ge(x, 8192), U32.is_le(x, 8202)),
+            Bool.or(Bool.or(U32.is_eq(x, 8232), U32.is_eq(x, 8233)),
+              Bool.or(Bool.or(U32.is_eq(x, 8239), U32.is_eq(x, 8287)),
+                Bool.or(U32.is_eq(x, 12288), U32.is_eq(x, 65279)))))))
+
+# the front of a line, past one character that may be blank
+def trim.front.at(skip: Bool, head: Char, tail: String, rest: Unit -> String) -> String:
+  match skip:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      SCon{head, tail}
+
+# a line with its leading blanks dropped
+def trim.front(line: String) -> String:
+  match line:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, +t}:
+      trim.front.at(blank(h), h, t, _u => trim.front(t))
+
+# a character kept before the rest of a line with its trailing blanks
+# dropped. The character goes too when it is blank and nothing follows it.
+def trim.back.at(gone: Bool, head: Char, rest: String) -> String:
+  match gone:
+    case True{}:
+      SNil{}
+    case False{}:
+      SCon{head, rest}
+
+# a line with its trailing blanks dropped, read from the front, so that the
+# trim of a line is a walk over it rather than over its reverse
+def trim.back(line: String) -> String:
+  match line:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, t}:
+      +rest = trim.back(t)
+      trim.back.at(Bool.and(blank(h), String.is_empty(rest)), h, rest)
+
+# a line with the blanks at either end dropped, as bend's loader trims it
+def trim(line: String) -> String:
+  trim.back(trim.front(line))
+
+# the fields of a line read so far: the field under way, and the fields after
+# it
+type Cut is Data:
+  Cut{field: String, after: List<&2, String>}
+
+# a field put before the fields after it, unless it is empty
+def cut.put(field: String, after: List<&2, String>) -> List<&2, String>:
+  match field:
+    case SNil{}:
+      after
+    case SCon{h, t}:
+      SCon{h, t} <> after
+
+# one character before the fields read so far: a blank ends the field under
+# way, and anything else extends it
+def cut.at(gap: Bool, head: Char, sofar: Cut) -> Cut:
+  match gap:
+    case True{}:
+      Cut{field, after} = sofar
+      Cut{"", cut.put(field, after)}
+    case False{}:
+      Cut{field, after} = sofar
+      Cut{SCon{head, field}, after}
+
+# a line cut at its blanks, read from the back
+def cut(line: String) -> Cut:
+  match line:
+    case SNil{}:
+      Cut{"", []}
+    case SCon{+h, t}:
+      cut.at(blank(h), h, cut(t))
+
+# a line's fields once it is cut: the one under way before the rest
+def cut.all(sofar: Cut) -> List<&2, String>:
+  Cut{field, after} = sofar
+  cut.put(field, after)
+
+# the fields of an import line: what is left between its runs of blanks, as
+# bend's loader splits it. `words` splits on spaces alone, which is how a
+# manifest line is split.
+def fields(line: String) -> List<&2, String>:
+  cut.all(cut(line))
+
 # the nth word, or "" when the line is shorter than that. Both the list and the
 # count are scrutinised together, so the walk needs no helper to branch through.
 def word(ws: List<&2, String>, index: Nat) -> String:
@@ -96,10 +194,12 @@ def base_of.step(prelude: Bool, ws: List<&2, String>) -> Stmt:
     case False{}:
       mod_of(ws)
 
-# `import Base` brings in the prelude, which is no part of any package
+# `import Base` brings in the prelude, which is no part of any package. bend
+# lets a comment follow it, and a comment names no module.
 def base_of(+ws: List<&2, String>) -> Stmt:
   base_of.step(
-    Bool.and(Nat.is_eq(List.length(&2, String, ws), 2n),
+    Bool.and(Bool.or(Nat.is_eq(List.length(&2, String, ws), 2n),
+        String.starts_with(word(ws, 2n), "#")),
       Bool.and(String.eq(word(ws, 0n), "import"), String.eq(word(ws, 1n), "Base"))),
     ws)
 
@@ -107,8 +207,8 @@ def base_of(+ws: List<&2, String>) -> Stmt:
 def quiet(+line: String) -> Bool:
   Bool.or(String.is_empty(line), String.starts_with(line, "#"))
 
-# a line that says nothing about the header, decided. `words` is a
-# `String.split` and a filter over its result, and this is the arm it hangs
+# a line that says nothing about the header, decided. `fields` is a walk
+# over the line that cuts it at its blanks, and this is the arm it hangs
 # from: every blank line and every comment line of every `.bend` file of the
 # project and of every package it resolves used to be split into words and
 # classified, which is most of the lines ez ever reads.
@@ -117,7 +217,34 @@ def stmt_of.quiet(skip: Bool, +line: String) -> Stmt:
     case True{}:
       SNone{}
     case False{}:
-      base_of(words(line))
+      base_of(fields(line))
+
+# the rest of a line, past one character that may be skipped
+def foreign.gap.at(skip: Bool, head: Char, tail: String, rest: Unit -> String) -> String:
+  match skip:
+    case True{}:
+      rest(Unit{})
+    case False{}:
+      SCon{head, tail}
+
+# a line past its `import`, with the spaces, tabs and carriage returns bend's
+# parser skips between the word and the path dropped
+def foreign.gap(line: String) -> String:
+  match line:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, +t}:
+      foreign.gap.at(Bool.or(Char.is_eq(h, ' '), Bool.or(Char.is_eq(h, '\t'),
+        Char.is_eq(h, '\r'))), h, t, _u => foreign.gap(t))
+
+# the quoted path of a foreign import, once its `import` and the gap after
+# it are gone
+def foreign.path(+rest: String) -> String:
+  String.take(String.drop(rest, 1n), Nat.sub(String.length(rest), 2n))
+
+# whether what follows a line's `import` is a quoted path
+def foreign.quoted(+rest: String) -> Bool:
+  Bool.and(String.starts_with(rest, "\""), String.ends_with(rest, "\""))
 
 # the foreign import decided. The rest of the cascade hangs off the False arm
 # rather than sitting in an argument, so a line that is a foreign import pays
@@ -125,15 +252,17 @@ def stmt_of.quiet(skip: Bool, +line: String) -> Stmt:
 def stmt_of.foreign(here: Bool, +line: String) -> Stmt:
   match here:
     case True{}:
-      SForeign{String.take(String.drop(line, 8n), Nat.sub(String.length(line), 9n))}
+      SForeign{foreign.path(foreign.gap(String.drop(line, 6n)))}
     case False{}:
       stmt_of.quiet(quiet(line), line)
 
 # a trimmed line classified. A foreign import is tested first: it lives in a
-# def's body, long after the header has ended.
+# def's body, long after the header has ended. bend's parser reads the word
+# `import`, skips spaces, tabs and carriage returns, and reads a quoted path.
 def stmt_of(+line: String) -> Stmt:
   stmt_of.foreign(
-    Bool.and(String.starts_with(line, "import \""), String.ends_with(line, "\"")), line)
+    Bool.and(String.starts_with(line, "import"),
+      foreign.quoted(foreign.gap(String.drop(line, 6n)))), line)
 
 # a module named after the header has ended is not part of the header, so the
 # line is ignored rather than followed
@@ -159,7 +288,7 @@ def scan.go(st: Head, stmt: Stmt) -> Head:
 
 # one line of a source file against the state
 def scan.step(st: Head, raw: String) -> Head:
-  scan.go(st, stmt_of(String.trim(raw)))
+  scan.go(st, stmt_of(trim(raw)))
 
 # what a finished scan gathered, in source order
 def scan.fin(st: Head) -> Scan:
@@ -381,6 +510,47 @@ def manifest_of(fs: List<&2, File>) -> String:
 def hash_of(fs: List<&2, File>) -> String:
   "0x" ++ String.take(Sha.hex(manifest_of(fs)), 32n)
 
+# whether a file of a package is a LICENSE bend took along. A module ends in
+# `.bend` and a foreign body in `.c` or `.js`, so a file named LICENSE is one
+# the walk took along beside them.
+def file.lic(item: File) -> Bool:
+  File{at, _sum} = item
+  String.eq(P.base(at), "LICENSE")
+
+def bare.pick(lic: Bool, head: File, rest: List<&2, File>) -> List<&2, File>:
+  match lic:
+    case True{}:
+      rest
+    case False{}:
+      head <> rest
+
+# a package's files as bend named them before 2.0.27: without the LICENSE
+# files it now takes along, in the order they were given
+def bare(fs: List<&2, File>) -> List<&2, File>:
+  match fs:
+    case []:
+      []
+    case +h <> t:
+      bare.pick(file.lic(h), h, bare(t))
+
+def bare.srcs.pick(lic: Bool, text: String, rest: List<&2, String>) -> List<&2, String>:
+  match lic:
+    case True{}:
+      rest
+    case False{}:
+      text <> rest
+
+# the texts that go with those files: the texts of a file list, one per file
+# in the same order, with the LICENSE files' texts left out
+def bare.srcs(fs: List<&2, File>, ss: List<&2, String>) -> List<&2, String>:
+  match fs ss:
+    case Nil{} _:
+      ss
+    case Con{_h, _t} Nil{}:
+      []
+    case Con{+h, t} Con{s, u}:
+      bare.srcs.pick(file.lic(h), s, bare.srcs(t, u))
+
 # ---------------------------------------------------------------------------
 # the walk
 
@@ -429,6 +599,14 @@ type Walked is Data:
   Walked{hash: String, root: String, files: List<&2, Source>, sums: List<&2, File>}
   Asks{at: String}
   Refused{why: String}
+
+# a path of the project, as it is written inside a package rooted at `root`:
+# the path itself under the project's own root, and the path with the root's
+# directories taken off otherwise. The hub serves a package's files at these
+# paths, so `ez add` and `ez publish` both name the entry by it.
+def inside(+root: String, +path: String) -> String:
+  Bool.pick(String, String.eq(root, "."), path,
+    String.drop(path, (String.length(root) + 1n : Nat)))
 
 # one step of a lookup, with the head's answer in hand. The rest arrives as a
 # thunk, so a hit ends the search.
@@ -483,14 +661,33 @@ def outside(+at: String) -> Bool:
   +n = P.norm(at)
   Bool.or(String.eq(n, ".."), String.starts_with(n, "../"))
 
-# a foreign body the tree holds, or nothing when it is not there. bend uploads
-# only the ones that are there. It is named the way the module importing it
-# is named, from that module's own directory: `bend --publish` writes
-# `src/util/beep.c` for a body imported by `src/util/math.bend`.
-def foreign.put(got: Look, +raw: String) -> List<&2, Hit>:
+# the file bend takes along beside every file it publishes: a file named
+# exactly `LICENSE` in the same directory, at the same path in the package.
+# bend 2.0.27 hashes it with the rest, so a package that has one is named
+# with it.
+def beside(+path: String) -> String:
+  P.join(P.dir(path), "LICENSE")
+
+# the LICENSE beside a published file, when the tree holds one, named beside
+# the file's own name in the package
+def license.put(got: Look, +raw: String) -> List<&2, Hit>:
   match got:
     case Here{text}:
       [Hit{raw, text}]
+    case Absent{}:
+      []
+    case Unasked{}:
+      []
+
+# a foreign body the tree holds, with the LICENSE beside it, or nothing when
+# it is not there. bend uploads only the ones that are there. It is named the
+# way the module importing it is named, from that module's own directory:
+# `bend --publish` writes `src/util/beep.c` for a body imported by
+# `src/util/math.bend`.
+def foreign.put(got: Look, +tree: Tree, +at: String, +raw: String) -> List<&2, Hit>:
+  match got:
+    case Here{text}:
+      Hit{raw, text} <> license.put(find(tree, beside(at)), beside(raw))
     case Absent{}:
       []
     case Unasked{}:
@@ -503,14 +700,26 @@ def foreigns(+tree: Tree, +dir: String, +nd: String, ats: List<&2, String>) -> L
     case []:
       []
     case +h <> t:
-      List.append(&2, Hit, foreign.put(find(tree, P.join(dir, h)), P.join(nd, h)),
-        foreigns(tree, dir, nd, t))
+      List.append(&2, Hit, foreign.put(find(tree, P.join(dir, h)), tree, P.join(dir, h),
+        P.join(nd, h)), foreigns(tree, dir, nd, t))
 
-# a foreign body inside the checkout stops the walk only when it was not given
-def foreign.asked(got: Look, +at: String, rest: Unit -> Stop) -> Stop:
+# a file the walk may need stops it only when it was not given, as a
+# question: one that is there or not there lets the walk go on
+def asked(got: Look, +at: String, rest: Unit -> Stop) -> Stop:
   match got:
     case Here{_text}:
       rest(Unit{})
+    case Absent{}:
+      rest(Unit{})
+    case Unasked{}:
+      Asking{at}
+
+# a foreign body inside the checkout stops the walk only when it, or the
+# LICENSE beside it once it is there, was not given
+def foreign.asked(got: Look, +tree: Tree, +at: String, rest: Unit -> Stop) -> Stop:
+  match got:
+    case Here{_text}:
+      asked(find(tree, beside(at)), beside(at), rest)
     case Absent{}:
       rest(Unit{})
     case Unasked{}:
@@ -522,7 +731,7 @@ def foreign.judge(out: Bool, +tree: Tree, +at: String, +raw: String, rest: Unit 
     case True{}:
       Climbs{raw}
     case False{}:
-      foreign.asked(find(tree, at), at, rest)
+      foreign.asked(find(tree, at), tree, at, rest)
 
 # the first foreign body of a file that stops the walk, or `Going` when none
 # does
@@ -535,9 +744,9 @@ def foreign.check(+tree: Tree, +dir: String, +nd: String, ats: List<&2, String>)
       foreign.judge(outside(at), tree, at, P.join(nd, h),
         _u => foreign.check(tree, dir, nd, t))
 
-# a file whose foreign bodies are all settled: itself and its foreign bodies
-# found, and the modules it imports put at the front of the queue, so the walk
-# goes depth first the way bend's does. A foreign body that stops the walk
+# a file whose LICENSE and foreign bodies are all settled: itself, the LICENSE
+# beside it and its foreign bodies found, and the modules it imports put at
+# the front of the queue, so the walk goes depth first the way bend's does. A foreign body that stops the walk
 # leaves the file queued, so an answered question visits it again.
 def visit.put(
   fstop: Stop,
@@ -555,9 +764,11 @@ def visit.put(
     case Going{}:
       +d = P.dir(file)
       +nd = nsdir(ns)
+      +raw = raw_of(ns, eb)
       State{file <> seen,
-        Hit{raw_of(ns, eb), text} <> List.append(&2, Hit,
-          foreigns(tree, d, nd, scan.foreign(sc)), out),
+        Hit{raw, text} <> List.append(&2, Hit,
+          license.put(find(tree, beside(file)), beside(raw)),
+          List.append(&2, Hit, foreigns(tree, d, nd, scan.foreign(sc)), out)),
         Going{},
         List.append(&2, Task, tasks(d, nd, scan.mods(sc)), rest)}
     case Missing{at}:
@@ -569,7 +780,8 @@ def visit.put(
     case Spent{}:
       State{seen, out, Spent{}, Task{file, ns} <> rest}
 
-# a file that is in the tree, scanned, with its foreign bodies checked first
+# a file that is in the tree, scanned, with the LICENSE beside it and its
+# foreign bodies checked first
 def visit.found(
   +tree: Tree,
   +text: String,
@@ -581,7 +793,8 @@ def visit.found(
   rest: List<&2, Task>
 ) -> State:
   +sc = scan(text)
-  visit.put(foreign.check(tree, P.dir(file), nsdir(ns), scan.foreign(sc)),
+  visit.put(asked(find(tree, beside(file)), beside(file),
+      _u => foreign.check(tree, P.dir(file), nsdir(ns), scan.foreign(sc))),
     tree, sc, text, file, ns, eb, seen, out, rest)
 
 # a module that is imported and not there stops the walk, since a package
@@ -797,6 +1010,67 @@ def made.placed(+root: String, +pre: String, +out: List<&2, Hit>) -> Walked:
   +bad = escaped(fs)
   made.judge(String.is_empty(bad), bad, root, pre, fs, out)
 
+# whether a component is named license in any case. bend 2.0.27 refuses to
+# publish a file under such a directory, since on a disk that does not tell
+# case apart it is the same name as a LICENSE file beside it.
+def license.is(+part: String) -> Bool:
+  String.eq(String.to_lower(part), "license")
+
+# one step of the search, with the head's answer in hand; the rest arrives as
+# a thunk, so a hit ends the search
+def license.step(here: Bool, rest: Unit -> Bool) -> Bool:
+  match here:
+    case True{}:
+      True{}
+    case False{}:
+      rest(Unit{})
+
+# whether any of the components is named license
+def license.any(ps: List<&2, String>) -> Bool:
+  match ps:
+    case []:
+      False{}
+    case +h <> t:
+      license.step(license.is(h), _u => license.any(t))
+
+# whether a path of the package lies under a directory named license
+def license.under(+at: String) -> Bool:
+  license.any(String.split(P.dir(at), '/'))
+
+# one step of the search for such a path
+def licensed.step(here: Bool, +at: String, rest: Unit -> String) -> String:
+  match here:
+    case True{}:
+      at
+    case False{}:
+      rest(Unit{})
+
+# the first found file whose place in the package lies under a directory
+# named license, or "" when none does. It reads names alone, so nothing is
+# weighed for it.
+def licensed(+pre: String, fs: List<&2, Hit>) -> String:
+  match fs:
+    case []:
+      ""
+    case Hit{raw, _text} <> t:
+      +at = P.join(pre, raw)
+      licensed.step(license.under(at), at, _u => licensed(pre, t))
+
+# the found files placed and weighed, once none lies under a directory named
+# license, which bend refuses before it mines
+def made.lic(ok: Bool, +bad: String, +root: String, +pre: String, +out: List<&2, Hit>) -> Walked:
+  match ok:
+    case True{}:
+      made.placed(root, pre, out)
+    case False{}:
+      Refused{"ez: " ++ bad ++ " is in a directory named license, which clashes with a LICENSE file"}
+
+# the found files, refused when one lies under a directory named license, and
+# placed and weighed otherwise
+def made.checked(+root: String, +pre: String, +out: List<&2, Hit>) -> Walked:
+  +bad = licensed(pre, out)
+  made.lic(String.is_empty(bad), bad, root, pre, out)
+
 # a package that climbs re-roots under as many of the entry directory's
 # trailing components as its deepest climb. The walk refuses an import that
 # climbs out of the checkout, so there are always that many; a package that
@@ -806,7 +1080,7 @@ def made.anc(far: Bool, +levels: Nat, +dir: String, +out: List<&2, Hit>) -> Walk
     case True{}:
       Refused{"ez: the package climbs out of the checkout"}
     case False{}:
-      made.placed(P.climb(levels, dir), P.tail(dir, levels), out)
+      made.checked(P.climb(levels, dir), P.tail(dir, levels), out)
 
 # how many components a checkout-relative directory has: none for the
 # checkout's top
@@ -819,7 +1093,7 @@ def comps(+dir: String) -> Nat:
 def made.climb(+levels: Nat, +dir: String, +out: List<&2, Hit>) -> Walked:
   match levels:
     case 0n:
-      made.placed(P.norm(dir), "", out)
+      made.checked(P.norm(dir), "", out)
     case 1n+p:
       made.anc(Nat.is_gt(1n+p, comps(dir)), 1n+p, dir, out)
 

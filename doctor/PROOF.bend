@@ -72,7 +72,7 @@ def says_quiet(ns):
 
 def Laws.doctor_writes_nothing(w):
   says_quiet(DP.notes.of(DP.ledger.seen(DW.read(w)), DW.heard(DW.replies(w), DW.Sources{}),
-    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w)))
+    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w)))
 
 # ---------------------------------------------------------------------------
 # what a plan says
@@ -159,12 +159,13 @@ law said_notes:
   for +lib: String
   for +lock: Maybe<&2, String>
   for +rs: List<&2, DW.Reply>
+  for +cs: List<&2, DP.Note>
   for +line: String
   for e: {DP.said.in(DP.says(DP.imports.notes(led, got)), line) == True{} : Bool}
-  {DP.said.in(DP.says(DP.notes.of(led, got, cc, lib, lock, rs)), line) == True{} : Bool}
+  {DP.said.in(DP.says(DP.notes.of(led, got, cc, lib, lock, rs, cs)), line) == True{} : Bool}
 
-def said_notes(led, got, cc, lib, lock, rs, line, e):
-  said_append(DP.head.notes(led, cc, lib, lock, rs), DP.imports.notes(led, got), line, e)
+def said_notes(led, got, cc, lib, lock, rs, cs, line, e):
+  said_append(DP.head.notes(led, cc, lib, lock, rs, cs), DP.imports.notes(led, got), line, e)
 
 # ---------------------------------------------------------------------------
 # membership
@@ -440,12 +441,12 @@ def unused_has(pre, d, post, hs, e):
 
 def Laws.doctor_reports_unrecorded(w, n, e, b, hub, ds, _ts, fs, h, g, l, i, u):
   %g : {DP.said(DP.plan.of(DP.ledger.seen(_), DW.cc(w), DW.lib(w), DW.lock(w),
-    DW.replies(w)), DP.unrecorded.line(h)) == True{} : Bool}
+    DW.replies(w), DP.checked(w)), DP.unrecorded.line(h)) == True{} : Bool}
   %l : {DP.said.in(DP.says(DP.notes.of(M.Good{M.Manifest{n, e, b, hub, ds, []}}, _,
-    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w))), DP.unrecorded.line(h)) == True{}
-    : Bool}
+    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w))), DP.unrecorded.line(h))
+    == True{} : Bool}
   said_notes(M.Good{M.Manifest{n, e, b, hub, ds, []}}, DW.Heard{DW.Listed{W.Listed{fs}}},
-    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.unrecorded.line(h),
+    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w), DP.unrecorded.line(h),
     said_drift(DP.imports(fs), DP.drift(DP.imports(fs), ds), DP.unrecorded.line(h),
       has_append_left(DP.unrecorded(DP.missing(DP.imports(fs), DP.pinned(ds))),
         DP.unused(ds, DP.imports(fs)), DP.unrecorded.line(h),
@@ -457,13 +458,14 @@ def Laws.doctor_reports_unrecorded(w, n, e, b, hub, ds, _ts, fs, h, g, l, i, u):
 
 def Laws.doctor_reports_unused(w, n, e, b, hub, pre, d, post, _ts, fs, g, l, u):
   %g : {DP.said(DP.plan.of(DP.ledger.seen(_), DW.cc(w), DW.lib(w), DW.lock(w),
-    DW.replies(w)), DP.unused.line(d)) == True{} : Bool}
+    DW.replies(w), DP.checked(w)), DP.unused.line(d)) == True{} : Bool}
   %l : {DP.said.in(DP.says(DP.notes.of(
     M.Good{M.Manifest{n, e, b, hub, List.append(&2, M.Dep, pre, d <> post), []}}, _,
-    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w))), DP.unused.line(d)) == True{} : Bool}
+    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w))), DP.unused.line(d))
+    == True{} : Bool}
   said_notes(M.Good{M.Manifest{n, e, b, hub, List.append(&2, M.Dep, pre, d <> post), []}},
     DW.Heard{DW.Listed{W.Listed{fs}}},
-    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.unused.line(d),
+    DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w), DP.unused.line(d),
     said_drift(DP.imports(fs),
       DP.drift(DP.imports(fs), List.append(&2, M.Dep, pre, d <> post)), DP.unused.line(d),
       has_append_right(
@@ -536,20 +538,20 @@ def refuses_wrong(ns, e):
 
 def Laws.doctor_drift_fails(w, n, e, b, hub, ds, _ts, fs, x, xs, g, l, r):
   %g : {DP.refuses.plan(DP.plan.of(DP.ledger.seen(_), DW.cc(w), DW.lib(w), DW.lock(w),
-    DW.replies(w))) == True{} : Bool}
+    DW.replies(w), DP.checked(w))) == True{} : Bool}
   %l : {DP.refuses.plan(DP.plan.notes(DP.notes.of(M.Good{M.Manifest{n, e, b, hub, ds, []}},
-    _, DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w)))) == True{} : Bool}
+    _, DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w)))) == True{} : Bool}
   %Equal.sym(List<&2, String>, DP.drift.of(fs, ds), x <> xs, r)
     : {DP.refuses.plan(DP.plan.notes(List.append(&2, DP.Note,
       DP.head.notes(M.Good{M.Manifest{n, e, b, hub, ds, []}}, DW.cc(w), DW.lib(w), DW.lock(w),
-        DW.replies(w)),
+        DW.replies(w), DP.checked(w)),
       DP.drift.notes(DP.imports(fs), _)))) == True{} : Bool}
   refuses_wrong(List.append(&2, DP.Note,
       DP.head.notes(M.Good{M.Manifest{n, e, b, hub, ds, []}}, DW.cc(w), DW.lib(w), DW.lock(w),
-        DW.replies(w)),
+        DW.replies(w), DP.checked(w)),
       DP.flag(x <> xs)),
     wrong_append(DP.head.notes(M.Good{M.Manifest{n, e, b, hub, ds, []}}, DW.cc(w), DW.lib(w),
-      DW.lock(w), DW.replies(w)), DP.flag(x <> xs), {==}))
+      DW.lock(w), DW.replies(w), DP.checked(w)), DP.flag(x <> xs), {==}))
 
 # ---------------------------------------------------------------------------
 # a ledger that is not there, or not read
@@ -561,34 +563,40 @@ law bad_fails:
   for +lib: String
   for +lock: Maybe<&2, String>
   for +rs: List<&2, DW.Reply>
-  {DP.refuses.plan(DP.plan.of(M.Bad{why}, cc, lib, lock, rs)) == True{} : Bool}
+  for +cs: List<&2, DP.Note>
+  {DP.refuses.plan(DP.plan.of(M.Bad{why}, cc, lib, lock, rs, cs)) == True{} : Bool}
 
-def bad_fails(why, cc, lib, lock, rs):
-  refuses_wrong(DP.notes.of(M.Bad{why}, DW.heard(rs, DW.Sources{}), cc, lib, lock, rs),
-    wrong_append_left(DP.head.notes(M.Bad{why}, cc, lib, lock, rs),
+def bad_fails(why, cc, lib, lock, rs, cs):
+  refuses_wrong(DP.notes.of(M.Bad{why}, DW.heard(rs, DW.Sources{}), cc, lib, lock, rs, cs),
+    wrong_append_left(DP.head.notes(M.Bad{why}, cc, lib, lock, rs, cs),
       DP.imports.notes(M.Bad{why}, DW.heard(rs, DW.Sources{})),
       wrong_append(DP.probes(DP.programs(cc), rs),
-        [DP.ledger.note(M.Bad{why}), DP.lock.note(0n, DP.locked.of(lock)),
-          DP.lib.note(DP.lib.at(lib), DP.locked.hashes(DP.locked.of(lock)), rs)],
-        {==})))
+        List.append(&2, DP.Note,
+          [DP.ledger.note(M.Bad{why}), DP.lock.note(0n, DP.locked.of(lock)),
+            DP.lib.note(DP.lib.at(lib), DP.locked.hashes(DP.locked.of(lock)), rs)], cs),
+        wrong_append_left(
+          [DP.ledger.note(M.Bad{why}), DP.lock.note(0n, DP.locked.of(lock)),
+            DP.lib.note(DP.lib.at(lib), DP.locked.hashes(DP.locked.of(lock)), rs)], cs,
+          {==}))))
 
 def Laws.doctor_needs_ledger(cc, lib, lock, rs):
-  bad_fails("none here; ez init makes one", cc, lib, lock, rs)
+  bad_fails("none here; ez init makes one", cc, lib, lock, rs,
+    DP.checked(DW.World{cc, lib, None{}, lock, rs}))
 
-def Laws.doctor_refuses_unread(cc, lib, lock, rs, _s, why, bad):
-  %bad : {DP.refuses.plan(DP.plan.of(DP.ledger.seen(_), cc, lib, lock, rs)) == True{}
-    : Bool}
-  bad_fails(why, cc, lib, lock, rs)
+def Laws.doctor_refuses_unread(cc, lib, lock, rs, s, why, bad):
+  %bad : {DP.refuses.plan(DP.plan.of(DP.ledger.seen(_), cc, lib, lock, rs,
+    DP.checked(DW.World{cc, lib, Some{s}, lock, rs}))) == True{} : Bool}
+  bad_fails(why, cc, lib, lock, rs, DP.checked(DW.World{cc, lib, Some{s}, lock, rs}))
 
 # ---------------------------------------------------------------------------
 # EZ-LED-5
 
 # Both ledgers are seen without their tools, which is the same ledger.
-def Laws.doctor_ignores_tools(cc, lib, lock, rs, _t1, t2, n, e, b, hub, ds, ts1, _ts2, g1, g2):
-  %g1 : {DP.step.of(DP.ledger.seen(_), cc, lib, lock, rs)
-    == DP.step(DW.World{cc, lib, Some{t2}, lock, rs}) : DP.Step}
-  %g2 : {DP.step.of(DP.ledger.seen(M.Good{M.Manifest{n, e, b, hub, ds, ts1}}), cc, lib, lock, rs)
-    == DP.step.of(DP.ledger.seen(_), cc, lib, lock, rs) : DP.Step}
+def Laws.doctor_ignores_tools(cc, lib, lock, rs, cs, _t1, t2, n, e, b, hub, ds, ts1, _ts2, g1, g2):
+  %g1 : {DP.plan.of(DP.ledger.seen(_), cc, lib, lock, rs, cs)
+    == DP.plan.of(DP.ledger.seen(M.parse(t2)), cc, lib, lock, rs, cs) : P.Plan}
+  %g2 : {DP.plan.of(DP.ledger.seen(M.Good{M.Manifest{n, e, b, hub, ds, ts1}}), cc, lib, lock,
+    rs, cs) == DP.plan.of(DP.ledger.seen(_), cc, lib, lock, rs, cs) : P.Plan}
   {==}
 
 # ---------------------------------------------------------------------------
@@ -627,3 +635,194 @@ def plan_code(pl):
 
 def Laws.doctor_exits_as_it_fails(w):
   plan_code(DP.plan(w))
+
+# ---------------------------------------------------------------------------
+# EZ-VEN-6
+#
+# The lock check's lines stand after the library's and before the drift
+# report, so a line the check says is said by doctor (`said_check`), and a
+# check line that is a problem fails it (`wrong_check`). What the check says
+# is found by rewriting the World's lock, its sources and the lock planner's
+# open questions and decision to what each law assumes, after which the check
+# is one note computed.
+
+# LAW: one step of the front, with its head decided
+law said_left.step:
+  for bb: Bool
+  for +t: List<&2, DP.Note>
+  for +b: List<&2, DP.Note>
+  for +line: String
+  for e: {DP.has.step(bb, _u => DP.said.in(DP.says(t), line)) == True{} : Bool}
+  for ih: {DP.said.in(DP.says(t), line) == True{} : Bool}
+    -> {DP.said.in(DP.says(List.append(&2, DP.Note, t, b)), line) == True{} : Bool}
+  {DP.has.step(bb, _u => DP.said.in(DP.says(List.append(&2, DP.Note, t, b)), line)) == True{}
+    : Bool}
+
+def said_left.step(bb, _t, _b, _line, e, ih):
+  match bb:
+    case True{}:
+      {==}
+    case False{}:
+      ih(e)
+
+# LAW: a line said by the first lines is said by all of them
+law said_append_left:
+  for a: List<&2, DP.Note>
+  for +b: List<&2, DP.Note>
+  for +line: String
+  for e: {DP.said.in(DP.says(a), line) == True{} : Bool}
+  {DP.said.in(DP.says(List.append(&2, DP.Note, a, b)), line) == True{} : Bool}
+
+def said_append_left(a, b, line, e):
+  match a:
+    case []:
+      Eq.bit.absurd(&2,
+        {DP.said.in(DP.says(List.append(&2, DP.Note, [], b)), line) == True{} : Bool}, e)
+    case h <> +t:
+      match h:
+        case DP.Note{_w, +l}:
+          said_left.step(String.eq(l, line), t, b, line, e,
+            z => said_append_left(t, b, line, z))
+
+# LAW: a line the lock check says is said by doctor
+law said_check:
+  for +led: M.Read
+  for +got: DW.Heard
+  for +cc: String
+  for +lib: String
+  for +lock: Maybe<&2, String>
+  for +rs: List<&2, DW.Reply>
+  for +cs: List<&2, DP.Note>
+  for +line: String
+  for e: {DP.said.in(DP.says(cs), line) == True{} : Bool}
+  {DP.said.in(DP.says(DP.notes.of(led, got, cc, lib, lock, rs, cs)), line) == True{} : Bool}
+
+def said_check(led, got, cc, lib, lock, rs, cs, line, e):
+  said_append_left(DP.head.notes(led, cc, lib, lock, rs, cs), DP.imports.notes(led, got), line,
+    said_append(DP.probes(DP.programs(cc), rs),
+      List.append(&2, DP.Note,
+        [DP.ledger.note(led), DP.lock.note(DP.deps.count(led), DP.locked.of(lock)),
+          DP.lib.note(DP.lib.at(lib), DP.locked.hashes(DP.locked.of(lock)), rs)], cs),
+      line,
+      said_append(
+        [DP.ledger.note(led), DP.lock.note(DP.deps.count(led), DP.locked.of(lock)),
+          DP.lib.note(DP.lib.at(lib), DP.locked.hashes(DP.locked.of(lock)), rs)], cs,
+        line, e)))
+
+# LAW: and a lock check line that is a problem fails doctor
+law wrong_check:
+  for +led: M.Read
+  for +got: DW.Heard
+  for +cc: String
+  for +lib: String
+  for +lock: Maybe<&2, String>
+  for +rs: List<&2, DW.Reply>
+  for +cs: List<&2, DP.Note>
+  for e: {DP.wrong(cs) == True{} : Bool}
+  {DP.refuses.plan(DP.plan.notes(DP.notes.of(led, got, cc, lib, lock, rs, cs))) == True{} : Bool}
+
+def wrong_check(led, got, cc, lib, lock, rs, cs, e):
+  refuses_wrong(DP.notes.of(led, got, cc, lib, lock, rs, cs),
+    wrong_append_left(DP.head.notes(led, cc, lib, lock, rs, cs), DP.imports.notes(led, got),
+      wrong_append(DP.probes(DP.programs(cc), rs),
+        List.append(&2, DP.Note,
+          [DP.ledger.note(led), DP.lock.note(DP.deps.count(led), DP.locked.of(lock)),
+            DP.lib.note(DP.lib.at(lib), DP.locked.hashes(DP.locked.of(lock)), rs)], cs),
+        wrong_append(
+          [DP.ledger.note(led), DP.lock.note(DP.deps.count(led), DP.locked.of(lock)),
+            DP.lib.note(DP.lib.at(lib), DP.locked.hashes(DP.locked.of(lock)), rs)], cs,
+          e))))
+
+# LAW: a note alone says its own line
+law said_one:
+  for +b: Bool
+  for +line: String
+  {DP.said.in(DP.says([DP.Note{b, line}]), line) == True{} : Bool}
+
+def said_one(_b, line):
+  step_hit(String.eq(line, line), _u => DP.said.in(DP.says([]), line),
+    Eq.string_eq_self(line))
+
+def Laws.doctor_passes_fresh_lock(w, t, fs, k, l, o, d):
+  %k : {DP.fresh.notes(DW.ledger(w), _, DW.replies(w))
+    == [DP.Note{False{}, DP.fresh.line()}] : List<&2, DP.Note>}
+  %l : {DP.fresh.heard(_, DW.ledger(w), DW.replies(w), t)
+    == [DP.Note{False{}, DP.fresh.line()}] : List<&2, DP.Note>}
+  %o : {[DP.fresh.away(_, DP.relock(w, fs), t)]
+    == [DP.Note{False{}, DP.fresh.line()}] : List<&2, DP.Note>}
+  %d : {[DP.fresh.doc(_, t)] == [DP.Note{False{}, DP.fresh.line()}] : List<&2, DP.Note>}
+  %Equal.sym(Bool, String.eq(t, t), True{}, Eq.string_eq_self(t))
+    : {[DP.fresh.said(_)] == [DP.Note{False{}, DP.fresh.line()}] : List<&2, DP.Note>}
+  {==}
+
+# LAW: the check's one line, for a lock that differs from the one decided on
+law checked_stale:
+  for +w: DW.World
+  for +t: String
+  for +u: String
+  for +fs: List<&2, W.Source>
+  for k: {Some{t} == DW.lock(w) : Maybe<&2, String>}
+  for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
+  for o: {[] == P.wants(DP.relock(w, fs)) : List<&2, W.Ask>}
+  for d: {P.Doc{u} == P.decide(W.inputs(DP.relock(w, fs))) : P.Doc}
+  for ne: {False{} == String.eq(u, t) : Bool}
+  {DP.checked(w) == [DP.Note{True{}, DP.stale.line()}] : List<&2, DP.Note>}
+
+def checked_stale(w, t, _u, fs, k, l, o, d, ne):
+  %k : {DP.fresh.notes(DW.ledger(w), _, DW.replies(w))
+    == [DP.Note{True{}, DP.stale.line()}] : List<&2, DP.Note>}
+  %l : {DP.fresh.heard(_, DW.ledger(w), DW.replies(w), t)
+    == [DP.Note{True{}, DP.stale.line()}] : List<&2, DP.Note>}
+  %o : {[DP.fresh.away(_, DP.relock(w, fs), t)]
+    == [DP.Note{True{}, DP.stale.line()}] : List<&2, DP.Note>}
+  %d : {[DP.fresh.doc(_, t)] == [DP.Note{True{}, DP.stale.line()}] : List<&2, DP.Note>}
+  %ne : {[DP.fresh.said(_)] == [DP.Note{True{}, DP.stale.line()}] : List<&2, DP.Note>}
+  {==}
+
+def Laws.doctor_says_fresh_lock(w, t, fs, k, l, o, d):
+  %Equal.sym(List<&2, DP.Note>, DP.checked(w), [DP.Note{False{}, DP.fresh.line()}],
+    Laws.doctor_passes_fresh_lock(w, t, fs, k, l, o, d))
+    : {DP.said(DP.plan.of(DP.ledger.seen(DW.read(w)), DW.cc(w), DW.lib(w), DW.lock(w),
+      DW.replies(w), _), DP.fresh.line()) == True{} : Bool}
+  said_check(DP.ledger.seen(DW.read(w)), DW.heard(DW.replies(w), DW.Sources{}), DW.cc(w),
+    DW.lib(w), DW.lock(w), DW.replies(w), [DP.Note{False{}, DP.fresh.line()}], DP.fresh.line(),
+    said_one(False{}, DP.fresh.line()))
+
+def Laws.doctor_reports_stale_lock(w, t, u, fs, k, l, o, d, ne):
+  %Equal.sym(List<&2, DP.Note>, DP.checked(w), [DP.Note{True{}, DP.stale.line()}],
+    checked_stale(w, t, u, fs, k, l, o, d, ne))
+    : {DP.said(DP.plan.of(DP.ledger.seen(DW.read(w)), DW.cc(w), DW.lib(w), DW.lock(w),
+      DW.replies(w), _), DP.stale.line()) == True{} : Bool}
+  said_check(DP.ledger.seen(DW.read(w)), DW.heard(DW.replies(w), DW.Sources{}), DW.cc(w),
+    DW.lib(w), DW.lock(w), DW.replies(w), [DP.Note{True{}, DP.stale.line()}], DP.stale.line(),
+    said_one(True{}, DP.stale.line()))
+
+def Laws.doctor_stale_lock_fails(w, t, u, fs, k, l, o, d, ne):
+  %Equal.sym(List<&2, DP.Note>, DP.checked(w), [DP.Note{True{}, DP.stale.line()}],
+    checked_stale(w, t, u, fs, k, l, o, d, ne))
+    : {DP.refuses.plan(DP.plan.of(DP.ledger.seen(DW.read(w)), DW.cc(w), DW.lib(w), DW.lock(w),
+      DW.replies(w), _)) == True{} : Bool}
+  wrong_check(DP.ledger.seen(DW.read(w)), DW.heard(DW.replies(w), DW.Sources{}), DW.cc(w),
+    DW.lib(w), DW.lock(w), DW.replies(w), [DP.Note{True{}, DP.stale.line()}], {==})
+
+# LAW: a lock the lock planner still has questions about is a problem
+law checked_away:
+  for +w: DW.World
+  for +t: String
+  for +fs: List<&2, W.Source>
+  for +a: W.Ask
+  for +as: List<&2, W.Ask>
+  for k: {Some{t} == DW.lock(w) : Maybe<&2, String>}
+  for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
+  for o: {a <> as == P.wants(DP.relock(w, fs)) : List<&2, W.Ask>}
+  {DP.wrong(DP.checked(w)) == True{} : Bool}
+
+def checked_away(w, t, fs, _a, _as, k, l, o):
+  %k : {DP.wrong(DP.fresh.notes(DW.ledger(w), _, DW.replies(w))) == True{} : Bool}
+  %l : {DP.wrong(DP.fresh.heard(_, DW.ledger(w), DW.replies(w), t)) == True{} : Bool}
+  %o : {DP.wrong([DP.fresh.away(_, DP.relock(w, fs), t)]) == True{} : Bool}
+  {==}
+
+def Laws.doctor_unchecked_lock_fails(w, t, fs, a, as, k, l, o):
+  wrong_check(DP.ledger.seen(DW.read(w)), DW.heard(DW.replies(w), DW.Sources{}), DW.cc(w),
+    DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w), checked_away(w, t, fs, a, as, k, l, o))

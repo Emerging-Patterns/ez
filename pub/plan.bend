@@ -41,11 +41,12 @@ def name.length() -> Nat:
 # a lowercase hex digest may hold. `git/git.bend` already walks a hex string
 # for `is_rev`, and its walk stops at the first character that is not hex.
 #
-# Both other lines bend prints around its answer fail this, and
-# `pub/LAWS.bend` says so rather than leaving it to a reading of bend's
-# source: `publishing N files, ... as 0x... (mining its proof of work)` and
-# `import 0x.../entry.bend as Name` each start with something that is not
-# `0x`.
+# The lines bend prints around its answer fail this, and `pub/LAWS.bend` says
+# so for the two that hold the name, rather than leaving it to a reading of
+# bend's source: `publishing N files, ... as 0x... (mining its proof of work)`
+# and `import 0x.../entry.bend as Name` each start with something that is not
+# `0x`. The terms notice and the license line bend 2.0.27 prints first
+# (`Publishing to BendHub: ...`, `License: ...`) start with a word too.
 def is_name(+word: String) -> Bool:
   Bool.and(String.starts_with(word, "0x"),
     Bool.and(Nat.is_eq(String.length(word), name.length()),
@@ -329,16 +330,11 @@ def root.of(got: K.Walked) -> String:
     case K.Refused{_why}:
       "."
 
-# a path of the project, as it is written inside a package rooted at `root`
-def inside(+root: String, +path: String) -> String:
-  Bool.pick(String, String.eq(root, "."), path,
-    String.drop(path, (String.length(root) + 1n : Nat)))
-
 # the entry's path inside the package, which is where the hub serves it: the
 # entry's name, under the directories the package re-rooted above it when an
 # import climbs out of the entry's directory
 def at(+world: PW.World) -> String:
-  inside(root.of(walked(world)), entry(world))
+  K.inside(root.of(walked(world)), entry(world))
 
 # the files of a package, as paths of the project
 def paths(+root: String, fs: List<&2, K.Source>) -> List<&2, String>:
@@ -435,8 +431,9 @@ def stray(+world: PW.World) -> Kept:
 # ---------------------------------------------------------------------------
 # the upload
 
-# the words the upload runs. bend 2.0.25 takes the entry alone; a bend that
-# also wants the package's name and version reads them from here.
+# the words the upload runs: the entry alone. bend 2.0.27 also takes a
+# `<name>@<version>` after `--publish` to name the package; ez does not ask
+# for a name yet, and a publish that does reads it from here.
 def upload.line(+entry: String) -> List<&2, String>:
   ["bend", entry, "--publish"]
 
@@ -601,16 +598,11 @@ def decide(+world: PW.World) -> Verdict:
 # ---------------------------------------------------------------------------
 # the plan
 
-# the import line a consumer writes for the package: the hash, the entry's
-# path inside the package, and the entry's name as the alias, the way bend
-# prints it
-def import.line(+hash: String, +at: String) -> String:
-  "import " ++ hash ++ "/" ++ at ++ " as " ++ G.title(Path.unbend(Path.base(at)))
-
-# what a publish that agreed says: the hash ez computed, then the import line.
-# It writes nothing.
+# what a publish that agreed says: the hash ez computed, then the import line
+# for the entry's path inside the package (`G.import.line`, which `ez add`
+# prints too). It writes nothing.
 def made(+world: PW.World) -> P.Plan:
-  P.Plan{[P.Say{hash(world)}, P.Say{import.line(hash(world), at(world))}],
+  P.Plan{[P.Say{hash(world)}, P.Say{G.import.line(hash(world), at(world))}],
     P.Success{}}
 
 # the plan for where a World stands. One that still asks is a World the
@@ -715,20 +707,3 @@ def sends.v(verdict: Verdict) -> Bool:
 # whether `ez publish` gets as far as the upload on a World
 def sends(+world: PW.World) -> Bool:
   sends.v(decide(world))
-
-# the lines a plan says, in order
-def said.in(es: List<&2, P.Effect>) -> List<&2, String>:
-  match es:
-    case []:
-      []
-    case e <> t:
-      match e:
-        case P.Say{text}:
-          text <> said.in(t)
-        case _:
-          said.in(t)
-
-# the lines a plan says
-def said(pl: P.Plan) -> List<&2, String>:
-  P.Plan{es, _outcome} = pl
-  said.in(es)
