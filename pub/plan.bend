@@ -28,6 +28,7 @@ import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../git/git.bend as G
 import ./world.bend as PW
+import ./blurb.bend as B
 
 # ---------------------------------------------------------------------------
 # bend's answer
@@ -571,9 +572,28 @@ def upload.go(bare: Bool, +entry: String, +named: String) -> List<&2, String>:
 def upload.line(+entry: String, +named: String) -> List<&2, String>:
   upload.go(String.is_empty(named), entry, named)
 
-# the question: the entry sent, under the name the ledger gives it
+# the files of a package, with their texts, at the paths the hub holds them
+# at; none while there is no package
+def files.of(got: K.Walked) -> List<&2, K.Source>:
+  match got:
+    case K.Walked{_h, _root, fs, _sums}:
+      fs
+    case K.Asks{_at}:
+      []
+    case K.Refused{_why}:
+      []
+
+# what is said just before the upload: the line the hub will describe the
+# package by (`B.blurb`). A package whose first file opens with `import Base`
+# would be listed that way for good, so the author sees the line while the
+# upload can still be stopped.
+def said(+world: PW.World) -> String:
+  "hub description: " ++ B.blurb(files.of(walked(world)))
+
+# the question: the entry sent, under the name the ledger gives it, with the
+# line said before it
 def upload(+world: PW.World) -> PW.Ask:
-  PW.Upload{entry(world), named.word(named(world))}
+  PW.Upload{entry(world), named.word(named(world)), said(world)}
 
 # the upload's answer, looked up
 def uploaded(+world: PW.World) -> PW.Heard:
@@ -829,7 +849,7 @@ def stops(+world: PW.World) -> Bool:
 # whether a question is the upload
 def is.upload(ask: PW.Ask) -> Bool:
   match ask:
-    case PW.Upload{_entry, _named}:
+    case PW.Upload{_entry, _named, _says}:
       True{}
     case PW.Tool{_q}:
       False{}

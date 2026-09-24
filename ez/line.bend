@@ -32,10 +32,12 @@ def spec() -> Shake.Cli:
   Shake.app("ez", "dependency tracking and builds for Bend 2", None{},
     [],
     [
-      Shake.sub("init", "scaffold a project: ez.toml, ignore, entry",
+      Shake.sub("init", "scaffold a project: ez.toml, ignore, entry, src/",
         [
           Shake.pos("name", "package name", False{}, None{}, []),
-          Shake.pos("entry", "entry file", False{}, None{}, [])
+          Shake.pos("entry", "entry file", False{}, None{}, []),
+          Shake.opt("description", None{}, Some{"description"},
+            "one line: the entry's first line, which the hub shows", False{}, None{}, [])
         ], []),
       Shake.sub("add", "record a git or hub package",
         [

@@ -18,6 +18,7 @@ import ../lock/plan.bend as P
 import ../git/git.bend as G
 import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
+import ./blurb.bend as B
 
 # whether any line of a list is a `0x` name. This is the vocabulary the
 # answer laws need and nothing else uses: it says here what "bend printed a
@@ -439,7 +440,8 @@ law pub_named_uploads_named:
   for +nv: String
   for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
   for u: {PP.naming(pa, pv) == PP.ByName{nv} : PP.Named}
-  {PP.upload(PW.World{here, Some{text}, rs}) == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), nv} : PW.Ask}
+  {PP.upload(PW.World{here, Some{text}, rs}) == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), nv,
+    PP.said(PW.World{here, Some{text}, rs})} : PW.Ask}
 
 # LAW: and one whose ledger names none asks for the upload by hash
 # EZ-PUB-3
@@ -457,7 +459,8 @@ law pub_unnamed_uploads_by_hash:
   for +ts: List<&2, M.Tool>
   for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
   for u: {PP.naming(pa, pv) == PP.ByHash{} : PP.Named}
-  {PP.upload(PW.World{here, Some{text}, rs}) == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), ""} : PW.Ask}
+  {PP.upload(PW.World{here, Some{text}, rs}) == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), "",
+    PP.said(PW.World{here, Some{text}, rs})} : PW.Ask}
 
 # LAW: a named publish that succeeds says the hash ez computed, then the
 # import line by the name it was published under
@@ -501,3 +504,54 @@ law pub_reports_hash:
   for ok: {PP.succeeds(PW.World{here, Some{text}, rs}) == True{} : Bool}
   {P.said(PP.plan(PW.World{here, Some{text}, rs})) == [PP.hash(PW.World{here, Some{text}, rs}),
     G.import.line(PP.hash(PW.World{here, Some{text}, rs}), PP.at(PW.World{here, Some{text}, rs}))] : List<&2, String>}
+
+# ---------------------------------------------------------------------------
+# the hub description
+
+# LAW: a text's first line is what comes before its first newline: a line
+# with no newline in it, then a newline, then anything, has that line first
+# EZ-PUB-4
+law line_first_cut:
+  for a: String
+  for +b: String
+  for one: {B.has.nl(a) == False{} : Bool}
+  {B.line.first(a ++ "\n" ++ b) == a : String}
+
+# LAW: a file named LICENSE at the top of the package is one the hub passes
+# over
+# EZ-PUB-4
+law hub_license_named:
+  for +t: String
+  {B.lic(K.Source{"LICENSE", t}) == True{} : Bool}
+
+# LAW: a LICENSE, wherever it stands in the package, never gives the
+# description: the package describes itself as it would without it
+# EZ-PUB-4
+law hub_skips_license:
+  for +p: String
+  for +t: String
+  for fs: List<&2, K.Source>
+  for l: {B.lic(K.Source{p, t}) == True{} : Bool}
+  {B.blurb(K.Source{p, t} <> fs) == B.blurb(fs) : String}
+
+# LAW: a file that is not a LICENSE, whose path comes no later than any other
+# file's, gives the description: its own first line, wherever the walk found
+# it
+# EZ-PUB-4
+law hub_first_by_path:
+  for +p: String
+  for +t: String
+  for fs: List<&2, K.Source>
+  for nl: {B.lic(K.Source{p, t}) == False{} : Bool}
+  for af: {B.after(p, fs) == True{} : Bool}
+  {B.blurb(K.Source{p, t} <> fs) == B.line.first(t) : String}
+
+# LAW: the upload is asked for with that line, the description of the
+# package the walk made, and it is the only question that carries one, so a
+# publish refused before the upload (`pub_stop_sends_nothing`,
+# `pub_stray_sends_nothing`) says nothing but why
+# EZ-PUB-4
+law pub_upload_says_description:
+  for +w: PW.World
+  {PP.upload(w) == PW.Upload{PP.entry(w), PP.named.word(PP.named(w)),
+    "hub description: " ++ B.blurb(PP.files.of(PP.walked(w)))} : PW.Ask}

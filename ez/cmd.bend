@@ -164,9 +164,10 @@ def lock(+up: Bool, +name: String) -> IO(Unit):
 def fetch() -> IO(Unit):
   FetchRun.run()
 
-# `ez init [name] [entry.bend]`: a new project, planned by init/plan.bend
-def init(+asked: String, +file: String) -> IO(Unit):
-  InitRun.run(asked, file)
+# `ez init [name] [entry.bend] [--description TEXT]`: a new project, planned
+# by init/plan.bend
+def init(+asked: String, +file: String, +desc: String) -> IO(Unit):
+  InitRun.run(asked, file, desc)
 
 # `ez add <target> [rev|tag|branch] [entry.bend] [--rename NAME]`, planned by
 # add/plan.bend. The target is an `owner/repo`, a git url, or a path, the same

@@ -11,8 +11,10 @@
 # upload is `bend <entry> --publish`, followed by the `<name>@<version>` the
 # planner put in the question when the ledger names one, with the project's
 # packages on BEND_LIB, the way every other `bend` ez starts has them; the
-# planner asks for it last, once every other check has passed. It decides nothing; that it reads and
-# executes faithfully is EZ-TRUST-2.
+# planner asks for it last, once every other check has passed. Just before it
+# runs, the line the question carries, the hub description, goes to stderr,
+# where bend's own notices go, so stdout stays the hash and the import line.
+# It decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
 import ../io/file.bend as F
@@ -38,8 +40,9 @@ def answer(+lib: String, ask: PW.Ask) -> IO(PW.Answer):
       do IO<PW.Answer>:
         +out : String <- R.exec(["git", "-c", "core.quotePath=false", "ls-files", "-v"])
         return ran(out)
-    case PW.Upload{+entry, +named}:
+    case PW.Upload{+entry, +named, says}:
       do IO<PW.Answer>:
+        IO.print_err(says)
         +out : String <- R.exec(Env.line(lib, PP.upload.line(entry, named)))
         return ran(out)
 

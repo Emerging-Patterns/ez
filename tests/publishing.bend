@@ -82,6 +82,8 @@ def refuses.dirty(+repo: String, +app: String, +hub: String) -> IO(Unit):
       String.contains(R.text(out), "src/lib.bend"))
     yes("and reports no hash at all",
       Bool.not(String.contains(R.text(out), "import 0x")))
+    yes("and says no hub description, since nothing was about to be sent",
+      Bool.not(String.contains(R.text(out), "hub description")))
 
 # the build output every project has and no project commits. `.ez/*` and
 # `bin/<name>.out` are what `ez init` wrote into the project's .gitignore, so
@@ -108,7 +110,9 @@ def consumer(+root: String, +hub: String, +hash: String) -> IO(Unit):
       W.last(said(out)), "44")
 
 # the tree clean, the hub up, and the package sent. Two lines come back: the
-# name ez computed, and the import line a consumer would write.
+# name ez computed, and the import line a consumer would write. Before the
+# upload the line the hub will describe the package by goes to stderr: the
+# package is `lib.bend` and `util/math.bend`, and `lib.bend` comes first.
 def publishes(+repo: String, +app: String, +root: String, +hub: String) -> IO(String):
   do IO<String>:
     +out : String <- R.exec(ez(repo, app, ["BEND_HUB=" ++ hub], ["publish"]))
@@ -120,6 +124,8 @@ def publishes(+repo: String, +app: String, +root: String, +hub: String) -> IO(St
       P.is_name(hash))
     Check.eq_str("and then the import line a consumer would write",
       W.nth(ls, 1n), "import " ++ hash ++ "/lib.bend as Lib")
+    yes("and says, on stderr, the line the hub describes it by",
+      String.contains(R.text(out), "hub description: import Base"))
     m : Maybe<&2, String> <- F.read(root ++ "/hub/" ++ hash ++ "/manifest")
     yes("the hub holds the package under the name publish reported",
       Bool.not(String.is_empty(F.text_of(m))))
@@ -208,10 +214,12 @@ def main() -> IO(Unit):
 #|ok publish stops on a dirty tree
 #|ok and says which file it was about
 #|ok and reports no hash at all
+#|ok and says no hub description, since nothing was about to be sent
 #|ok the oracle answers
 #|ok publish sends from a tree whose only extra files are ignored
 #|ok and reports a 0x name and nothing else on its first line
 #|ok and then the import line a consumer would write
+#|ok and says, on stderr, the line the hub describes it by
 #|ok the hub holds the package under the name publish reported
 #|ok a consumer's import of that name resolves and runs
 #|ok publish stops on an untracked file
