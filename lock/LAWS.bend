@@ -377,8 +377,8 @@ def alone(ledger: M.Read, +name: String) -> M.Read:
     case M.Bad{why}:
       M.Bad{why}
     case M.Good{m}:
-      M.Manifest{pn, pe, pb, hub, ds, ts} = m
-      M.Good{M.Manifest{pn, pe, pb, hub, deps.named(ds, name), tools.named(ts, name)}}
+      M.Manifest{pn, pe, pb, hub, hubpa, hubpv, ds, ts} = m
+      M.Good{M.Manifest{pn, pe, pb, hub, hubpa, hubpv, deps.named(ds, name), tools.named(ts, name)}}
 
 # LAW: `ez lock --upgrade` never moves a hub dependency. The entry ez.toml
 # records under a name, when its source is the hub, is the entry the ledger
@@ -895,7 +895,7 @@ def ledger.deps(read: M.Read) -> List<&2, M.Dep>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, _b, _h, ds, _ts} = m
+      M.Manifest{_n, _e, _b, _h, _hpa, _hpv, ds, _ts} = m
       ds
 
 # what a path holds after a plan: what the plan wrote there, or what it held
@@ -1650,7 +1650,7 @@ def ledger.tools(read: M.Read) -> List<&2, M.Tool>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, _b, _h, _ds, ts} = m
+      M.Manifest{_n, _e, _b, _h, _hpa, _hpv, _ds, ts} = m
       ts
 
 # whether a ledger parsed
@@ -1713,9 +1713,11 @@ law lock_origins_skip_tools:
   for +e: String
   for +b: String
   for +h: String
+  for +hpa: String
+  for +hpv: String
   for +ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  for g: {M.Good{M.Manifest{n, e, b, h, ds, ts}} == M.parse(s) : M.Read}
+  for g: {M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} == M.parse(s) : M.Read}
   {W.origins(Some{s}) == L.ledger.origins(ds) : List<&2, L.Origin>}
 
 # LAW: and so are the origins `ez lock --upgrade` reads packages by, over the
@@ -1727,9 +1729,11 @@ law upgrade_origins_skip_tools:
   for +e: String
   for +b: String
   for +h: String
+  for +hpa: String
+  for +hpv: String
   for +ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  for g: {M.Good{M.Manifest{n, e, b, h, ds, ts}} == Up.next.read(nx) : M.Read}
+  for g: {M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} == Up.next.read(nx) : M.Read}
   {W.next.origins(nx) == L.ledger.origins(ds) : List<&2, L.Origin>}
 
 # A ledger written before bend 2.0.27 names a git package without the LICENSE

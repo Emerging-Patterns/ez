@@ -627,21 +627,21 @@ def Laws.tool_plain_named(w, p):
 law none_man:
   for m: Maybe<&2, String>
   for h: {TP.none(m) == True{} : Bool}
-  {TP.man.of(TP.led.of(m)) == M.Manifest{"", "", "", "", [], []} : M.Manifest}
+  {TP.man.of(TP.led.of(m)) == M.Manifest{"", "", "", "", "", "", [], []} : M.Manifest}
 
 def none_man(m, h):
   match m:
     case None{}:
       {==}
     case Some{t}:
-      Eq.bit.absurd(&2, {TP.man.of(TP.led.of(Some{t})) == M.Manifest{"", "", "", "", [], []}
+      Eq.bit.absurd(&2, {TP.man.of(TP.led.of(Some{t})) == M.Manifest{"", "", "", "", "", "", [], []}
         : M.Manifest}, h)
 
 # LAW: so a plain repository's ledger names no `bin` and no `entry`
 law plain_man:
   for +w: TW.World
   for p: {TP.plain(w) == True{} : Bool}
-  {TP.man(w) == M.Manifest{"", "", "", "", [], []} : M.Manifest}
+  {TP.man(w) == M.Manifest{"", "", "", "", "", "", [], []} : M.Manifest}
 
 def plain_man(w, p):
   none_man(TP.co.toml(TP.co(w)), p)
@@ -659,7 +659,7 @@ def plain_file(w, p, free):
   %Equal.sym(String, TP.over(w), "", free)
     : {Path.join(TP.top(w), TP.chosen(TP.wish(_, TW.want(w)), TP.bin(w), TP.entry(w)))
       == Path.join(TP.top(w), TP.chosen(TW.want(w), "", "")) : String}
-  %Equal.sym(M.Manifest, TP.man(w), M.Manifest{"", "", "", "", [], []}, plain_man(w, p))
+  %Equal.sym(M.Manifest, TP.man(w), M.Manifest{"", "", "", "", "", "", [], []}, plain_man(w, p))
     : {Path.join(TP.top(w), TP.chosen(TW.want(w), TP.man.bin(_), TP.man.entry(_)))
       == Path.join(TP.top(w), TP.chosen(TW.want(w), "", "")) : String}
   {==}

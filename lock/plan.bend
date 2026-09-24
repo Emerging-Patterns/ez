@@ -284,7 +284,7 @@ def need.why(ledger: M.Read) -> String:
     case M.Bad{why}:
       "ez: " ++ M.show(M.Bad{why})
     case M.Good{m}:
-      M.Manifest{_n, _e, _b, _h, _ds, ts} = m
+      M.Manifest{_n, _e, _b, _h, _pa, _pv, _ds, ts} = m
       Pin.gaps(ts)
 
 # ---------------------------------------------------------------------------

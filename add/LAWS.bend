@@ -295,12 +295,14 @@ law add_keeps_tools:
   for +e: String
   for +b: String
   for +h: String
+  for +hpa: String
+  for +hpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
-  for good: {A.read(w) == M.Good{M.Manifest{n, e, b, h, ds, ts}} : M.Read}
+  for good: {A.read(w) == M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} : M.Read}
   for +ok: {AP.refuses(w) == False{} : Bool}
   {P.put.plan(AP.plan(w), "ez.toml")
-    == P.Put{Rend.show(M.Manifest{n, e, b, h,
+    == P.Put{Rend.show(M.Manifest{n, e, b, h, hpa, hpv,
       List.append(&2, M.Dep, Rend.without(ds, M.dep.name(Rend.readd(ds, AP.added(w)))),
         [Rend.readd(ds, AP.added(w))]), ts})} : P.Wrote}
 

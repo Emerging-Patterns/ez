@@ -257,7 +257,7 @@ def ledger.read(parsed: M.Read) -> List<&2, Origin>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, _b, _h, ds, _ts} = m
+      M.Manifest{_n, _e, _b, _h, _pa, _pv, ds, _ts} = m
       ledger.origins(ds)
 
 # a dependency's name, when the ledger records it by one
@@ -280,7 +280,7 @@ def ledger.names(parsed: M.Read) -> List<&2, Name>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, _b, _h, ds, _ts} = m
+      M.Manifest{_n, _e, _b, _h, _pa, _pv, ds, _ts} = m
       ledger.names.of(ds)
 
 # this origin's source when the hash matches, otherwise whatever the rest gave

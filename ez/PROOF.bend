@@ -1622,13 +1622,13 @@ def Laws.start_needs_parse(ask, _t, why, bad):
   %bad : {S.read(ask, _) == S.Refused{"ez: error: " ++ why} : S.Start}
   {==}
 
-def Laws.run_starts_entry(_t, _n, e, _b, _h, _ds, _ts, a, ws, good, named):
+def Laws.run_starts_entry(_t, _n, e, _b, _h, _hpa, _hpv, _ds, _ts, a, ws, good, named):
   %good : {S.read(S.Run{a <> ws}, _) == S.Starts{"bend" <> (e <> ws)} : S.Start}
   %named : {S.Starts{"bend" <> (Bool.pick(String, _, "main.bend", e) <> ws)}
     == S.Starts{"bend" <> (e <> ws)} : S.Start}
   {==}
 
-def Laws.run_starts_main(_t, _n, _b, _h, _ds, _ts, a, ws, good):
+def Laws.run_starts_main(_t, _n, _b, _h, _hpa, _hpv, _ds, _ts, a, ws, good):
   %good : {S.read(S.Run{a <> ws}, _) == S.Starts{"bend" <> ("main.bend" <> ws)}
     : S.Start}
   {==}

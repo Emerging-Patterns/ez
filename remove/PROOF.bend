@@ -209,11 +209,11 @@ def Laws.remove_syncs_allowlist(name, s, ignore, m, good, ok):
 # EZ-LED-5: `Rend.remove` edits the dependencies and hands the tools on as
 # they are, and a name that only a tool has is a name the dependencies lack,
 # which `remove_refuses_absent` refuses whatever the tools are.
-def Laws.remove_keeps_tools(name, s, ignore, n, e, b, h, ds, ts, good, ok):
-  Laws.remove_edits_ledger(name, s, ignore, M.Manifest{n, e, b, h, ds, ts}, good, ok)
+def Laws.remove_keeps_tools(name, s, ignore, n, e, b, h, hpa, hpv, ds, ts, good, ok):
+  Laws.remove_edits_ledger(name, s, ignore, M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, good, ok)
 
-def Laws.remove_refuses_tool(name, s, ignore, n, e, b, h, ds, ts, good, _tool, no):
-  Laws.remove_refuses_absent(name, s, ignore, M.Manifest{n, e, b, h, ds, ts}, good, no)
+def Laws.remove_refuses_tool(name, s, ignore, n, e, b, h, hpa, hpv, ds, ts, good, _tool, no):
+  Laws.remove_refuses_absent(name, s, ignore, M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, good, no)
 
 # ---------------------------------------------------------------------------
 # EZ-OUT-1

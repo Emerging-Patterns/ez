@@ -32,10 +32,12 @@ type Tool is Data:
 
 # the ledger: this package, the file `ez build` and `ez run` take, the file
 # `ez tool run`, `install` and `upgrade` build when one is named, the hub its
-# packages come from ("" for bend's own), everything the package depends on,
-# and every CLI it pins
+# packages come from ("" for bend's own), the hub name and the version `ez
+# publish` names the package by ("" for none, which publishes it by its hash
+# alone), everything the package depends on, and every CLI it pins
 type Manifest is Data:
   Manifest{name: String, entry: String, bin: String, hub: String,
+    publish: String, version: String,
     deps: List<&2, Dep>, tools: List<&2, Tool>}
 
 # a manifest, or why it could not be read
@@ -214,7 +216,9 @@ def build(+ss: List<&2, T.Sect>) -> Read:
   Good{Manifest{value(pairs_of(ss, "package"), "name"),
     value(pairs_of(ss, "package"), "entry"),
     value(pairs_of(ss, "package"), "bin"),
-    value(pairs_of(ss, "package"), "hub"), deps(ss), tools(ss)}}
+    value(pairs_of(ss, "package"), "hub"),
+    value(pairs_of(ss, "package"), "publish-as"),
+    value(pairs_of(ss, "package"), "version"), deps(ss), tools(ss)}}
 
 # the ledger, or the problem that stopped it
 def read.go(ok: Bool, why: String, ss: List<&2, T.Sect>) -> Read:
@@ -262,7 +266,7 @@ def show.deps(ds: List<&2, Dep>) -> List<&2, String>:
 
 # the ledger on one line, for a test or a report
 def show.m(manifest: Manifest) -> String:
-  Manifest{n, e, _b, _h, ds, _ts} = manifest
+  Manifest{n, e, _b, _h, _pa, _pv, ds, _ts} = manifest
   n ++ " " ++ e ++ " " ++ String.join(show.deps(ds), " ")
 
 # the ledger, or the error, on one line
@@ -300,7 +304,7 @@ def dep(ledger: Read, name: String) -> Dep:
     case Bad{_why}:
       Dep{"", "", "", Hub{""}}
     case Good{m}:
-      Manifest{_n, _e, _b, _h, ds, _ts} = m
+      Manifest{_n, _e, _b, _h, _pa, _pv, ds, _ts} = m
       find(ds, name)
 
 # the commit a dependency is pinned to, or "" when it is a hub package
@@ -395,7 +399,7 @@ def hub_of(ledger: Read) -> String:
     case Bad{_why}:
       hub.or("")
     case Good{m}:
-      Manifest{_n, _e, _b, h, _ds, _ts} = m
+      Manifest{_n, _e, _b, h, pa, pv, _ds, _ts} = m
       hub.or(h)
 
 # the pinned CLIs of a ledger that was read; one that would not parse has none
@@ -404,7 +408,7 @@ def tools_of(ledger: Read) -> List<&2, Tool>:
     case Bad{_why}:
       []
     case Good{m}:
-      Manifest{_n, _e, _b, _h, _ds, ts} = m
+      Manifest{_n, _e, _b, _h, _pa, _pv, _ds, ts} = m
       ts
 
 # this tool when its name matches, otherwise whatever the rest gave

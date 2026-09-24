@@ -46,7 +46,7 @@ def read.of(got: Maybe<&2, String>) -> M.Read:
 
 # the dependencies of a ledger that was read
 def deps.of(manifest: M.Manifest) -> List<&2, M.Dep>:
-  M.Manifest{_n, _e, _b, _h, ds, _ts} = manifest
+  M.Manifest{_n, _e, _b, _h, _pa, _pv, ds, _ts} = manifest
   ds
 
 # the rest of a scan only when this one was not it

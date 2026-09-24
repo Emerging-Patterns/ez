@@ -139,9 +139,9 @@ def main.put(got: Maybe<&2, String>, +at: String, rest: List<&2, P.Effect>) -> L
       main.write(Bool.or(String.eq(at, toml()), String.eq(at, ignore.file())), at, rest)
 
 # the ledger a new project starts from: this package, its entry, and nothing
-# else
+# else, so no `publish-as` or `version` and a project that publishes by hash
 def model(+name: String, +at: String) -> M.Manifest:
-  M.Manifest{name, at, "", "", [], []}
+  M.Manifest{name, at, "", "", "", "", [], []}
 
 # its text
 def fresh(+name: String, +at: String) -> String:

@@ -42,12 +42,12 @@ def entry.or(+file: String) -> String:
 
 # the entry file of a ledger that parsed
 def entry(ledger: M.Manifest) -> String:
-  M.Manifest{_n, e, _b, _h, _ds, _ts} = ledger
+  M.Manifest{_n, e, _b, _h, _pa, _pv, _ds, _ts} = ledger
   entry.or(e)
 
 # the name a ledger that parsed gives the package
 def named(ledger: M.Manifest) -> String:
-  M.Manifest{n, _e, _b, _h, _ds, _ts} = ledger
+  M.Manifest{n, _e, _b, _h, _pa, _pv, _ds, _ts} = ledger
   n
 
 # where a build lands when nothing said: `bin/<package name>.out`. The name
