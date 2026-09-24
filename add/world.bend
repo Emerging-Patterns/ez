@@ -5,13 +5,18 @@
 # answers to the questions the planner (add/plan.bend) asked. The questions
 # and answers are the upgrade's (lock/up.bend), which the lock's interpreter
 # answers: `Tags`, `Head` and `Refs` for what a ref names, and `Clone` for the
-# checkout at the rev, with its NAR hash and every file's text.
+# checkout at the rev, with its NAR hash and every file's text. A hub
+# package added by its `<name>@<version>` (add/hub.bend) asks the lock's own
+# questions instead (lock/world.bend), which the lock's interpreter answers
+# too: `Name` for the hash the hub says the name names, and `Pkg` for the
+# package's manifest and files, served by the hub. Those answers are `hubs`.
 #
 # Everything here is a projection: what a World says, read one way. The
 # planner is written over these, so each law about the plan is a law about
 # them.
 import Base
 import ../lock/up.bend as Up
+import ../lock/world.bend as W
 import ../manifest/manifest.bend as M
 import ../pkg/path.bend as P
 import ../ez/target.bend as Tgt
@@ -25,7 +30,7 @@ type Args is Data:
 # everything `ez add` reads
 type World is Data:
   World{args: Args, here: String, home: String, ledger: Maybe<&2, String>,
-    ignore: String, replies: List<&2, Up.Reply>}
+    ignore: String, replies: List<&2, Up.Reply>, hubs: List<&2, W.Reply>}
 
 # the ledger's path, which is fixed
 def toml() -> String:
@@ -37,7 +42,7 @@ def ignore.file() -> String:
 
 # the arguments
 def args(world: World) -> Args:
-  World{a, _here, _home, _ledger, _ignore, _replies} = world
+  World{a, _here, _home, _ledger, _ignore, _replies, _hubs} = world
   a
 
 def args.target(given: Args) -> String:
@@ -73,28 +78,33 @@ def rename(world: World) -> String:
 
 # the directory ez runs in, which is the project root
 def here(world: World) -> String:
-  World{_args, h, _home, _ledger, _ignore, _replies} = world
+  World{_args, h, _home, _ledger, _ignore, _replies, _hubs} = world
   h
 
 # HOME, which a `~/` target is expanded against
 def home(world: World) -> String:
-  World{_args, _here, h, _ledger, _ignore, _replies} = world
+  World{_args, _here, h, _ledger, _ignore, _replies, _hubs} = world
   h
 
 # the ledger's text, None when there is no ez.toml
 def ledger(world: World) -> Maybe<&2, String>:
-  World{_args, _here, _home, l, _ignore, _replies} = world
+  World{_args, _here, _home, l, _ignore, _replies, _hubs} = world
   l
 
 # `.gitignore`'s text, "" when there is none
 def ignore(world: World) -> String:
-  World{_args, _here, _home, _ledger, i, _replies} = world
+  World{_args, _here, _home, _ledger, i, _replies, _hubs} = world
   i
 
 # every question answered so far
 def replies(world: World) -> List<&2, Up.Reply>:
-  World{_args, _here, _home, _ledger, _ignore, rs} = world
+  World{_args, _here, _home, _ledger, _ignore, rs, _hubs} = world
   rs
+
+# every hub question answered so far
+def hubs(world: World) -> List<&2, W.Reply>:
+  World{_args, _here, _home, _ledger, _ignore, _replies, hs} = world
+  hs
 
 # the ledger as read: what the file says, or, with no file, a read that did
 # not parse and says why. A missing ledger is not an empty one to write back.
@@ -157,3 +167,15 @@ def from(+world: World) -> String:
 # path resolves to
 def fresh(+world: World) -> String:
   Named.called(place(world), from(world))
+
+# what the target names: a hub package by its `<name>@<version>`, or a place
+def aim(world: World) -> Tgt.Aim:
+  Tgt.aim(target(world))
+
+# whether the target is a hub package's `<name>@<version>`
+def named(world: World) -> Bool:
+  Tgt.aim.named(aim(world))
+
+# the hub the ledger names, which a name and its package are asked of
+def hub(world: World) -> String:
+  M.hub_of(read(world))

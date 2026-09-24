@@ -9,6 +9,7 @@
 import Base
 import ../manifest/manifest.bend as M
 import ../ez/target.bend as Tgt
+import ../pkg/pkg.bend as K
 
 # a text walked from its end: whether a slash has been passed yet, and what
 # lies after the last one
@@ -183,5 +184,74 @@ def why.as(+ds: List<&2, M.Dep>, +name: String, +url: String, +rename: String) -
       "ez: " ++ url ++ " is already recorded as deps." ++ old ++
         "; remove it first to record it as " ++ rename,
       other),
+    "ez: --rename " ++ rename ++ " is not a TOML bare key " ++
+      "(letters, digits, `-` and `_`)")
+
+# ---------------------------------------------------------------------------
+# a hub package added by its `<name>@<version>`
+
+# the name part of a `<name>@<version>`, what comes before its `@`. It is
+# a-z, 0-9 and `-`, so it is a TOML bare key as it is.
+def hub.part(+nv: String) -> String:
+  K.word(String.split(nv, '@'), 0n)
+
+# whether a source is a hub package added by a name with this name part,
+# whatever its version
+def hub.from(src: M.Source, +part: String) -> Bool:
+  match src:
+    case M.Hub{named}:
+      String.eq(hub.part(named), part)
+    case M.Git{_u, _rev, _tag, _root, _nar, _vend}:
+      False{}
+
+# the name the ledger already gives a hub package of this name part, first in
+# document order, or "" when it gives none. Adding another version of a name
+# is then the same entry, as re-adding a git dependency at a new tag is.
+def hub.had(ds: List<&2, M.Dep>, +part: String) -> String:
+  match ds:
+    case []:
+      ""
+    case h <> t:
+      M.Dep{n, _h, _e, s} = h
+      had.at(hub.from(s, part), n, hub.had(t, part))
+
+# the name a hub package is recorded under: `--rename` when it is given, else
+# the ledger's for this name part, else the name part itself
+def hub.key(ds: List<&2, M.Dep>, +part: String, +rename: String) -> String:
+  +old = hub.had(ds, part)
+  Bool.pick(String, String.is_empty(rename),
+    Bool.pick(String, String.is_empty(old), part, old), rename)
+
+# the first dependency of this name, asked whether it is another source
+def hub.clash.at(hit: Bool, src: M.Source, +part: String, rest: Bool) -> Bool:
+  match hit:
+    case True{}:
+      Bool.not(hub.from(src, part))
+    case False{}:
+      rest
+
+# whether the ledger gives this name to anything but a hub package of this
+# name part: a git dependency, or one added by its hash
+def hub.clash(ds: List<&2, M.Dep>, +name: String, +part: String) -> Bool:
+  match ds:
+    case []:
+      False{}
+    case h <> t:
+      M.Dep{n, _h, _e, s} = h
+      hub.clash.at(String.eq(n, name), s, part, hub.clash(t, name, part))
+
+# why a hub package cannot be recorded under a name, or nothing when it can:
+# a `--rename` that is no key, a `--rename` of a name part the ledger records
+# under another name, or a name the ledger gives another source
+def hub.why(+ds: List<&2, M.Dep>, +name: String, +part: String, +rename: String) -> String:
+  +old = hub.had(ds, part)
+  Bool.pick(String, renamed.ok(rename),
+    Bool.pick(String, moved.of(old, rename),
+      "ez: " ++ part ++ " is already recorded as deps." ++ old ++
+        "; remove it first to record it as " ++ rename,
+      Bool.pick(String, hub.clash(ds, name, part),
+        "ez: ez.toml already has a deps." ++ name ++ " from another source; " ++
+          "remove it first, or add this one with --rename",
+        "")),
     "ez: --rename " ++ rename ++ " is not a TOML bare key " ++
       "(letters, digits, `-` and `_`)")

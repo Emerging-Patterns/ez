@@ -37,9 +37,9 @@ def spec() -> Shake.Cli:
           Shake.pos("name", "package name", False{}, None{}, []),
           Shake.pos("entry", "entry file", False{}, None{}, [])
         ], []),
-      Shake.sub("add", "vendor a git package and record it",
+      Shake.sub("add", "record a git or hub package",
         [
-          Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
+          Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
             []),
           Shake.pos("ref", "commit, tag or branch", False{}, None{}, []),
           Shake.pos("entry", "entry file", False{}, None{}, []),
@@ -70,21 +70,21 @@ def spec() -> Shake.Cli:
           [], []),
         Shake.sub("run", "fetch, build and run the binary a repo declares",
           [
-            Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
+            Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
               []),
             Shake.opt("entry", None{}, Some{"entry"},
               "build this file of the checkout, not the one it names", False{}, None{}, [])
           ], []),
         Shake.sub("install", "build the binary and link it on PATH",
           [
-            Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
+            Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
               []),
             Shake.opt("entry", None{}, Some{"entry"},
               "build this file of the checkout, not the one it names", False{}, None{}, [])
           ], []),
         Shake.sub("upgrade", "rebuild when the commit moved, and refresh the link",
           [
-            Shake.pos("target", "owner/repo, git url, or path", True{}, None{},
+            Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
               []),
             Shake.opt("entry", None{}, Some{"entry"},
               "build this file of the checkout, not the one it names", False{}, None{}, [])

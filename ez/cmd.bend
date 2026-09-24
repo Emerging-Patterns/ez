@@ -170,8 +170,9 @@ def init(+asked: String, +file: String) -> IO(Unit):
 
 # `ez add <target> [rev|tag|branch] [entry.bend] [--rename NAME]`, planned by
 # add/plan.bend. The target is an `owner/repo`, a git url, or a path, the same
-# shapes `ez tool run` takes. A missing ref is resolved, and a missing entry
-# is read from the checkout.
+# shapes `ez tool run` takes, or a hub package's `<name>@<version>`
+# (add/hub.bend). A missing ref is resolved, and a missing entry is read from
+# the checkout, or from the package the hub serves.
 def add(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Unit):
   AddRun.run(target, ref, entry, rename)
 
