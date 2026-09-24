@@ -92,10 +92,12 @@
       # `lint` is bolt at the lock's `[tools.bolt]` pin, run with `--gpu off`
       # over a copy of the tree, graded by ./bolt.bend. `fresh` is EZ-DOC-3
       # checked directly: a clone's `ez lock` gives back the committed lock.
+      # `fresh` waits for `ez`: each compile of ez peaks near 3.3 GB, and the
+      # two side by side ran a CI runner out of memory.
       checks.${system} = {
         inherit proofs;
         lint = ez.mkLint { src = self; };
-        fresh = ez.mkFresh { src = self; };
+        fresh = ez.mkFresh { src = self; after = [ ezBin ]; };
         ez = ezBin;
       };
       devShells.${system}.default = ez.mkShell {

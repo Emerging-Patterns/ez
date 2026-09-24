@@ -268,12 +268,16 @@ rec {
   # and that binary's `lock`, with ez.lock.toml deleted, must write the
   # committed lock back byte for byte. `bendLib` is BEND_LIB as in mkProofs;
   # nativeBuildInputs is the C toolchain `bend -o` uses, as in toolPackage.
+  # `after` lists derivations this check waits for. Its build is a full
+  # compile of the project, so a flake whose own package is a check passes
+  # that package here to keep the two compiles from running side by side.
   mkFresh = {
     src,
     bend ? defaultBend,
     name ? "fresh",
     bendLib ? null,
     nativeBuildInputs ? [ llvm.clang ],
+    after ? [ ],
   }:
     let
       tree = bendLibFor bendLib src null;
@@ -285,6 +289,7 @@ rec {
     else
       pkgs.runCommand name {
         nativeBuildInputs = [ bend pkgs.git ] ++ nativeBuildInputs;
+        inherit after;
       } ''
         export HOME=$TMPDIR/home
         mkdir -p "$HOME"
