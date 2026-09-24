@@ -12,6 +12,7 @@ import ./world.bend as PW
 import ./plan.bend as PP
 import ../lock/plan.bend as P
 import ../pkg/pkg.bend as K
+import ./blurb.bend as B
 import ../git/git.bend as G
 import ../check/eq.bend as Eq
 import ../manifest/manifest.bend as M
@@ -701,19 +702,23 @@ def Laws.pub_misnamed_writes_nothing(here, text, rs, n, e, b, h, pa, pv, ds, ts,
 def Laws.pub_named_uploads_named(here, text, rs, n, e, b, h, pa, pv, ds, ts, nv, g, u):
   %Equal.sym(M.Read, M.parse(text), M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}}, g)
     : {PW.Upload{PP.entry(PW.World{here, Some{text}, rs}),
-      PP.named.word(PP.named.of(PP.led.read(_)))} == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), nv} : PW.Ask}
+      PP.named.word(PP.named.of(PP.led.read(_))), PP.said(PW.World{here, Some{text}, rs})}
+      == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), nv, PP.said(PW.World{here, Some{text}, rs})} : PW.Ask}
   %Equal.sym(PP.Named, PP.naming(pa, pv), PP.ByName{nv}, u)
     : {PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), PP.named.word(PP.named.of(PP.led.named(Bool.pick(String,
-      String.is_empty(e), "main.bend", e), _)))} == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), nv} : PW.Ask}
+      String.is_empty(e), "main.bend", e), _))), PP.said(PW.World{here, Some{text}, rs})}
+      == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), nv, PP.said(PW.World{here, Some{text}, rs})} : PW.Ask}
   {==}
 
 def Laws.pub_unnamed_uploads_by_hash(here, text, rs, n, e, b, h, pa, pv, ds, ts, g, u):
   %Equal.sym(M.Read, M.parse(text), M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}}, g)
     : {PW.Upload{PP.entry(PW.World{here, Some{text}, rs}),
-      PP.named.word(PP.named.of(PP.led.read(_)))} == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), ""} : PW.Ask}
+      PP.named.word(PP.named.of(PP.led.read(_))), PP.said(PW.World{here, Some{text}, rs})}
+      == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), "", PP.said(PW.World{here, Some{text}, rs})} : PW.Ask}
   %Equal.sym(PP.Named, PP.naming(pa, pv), PP.ByHash{}, u)
     : {PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), PP.named.word(PP.named.of(PP.led.named(Bool.pick(String,
-      String.is_empty(e), "main.bend", e), _)))} == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), ""} : PW.Ask}
+      String.is_empty(e), "main.bend", e), _))), PP.said(PW.World{here, Some{text}, rs})}
+      == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), "", PP.said(PW.World{here, Some{text}, rs})} : PW.Ask}
   {==}
 
 # LAW: a World whose ledger names the package calls it by that name
@@ -792,3 +797,97 @@ def Laws.pub_reports_hash(here, text, rs, n, e, b, h, pa, pv, ds, ts, g, u, ok):
       x => [PP.hash(PW.World{here, Some{text}, rs}), G.import.line(x, PP.at(PW.World{here, Some{text}, rs}))],
       PP.called(PW.World{here, Some{text}, rs}), PP.hash(PW.World{here, Some{text}, rs}), called_hash(here, text, rs,
         n, e, b, h, pa, pv, ds, ts, g, u)))
+
+# ---------------------------------------------------------------------------
+# the hub description
+
+# LAW: one character of the line: a newline contradicts the premise, and any
+# other character is the line's own, with the rest of the line after it
+law line_first_cut.arm:
+  for +h: Char
+  for t: String
+  for +b: String
+  for c: Bool
+  for one: {B.nl.step(c, _u => B.has.nl(t)) == False{} : Bool}
+  for ih: {B.has.nl(t) == False{} : Bool} -> {B.line.first(t ++ "\n" ++ b) == t : String}
+  {B.line.step(c, h, _u => B.line.first(t ++ "\n" ++ b)) == SCon{h, t} : String}
+
+def line_first_cut.arm(h, t, b, c, one, ih):
+  match c:
+    case True{}:
+      Eq.bit.absurd2(&2, {B.line.step(True{}, h, _u => B.line.first(t ++ "\n" ++ b)) == SCon{h, t} : String}, one)
+    case False{}:
+      Equal.cong(String, String, x => SCon{h, x}, B.line.first(t ++ "\n" ++ b), t, ih(one))
+
+def Laws.line_first_cut(a, b, one):
+  match a:
+    case SNil{}:
+      {==}
+    case SCon{+h, +t}:
+      line_first_cut.arm(h, t, b, Char.is_eq(h, '\n'), one, x => Laws.line_first_cut(t, b, x))
+
+def Laws.hub_license_named(_t):
+  {==}
+
+# A LICENSE is passed over by the first step of the scan.
+def Laws.hub_skips_license(p, t, fs, l):
+  %Equal.sym(Bool, B.lic(K.Source{p, t}), True{}, l)
+    : {B.line.of(B.least(fs, B.least.pick(_, None{}, K.Source{p, t}))) == B.blurb(fs) : String}
+  {==}
+
+# LAW: a file found first whose path comes no later than any file after it
+# is the one the scan ends with
+law keeps_least:
+  for fs: List<&2, K.Source>
+  for +p: String
+  for +t: String
+  for af: {B.after(p, fs) == True{} : Bool}
+  {B.least(fs, Some{K.Source{p, t}}) == Some{K.Source{p, t}} : Maybe<&2, K.Source>}
+
+# LAW: one file of the scan, with whether its path comes no earlier and
+# whether it is a LICENSE in hand
+law keeps_least.arm:
+  for +h: K.Source
+  for r: List<&2, K.Source>
+  for +p: String
+  for +t: String
+  for b: Bool
+  for eb: {String.is_le(p, B.at(h)) == b : Bool}
+  for k: Bool
+  for af: {B.after.step(b, _u => B.after(p, r)) == True{} : Bool}
+  for ih: {B.after(p, r) == True{} : Bool}
+    -> {B.least(r, Some{K.Source{p, t}}) == Some{K.Source{p, t}} : Maybe<&2, K.Source>}
+  {B.least(r, B.least.pick(k, Some{K.Source{p, t}}, h)) == Some{K.Source{p, t}} : Maybe<&2, K.Source>}
+
+def keeps_least.arm(h, r, p, t, b, eb, k, af, ih):
+  match b:
+    case False{}:
+      Eq.bit.absurd(&2, {B.least(r, B.least.pick(k, Some{K.Source{p, t}}, h)) == Some{K.Source{p, t}}
+        : Maybe<&2, K.Source>}, af)
+    case True{}:
+      match k:
+        case True{}:
+          ih(af)
+        case False{}:
+          %Equal.sym(Bool, String.is_le(p, B.at(h)), True{}, eb)
+            : {B.least(r, Bool.pick(Maybe<&2, K.Source>, _, Some{K.Source{p, t}}, Some{h}))
+              == Some{K.Source{p, t}} : Maybe<&2, K.Source>}
+          ih(af)
+
+def keeps_least(fs, p, t, af):
+  match fs:
+    case []:
+      {==}
+    case +h <> +r:
+      keeps_least.arm(h, r, p, t, String.is_le(p, B.at(h)), {==}, B.lic(h), af, x => keeps_least(r, p, t, x))
+
+# A file that is not a LICENSE starts the scan, and nothing after it comes
+# earlier.
+def Laws.hub_first_by_path(p, t, fs, nl, af):
+  %Equal.sym(Bool, B.lic(K.Source{p, t}), False{}, nl)
+    : {B.line.of(B.least(fs, B.least.pick(_, None{}, K.Source{p, t}))) == B.line.first(t) : String}
+  Equal.cong(Maybe<&2, K.Source>, String, m => B.line.of(m), B.least(fs, Some{K.Source{p, t}}),
+    Some{K.Source{p, t}}, keeps_least(fs, p, t, af))
+
+def Laws.pub_upload_says_description(_w):
+  {==}

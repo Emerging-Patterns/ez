@@ -28,7 +28,8 @@ import ../ez/line.bend as L
 def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
   match sub:
     case L.CInit{}:
-      Cmd.init(Shake.get(matched, "name"), Shake.get(matched, "entry"))
+      Cmd.init(Shake.get(matched, "name"), Shake.get(matched, "entry"),
+        Shake.get(matched, "description"))
     case L.CAdd{}:
       Cmd.add(Shake.get(matched, "target"), Shake.get(matched, "ref"),
         Shake.get(matched, "entry"), Shake.get(matched, "rename"))

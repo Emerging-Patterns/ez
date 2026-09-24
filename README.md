@@ -52,7 +52,8 @@ git, openssl and `BEND_LIB` already set.
 
 ```bash
 git init myapp && cd myapp
-ez init myapp                    # ez.toml, .gitignore and main.bend
+ez init myapp --description "my first app"
+                                 # ez.toml, .gitignore, main.bend, src/lib.bend
 git add -A
 ez add Emerging-Patterns/snap    # pin a git package; prints its import line
 ez lock                          # write ez.lock.toml
@@ -74,7 +75,8 @@ ez tool install ./hello                   # link it on PATH as `hello`
 ## Usage
 
 ```
-ez init [name] [entry.bend]      scaffold a project: ez.toml, .gitignore, entry
+ez init [name] [entry.bend] [--description TEXT]
+                                 scaffold a project: ez.toml, .gitignore, entry, src/
 ez add <target> [ref] [entry.bend] [--rename NAME]
                                  record a git or hub package (name@version)
 ez remove <name>                 drop a package from the ledger

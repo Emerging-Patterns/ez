@@ -29,16 +29,46 @@ A command that refuses writes nothing (EZ-OUT-2).
 
 ## init
 
-`ez init [name] [entry.bend]` scaffolds a project: `ez.toml`, `.gitignore`
-and the entry.
+`ez init [name] [entry.bend] [--description TEXT]` scaffolds a project the
+way `cargo new` does: `ez.toml`, `.gitignore`, the entry, and a library under
+`src/` that the entry imports.
 
+```
+$ ez init demo --description "a demo"
+$ cat main.bend
+# demo: a demo
+import Base
+import ./src/lib.bend as Lib
+
+def main() -> IO(Unit):
+  IO.print(Lib.greeting())
+$ ez run
+hello
+```
+
+- The name defaults to `app` and the entry to `main.bend`.
+- The entry opens with `# <name>: <description>`. The hub describes a package
+  by the first line of its first file by path, and `main.bend` comes before
+  `src/`, so this is the line the hub shows once the package is published
+  (see [Publish](#publish)). With no `--description` the line is
+  `# <name>: TODO describe <name>`, to be edited before then. A description
+  is one line; one holding a newline is refused (EZ-INIT-1).
+- `src/lib.bend` is written only with an entry at the project's top, where
+  `./src/lib.bend` finds it, and only when nothing is there yet. An entry in
+  a directory of its own, such as `ez init app src/main.bend`, is written
+  alone (EZ-INIT-2).
+- An entry or a `src/lib.bend` that is already there is never written over,
+  and neither gets the description then (EZ-INIT-2).
+- The layout is a default for new projects, not a rule: any entry the ledger
+  names works, and `ez doctor` does not check where files are.
 - It never writes over a project. In a directory that already has an
   `ez.toml` it exits 1 and writes nothing.
 - It is the only command that makes a ledger. In a directory with no
   `ez.toml`, `ez add`, `ez remove`, `ez fetch` and `ez lock` (with or without
   `--upgrade`) exit 1 and write nothing, and `ez check`, `ez build` and
   `ez run` exit 1 and start nothing (EZ-LED-6).
-- It refuses a name or entry that a ledger cannot carry (see below).
+- It refuses a name or entry that a ledger cannot carry (see below), and a
+  description holding a newline, and then writes nothing.
 
 The `.gitignore` it writes holds `.ez/*`, `!.ez/lib` and `.ez/lib/*`, which
 the vendoring allowlist needs (see [Fetch and vendoring](#fetch-and-vendoring)).
@@ -532,7 +562,25 @@ made before the upload is made first:
 4. git tracks every file of that package, unchanged (`git ls-files -v` tag
    `H`), so an ignored file is refused too.
 
-Only then does bend upload. bend cannot report a package's hash without
+Only then does bend upload. Just before it does, ez prints, on stderr, the
+line the hub will describe the package by:
+
+```
+hub description: # demo: a demo
+```
+
+The hub takes the first line of the package's first file by path, in plain
+string order, so an uppercase letter comes before every lowercase one, and
+passes over every file named `LICENSE`. The package's files are the entry,
+the files it imports, and the `LICENSE` beside each, so the line is the
+entry's first line unless a file it imports sorts before it: an entry
+`main.bend` importing `lib/util.bend` is described by the first line of
+`lib/util.bend`. The line comes as bend starts, not as a question: to change
+it, stop bend while it mines its proof of work, edit the file, commit, and
+publish again. A publish refused before the upload prints only why
+(EZ-PUB-4).
+
+bend cannot report a package's hash without
 uploading it, so its answer is checked after: ez succeeds only when bend exits
 0, a line of its output is exactly a `0x` name, and every such line equals
 ez's own hash. It then prints that hash and the import line for the entry's
