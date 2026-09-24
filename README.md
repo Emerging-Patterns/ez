@@ -76,7 +76,7 @@ ez tool install ./hello                   # link it on PATH as `hello`
 ```
 ez init [name] [entry.bend]      scaffold a project: ez.toml, .gitignore, entry
 ez add <target> [ref] [entry.bend] [--rename NAME]
-                                 vendor a git package and record it
+                                 record a git or hub package (name@version)
 ez remove <name>                 drop a package from the ledger
 ez lock [--upgrade] [--package NAME]
                                  resolve every import, write ez.lock.toml

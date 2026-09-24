@@ -1,8 +1,11 @@
 # ez/target: what `ez add`, `ez tool run`, `install` and `upgrade` were asked
 # for, decided from the word alone. `owner/repo` is GitHub. A URL is that URL.
 # Anything else is a path, and a path written `./…`, `../…`, `/…` or `~/…` is
-# a path even when it would otherwise read as a repository.
+# a path even when it would otherwise read as a repository. For `ez add`, a
+# word bend reads as a hub package's `<name>@<version>` names that package,
+# where it would otherwise be a path (`aim`).
 import Base
+import ../pkg/pkg.bend as K
 
 # where a target names, or why it names nothing
 type Place is Data:
@@ -382,6 +385,47 @@ def classify.empty(empty: Bool, +text: String) -> Place:
 # shorthand's law needs nothing said about `git@`.
 def classify(+text: String) -> Place:
   classify.empty(String.is_empty(text), text)
+
+# what `ez add` was asked for: a hub package by its `<name>@<version>`, or a
+# place as `classify` reads it
+type Aim is Data:
+  Named{nv: String}
+  Placed{place: Place}
+
+# a word `classify` reads as a path names a hub package when bend's NAMED rule
+# rules it in (`K.name.ok`); otherwise it is that path
+def aim.local(named: Bool, +text: String, +path: String) -> Aim:
+  match named:
+    case True{}:
+      Named{text}
+    case False{}:
+      Placed{Local{path}}
+
+# the place read, with only a path asked whether it is a name. A URL, a
+# `git@host:path` and an `owner/repo` are never read again, so nothing that
+# was a remote becomes a name.
+def aim.place(place: Place, +text: String) -> Aim:
+  match place:
+    case Bad{why}:
+      Placed{Bad{why}}
+    case Local{path}:
+      aim.local(K.name.ok(text), text, path)
+    case Remote{url, slug}:
+      Placed{Remote{url, slug}}
+
+# what an `ez add` target names. A name holds no `/` and no `:`, and starts
+# with a letter, so a word bend reads as a name is one `classify` reads as a
+# path, and only such a word is asked.
+def aim(+text: String) -> Aim:
+  aim.place(classify(text), text)
+
+# whether a target names a hub package
+def aim.named(aim: Aim) -> Bool:
+  match aim:
+    case Named{_nv}:
+      True{}
+    case Placed{_place}:
+      False{}
 
 # `~` and `~/…` expanded. Anything else is already a path.
 def expand(+home: String, +path: String) -> String:

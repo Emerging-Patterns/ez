@@ -98,6 +98,8 @@ read, so they only meet values you typed or edited in.
 `ez add <target> [ref] [entry.bend] [--rename NAME]` vendors a git package and
 records it in the ledger. On success it prints the import line for the
 entry's path inside the package, the line `ez publish` prints (EZ-RES-2).
+`ez add <name>@<version> [entry.bend]` records a hub package by its name
+instead (see "Named imports" below).
 
 ### Targets
 
@@ -110,6 +112,10 @@ entry's path inside the package, the line `ez publish` prints (EZ-RES-2).
   second segment ends in `.bend`. So `vercel/next.js` is GitHub and
   `src/main.bend` is a path.
 - Anything else is a path. The empty word is refused.
+- For `ez add` only, a path that bend reads as a hub package's
+  `<name>@<version>` (a-z, 0-9 and `-`, 12 to 64 characters, then `@` and four
+  numbers like `1.0.0.0`) is that package on the hub. A git URL,
+  `git@host:path` or `owner/repo` never is.
 
 A relative path is recorded as it was given, relative to the project, which
 is the directory ez runs in, since every command reads `ez.toml` from there.
@@ -471,14 +477,34 @@ key in the ledger's `[package]` table names. The lock records that hub, and
 ### Named imports
 
 A hub package can be imported by name, as bend 2.0.26 and later allow:
-`import <name>@<version>/file.bend as P`. Record it in ez.toml as a
-dependency with `hub = "<name>@<version>"` and its `hash`:
+`import <name>@<version>/file.bend as P`. `ez add` records one:
+
+```bash
+ez add bend-tensors@0.0.0.2          # or: ez add bend-tensors@0.0.0.2 lib.bend
+```
+
+It asks the hub the ledger names (`[package] hub`) for the hash the name
+names, fetches that package, checks its manifest hashes to that name, lays
+it under `BEND_LIB` with the name's file beside it, and records a dependency
+with `hub = "<name>@<version>"` and its `hash`:
 
 ```toml
-[deps.tensors]
-hub = "bend-tensors@0.0.0.2"
+[deps.bend-tensors]
 hash = "0x39d8166231e68361eb37e8bef9287b8a"
+hub = "bend-tensors@0.0.0.2"
+entry = "tensors.bend"
 ```
+
+Then it prints the hash and the line to import it by,
+`import bend-tensors@0.0.0.2/tensors.bend as Tensors`. The key is
+`--rename NAME` when given, else the key ez.toml already gives that name at
+any version, so adding another version replaces it, else the name before the
+`@`. A key ez.toml gives any other dependency is refused. The word after the
+name is the entry, since the version is already pinned. With none, the entry
+is the package's `main.bend`, else its first top-level `.bend` file, else none
+is recorded and no import line is printed. A name the hub does not have, a
+package that does not hash to it, and an entry the package lacks are refused,
+and a refused add writes nothing. You can also write the section by hand.
 
 `ez lock` pins every name to its hash under `[names]` in ez.lock.toml. It asks
 the hub only for a name that neither ez.toml nor the lock already records,

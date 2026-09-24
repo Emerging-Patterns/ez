@@ -30,11 +30,17 @@
 # person is told. A refusal has no effect at all: nothing laid, nothing
 # written, no cache fill.
 #
+# A target bend reads as a hub package's `<name>@<version>` is planned by
+# add/hub.bend instead (`H.plan`). `command` is the plan `ez add` runs, which
+# is `plan` for a git or path target and `H.plan` for a name, and `next` is
+# the interpreter's step over both.
+#
 # The Effect, Plan and Outcome types are the lock's (lock/plan.bend), as for
 # `ez remove` and `ez init`; see "Update (A1, A4)" and "Update (A2)" in
 # docs/rfc/ez-add-planner.md.
 import Base
 import ./world.bend as A
+import ./hub.bend as H
 import ../lock/plan.bend as P
 import ../lock/world.bend as W
 import ../lock/up.bend as Up
@@ -759,3 +765,66 @@ def last.go(ls: List<&2, String>, +prev: String) -> String:
 # the last line a plan says, "" when it says none
 def last(pl: P.Plan) -> String:
   last.go(P.said(pl), "")
+
+# ---------------------------------------------------------------------------
+# the command: a git or path target, or a hub package's name
+
+# the plan `ez add` runs, once it is known whether the target is a name
+def command.of(named: Bool, +world: A.World) -> P.Plan:
+  match named:
+    case True{}:
+      H.plan(world)
+    case False{}:
+      plan(world)
+
+# the plan `ez add` runs on a World
+def command(+world: A.World) -> P.Plan:
+  command.of(A.named(world), world)
+
+# whether `ez add` refuses on a World
+def refuses.command(+world: A.World) -> Bool:
+  refuses.plan(command(world))
+
+# what the interpreter does next: answer git's questions, answer the hub's,
+# or run the plan
+type Next is Data:
+  AskGit{asks: List<&2, Up.Ask>}
+  AskHub{asks: List<&2, W.Ask>}
+  Done{plan: P.Plan}
+
+# the git planner's step
+def next.git(st: Step) -> Next:
+  match st:
+    case Asking{asks}:
+      AskGit{asks}
+    case Run{pl}:
+      Done{pl}
+
+# the hub planner's step: its questions, or its plan once there are none
+def next.hub(asks: List<&2, W.Ask>, +world: A.World) -> Next:
+  match asks:
+    case []:
+      Done{H.plan(world)}
+    case h <> t:
+      AskHub{h <> t}
+
+def next.of(named: Bool, +world: A.World) -> Next:
+  match named:
+    case True{}:
+      next.hub(H.wants(world), world)
+    case False{}:
+      next.git(step(world))
+
+# what the interpreter does next on a World
+def next(+world: A.World) -> Next:
+  next.of(A.named(world), world)
+
+# whether a step still asks anything
+def next.asks(nx: Next) -> Bool:
+  match nx:
+    case AskGit{_asks}:
+      True{}
+    case AskHub{_asks}:
+      True{}
+    case Done{_pl}:
+      False{}

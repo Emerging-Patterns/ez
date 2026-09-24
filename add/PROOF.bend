@@ -11,9 +11,12 @@
 import Base
 import ./world.bend as A
 import ./plan.bend as AP
+import ./hub.bend as H
 import ../lock/plan.bend as P
 import ../lock/world.bend as W
 import ../lock/up.bend as Up
+import ../lock/lock.bend as L
+import ../hub/hub.bend as Web
 import ../manifest/manifest.bend as M
 import ../manifest/render.bend as Rend
 import ../manifest/ignore.bend as I
@@ -62,22 +65,6 @@ def plan_quiet(v, w, r):
       {==}
     case AP.Stop{_why}:
       {==}
-
-def Laws.add_refusal_writes_nothing(w, r):
-  plan_quiet(AP.decide(w), w, r)
-
-# No ledger reads as the `Bad` arm, which stops before anything is asked.
-def Laws.add_needs_ledger(_a, _here, _home, _ignore, _rs):
-  {==}
-
-def Laws.add_needs_ledger_asks_nothing(_a, _here, _home, _ignore, _rs):
-  {==}
-
-# The read is rewritten to the `Bad` the premise gives, which stops.
-def Laws.add_refuses_unread(a, here, home, s, ignore, rs, _why, bad):
-  %bad : {AP.refuses.plan(AP.plan.v(AP.decide.read(_, A.World{a, here, home, Some{s},
-    ignore, rs}), A.World{a, here, home, Some{s}, ignore, rs})) == True{} : Bool}
-  {==}
 
 # ---------------------------------------------------------------------------
 # an add that does not refuse
@@ -1435,7 +1422,7 @@ def plan_code(pl):
           {==}
 
 def Laws.add_exits_as_it_refuses(w):
-  plan_code(AP.plan(w))
+  plan_code(AP.command(w))
 
 # ---------------------------------------------------------------------------
 # EZ-LED-4
@@ -1535,3 +1522,1348 @@ def Laws.add_ledger_reads_back(w, m, good, ok, text, put):
     P.Put{Rend.show(Rend.add.keep(m, AP.added(w)))}, P.Put{text}, p)
   %t : {M.parse(_) == M.Good{Rend.add.keep(m, AP.added(w))} : M.Read}
   ML.ledger_reads_back(Rend.add.keep(m, AP.added(w)), fit)
+
+# ---------------------------------------------------------------------------
+# a hub package's `<name>@<version>` (`H.plan`)
+#
+# The hub plan is `H.plan.v(H.decide(w), w)`. `H.decide` walks the ledger,
+# the refusals the ledger decides, the hub's answer for the name, and the
+# package it serves for that hash; each law about where it lands is proved by
+# a walk down those arms, the arms the premises rule out closing at once. On
+# `Go` the plan is `H.made`, which seals the effects of the package with how
+# it ends.
+
+# LAW: the two readings of whether a plan refuses are one
+law refuses_same:
+  for pl: P.Plan
+  {AP.refuses.plan(pl) == H.refuses.plan(pl) : Bool}
+
+def refuses_same(pl):
+  match pl:
+    case P.Plan{_es, o}:
+      match o:
+        case P.Success{}:
+          {==}
+        case P.Refused{_why}:
+          {==}
+
+# LAW: a sealed hub plan that refuses writes nothing
+law hseal_quiet:
+  for es: List<&2, P.Effect>
+  for o: P.Outcome
+  for r: {H.refuses.plan(H.seal(es, o)) == True{} : Bool}
+  {P.writes(H.seal(es, o)) == False{} : Bool}
+
+def hseal_quiet(es, o, r):
+  match o:
+    case P.Success{}:
+      Eq.bit.absurd(&2, {P.writes(H.seal(es, P.Success{})) == False{} : Bool}, r)
+    case P.Refused{_why}:
+      {==}
+
+# LAW: nor does any hub plan for a verdict that refuses
+law hplan_quiet:
+  for v: H.Verdict
+  for +w: A.World
+  for r: {H.refuses.plan(H.plan.v(v, w)) == True{} : Bool}
+  {P.writes(H.plan.v(v, w)) == False{} : Bool}
+
+def hplan_quiet(v, w, r):
+  match v:
+    case H.Go{+h, +fs, +ss}:
+      hseal_quiet(H.effects.of(H.dep.of(h, fs, w), h, W.laid(fs, ss),
+        A.manifest.of(A.read(w)), w), H.outcome.of(h, fs, w), r)
+    case H.Wait{_asks}:
+      {==}
+    case H.Stop{_why}:
+      {==}
+
+def Laws.add_named_refusal_writes_nothing(w, r):
+  hplan_quiet(H.decide(w), w, r)
+
+# whether a verdict stops the add. Proof vocabulary.
+def hstops(v: H.Verdict) -> Bool:
+  match v:
+    case H.Go{_h, _fs, _ss}:
+      False{}
+    case H.Wait{_asks}:
+      True{}
+    case H.Stop{_why}:
+      True{}
+
+# LAW: a verdict that stops the add refuses it
+law hstops_refuses:
+  for v: H.Verdict
+  for +w: A.World
+  for e: {hstops(v) == True{} : Bool}
+  {H.refuses.plan(H.plan.v(v, w)) == True{} : Bool}
+
+def hstops_refuses(v, w, e):
+  match v:
+    case H.Go{h, fs, ss}:
+      Eq.bit.absurd(&2, {H.refuses.plan(H.plan.v(H.Go{h, fs, ss}, w)) == True{} : Bool}, e)
+    case H.Wait{_asks}:
+      {==}
+    case H.Stop{_why}:
+      {==}
+
+# LAW: the add stops whenever the arm past the ledger's refusals stops it
+law hread_stops:
+  for r: M.Read
+  for +w: A.World
+  for g: {hstops(H.decide.early(String.is_empty(H.early(w)), H.early(w), w)) == True{} : Bool}
+  {hstops(H.decide.read(r, w)) == True{} : Bool}
+
+def hread_stops(r, _w, g):
+  match r:
+    case M.Bad{_why}:
+      {==}
+    case M.Good{_m}:
+      g
+
+# LAW: and that arm stops whenever the name's arm does
+law hearly_stops:
+  for b: Bool
+  for +why: String
+  for +w: A.World
+  for g: {hstops(H.decide.name(H.heard(A.hubs(w), A.target(w)), w)) == True{} : Bool}
+  {hstops(H.decide.early(b, why, w)) == True{} : Bool}
+
+def hearly_stops(b, _why, _w, g):
+  match b:
+    case True{}:
+      g
+    case False{}:
+      {==}
+
+# LAW: a name the hub has no package for stops the add
+law hmiss_stops:
+  for +w: A.World
+  for why: String
+  for miss: {H.heard(A.hubs(w), A.target(w)) == Some{W.Miss{why}} : Maybe<&2, W.Answer>}
+  {hstops(H.decide.name(H.heard(A.hubs(w), A.target(w)), w)) == True{} : Bool}
+
+def hmiss_stops(w, why, miss):
+  %Equal.sym(Maybe<&2, W.Answer>, H.heard(A.hubs(w), A.target(w)), Some{W.Miss{why}}, miss)
+    : {hstops(H.decide.name(_, w)) == True{} : Bool}
+  {==}
+
+def Laws.add_named_refuses_unknown(w, why, miss):
+  hstops_refuses(H.decide(w), w,
+    hread_stops(A.read(w), w,
+      hearly_stops(String.is_empty(H.early(w)), H.early(w), w, hmiss_stops(w, why, miss))))
+
+# LAW: an answer that is no `0x` name stops the add
+law hbad_hash_stops:
+  for ok: Bool
+  for +hash: String
+  for +w: A.World
+  for e: {ok == False{} : Bool}
+  {hstops(H.decide.hash(ok, hash, w)) == True{} : Bool}
+
+def hbad_hash_stops(ok, hash, w, e):
+  match ok:
+    case True{}:
+      Eq.bit.absurd2(&2, {hstops(H.decide.hash(True{}, hash, w)) == True{} : Bool}, e)
+    case False{}:
+      {==}
+
+def Laws.add_named_refuses_unhashed(w, text, said, bad):
+  hstops_refuses(H.decide(w), w,
+    hread_stops(A.read(w), w,
+      hearly_stops(String.is_empty(H.early(w)), H.early(w), w,
+        Equal.trans(Bool, hstops(H.decide.name(H.heard(A.hubs(w), A.target(w)), w)),
+          hstops(H.decide.hash(L.hash.ok(String.trim(text)), String.trim(text), w)), True{},
+          Equal.cong(Maybe<&2, W.Answer>, Bool, g => hstops(H.decide.name(g, w)),
+            H.heard(A.hubs(w), A.target(w)), Some{W.Said{text}}, said),
+          hbad_hash_stops(L.hash.ok(String.trim(text)), String.trim(text), w, bad)))))
+
+# LAW: a package whose manifest does not hash to its name stops the add,
+# however it arrived
+law hbody_stops:
+  for how: W.How
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  for bad: {Web.matches(L.want(hash), manifest) == False{} : Bool}
+  {hstops(H.decide.body(W.hub.how(how, hash, manifest, ss), hash)) == True{} : Bool}
+
+def hbody_stops(how, hash, manifest, ss, bad):
+  match how:
+    case W.Lib{}:
+      {==}
+    case W.Clone{_got}:
+      {==}
+    case W.Served{}:
+      %Equal.sym(Bool, Web.matches(L.want(hash), manifest), False{}, bad)
+        : {hstops(H.decide.body(W.body.named(_, hash, manifest, ss), hash)) == True{} : Bool}
+      {==}
+
+# LAW: so does a `0x` name the hub answered whose package is that one
+law hgot_stops:
+  for ok: Bool
+  for +hash: String
+  for +w: A.World
+  for how: W.How
+  for +manifest: String
+  for +ss: List<&2, String>
+  for got: {H.heard(A.hubs(w), hash) == Some{W.Got{how, manifest, ss}} : Maybe<&2, W.Answer>}
+  for bad: {Web.matches(L.want(hash), manifest) == False{} : Bool}
+  {hstops(H.decide.hash(ok, hash, w)) == True{} : Bool}
+
+def hgot_stops(ok, hash, w, how, manifest, ss, got, bad):
+  match ok:
+    case True{}:
+      %Equal.sym(Maybe<&2, W.Answer>, H.heard(A.hubs(w), hash), Some{W.Got{how, manifest, ss}},
+        got)
+        : {hstops(H.decide.pkg(_, hash, w)) == True{} : Bool}
+      hbody_stops(how, hash, manifest, ss, bad)
+    case False{}:
+      {==}
+
+def Laws.add_named_refuses_manifest(w, text, said, how, manifest, ss, got, bad):
+  hstops_refuses(H.decide(w), w,
+    hread_stops(A.read(w), w,
+      hearly_stops(String.is_empty(H.early(w)), H.early(w), w,
+        Equal.trans(Bool, hstops(H.decide.name(H.heard(A.hubs(w), A.target(w)), w)),
+          hstops(H.decide.hash(L.hash.ok(String.trim(text)), String.trim(text), w)), True{},
+          Equal.cong(Maybe<&2, W.Answer>, Bool, g => hstops(H.decide.name(g, w)),
+            H.heard(A.hubs(w), A.target(w)), Some{W.Said{text}}, said),
+          hgot_stops(L.hash.ok(String.trim(text)), String.trim(text), w, how, manifest, ss,
+            got, bad)))))
+
+# The key is the one `dep.of` records, whatever the World.
+def Laws.add_named_key(_w):
+  {==}
+
+# LAW: a pick between two texts that are not empty is not empty
+law pick_full:
+  for c: Bool
+  for +x: String
+  for +y: String
+  for ex: {False{} == String.is_empty(x) : Bool}
+  for ey: {False{} == String.is_empty(y) : Bool}
+  {False{} == String.is_empty(Bool.pick(String, c, x, y)) : Bool}
+
+def pick_full(c, _x, _y, ex, ey):
+  match c:
+    case True{}:
+      ex
+    case False{}:
+      ey
+
+# LAW: a refusal the ledger decides stops the add
+law hearly_false:
+  for b: Bool
+  for +why: String
+  for +w: A.World
+  for e: {False{} == b : Bool}
+  {hstops(H.decide.early(b, why, w)) == True{} : Bool}
+
+def hearly_false(b, why, w, e):
+  match b:
+    case True{}:
+      Eq.bit.absurd(&2, {hstops(H.decide.early(True{}, why, w)) == True{} : Bool}, e)
+    case False{}:
+      {==}
+
+def Laws.add_named_refuses_clash(w, why):
+  hstops_refuses(H.decide(w), w,
+    hread_stops(A.read(w), w,
+      hearly_false(String.is_empty(H.early(w)), H.early(w), w,
+        pick_full(Bool.or(String.is_empty(A.ref(w)), String.is_empty(A.entry.arg(w))),
+          Named.hub.why(A.deps(w), H.key(w), H.part(w), A.rename(w)),
+          "ez: " ++ A.target(w) ++ " pins its version; the word after it is the entry, " ++
+            "and there is only one", why, {==}))))
+
+# ---------------------------------------------------------------------------
+# a hub add that has a package
+
+# the texts a verdict carries. Proof vocabulary.
+def hvs(v: H.Verdict) -> List<&2, String>:
+  match v:
+    case H.Go{_h, _fs, ss}:
+      ss
+    case H.Wait{_asks}:
+      []
+    case H.Stop{_why}:
+      []
+
+# LAW: an outcome that is the entry's when it is not held refuses
+law hentry_loses:
+  for held: Bool
+  for fit: Bool
+  for +at: String
+  for +w: A.World
+  for es: List<&2, P.Effect>
+  for e: {held == False{} : Bool}
+  {H.refuses.plan(H.seal(es, H.outcome.entry(held, fit, at, w))) == True{} : Bool}
+
+def hentry_loses(held, fit, at, w, es, e):
+  match held:
+    case True{}:
+      Eq.bit.absurd2(&2, {H.refuses.plan(H.seal(es, H.outcome.entry(True{}, fit, at, w)))
+        == True{} : Bool}, e)
+    case False{}:
+      {==}
+
+# LAW: and one whose ledger would not read back refuses too
+law hfit_false:
+  for held: Bool
+  for +at: String
+  for +w: A.World
+  for es: List<&2, P.Effect>
+  {H.refuses.plan(H.seal(es, H.outcome.entry(held, False{}, at, w))) == True{} : Bool}
+
+def hfit_false(held, _at, _w, _es):
+  match held:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+law hfit_loses:
+  for held: Bool
+  for fit: Bool
+  for +at: String
+  for +w: A.World
+  for es: List<&2, P.Effect>
+  for e: {fit == False{} : Bool}
+  {H.refuses.plan(H.seal(es, H.outcome.entry(held, fit, at, w))) == True{} : Bool}
+
+def hfit_loses(held, fit, at, w, es, e):
+  match fit:
+    case True{}:
+      Eq.bit.absurd2(&2, {H.refuses.plan(H.seal(es, H.outcome.entry(held, True{}, at, w)))
+        == True{} : Bool}, e)
+    case False{}:
+      hfit_false(held, at, w, es)
+
+# LAW: a hub plan whose ledger would not read back refuses
+law hv_unfit:
+  for v: H.Verdict
+  for +w: A.World
+  for bad: {Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)),
+    H.dep.of(H.verdict.hash(v), H.verdict.files(v), w))) == False{} : Bool}
+  {H.refuses.plan(H.plan.v(v, w)) == True{} : Bool}
+
+def hv_unfit(v, w, bad):
+  match v:
+    case H.Go{+h, +fs, +ss}:
+      hfit_loses(Bool.or(String.is_empty(H.asked(w)), H.holds(fs, Path.norm(H.asked(w)))),
+        Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), H.dep.of(h, fs, w))),
+        H.asked(w), w,
+        H.effects.of(H.dep.of(h, fs, w), h, W.laid(fs, ss), A.manifest.of(A.read(w)), w), bad)
+    case H.Wait{_asks}:
+      {==}
+    case H.Stop{_why}:
+      {==}
+
+def Laws.add_named_refuses_unrenderable(w, bad):
+  hv_unfit(H.decide(w), w, bad)
+
+# LAW: both halves of an `or` that are False
+law or_false:
+  for x: Bool
+  for y: Bool
+  for ex: {x == False{} : Bool}
+  for ey: {y == False{} : Bool}
+  {Bool.or(x, y) == False{} : Bool}
+
+def or_false(x, y, ex, ey):
+  %Equal.sym(Bool, x, False{}, ex) : {Bool.or(_, y) == False{} : Bool}
+  ey
+
+# LAW: a hub plan whose entry asked for is not in the package refuses
+law hv_absent:
+  for v: H.Verdict
+  for +w: A.World
+  for given: {String.is_empty(H.asked(w)) == False{} : Bool}
+  for miss: {H.holds(H.verdict.files(v), Path.norm(H.asked(w))) == False{} : Bool}
+  {H.refuses.plan(H.plan.v(v, w)) == True{} : Bool}
+
+def hv_absent(v, w, given, miss):
+  match v:
+    case H.Go{+h, +fs, +ss}:
+      hentry_loses(Bool.or(String.is_empty(H.asked(w)), H.holds(fs, Path.norm(H.asked(w)))),
+        Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), H.dep.of(h, fs, w))),
+        H.asked(w), w,
+        H.effects.of(H.dep.of(h, fs, w), h, W.laid(fs, ss), A.manifest.of(A.read(w)), w),
+        or_false(String.is_empty(H.asked(w)), H.holds(fs, Path.norm(H.asked(w))), given, miss))
+    case H.Wait{_asks}:
+      {==}
+    case H.Stop{_why}:
+      {==}
+
+def Laws.add_named_entry_absent(w, given, miss):
+  hv_absent(H.decide(w), w, given, miss)
+
+# LAW: a hub verdict whose plan does not refuse is `Go`, and its plan is made
+# from the package it carries
+law hplan_made:
+  for v: H.Verdict
+  for +w: A.World
+  for ok: {H.refuses.plan(H.plan.v(v, w)) == False{} : Bool}
+  {H.plan.v(v, w) == H.made(H.verdict.hash(v), H.verdict.files(v), hvs(v), w) : P.Plan}
+
+def hplan_made(v, w, ok):
+  match v:
+    case H.Go{_h, _fs, _ss}:
+      {==}
+    case H.Wait{asks}:
+      Eq.bit.absurd2(&2, {H.plan.v(H.Wait{asks}, w) == H.made("", [], [], w) : P.Plan}, ok)
+    case H.Stop{why}:
+      Eq.bit.absurd2(&2, {H.plan.v(H.Stop{why}, w) == H.made("", [], [], w) : P.Plan}, ok)
+
+# LAW: a sealed hub plan that does not refuse is its effects, ending in
+# success
+law hseal_success:
+  for es: List<&2, P.Effect>
+  for o: P.Outcome
+  for ok: {H.refuses.plan(H.seal(es, o)) == False{} : Bool}
+  {H.seal(es, o) == P.Plan{es, P.Success{}} : P.Plan}
+
+def hseal_success(_es, o, ok):
+  match o:
+    case P.Success{}:
+      {==}
+    case P.Refused{why}:
+      Eq.bit.absurd2(&2, {H.seal(_es, P.Refused{why}) == P.Plan{_es, P.Success{}} : P.Plan},
+        ok)
+
+# LAW: and its outcome is a success
+law hseal_outcome:
+  for es: List<&2, P.Effect>
+  for o: P.Outcome
+  for ok: {H.refuses.plan(H.seal(es, o)) == False{} : Bool}
+  {o == P.Success{} : P.Outcome}
+
+def hseal_outcome(_es, o, ok):
+  match o:
+    case P.Success{}:
+      {==}
+    case P.Refused{why}:
+      Eq.bit.absurd2(&2, {P.Refused{why} == P.Success{} : P.Outcome}, ok)
+
+# the plan a hub add made, and its effects, named. Proof vocabulary.
+def hmade(+w: A.World) -> P.Plan:
+  H.made(H.hash(w), H.files(w), hvs(H.decide(w)), w)
+
+def heff(+w: A.World) -> List<&2, P.Effect>:
+  H.effects.of(H.added(w), H.hash(w), W.laid(H.files(w), hvs(H.decide(w))),
+    A.manifest.of(A.read(w)), w)
+
+def hout(+w: A.World) -> P.Outcome:
+  H.outcome.of(H.hash(w), H.files(w), w)
+
+# LAW: a hub add that does not refuse made a plan that does not refuse
+law hmade_ok:
+  for +w: A.World
+  for +ok: {H.refuses(w) == False{} : Bool}
+  {H.refuses.plan(hmade(w)) == False{} : Bool}
+
+def hmade_ok(w, ok):
+  Equal.trans(Bool, H.refuses.plan(hmade(w)), H.refuses.plan(H.plan(w)), False{},
+    Equal.cong(P.Plan, Bool, pl => H.refuses.plan(pl), hmade(w), H.plan(w),
+      Equal.sym(P.Plan, H.plan(w), hmade(w), hplan_made(H.decide(w), w, ok))),
+    ok)
+
+# LAW: a hub add that does not refuse runs the effects of its package
+law hsucceeds:
+  for +w: A.World
+  for +ok: {H.refuses(w) == False{} : Bool}
+  {H.plan(w) == P.Plan{heff(w), P.Success{}} : P.Plan}
+
+def hsucceeds(w, ok):
+  Equal.trans(P.Plan, H.plan(w), hmade(w), P.Plan{heff(w), P.Success{}},
+    hplan_made(H.decide(w), w, ok),
+    hseal_success(heff(w), hout(w), hmade_ok(w, ok)))
+
+# LAW: and its outcome is a success
+law hwon:
+  for +w: A.World
+  for ok: {H.refuses(w) == False{} : Bool}
+  {hout(w) == P.Success{} : P.Outcome}
+
+def hwon(w, ok):
+  hseal_outcome(heff(w), hout(w), hmade_ok(w, ok))
+
+# ---------------------------------------------------------------------------
+# what a hub add writes
+
+# the `.gitignore` a hub add derives, and whether it is the one there
+def hnext(+w: A.World) -> String:
+  I.sync(A.deps.of(Rend.add.keep(A.manifest.of(A.read(w)), H.added(w))), A.ignore(w))
+
+def hsame(+w: A.World) -> Bool:
+  String.eq(hnext(w), A.ignore(w))
+
+# LAW: the lines a hub add tells write nothing
+law hsays_keep:
+  for c: Bool
+  for +a: String
+  for +b: String
+  for +p: String
+  {P.put.in(Bool.pick(List<&2, P.Effect>, c, [P.Say{a}], [P.Say{a}, P.Say{b}]), p)
+    == P.Kept{} : P.Wrote}
+
+def hsays_keep(c, _a, _b, _p):
+  match c:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# LAW: nor does anything after the ledger's write, `.gitignore` included
+law hignore_keeps_ledger:
+  for b: Bool
+  for +next: String
+  for +h: String
+  for +e: String
+  for +w: A.World
+  {P.put.in(H.ignore.put(b, next, H.says(h, e, w)), "ez.toml") == P.Kept{} : P.Wrote}
+
+def hignore_keeps_ledger(b, next, h, e, w):
+  match b:
+    case True{}:
+      hsays_keep(String.is_empty(e), A.target(w) ++ " is " ++ h,
+        Git.import.line(A.target(w), Path.norm(e)), "ez.toml")
+    case False{}:
+      %Equal.sym(P.Wrote, P.put.in(H.says(h, e, w), "ez.toml"), P.Kept{},
+        hsays_keep(String.is_empty(e), A.target(w) ++ " is " ++ h,
+          Git.import.line(A.target(w), Path.norm(e)), "ez.toml"))
+        : {P.put.one(P.Write{".gitignore", next}, "ez.toml", _) == P.Kept{} : P.Wrote}
+      {==}
+
+def Laws.add_named_edits_ledger(w, m, good, ok):
+  %Equal.sym(P.Plan, H.plan(w), P.Plan{heff(w), P.Success{}}, hsucceeds(w, ok))
+    : {P.put.plan(_, "ez.toml") == P.Put{Rend.show(Rend.add.keep(m, H.added(w)))} : P.Wrote}
+  %good_m(w, m, good)
+    : {P.put.in(heff(w), "ez.toml") == P.Put{Rend.show(Rend.add.keep(_, H.added(w)))}
+      : P.Wrote}
+  write_then_keep(Rend.show(Rend.add.keep(A.manifest.of(A.read(w)), H.added(w))),
+    H.ignore.put(hsame(w), hnext(w), H.says(H.hash(w), M.dep.entry(H.added(w)), w)),
+    hignore_keeps_ledger(hsame(w), hnext(w), H.hash(w), M.dep.entry(H.added(w)), w))
+
+# LAW: a hub add's outcome that is a success found its ledger renderable
+law hentry_fit:
+  for held: Bool
+  for fit: Bool
+  for +at: String
+  for +w: A.World
+  for s: {win(H.outcome.entry(held, fit, at, w)) == True{} : Bool}
+  {fit == True{} : Bool}
+
+def hentry_fit(held, fit, _at, _w, s):
+  match held fit:
+    case True{} True{}:
+      {==}
+    case True{} False{}:
+      Eq.bit.absurd(&2, {False{} == True{} : Bool}, s)
+    case False{} _:
+      Eq.bit.absurd(&2, {fit == True{} : Bool}, s)
+
+# An add that does not refuse writes `Rend.add.keep`'s ledger, whose outcome
+# was a success, so the ledger is renderable and reads back.
+def Laws.add_named_reads_back(w, m, good, ok, text, put):
+  +fit = Equal.trans(Bool, Rend.renderable(Rend.add.keep(m, H.added(w))),
+    Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), H.added(w))), True{},
+    Equal.cong(M.Manifest, Bool, x => Rend.renderable(Rend.add.keep(x, H.added(w))),
+      m, A.manifest.of(A.read(w)),
+      Equal.sym(M.Manifest, A.manifest.of(A.read(w)), m, good_m(w, m, good))),
+    hentry_fit(Bool.or(String.is_empty(H.asked(w)), H.holds(H.files(w), Path.norm(H.asked(w)))),
+      Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), H.added(w))), H.asked(w), w,
+      Equal.cong(P.Outcome, Bool, o => win(o), hout(w), P.Success{}, hwon(w, ok))))
+  +p = Equal.trans(P.Wrote, P.Put{Rend.show(Rend.add.keep(m, H.added(w)))},
+    P.put.plan(H.plan(w), "ez.toml"), P.Put{text},
+    Equal.sym(P.Wrote, P.put.plan(H.plan(w), "ez.toml"),
+      P.Put{Rend.show(Rend.add.keep(m, H.added(w)))},
+      Laws.add_named_edits_ledger(w, m, good, ok)),
+    put)
+  +t = Equal.cong(P.Wrote, String, x => wrote.text(x),
+    P.Put{Rend.show(Rend.add.keep(m, H.added(w)))}, P.Put{text}, p)
+  %t : {M.parse(_) == M.Good{Rend.add.keep(m, H.added(w))} : M.Read}
+  ML.ledger_reads_back(Rend.add.keep(m, H.added(w)), fit)
+
+# LAW: the lines a hub add tells lay no name's file
+law hsays_unnamed:
+  for c: Bool
+  for +w: A.World
+  for +h: String
+  for +e: String
+  {H.names.laid(Bool.pick(List<&2, P.Effect>, c, [P.Say{A.target(w) ++ " is " ++ h}],
+    [P.Say{A.target(w) ++ " is " ++ h}, P.Say{Git.import.line(A.target(w), Path.norm(e))}]))
+    == [] : List<&2, L.Name>}
+
+def hsays_unnamed(c, _w, _h, _e):
+  match c:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# LAW: nothing after the ledger's write lays a name's file
+law hignore_unnamed:
+  for b: Bool
+  for +next: String
+  for +h: String
+  for +e: String
+  for +w: A.World
+  {H.names.laid(H.ignore.put(b, next, H.says(h, e, w))) == [] : List<&2, L.Name>}
+
+def hignore_unnamed(b, _next, _h, e, _w):
+  match b:
+    case True{}:
+      hsays_unnamed(String.is_empty(e), _w, _h, e)
+    case False{}:
+      hsays_unnamed(String.is_empty(e), _w, _h, e)
+
+def Laws.add_named_lays_name(w, ok):
+  %Equal.sym(P.Plan, H.plan(w), P.Plan{heff(w), P.Success{}}, hsucceeds(w, ok))
+    : {H.names.laid(P.effects(_)) == [L.Name{A.target(w), M.dep.hash(H.added(w))}]
+      : List<&2, L.Name>}
+  Equal.cong(List<&2, L.Name>, List<&2, L.Name>,
+    t => L.Name{A.target(w), M.dep.hash(H.added(w))} <> t,
+    H.names.laid(H.ignore.put(hsame(w), hnext(w), H.says(H.hash(w), M.dep.entry(H.added(w)),
+      w))), [],
+    hignore_unnamed(hsame(w), hnext(w), H.hash(w), M.dep.entry(H.added(w)), w))
+
+# ---------------------------------------------------------------------------
+# the hash recorded is the one the hub answered (EZ-HUB-1)
+
+# whether a verdict that has a package has it under this hash. Proof
+# vocabulary.
+def hnb(v: H.Verdict, +t: String) -> Bool:
+  match v:
+    case H.Go{h, _fs, _ss}:
+      String.eq(h, t)
+    case H.Wait{_asks}:
+      True{}
+    case H.Stop{_why}:
+      True{}
+
+law hnb_body:
+  for vv: W.Verdict
+  for +hash: String
+  {hnb(H.decide.body(vv, hash), hash) == True{} : Bool}
+
+def hnb_body(vv, hash):
+  match vv:
+    case W.Ok{_fs, _ss}:
+      Eq.string_eq_self(hash)
+    case W.No{_why}:
+      {==}
+    case W.Named{_ns}:
+      {==}
+
+law hnb_got:
+  for a: W.Answer
+  for +hash: String
+  for +w: A.World
+  {hnb(H.decide.got(a, hash, w), hash) == True{} : Bool}
+
+def hnb_got(a, hash, _w):
+  match a:
+    case W.Got{how, manifest, ss}:
+      hnb_body(W.hub.how(how, hash, manifest, ss), hash)
+    case W.Miss{_why}:
+      {==}
+    case W.Said{_text}:
+      {==}
+    case W.Locked{_text}:
+      {==}
+
+law hnb_pkg:
+  for g: Maybe<&2, W.Answer>
+  for +hash: String
+  for +w: A.World
+  {hnb(H.decide.pkg(g, hash, w), hash) == True{} : Bool}
+
+def hnb_pkg(g, hash, w):
+  match g:
+    case None{}:
+      {==}
+    case Some{a}:
+      hnb_got(a, hash, w)
+
+law hnb_hash:
+  for ok: Bool
+  for +hash: String
+  for +w: A.World
+  {hnb(H.decide.hash(ok, hash, w), hash) == True{} : Bool}
+
+def hnb_hash(ok, hash, w):
+  match ok:
+    case True{}:
+      hnb_pkg(H.heard(A.hubs(w), hash), hash, w)
+    case False{}:
+      {==}
+
+law hnb_early:
+  for b: Bool
+  for +why: String
+  for +w: A.World
+  for +text: String
+  for said: {H.heard(A.hubs(w), A.target(w)) == Some{W.Said{text}} : Maybe<&2, W.Answer>}
+  {hnb(H.decide.early(b, why, w), String.trim(text)) == True{} : Bool}
+
+def hnb_early(b, _why, w, text, said):
+  match b:
+    case True{}:
+      %Equal.sym(Maybe<&2, W.Answer>, H.heard(A.hubs(w), A.target(w)), Some{W.Said{text}}, said)
+        : {hnb(H.decide.name(_, w), String.trim(text)) == True{} : Bool}
+      hnb_hash(L.hash.ok(String.trim(text)), String.trim(text), w)
+    case False{}:
+      {==}
+
+law hnb_read:
+  for r: M.Read
+  for +w: A.World
+  for +text: String
+  for said: {H.heard(A.hubs(w), A.target(w)) == Some{W.Said{text}} : Maybe<&2, W.Answer>}
+  {hnb(H.decide.read(r, w), String.trim(text)) == True{} : Bool}
+
+def hnb_read(r, w, text, said):
+  match r:
+    case M.Bad{_why}:
+      {==}
+    case M.Good{_m}:
+      hnb_early(String.is_empty(H.early(w)), H.early(w), w, text, said)
+
+# LAW: a verdict that does not refuse has its package under the hash it is
+# known to name
+law hnb_hash_is:
+  for v: H.Verdict
+  for +t: String
+  for +w: A.World
+  for e: {hnb(v, t) == True{} : Bool}
+  for ok: {H.refuses.plan(H.plan.v(v, w)) == False{} : Bool}
+  {H.verdict.hash(v) == t : String}
+
+def hnb_hash_is(v, t, _w, e, ok):
+  match v:
+    case H.Go{h, _fs, _ss}:
+      Str.string_eq_true(h, t, e)
+    case H.Wait{asks}:
+      Eq.bit.absurd2(&2, {H.verdict.hash(H.Wait{asks}) == t : String}, ok)
+    case H.Stop{why}:
+      Eq.bit.absurd2(&2, {H.verdict.hash(H.Stop{why}) == t : String}, ok)
+
+def Laws.add_named_records_name(w, text, said, ok):
+  Equal.cong(String, M.Dep, x => M.Dep{H.key(w), x, M.dep.entry(H.added(w)),
+      M.Hub{A.target(w)}}, H.hash(w), String.trim(text),
+    hnb_hash_is(H.decide(w), String.trim(text), w, hnb_read(A.read(w), w, text, said), ok))
+
+# ---------------------------------------------------------------------------
+# the trees a hub add lays are named (EZ-HASH-3)
+
+# whether a verdict that has a package has one its files hash to. Proof
+# vocabulary.
+def hgv(v: H.Verdict) -> Bool:
+  match v:
+    case H.Go{h, fs, ss}:
+      String.eq(h, W.named(W.laid(fs, ss)))
+    case H.Wait{_asks}:
+      True{}
+    case H.Stop{_why}:
+      True{}
+
+# whether a lock verdict, laid under a hash, would be named by it, as
+# lock/PROOF.bend states it
+def lnv(+hash: String, v: W.Verdict) -> Bool:
+  match v:
+    case W.No{_why}:
+      True{}
+    case W.Ok{fs, ss}:
+      String.eq(hash, W.named(W.laid(fs, ss)))
+    case W.Named{_names}:
+      True{}
+
+law lnv.laid:
+  for ok: Bool
+  for +hash: String
+  for +fs: List<&2, K.File>
+  for +ss: List<&2, String>
+  for e: {String.eq(hash, W.named(W.laid(fs, ss))) == ok : Bool}
+  {lnv(hash, W.body.laid(ok, hash, fs, ss)) == True{} : Bool}
+
+def lnv.laid(ok, _hash, _fs, _ss, e):
+  match ok:
+    case True{}:
+      e
+    case False{}:
+      {==}
+
+law lnv.sums:
+  for ok: Bool
+  for +hash: String
+  for +fs: List<&2, K.File>
+  for +ss: List<&2, String>
+  {lnv(hash, W.body.sums(ok, hash, fs, ss)) == True{} : Bool}
+
+def lnv.sums(ok, hash, fs, ss):
+  match ok:
+    case True{}:
+      lnv.laid(String.eq(hash, W.named(W.laid(fs, ss))), hash, fs, ss, {==})
+    case False{}:
+      {==}
+
+law lnv.escape:
+  for clean: Bool
+  for +bad: String
+  for +hash: String
+  for +fs: List<&2, K.File>
+  for +ss: List<&2, String>
+  {lnv(hash, W.body.escape.go(clean, bad, hash, fs, ss)) == True{} : Bool}
+
+def lnv.escape(clean, _bad, hash, fs, ss):
+  match clean:
+    case True{}:
+      lnv.sums(W.sums.ok(fs, ss), hash, fs, ss)
+    case False{}:
+      {==}
+
+law lnv.named:
+  for ok: Bool
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  {lnv(hash, W.body.named(ok, hash, manifest, ss)) == True{} : Bool}
+
+def lnv.named(ok, hash, manifest, ss):
+  match ok:
+    case True{}:
+      lnv.escape(String.is_empty(K.escaped(L.manifest.files(String.lines(manifest)))),
+        K.escaped(L.manifest.files(String.lines(manifest))), hash,
+        L.manifest.files(String.lines(manifest)), ss)
+    case False{}:
+      {==}
+
+law lnv.hub.how:
+  for how: W.How
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  {lnv(hash, W.hub.how(how, hash, manifest, ss)) == True{} : Bool}
+
+def lnv.hub.how(how, hash, manifest, ss):
+  match how:
+    case W.Lib{}:
+      {==}
+    case W.Clone{_got}:
+      {==}
+    case W.Served{}:
+      lnv.named(Web.matches(L.want(hash), manifest), hash, manifest, ss)
+
+law hgv_body:
+  for vv: W.Verdict
+  for +hash: String
+  for e: {lnv(hash, vv) == True{} : Bool}
+  {hgv(H.decide.body(vv, hash)) == True{} : Bool}
+
+def hgv_body(vv, _hash, e):
+  match vv:
+    case W.Ok{_fs, _ss}:
+      e
+    case W.No{_why}:
+      {==}
+    case W.Named{_ns}:
+      {==}
+
+law hgv_got:
+  for a: W.Answer
+  for +hash: String
+  for +w: A.World
+  {hgv(H.decide.got(a, hash, w)) == True{} : Bool}
+
+def hgv_got(a, hash, _w):
+  match a:
+    case W.Got{+how, +manifest, +ss}:
+      hgv_body(W.hub.how(how, hash, manifest, ss), hash, lnv.hub.how(how, hash, manifest, ss))
+    case W.Miss{_why}:
+      {==}
+    case W.Said{_text}:
+      {==}
+    case W.Locked{_text}:
+      {==}
+
+law hgv_pkg:
+  for g: Maybe<&2, W.Answer>
+  for +hash: String
+  for +w: A.World
+  {hgv(H.decide.pkg(g, hash, w)) == True{} : Bool}
+
+def hgv_pkg(g, hash, w):
+  match g:
+    case None{}:
+      {==}
+    case Some{a}:
+      hgv_got(a, hash, w)
+
+law hgv_hash:
+  for ok: Bool
+  for +hash: String
+  for +w: A.World
+  {hgv(H.decide.hash(ok, hash, w)) == True{} : Bool}
+
+def hgv_hash(ok, hash, w):
+  match ok:
+    case True{}:
+      hgv_pkg(H.heard(A.hubs(w), hash), hash, w)
+    case False{}:
+      {==}
+
+law hgv_said:
+  for a: W.Answer
+  for +w: A.World
+  {hgv(H.decide.said(a, w)) == True{} : Bool}
+
+def hgv_said(a, w):
+  match a:
+    case W.Said{+text}:
+      hgv_hash(L.hash.ok(String.trim(text)), String.trim(text), w)
+    case W.Got{_how, _manifest, _ss}:
+      {==}
+    case W.Miss{_why}:
+      {==}
+    case W.Locked{_text}:
+      {==}
+
+law hgv_name:
+  for g: Maybe<&2, W.Answer>
+  for +w: A.World
+  {hgv(H.decide.name(g, w)) == True{} : Bool}
+
+def hgv_name(g, w):
+  match g:
+    case None{}:
+      {==}
+    case Some{a}:
+      hgv_said(a, w)
+
+law hgv_early:
+  for b: Bool
+  for +why: String
+  for +w: A.World
+  {hgv(H.decide.early(b, why, w)) == True{} : Bool}
+
+def hgv_early(b, _why, w):
+  match b:
+    case True{}:
+      hgv_name(H.heard(A.hubs(w), A.target(w)), w)
+    case False{}:
+      {==}
+
+law hgv_read:
+  for r: M.Read
+  for +w: A.World
+  {hgv(H.decide.read(r, w)) == True{} : Bool}
+
+def hgv_read(r, w):
+  match r:
+    case M.Bad{_why}:
+      {==}
+    case M.Good{_m}:
+      hgv_early(String.is_empty(H.early(w)), H.early(w), w)
+
+# LAW: files laid with the manifest of their own texts last are named by
+# that manifest when their texts hash to the name
+law hlay:
+  for +h: String
+  for +ls: List<&2, W.Source>
+  for e: {String.eq(h, W.named(ls)) == True{} : Bool}
+  {P.lay.named(h, List.append(&2, W.Source, ls, [W.Source{"manifest", W.manifest(ls)}]))
+    == True{} : Bool}
+
+def hlay(h, ls, e):
+  %Equal.sym(List<&2, W.Source>,
+    P.front(List.append(&2, W.Source, ls, [W.Source{"manifest", W.manifest(ls)}])), ls,
+    front_snoc(ls, W.Source{"manifest", W.manifest(ls)}))
+    : {Bool.and(String.eq(h, K.hash_of(K.files_of(W.weighs(_)))),
+      String.eq(P.last(List.append(&2, W.Source, ls, [W.Source{"manifest", W.manifest(ls)}])),
+        K.manifest_of(K.files_of(W.weighs(_))))) == True{} : Bool}
+  %Equal.sym(String,
+    P.last(List.append(&2, W.Source, ls, [W.Source{"manifest", W.manifest(ls)}])),
+    W.manifest(ls), last_snoc(ls, "manifest", W.manifest(ls)))
+    : {Bool.and(String.eq(h, W.named(ls)), String.eq(_, W.manifest(ls))) == True{} : Bool}
+  %Equal.sym(Bool, String.eq(W.manifest(ls), W.manifest(ls)), True{},
+    Eq.string_eq_self(W.manifest(ls)))
+    : {Bool.and(String.eq(h, W.named(ls)), _) == True{} : Bool}
+  %Equal.sym(Bool, String.eq(h, W.named(ls)), True{}, e)
+    : {Bool.and(_, True{}) == True{} : Bool}
+  {==}
+
+# LAW: the lines a hub add tells lay nothing
+law hsays_lays:
+  for c: Bool
+  for +a: String
+  for +b: String
+  {P.lays.named(Bool.pick(List<&2, P.Effect>, c, [P.Say{a}], [P.Say{a}, P.Say{b}]))
+    == True{} : Bool}
+
+def hsays_lays(c, _a, _b):
+  match c:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+law hignore_lays:
+  for b: Bool
+  for +next: String
+  for +h: String
+  for +e: String
+  for +w: A.World
+  {P.lays.named(H.ignore.put(b, next, H.says(h, e, w))) == True{} : Bool}
+
+def hignore_lays(b, _next, h, e, w):
+  match b:
+    case True{}:
+      hsays_lays(String.is_empty(e), A.target(w) ++ " is " ++ h,
+        Git.import.line(A.target(w), Path.norm(e)))
+    case False{}:
+      hsays_lays(String.is_empty(e), A.target(w) ++ " is " ++ h,
+        Git.import.line(A.target(w), Path.norm(e)))
+
+# LAW: a sealed hub plan lays what its effects lay, or nothing
+law hseal_lays:
+  for es: List<&2, P.Effect>
+  for o: P.Outcome
+  for e: {P.lays.named(es) == True{} : Bool}
+  {P.lays.named(P.effects(H.seal(es, o))) == True{} : Bool}
+
+def hseal_lays(_es, o, e):
+  match o:
+    case P.Success{}:
+      e
+    case P.Refused{_why}:
+      {==}
+
+# LAW: the plan for a verdict whose package its files hash to lays named
+# trees
+law hv_lays:
+  for v: H.Verdict
+  for +w: A.World
+  for g: {hgv(v) == True{} : Bool}
+  {P.lays.named(P.effects(H.plan.v(v, w))) == True{} : Bool}
+
+def hv_lays(v, w, g):
+  match v:
+    case H.Go{+h, +fs, +ss}:
+      hseal_lays(H.effects.of(H.dep.of(h, fs, w), h, W.laid(fs, ss),
+          A.manifest.of(A.read(w)), w), H.outcome.of(h, fs, w),
+        both(P.lay.named(h, List.append(&2, W.Source, W.laid(fs, ss),
+            [W.Source{"manifest", W.manifest(W.laid(fs, ss))}])),
+          P.lays.named(H.ignore.put(String.eq(I.sync(A.deps.of(Rend.add.keep(
+              A.manifest.of(A.read(w)), H.dep.of(h, fs, w))), A.ignore(w)), A.ignore(w)),
+            I.sync(A.deps.of(Rend.add.keep(A.manifest.of(A.read(w)), H.dep.of(h, fs, w))),
+              A.ignore(w)), H.says(h, H.entry(fs, w), w))),
+          hlay(h, W.laid(fs, ss), g),
+          hignore_lays(String.eq(I.sync(A.deps.of(Rend.add.keep(A.manifest.of(A.read(w)),
+              H.dep.of(h, fs, w))), A.ignore(w)), A.ignore(w)),
+            I.sync(A.deps.of(Rend.add.keep(A.manifest.of(A.read(w)), H.dep.of(h, fs, w))),
+              A.ignore(w)), h, H.entry(fs, w), w)))
+    case H.Wait{_asks}:
+      {==}
+    case H.Stop{_why}:
+      {==}
+
+def Laws.add_named_lays_named(w):
+  hv_lays(H.decide(w), w, hgv_read(A.read(w), w))
+
+# ---------------------------------------------------------------------------
+# the entry and the import line (EZ-RES-2)
+
+# LAW: with neither word after the name, none was asked for
+law hasked_none:
+  for +w: A.World
+  for ne: {A.entry.arg(w) == "" : String}
+  for nr: {A.ref(w) == "" : String}
+  {H.asked(w) == "" : String}
+
+def hasked_none(w, ne, nr):
+  %Equal.sym(String, A.entry.arg(w), "", ne)
+    : {Bool.pick(String, String.is_empty(_), A.ref(w), _) == "" : String}
+  %Equal.sym(String, A.ref(w), "", nr)
+    : {Bool.pick(String, True{}, _, "") == "" : String}
+  {==}
+
+def Laws.add_named_entry_default(w, ne, nr):
+  %Equal.sym(String, H.asked(w), "", hasked_none(w, ne, nr))
+    : {H.entry.pick(String.is_empty(_), H.files(w), _) == H.entry.of(H.files(w)) : String}
+  {==}
+
+# LAW: the lines a hub add tells end with the import line when there is an
+# entry
+law hsays_last:
+  for c: Bool
+  for +a: String
+  for +b: String
+  for e: {c == False{} : Bool}
+  {H.last.go(P.said.in(Bool.pick(List<&2, P.Effect>, c, [P.Say{a}], [P.Say{a}, P.Say{b}])), "")
+    == b : String}
+
+def hsays_last(c, a, b, e):
+  match c:
+    case True{}:
+      Eq.bit.absurd2(&2, {H.last.go(P.said.in(Bool.pick(List<&2, P.Effect>, True{}, [P.Say{a}],
+        [P.Say{a}, P.Say{b}])), "") == b : String}, e)
+    case False{}:
+      {==}
+
+# LAW: `.gitignore`'s write says nothing
+law hignore_said:
+  for b: Bool
+  for +next: String
+  for rest: List<&2, P.Effect>
+  {P.said.in(H.ignore.put(b, next, rest)) == P.said.in(rest) : List<&2, String>}
+
+def hignore_said(b, _next, _rest):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.add_named_says_import(w, ok, some):
+  %Equal.sym(P.Plan, H.plan(w), P.Plan{heff(w), P.Success{}}, hsucceeds(w, ok))
+    : {H.last(_) == Git.import.line(A.target(w), Path.norm(M.dep.entry(H.added(w)))) : String}
+  %Equal.sym(List<&2, String>,
+    P.said.in(H.ignore.put(hsame(w), hnext(w), H.says(H.hash(w), M.dep.entry(H.added(w)), w))),
+    P.said.in(H.says(H.hash(w), M.dep.entry(H.added(w)), w)),
+    hignore_said(hsame(w), hnext(w), H.says(H.hash(w), M.dep.entry(H.added(w)), w)))
+    : {H.last.go(_, "") == Git.import.line(A.target(w), Path.norm(M.dep.entry(H.added(w))))
+      : String}
+  hsays_last(String.is_empty(M.dep.entry(H.added(w))), A.target(w) ++ " is " ++ H.hash(w),
+    Git.import.line(A.target(w), Path.norm(M.dep.entry(H.added(w)))), some)
+
+# ---------------------------------------------------------------------------
+# every question names the ledger's hub (EZ-HUB-1)
+
+law hah_body:
+  for vv: W.Verdict
+  for +hash: String
+  for +hub: String
+  {H.asks.hub(H.asks.v(H.decide.body(vv, hash)), hub) == True{} : Bool}
+
+def hah_body(vv, _hash, _hub):
+  match vv:
+    case W.Ok{_fs, _ss}:
+      {==}
+    case W.No{_why}:
+      {==}
+    case W.Named{_ns}:
+      {==}
+
+law hah_got:
+  for a: W.Answer
+  for +hash: String
+  for +w: A.World
+  {H.asks.hub(H.asks.v(H.decide.got(a, hash, w)), A.hub(w)) == True{} : Bool}
+
+def hah_got(a, hash, w):
+  match a:
+    case W.Got{how, manifest, ss}:
+      hah_body(W.hub.how(how, hash, manifest, ss), hash, A.hub(w))
+    case W.Miss{_why}:
+      {==}
+    case W.Said{_text}:
+      {==}
+    case W.Locked{_text}:
+      {==}
+
+law hah_pkg:
+  for g: Maybe<&2, W.Answer>
+  for +hash: String
+  for +w: A.World
+  {H.asks.hub(H.asks.v(H.decide.pkg(g, hash, w)), A.hub(w)) == True{} : Bool}
+
+def hah_pkg(g, hash, w):
+  match g:
+    case None{}:
+      %Equal.sym(Bool, String.eq(A.hub(w), A.hub(w)), True{}, Eq.string_eq_self(A.hub(w)))
+        : {Bool.and(_, True{}) == True{} : Bool}
+      {==}
+    case Some{a}:
+      hah_got(a, hash, w)
+
+law hah_hash:
+  for ok: Bool
+  for +hash: String
+  for +w: A.World
+  {H.asks.hub(H.asks.v(H.decide.hash(ok, hash, w)), A.hub(w)) == True{} : Bool}
+
+def hah_hash(ok, hash, w):
+  match ok:
+    case True{}:
+      hah_pkg(H.heard(A.hubs(w), hash), hash, w)
+    case False{}:
+      {==}
+
+law hah_said:
+  for a: W.Answer
+  for +w: A.World
+  {H.asks.hub(H.asks.v(H.decide.said(a, w)), A.hub(w)) == True{} : Bool}
+
+def hah_said(a, w):
+  match a:
+    case W.Said{+text}:
+      hah_hash(L.hash.ok(String.trim(text)), String.trim(text), w)
+    case W.Got{_how, _manifest, _ss}:
+      {==}
+    case W.Miss{_why}:
+      {==}
+    case W.Locked{_text}:
+      {==}
+
+law hah_name:
+  for g: Maybe<&2, W.Answer>
+  for +w: A.World
+  {H.asks.hub(H.asks.v(H.decide.name(g, w)), A.hub(w)) == True{} : Bool}
+
+def hah_name(g, w):
+  match g:
+    case None{}:
+      %Equal.sym(Bool, String.eq(A.hub(w), A.hub(w)), True{}, Eq.string_eq_self(A.hub(w)))
+        : {Bool.and(_, True{}) == True{} : Bool}
+      {==}
+    case Some{a}:
+      hah_said(a, w)
+
+law hah_early:
+  for b: Bool
+  for +why: String
+  for +w: A.World
+  {H.asks.hub(H.asks.v(H.decide.early(b, why, w)), A.hub(w)) == True{} : Bool}
+
+def hah_early(b, _why, w):
+  match b:
+    case True{}:
+      hah_name(H.heard(A.hubs(w), A.target(w)), w)
+    case False{}:
+      {==}
+
+law hah_read:
+  for r: M.Read
+  for +w: A.World
+  {H.asks.hub(H.asks.v(H.decide.read(r, w)), A.hub(w)) == True{} : Bool}
+
+def hah_read(r, w):
+  match r:
+    case M.Bad{_why}:
+      {==}
+    case M.Good{_m}:
+      hah_early(String.is_empty(H.early(w)), H.early(w), w)
+
+def Laws.add_named_asks_hub(w):
+  hah_read(A.read(w), w)
+
+# ---------------------------------------------------------------------------
+# the command: whichever planner runs
+
+# LAW: the command's plan refuses without effect, whichever planner runs
+law command_quiet:
+  for b: Bool
+  for +w: A.World
+  for r: {AP.refuses.plan(AP.command.of(b, w)) == True{} : Bool}
+  {P.writes(AP.command.of(b, w)) == False{} : Bool}
+
+def command_quiet(b, w, r):
+  match b:
+    case True{}:
+      hplan_quiet(H.decide(w), w,
+        Equal.trans(Bool, H.refuses.plan(H.plan(w)), AP.refuses.plan(H.plan(w)), True{},
+          Equal.sym(Bool, AP.refuses.plan(H.plan(w)), H.refuses.plan(H.plan(w)),
+            refuses_same(H.plan(w))), r))
+    case False{}:
+      plan_quiet(AP.decide(w), w, r)
+
+def Laws.add_refusal_writes_nothing(w, r):
+  command_quiet(A.named(w), w, r)
+
+# LAW: a plan with no ledger refuses, whichever planner runs, and the step
+# asks nothing
+law command_no_ledger:
+  for b: Bool
+  for +a: A.Args
+  for +here: String
+  for +home: String
+  for +ignore: String
+  for +rs: List<&2, Up.Reply>
+  for +hs: List<&2, W.Reply>
+  {AP.refuses.plan(AP.command.of(b, A.World{a, here, home, None{}, ignore, rs, hs}))
+    == True{} : Bool}
+
+def command_no_ledger(b, _a, _here, _home, _ignore, _rs, _hs):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+law next_no_ledger:
+  for b: Bool
+  for +a: A.Args
+  for +here: String
+  for +home: String
+  for +ignore: String
+  for +rs: List<&2, Up.Reply>
+  for +hs: List<&2, W.Reply>
+  {AP.next.asks(AP.next.of(b, A.World{a, here, home, None{}, ignore, rs, hs})) == False{}
+    : Bool}
+
+def next_no_ledger(b, _a, _here, _home, _ignore, _rs, _hs):
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# No ledger reads as the `Bad` arm, which stops before anything is asked.
+def Laws.add_needs_ledger(a, here, home, ignore, rs, hs):
+  command_no_ledger(A.named(A.World{a, here, home, None{}, ignore, rs, hs}), a, here, home,
+    ignore, rs, hs)
+
+def Laws.add_needs_ledger_asks_nothing(a, here, home, ignore, rs, hs):
+  next_no_ledger(A.named(A.World{a, here, home, None{}, ignore, rs, hs}), a, here, home,
+    ignore, rs, hs)
+
+# LAW: a ledger that does not parse refuses, whichever planner runs
+law command_unread:
+  for b: Bool
+  for +a: A.Args
+  for +here: String
+  for +home: String
+  for +s: String
+  for +ignore: String
+  for +rs: List<&2, Up.Reply>
+  for +hs: List<&2, W.Reply>
+  for why: String
+  for bad: {M.Bad{why} == M.parse(s) : M.Read}
+  {AP.refuses.plan(AP.command.of(b, A.World{a, here, home, Some{s}, ignore, rs, hs}))
+    == True{} : Bool}
+
+# The read is rewritten to the `Bad` the premise gives, which stops.
+def command_unread(b, a, here, home, s, ignore, rs, hs, _why, bad):
+  match b:
+    case True{}:
+      %bad : {AP.refuses.plan(H.plan.v(H.decide.read(_, A.World{a, here, home, Some{s},
+        ignore, rs, hs}), A.World{a, here, home, Some{s}, ignore, rs, hs})) == True{} : Bool}
+      {==}
+    case False{}:
+      %bad : {AP.refuses.plan(AP.plan.v(AP.decide.read(_, A.World{a, here, home, Some{s},
+        ignore, rs, hs}), A.World{a, here, home, Some{s}, ignore, rs, hs})) == True{} : Bool}
+      {==}
+
+def Laws.add_refuses_unread(a, here, home, s, ignore, rs, hs, why, bad):
+  command_unread(A.named(A.World{a, here, home, Some{s}, ignore, rs, hs}), a, here, home, s,
+    ignore, rs, hs, why, bad)
+
+# The command's planner is picked by whether the target is a name.
+def Laws.add_runs_plan(w, g):
+  %Equal.sym(Bool, A.named(w), False{}, g) : {AP.command.of(_, w) == AP.plan(w) : P.Plan}
+  {==}
+
+def Laws.add_runs_hub(w, n):
+  %Equal.sym(Bool, A.named(w), True{}, n) : {AP.command.of(_, w) == H.plan(w) : P.Plan}
+  {==}

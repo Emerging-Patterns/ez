@@ -17,6 +17,7 @@ import ../ez/pin.bend as Pin
 import ../ez/env.bend as Env
 import ../pkg/path.bend as P
 import ../ez/named.bend as Named
+import ../pkg/pkg.bend as Pkg
 import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
@@ -764,3 +765,96 @@ law run_exits_with_program:
   for +line: List<&2, String>
   for +program: U32
   {S.code(S.Starts{line}, program) == program : U32}
+
+# ---------------------------------------------------------------------------
+# a hub package's `<name>@<version>` as an `ez add` target (`Tgt.aim`)
+
+# LAW: a word `classify` reads as a path is a hub package's name when bend's
+# NAMED rule rules it in. Every such name reads as a path: it holds no `/`
+# and no `:`, and its name part runs to 12 characters before its `@`, so it
+# never starts `git@`.
+# EZ-RES-3
+law aim_named:
+  for +text: String
+  for +p: String
+  for e: {Tgt.classify(text) == Tgt.Local{p} : Tgt.Place}
+  for n: {Pkg.name.ok(text) == True{} : Bool}
+  {Tgt.aim(text) == Tgt.Named{text} : Tgt.Aim}
+
+# LAW: and any other path stays that path
+# EZ-RES-3
+law aim_path:
+  for +text: String
+  for +p: String
+  for e: {Tgt.classify(text) == Tgt.Local{p} : Tgt.Place}
+  for n: {Pkg.name.ok(text) == False{} : Bool}
+  {Tgt.aim(text) == Tgt.Placed{Tgt.Local{p}} : Tgt.Aim}
+
+# LAW: a git URL or an `owner/repo` is never read as a name
+# EZ-RES-3
+law aim_remote:
+  for +text: String
+  for +url: String
+  for +slug: String
+  for e: {Tgt.classify(text) == Tgt.Remote{url, slug} : Tgt.Place}
+  {Tgt.aim(text) == Tgt.Placed{Tgt.Remote{url, slug}} : Tgt.Aim}
+
+# LAW: nor is a word that names nothing
+# EZ-RES-3
+law aim_bad:
+  for +text: String
+  for +why: String
+  for e: {Tgt.classify(text) == Tgt.Bad{why} : Tgt.Place}
+  {Tgt.aim(text) == Tgt.Placed{Tgt.Bad{why}} : Tgt.Aim}
+
+# LAW: so `git@host:path` stays a git URL, though it holds an `@`
+# EZ-RES-3
+law aim_scp:
+  for +rest: String
+  for e: {False{} == String.contains("git@" ++ rest, "://") : Bool}
+  {Tgt.aim.named(Tgt.aim("git@" ++ rest)) == False{} : Bool}
+
+# LAW: a hub package is recorded under `--rename` when it is given
+# EZ-LED-7
+law hub_rename_wins:
+  for ds: List<&2, M.Dep>
+  for +part: String
+  for +rename: String
+  for e: {False{} == String.is_empty(rename) : Bool}
+  {Named.hub.key(ds, part, rename) == rename : String}
+
+# LAW: else under the key the ledger gives a dependency added by the same
+# name part, so another version replaces it, as a git dependency added again
+# at a new tag does
+# EZ-LED-7
+law hub_key_keeps:
+  for +n: String
+  for h: String
+  for en: String
+  for +nv: String
+  for t: List<&2, M.Dep>
+  for e: {False{} == String.is_empty(n) : Bool}
+  {Named.hub.key(M.Dep{n, h, en, M.Hub{nv}} <> t, Named.hub.part(nv), "") == n : String}
+
+# LAW: else under the name part itself
+# EZ-LED-7
+law hub_key_fresh:
+  for +part: String
+  {Named.hub.key([], part, "") == part : String}
+
+# LAW: a key the ledger gives a git dependency clashes
+# EZ-LED-7
+law hub_clash_git:
+  for +k: String
+  for h: String
+  for en: String
+  for url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for vend: Bool
+  for t: List<&2, M.Dep>
+  for +part: String
+  {Named.hub.clash(M.Dep{k, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, k, part)
+    == True{} : Bool}

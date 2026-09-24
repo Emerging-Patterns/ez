@@ -10,6 +10,7 @@ import ./gate.bend as G
 import ../ez/pin.bend as Pin
 import ../ez/target.bend as Tgt
 import ../ez/named.bend as Named
+import ../pkg/pkg.bend as Pkg
 import ../ez/env.bend as Env
 import ../pkg/path.bend as P
 import ../manifest/manifest.bend as M
@@ -1636,4 +1637,78 @@ def Laws.run_refusal_exits_one(_why, _program):
   {==}
 
 def Laws.run_exits_with_program(_line, _program):
+  {==}
+
+# ---------------------------------------------------------------------------
+# a hub package's `<name>@<version>` as an `ez add` target
+
+def Laws.aim_named(text, p, e, n):
+  %Equal.sym(Tgt.Place, Tgt.classify(text), Tgt.Local{p}, e)
+    : {Tgt.aim.place(_, text) == Tgt.Named{text} : Tgt.Aim}
+  %Equal.sym(Bool, Pkg.name.ok(text), True{}, n)
+    : {Tgt.aim.local(_, text, p) == Tgt.Named{text} : Tgt.Aim}
+  {==}
+
+def Laws.aim_path(text, p, e, n):
+  %Equal.sym(Tgt.Place, Tgt.classify(text), Tgt.Local{p}, e)
+    : {Tgt.aim.place(_, text) == Tgt.Placed{Tgt.Local{p}} : Tgt.Aim}
+  %Equal.sym(Bool, Pkg.name.ok(text), False{}, n)
+    : {Tgt.aim.local(_, text, p) == Tgt.Placed{Tgt.Local{p}} : Tgt.Aim}
+  {==}
+
+def Laws.aim_remote(text, url, slug, e):
+  %Equal.sym(Tgt.Place, Tgt.classify(text), Tgt.Remote{url, slug}, e)
+    : {Tgt.aim.place(_, text) == Tgt.Placed{Tgt.Remote{url, slug}} : Tgt.Aim}
+  {==}
+
+def Laws.aim_bad(text, why, e):
+  %Equal.sym(Tgt.Place, Tgt.classify(text), Tgt.Bad{why}, e)
+    : {Tgt.aim.place(_, text) == Tgt.Placed{Tgt.Bad{why}} : Tgt.Aim}
+  {==}
+
+# LAW: a remote, or the refusal of one whose slug could not be a directory,
+# is no name
+law remote_unnamed:
+  for ok: Bool
+  for +text: String
+  for +slug: String
+  {Tgt.aim.named(Tgt.aim.place(Bool.pick(Tgt.Place, ok, Tgt.Remote{text, slug},
+    Tgt.Bad{"not a repository"}), text)) == False{} : Bool}
+
+def remote_unnamed(ok, _text, _slug):
+  match ok:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.aim_scp(rest, e):
+  %Equal.sym(Tgt.Place, Tgt.classify("git@" ++ rest),
+    Tgt.remote("git@" ++ rest, Tgt.slug.scp("git@" ++ rest)), Laws.classify_scp(rest, e))
+    : {Tgt.aim.named(Tgt.aim.place(_, "git@" ++ rest)) == False{} : Bool}
+  remote_unnamed(Tgt.slug.ok(Tgt.slug.scp("git@" ++ rest)), "git@" ++ rest,
+    Tgt.slug.scp("git@" ++ rest))
+
+def Laws.hub_rename_wins(ds, part, rename, e):
+  %e : {Bool.pick(String, _, Bool.pick(String, String.is_empty(Named.hub.had(ds, part)), part,
+    Named.hub.had(ds, part)), rename) == rename : String}
+  {==}
+
+def Laws.hub_key_keeps(n, _h, _en, nv, t, e):
+  %Equal.sym(Bool, String.eq(Named.hub.part(nv), Named.hub.part(nv)), True{},
+    Eq.string_eq_self(Named.hub.part(nv)))
+    : {Bool.pick(String, True{}, Bool.pick(String,
+      String.is_empty(Named.had.at(_, n, Named.hub.had(t, Named.hub.part(nv)))),
+      Named.hub.part(nv), Named.had.at(_, n, Named.hub.had(t, Named.hub.part(nv)))), "")
+      == n : String}
+  %e : {Bool.pick(String, _, Named.hub.part(nv), n) == n : String}
+  {==}
+
+def Laws.hub_key_fresh(_part):
+  {==}
+
+def Laws.hub_clash_git(k, _h, _en, _url, _rev, _tag, _root, _nar, _vend, t, part):
+  %Equal.sym(Bool, String.eq(k, k), True{}, Eq.string_eq_self(k))
+    : {Named.hub.clash.at(_, M.Git{_url, _rev, _tag, _root, _nar, _vend}, part,
+      Named.hub.clash(t, k, part)) == True{} : Bool}
   {==}
