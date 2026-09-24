@@ -11,8 +11,9 @@
 # parses, and it names the entry, and the name it publishes under, if any, is
 # one bend takes (EZ-PUB-3); git answers `git status --porcelain
 # --untracked-files=normal` about the project and names no path (EZ-PUB-1);
-# the walk from the entry makes a package; and git tracks every file of that
-# package. Only then is the upload asked for, and its answer is checked
+# the walk from the entry makes a package; git tracks every file of that
+# package; and the hub the ledger names has every hub package the package
+# imports (EZ-PUB-5). Only then is the upload asked for, and its answer is checked
 # against ez's hash (EZ-PUB-2). bend cannot report a package's hash without
 # uploading it, so that check comes after the upload, and a disagreement
 # exits 1 with no import line rather than taking the upload back.
@@ -29,6 +30,9 @@ import ../pkg/path.bend as Path
 import ../git/git.bend as G
 import ./world.bend as PW
 import ./blurb.bend as B
+import ../lock/lock.bend as L
+import ../sha/sha.bend as Sha
+import ../io/file.bend as F
 
 # ---------------------------------------------------------------------------
 # bend's answer
@@ -663,6 +667,411 @@ def why.upload(+world: PW.World) -> String:
     hash(world))
 
 # ---------------------------------------------------------------------------
+# the hub packages the package imports
+
+# A package on the hub is built from the hub: whoever imports it has bend
+# fetch every hub package it imports in turn. So a package that imports one
+# the hub does not have is one no one can build, and `ez publish` asks the
+# hub about each before it sends anything, as `cargo publish` refuses a
+# dependency that is not on crates.io (EZ-PUB-5). It asks the hub the ledger
+# names, the one `ez lock` resolved the imports against.
+
+# a hub package the package imports, as the hub is asked about it: by its
+# `0x` name, whose manifest the hub serves at `<hub>/<hash>/manifest`; or by
+# its `<name>@<version>`, which the hub resolves at `<hub>/name/<nv>`, with
+# the hash ez.lock.toml or ez.toml resolved the name to, "" when neither
+# records one
+type Probe is Data:
+  ProbeHash{hash: String}
+  ProbeName{nv: String, hash: String}
+
+# the texts of the package's files
+def texts(fs: List<&2, K.Source>) -> List<&2, String>:
+  match fs:
+    case []:
+      []
+    case K.Source{_at, text} <> t:
+      text <> texts(t)
+
+# a string kept unless it was seen before
+def once.pick(dup: Bool, +word: String, rest: List<&2, String>) -> List<&2, String>:
+  match dup:
+    case True{}:
+      rest
+    case False{}:
+      word <> rest
+
+# each string of a list once, where it first appears
+def once.go(xs: List<&2, String>, +seen: List<&2, String>) -> List<&2, String>:
+  match xs:
+    case []:
+      []
+    case +h <> t:
+      once.pick(L.seen.holds(seen, h), h, once.go(t, h <> seen))
+
+# each string of a list once
+def once(xs: List<&2, String>) -> List<&2, String>:
+  once.go(xs, [])
+
+# the texts of the package the walk made, none while there is none
+def sources(+world: PW.World) -> List<&2, String>:
+  texts(files.of(walked(world)))
+
+# every `0x` name the package's files import, once each
+def hashes(+world: PW.World) -> List<&2, String>:
+  once(L.kids(sources(world)))
+
+# every `<name>@<version>` they import, once each
+def nvs(+world: PW.World) -> List<&2, String>:
+  once(L.kids.named(sources(world)))
+
+# whether a list holds anything
+def any(xs: List<&2, String>) -> Bool:
+  match xs:
+    case []:
+      False{}
+    case _h <> _t:
+      True{}
+
+# the ledger read, a bad one when there is none; the planner reaches this
+# stage only past a ledger that parsed
+def parsed.of(got: Maybe<&2, String>) -> M.Read:
+  match got:
+    case None{}:
+      M.Bad{"no " ++ PW.toml()}
+    case Some{text}:
+      M.parse(text)
+
+# the World's ledger, read
+def parsed(world: PW.World) -> M.Read:
+  parsed.of(PW.ledger(world))
+
+# the hub the ledger names, bend's own when it names none
+def hub(world: PW.World) -> String:
+  M.hub_of(parsed(world))
+
+# the dependencies the ledger records
+def deps.of(got: M.Read) -> List<&2, M.Dep>:
+  match got:
+    case M.Bad{_why}:
+      []
+    case M.Good{m}:
+      M.Manifest{_n, _e, _b, _h, _pa, _pv, ds, _ts} = m
+      ds
+
+# the dependencies the World's ledger records
+def deps(world: PW.World) -> List<&2, M.Dep>:
+  deps.of(parsed(world))
+
+# the lock's text, "" when there is none or it was not read
+def lock.told(got: TW.Answer) -> String:
+  match got:
+    case TW.Text{m}:
+      F.text_of(m)
+    case _:
+      ""
+
+def lock.answer(got: PW.Answer) -> String:
+  match got:
+    case PW.Told{t}:
+      lock.told(t)
+    case PW.Ran{_ok, _text}:
+      ""
+
+def lock.of(got: PW.Heard) -> String:
+  match got:
+    case PW.Open{}:
+      ""
+    case PW.Heard{a}:
+      lock.answer(a)
+
+# ez.lock.toml as the planner was given it
+def lock(+world: PW.World) -> String:
+  lock.of(PW.heard(world, PW.Lock{}))
+
+# every name the lock resolves, then every one the ledger records with the
+# hash it named when it was added
+def names(+world: PW.World) -> List<&2, L.Name>:
+  List.append(&2, L.Name, L.names.read(lock(world)), L.ledger.names(parsed(world)))
+
+# each `0x` name as the hub is asked about it
+def probes.hash(hs: List<&2, String>) -> List<&2, Probe>:
+  match hs:
+    case []:
+      []
+    case h <> t:
+      ProbeHash{h} <> probes.hash(t)
+
+# each name, with the hash the lock or the ledger resolves it to
+def probes.name(+ns: List<&2, L.Name>, vs: List<&2, String>) -> List<&2, Probe>:
+  match vs:
+    case []:
+      []
+    case +h <> t:
+      ProbeName{h, L.name.find(ns, h)} <> probes.name(ns, t)
+
+# every hub package the package imports, as the hub is asked about it
+def probes(+world: PW.World) -> List<&2, Probe>:
+  List.append(&2, Probe, probes.hash(hashes(world)), probes.name(names(world), nvs(world)))
+
+# the url the hub is asked
+def probe.url(+hub: String, one: Probe) -> String:
+  match one:
+    case ProbeHash{h}:
+      L.url_of(hub, h, "manifest")
+    case ProbeName{nv, _h}:
+      hub ++ "/name/" ++ nv
+
+# the question: a GET of that url
+def probe.ask(+hub: String, one: Probe) -> PW.Ask:
+  PW.Hub{probe.url(hub, one)}
+
+# the questions for a list of them
+def probe.asks(+hub: String, ps: List<&2, Probe>) -> List<&2, PW.Ask>:
+  match ps:
+    case []:
+      []
+    case h <> t:
+      probe.ask(hub, h) <> probe.asks(hub, t)
+
+# the import, as the package's files write it
+def probe.word(one: Probe) -> String:
+  match one:
+    case ProbeHash{h}:
+      h
+    case ProbeName{nv, _h}:
+      nv
+
+# where the ledger says a dependency comes from
+def origin.say(src: M.Source) -> String:
+  match src:
+    case M.Hub{_named}:
+      "hub"
+    case M.Git{url, _rev, _tag, _root, _nar, _vend}:
+      "git " ++ url
+
+# a dependency as a refusal names it: its key and its origin
+def dep.say(item: M.Dep) -> String:
+  M.Dep{n, _h, _e, src} = item
+  n ++ ", " ++ origin.say(src)
+
+# whether the ledger's dependency is the one a probe is about: the same hash,
+# or for a name, the same `<name>@<version>` or the hash it resolved to
+def dep.is.go(one: Probe, +hash: String, src: M.Source) -> Bool:
+  match one:
+    case ProbeHash{ph}:
+      String.eq(hash, ph)
+    case ProbeName{nv, +ph}:
+      Bool.or(String.eq(M.source.nv(src), nv),
+        Bool.and(Bool.not(String.is_empty(ph)), String.eq(hash, ph)))
+
+def dep.is(one: Probe, item: M.Dep) -> Bool:
+  M.Dep{_n, h, _e, src} = item
+  dep.is.go(one, h, src)
+
+def dep.find.pick(hit: Bool, item: M.Dep, rest: Unit -> String) -> String:
+  match hit:
+    case True{}:
+      dep.say(item)
+    case False{}:
+      rest(Unit{})
+
+# the first dependency the ledger records for a probe, said, "" for none
+def dep.find(+one: Probe, ds: List<&2, M.Dep>) -> String:
+  match ds:
+    case []:
+      ""
+    case +h <> t:
+      dep.find.pick(dep.is(one, h), h, _u => dep.find(one, t))
+
+# the import a refusal names, with the dependency key and origin the ledger
+# records for it when it records one
+def who.of(+word: String, +dep: String) -> String:
+  Bool.pick(String, String.is_empty(dep), word, word ++ " (" ++ dep ++ ")")
+
+# a probe as a refusal names it
+def who(+one: Probe, ds: List<&2, M.Dep>) -> String:
+  who.of(probe.word(one), dep.find(one, ds))
+
+# where one probe stands: on the hub, not asked yet, or off it, with the line
+# a refusal says of it
+type Seen is Data:
+  There{}
+  Unasked{}
+  Off{line: String}
+
+# what the hub answers for a url it has nothing at: status 404, as
+# `Web.get` says it
+def absent(+text: String) -> Bool:
+  String.eq(text, "the server answered 404")
+
+# the line for a package the hub does not have
+def why.absent(+who: String) -> String:
+  "  " ++ who ++ " is not on the hub; publish it first"
+
+# the line for one the hub could not be asked about
+def why.unasked(+who: String, +text: String) -> String:
+  "  " ++ who ++ ": the hub could not be asked: " ++ text
+
+# a GET that did not come back 200: the hub does not have it, or it could not
+# be asked. Neither is the hub having it, so both refuse, and nothing is sent
+# on a guess.
+def seen.miss(gone: Bool, +text: String, +who: String) -> Seen:
+  match gone:
+    case True{}:
+      Off{why.absent(who)}
+    case False{}:
+      Off{why.unasked(who, text)}
+
+# a manifest the hub served for a `0x` name: the package is there when the
+# manifest hashes to the name, as `ez lock` checks it
+def seen.hash(ok: Bool, +hash: String, +text: String, +who: String) -> Seen:
+  match ok:
+    case True{}:
+      Bool.pick(Seen, String.starts_with(Sha.hex(text), L.want(hash)), There{},
+        Off{"  " ++ who ++ ": the hub served a manifest that does not hash to it"})
+    case False{}:
+      seen.miss(absent(text), text, who)
+
+# why a name the hub answered is not the package imported
+def why.named(+got: String, +want: String, +who: String) -> String:
+  Bool.pick(String, String.is_empty(want),
+    "  " ++ who ++ ": the hub answered `" ++ got ++ "`, which is not a 0x name",
+    "  " ++ who ++ ": the hub names `" ++ got ++ "` by it, and the lock " ++
+      "resolved it to " ++ want)
+
+# a name the hub resolved: the package is there when the hub names a `0x`
+# name by it, and the one the lock resolved it to when the lock resolved it
+def seen.named.go(good: Bool, +got: String, +want: String, +who: String) -> Seen:
+  match good:
+    case True{}:
+      There{}
+    case False{}:
+      Off{why.named(got, want, who)}
+
+def seen.named(+got: String, +want: String, +who: String) -> Seen:
+  seen.named.go(Bool.and(Bool.or(String.eq(got, want), String.is_empty(want)), L.hash.ok(got)),
+    got, want, who)
+
+# a name asked of the hub, answered
+def seen.name(ok: Bool, +want: String, +text: String, +who: String) -> Seen:
+  match ok:
+    case True{}:
+      seen.named(String.trim(text), want, who)
+    case False{}:
+      seen.miss(absent(text), text, who)
+
+# a probe's GET answered: whether it came back 200, and what it said
+def seen.ran(one: Probe, ok: Bool, +text: String, +who: String) -> Seen:
+  match one:
+    case ProbeHash{h}:
+      seen.hash(ok, h, text, who)
+    case ProbeName{_nv, h}:
+      seen.name(ok, h, text, who)
+
+def seen.answer(one: Probe, got: PW.Answer, +who: String) -> Seen:
+  match got:
+    case PW.Ran{ok, text}:
+      seen.ran(one, ok, text, who)
+    case PW.Told{_t}:
+      Off{"  " ++ who ++ ": the hub was not asked"}
+
+def seen.heard(got: PW.Heard, one: Probe, +who: String) -> Seen:
+  match got:
+    case PW.Open{}:
+      Unasked{}
+    case PW.Heard{a}:
+      seen.answer(one, a, who)
+
+# where a probe stands in a World
+def seen(+world: PW.World, +hub: String, +ds: List<&2, M.Dep>, +one: Probe) -> Seen:
+  seen.heard(PW.heard(world, probe.ask(hub, one)), one, who(one, ds))
+
+# the probes not asked yet, and the lines for the ones off the hub
+type Tally is Data:
+  Tally{open: List<&2, Probe>, offs: List<&2, String>}
+
+# a probe still to ask about, added
+def tally.unasked(one: Probe, sofar: Tally) -> Tally:
+  Tally{open, offs} = sofar
+  Tally{one <> open, offs}
+
+# a line for a probe off the hub, added
+def tally.offhub(line: String, sofar: Tally) -> Tally:
+  Tally{open, offs} = sofar
+  Tally{open, line <> offs}
+
+# one probe's standing added to the rest's
+def tally.put(standing: Seen, one: Probe, sofar: Tally) -> Tally:
+  match standing:
+    case There{}:
+      sofar
+    case Unasked{}:
+      tally.unasked(one, sofar)
+    case Off{line}:
+      tally.offhub(line, sofar)
+
+# every probe'standing standing
+def tally(+world: PW.World, +hub: String, +ds: List<&2, M.Dep>, ps: List<&2, Probe>) -> Tally:
+  match ps:
+    case []:
+      Tally{[], []}
+    case +h <> t:
+      tally.put(seen(world, hub, ds, h), h, tally(world, hub, ds, t))
+
+# every hub package the package imports on the hub, some still to ask about,
+# or why the command refuses
+type Hubbed is Data:
+  OnHub{}
+  HubWait{open: List<&2, Probe>}
+  OffHub{why: String}
+
+# why a package with imports off the hub is refused: every one of them, and
+# the hub that was asked
+def why.hub(+hub: String, lines: List<&2, String>) -> String:
+  "ez: the package imports hub packages that " ++ hub ++ " does not have, or " ++
+    "could not be asked about, and a package on the hub has to build from the " ++
+    "hub alone, so nothing was sent:\n" ++ String.join(lines, "\n")
+
+def hubbed.offs(offs: List<&2, String>, +hub: String) -> Hubbed:
+  match offs:
+    case []:
+      OnHub{}
+    case h <> t:
+      OffHub{why.hub(hub, h <> t)}
+
+# the tally read: every probe asked before any is judged, then every one off
+# the hub named at once
+def hubbed.go(open: List<&2, Probe>, offs: List<&2, String>, +hub: String) -> Hubbed:
+  match open:
+    case []:
+      hubbed.offs(offs, hub)
+    case h <> rest:
+      HubWait{h <> rest}
+
+def hubbed.of(sofar: Tally, +hub: String) -> Hubbed:
+  Tally{open, offs} = sofar
+  hubbed.go(open, offs, hub)
+
+# where the World's hub imports stand
+def hubbed(+world: PW.World) -> Hubbed:
+  +hub = hub(world)
+  hubbed.of(tally(world, hub, deps(world), probes(world)), hub)
+
+# whether they are all on the hub
+def on.hub.v(got: Hubbed) -> Bool:
+  match got:
+    case OnHub{}:
+      True{}
+    case HubWait{_open}:
+      False{}
+    case OffHub{_why}:
+      False{}
+
+def on.hub(+world: PW.World) -> Bool:
+  on.hub.v(hubbed(world))
+
+# ---------------------------------------------------------------------------
 # where a World stands
 
 # every check passed, questions still open, or why the command refuses
@@ -699,11 +1108,35 @@ def decide.upload(got: PW.Heard, +world: PW.World) -> Verdict:
     case PW.Heard{_a}:
       decide.agreed(agreed(world), world)
 
+# the hub imports: every one on the hub goes on to the upload, one still to
+# ask about is asked, and any other refuses, sending nothing (EZ-PUB-5)
+def decide.hub(on: Hubbed, +world: PW.World) -> Verdict:
+  match on:
+    case OnHub{}:
+      decide.upload(uploaded(world), world)
+    case HubWait{open}:
+      Wait{probe.asks(hub(world), open)}
+    case OffHub{why}:
+      Stop{why}
+
+# the lock, read first when the package imports a package by name, since it
+# holds the hash the name was resolved to
+def decide.lock(need: Bool, got: PW.Heard, +world: PW.World) -> Verdict:
+  match need:
+    case False{}:
+      decide.hub(hubbed(world), world)
+    case True{}:
+      match got:
+        case PW.Open{}:
+          Wait{[PW.Lock{}]}
+        case PW.Heard{_a}:
+          decide.hub(hubbed(world), world)
+
 # every file of the package tracked, or the first that is not refused
 def decide.kept(kept: Kept, +world: PW.World) -> Verdict:
   match kept:
     case Kept{}:
-      decide.upload(uploaded(world), world)
+      decide.lock(any(nvs(world)), PW.heard(world, PW.Lock{}), world)
     case Stray{path}:
       Stop{why.stray(path)}
     case KeptWait{}:
@@ -854,6 +1287,10 @@ def is.upload(ask: PW.Ask) -> Bool:
     case PW.Tool{_q}:
       False{}
     case PW.Tracked{}:
+      False{}
+    case PW.Lock{}:
+      False{}
+    case PW.Hub{_url}:
       False{}
 
 # whether any of these questions is the upload

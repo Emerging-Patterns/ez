@@ -22,6 +22,8 @@ type Ask is Data:
   Tool{ask: TW.Ask}         # a file's text, or what git says of a path
   Tracked{}                 # `git ls-files -v` in the project
   Upload{entry: String, named: String, says: String}  # `bend <entry> --publish [<named>]`
+  Lock{}                    # ez.lock.toml's text
+  Hub{url: String}          # `GET <url>`, a url under the ledger's hub
 
 # the answer to one: the tool commands' answer, or whether a program exited 0
 # and what it printed
@@ -40,6 +42,10 @@ type World is Data:
 # the ledger's path, which is fixed
 def toml() -> String:
   "ez.toml"
+
+# the lock's path, which is fixed
+def lockfile() -> String:
+  "ez.lock.toml"
 
 # the directory the project is in
 def here(world: World) -> String:
@@ -68,6 +74,10 @@ def key(ask: Ask) -> String:
       "tracked"
     case Upload{_entry, _named, _says}:
       "upload"
+    case Lock{}:
+      "lock"
+    case Hub{url}:
+      "hub " ++ url
 
 # an answer looked up, or none yet
 type Heard is Data:

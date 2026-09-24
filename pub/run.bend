@@ -14,6 +14,9 @@
 # planner asks for it last, once every other check has passed. Just before it
 # runs, the line the question carries, the hub description, goes to stderr,
 # where bend's own notices go, so stdout stays the hash and the import line.
+# Before that, the lock is read as a file, and a url under the hub is asked
+# for with the lock's own GET (`Web.get`), whose answer is a status line and
+# the text: whether the hub answered 200, and the body or why not.
 # It decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
@@ -21,6 +24,7 @@ import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../tool/run.bend as ToolRun
 import ../tool/world.bend as TW
+import ../hub/hub.bend as Web
 import ../ez/env.bend as Env
 import ./world.bend as PW
 import ./plan.bend as PP
@@ -44,6 +48,14 @@ def answer(+lib: String, ask: PW.Ask) -> IO(PW.Answer):
       do IO<PW.Answer>:
         IO.print_err(says)
         +out : String <- R.exec(Env.line(lib, PP.upload.line(entry, named)))
+        return ran(out)
+    case PW.Lock{}:
+      do IO<PW.Answer>:
+        m : Maybe<&2, String> <- F.read(PW.lockfile())
+        return PW.Told{TW.Text{m}}
+    case PW.Hub{+url}:
+      do IO<PW.Answer>:
+        +out : String <- Web.get(url)
         return ran(out)
 
 # every question, answered

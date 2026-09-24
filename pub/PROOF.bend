@@ -16,6 +16,7 @@ import ./blurb.bend as B
 import ../git/git.bend as G
 import ../check/eq.bend as Eq
 import ../manifest/manifest.bend as M
+import ../lock/lock.bend as L
 import ./LAWS.bend as Laws
 
 # ---------------------------------------------------------------------------
@@ -436,6 +437,48 @@ def ag_upload(got, w, e):
         : {PP.succeeds.plan(PP.plan.v(PP.decide.agreed(_, w), w)) == False{} : Bool}
       {==}
 
+law ag_hub:
+  for h: PP.Hubbed
+  for +w: PW.World
+  for e: {PP.agreed(w) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(PP.decide.hub(h, w), w)) == False{} : Bool}
+
+def ag_hub(h, w, e):
+  match h:
+    case PP.OnHub{}:
+      ag_upload(PP.uploaded(w), w, e)
+    case PP.HubWait{_open}:
+      {==}
+    case PP.OffHub{_why}:
+      {==}
+
+law ag_lock.got:
+  for got: PW.Heard
+  for +w: PW.World
+  for e: {PP.agreed(w) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(PP.decide.lock(True{}, got, w), w)) == False{} : Bool}
+
+def ag_lock.got(got, w, e):
+  match got:
+    case PW.Open{}:
+      {==}
+    case PW.Heard{_a}:
+      ag_hub(PP.hubbed(w), w, e)
+
+law ag_lock:
+  for need: Bool
+  for got: PW.Heard
+  for +w: PW.World
+  for e: {PP.agreed(w) == False{} : Bool}
+  {PP.succeeds.plan(PP.plan.v(PP.decide.lock(need, got, w), w)) == False{} : Bool}
+
+def ag_lock(need, got, w, e):
+  match need:
+    case False{}:
+      ag_hub(PP.hubbed(w), w, e)
+    case True{}:
+      ag_lock.got(got, w, e)
+
 law ag_kept:
   for k: PP.Kept
   for +w: PW.World
@@ -445,7 +488,7 @@ law ag_kept:
 def ag_kept(k, w, e):
   match k:
     case PP.Kept{}:
-      ag_upload(PP.uploaded(w), w, e)
+      ag_lock(PP.any(PP.nvs(w)), PW.heard(w, PW.Lock{}), w, e)
     case PP.Stray{_path}:
       {==}
     case PP.KeptWait{}:
@@ -890,4 +933,294 @@ def Laws.hub_first_by_path(p, t, fs, nl, af):
     Some{K.Source{p, t}}, keeps_least(fs, p, t, af))
 
 def Laws.pub_upload_says_description(_w):
+  {==}
+
+# ---------------------------------------------------------------------------
+# the hub packages the package imports: the upload is reached only past a
+# World in which every one of them is on the hub
+
+# LAW: the questions about the hub are none of them the upload
+law asks_quiet:
+  for +hub: String
+  for ps: List<&2, PP.Probe>
+  {PP.any.upload(PP.probe.asks(hub, ps)) == False{} : Bool}
+
+def asks_quiet(hub, ps):
+  match ps:
+    case []:
+      {==}
+    case _h <> t:
+      asks_quiet(hub, t)
+
+# LAW: the hub stage gets as far as the upload only when every hub import is
+# on the hub. Still asking is asking the hub, not bend, and off the hub stops.
+law on_hub:
+  for h: PP.Hubbed
+  for +w: PW.World
+  for s: {PP.sends.v(PP.decide.hub(h, w)) == True{} : Bool}
+  {PP.on.hub.v(h) == True{} : Bool}
+
+def on_hub(h, w, s):
+  match h:
+    case PP.OnHub{}:
+      {==}
+    case PP.HubWait{open}:
+      Eq.bit.absurd(&2, {PP.on.hub.v(PP.HubWait{open}) == True{} : Bool},
+        Equal.trans(Bool, False{}, PP.any.upload(PP.probe.asks(PP.hub(w), open)), True{},
+          Equal.sym(Bool, PP.any.upload(PP.probe.asks(PP.hub(w), open)), False{},
+            asks_quiet(PP.hub(w), open)),
+          s))
+    case PP.OffHub{why}:
+      Eq.bit.absurd(&2, {PP.on.hub.v(PP.OffHub{why}) == True{} : Bool}, s)
+
+law hub_lock.got:
+  for got: PW.Heard
+  for +w: PW.World
+  for s: {PP.sends.v(PP.decide.lock(True{}, got, w)) == True{} : Bool}
+  {PP.on.hub(w) == True{} : Bool}
+
+def hub_lock.got(got, w, s):
+  match got:
+    case PW.Open{}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+    case PW.Heard{_a}:
+      on_hub(PP.hubbed(w), w, s)
+
+law hub_lock:
+  for need: Bool
+  for got: PW.Heard
+  for +w: PW.World
+  for s: {PP.sends.v(PP.decide.lock(need, got, w)) == True{} : Bool}
+  {PP.on.hub(w) == True{} : Bool}
+
+def hub_lock(need, got, w, s):
+  match need:
+    case False{}:
+      on_hub(PP.hubbed(w), w, s)
+    case True{}:
+      hub_lock.got(got, w, s)
+
+law hub_kept:
+  for k: PP.Kept
+  for +w: PW.World
+  for s: {PP.sends.v(PP.decide.kept(k, w)) == True{} : Bool}
+  {PP.on.hub(w) == True{} : Bool}
+
+def hub_kept(k, w, s):
+  match k:
+    case PP.Kept{}:
+      hub_lock(PP.any(PP.nvs(w)), PW.heard(w, PW.Lock{}), w, s)
+    case PP.Stray{_path}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+    case PP.KeptWait{}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+    case PP.KeptNo{_why}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+
+law hub_walk:
+  for k: K.Walked
+  for +w: PW.World
+  for s: {PP.sends.v(PP.decide.walk(k, w)) == True{} : Bool}
+  {PP.on.hub(w) == True{} : Bool}
+
+def hub_walk(k, w, s):
+  match k:
+    case K.Walked{_h, _root, _fs, _sums}:
+      hub_kept(PP.stray(w), w, s)
+    case K.Asks{_at}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+    case K.Refused{_why}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+
+law hub_clean:
+  for b: Bool
+  for +text: String
+  for +w: PW.World
+  for s: {PP.sends.v(PP.decide.clean(b, text, w)) == True{} : Bool}
+  {PP.on.hub(w) == True{} : Bool}
+
+def hub_clean(b, _text, w, s):
+  match b:
+    case True{}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+    case False{}:
+      hub_walk(PP.walked(w), w, s)
+
+law hub_status:
+  for st: PP.Status
+  for +w: PW.World
+  for s: {PP.sends.v(PP.decide.status(st, w)) == True{} : Bool}
+  {PP.on.hub(w) == True{} : Bool}
+
+def hub_status(st, w, s):
+  match st:
+    case PP.Said{+text}:
+      hub_clean(PP.dirty(text), text, w, s)
+    case PP.StatusWait{}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+    case PP.StatusNo{_why}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+
+law hub_led:
+  for l: PP.Led
+  for +w: PW.World
+  for s: {PP.sends.v(PP.decide.led(l, w)) == True{} : Bool}
+  {PP.on.hub(w) == True{} : Bool}
+
+def hub_led(l, w, s):
+  match l:
+    case PP.Led{_e, _nv}:
+      hub_status(PP.status(w), w, s)
+    case PP.LedNo{_why}:
+      Eq.bit.absurd(&2, {PP.on.hub(w) == True{} : Bool}, s)
+
+def Laws.pub_sends_only_on_hub(w, s):
+  hub_led(PP.led(w), w, s)
+
+# LAW: a bit that is True only when every hub import is on the hub is False
+# when one is not
+law off_flip:
+  for b: Bool
+  for +w: PW.World
+  for f: {b == True{} : Bool} -> {PP.on.hub(w) == True{} : Bool}
+  for e: {PP.on.hub(w) == False{} : Bool}
+  {b == False{} : Bool}
+
+def off_flip(b, w, f, e):
+  match b:
+    case True{}:
+      Eq.bit.absurd(&2, {True{} == False{} : Bool},
+        Equal.trans(Bool, False{}, PP.on.hub(w), True{},
+          Equal.sym(Bool, PP.on.hub(w), False{}, e), f({==})))
+    case False{}:
+      {==}
+
+def Laws.pub_offhub_sends_nothing(w, why, e):
+  off_flip(PP.sends(w), w, x => Laws.pub_sends_only_on_hub(w, x),
+    Equal.cong(PP.Hubbed, Bool, x => PP.on.hub.v(x), PP.hubbed(w), PP.OffHub{why}, e))
+
+def Laws.pub_offhub_refuses(w, why, e):
+  Laws.pub_unsent_refuses(w, Laws.pub_offhub_sends_nothing(w, why, e))
+
+# LAW: a verdict that sends nothing has a plan with no effect
+law unsent_quiet:
+  for v: PP.Verdict
+  for +w: PW.World
+  for r: {PP.sends.v(v) == False{} : Bool}
+  {P.effects(PP.plan.v(v, w)) == [] : List<&2, P.Effect>}
+
+def unsent_quiet(v, w, r):
+  match v:
+    case PP.Go{}:
+      Eq.bit.absurd2(&2, {P.effects(PP.plan.v(PP.Go{}, w)) == [] : List<&2, P.Effect>}, r)
+    case PP.Wait{_asks}:
+      {==}
+    case PP.Stop{_why}:
+      {==}
+
+def Laws.pub_offhub_writes_nothing(w, why, e):
+  unsent_quiet(PP.decide(w), w, Laws.pub_offhub_sends_nothing(w, why, e))
+
+# LAW: a probe still to ask about keeps the hub stage waiting
+law ask_head:
+  for p: PP.Probe
+  for t: PP.Tally
+  for +hub: String
+  {PP.on.hub.v(PP.hubbed.of(PP.tally.unasked(p, t), hub)) == False{} : Bool}
+
+def ask_head(_p, t, _hub):
+  match t:
+    case PP.Tally{_open, _offs}:
+      {==}
+
+# LAW: a line off the hub makes the tally off the hub, asked or not
+law off_head.go:
+  for open: List<&2, PP.Probe>
+  for offs: List<&2, String>
+  for +hub: String
+  for +line: String
+  {PP.on.hub.v(PP.hubbed.go(open, line <> offs, hub)) == False{} : Bool}
+
+def off_head.go(open, _offs, _hub, _line):
+  match open:
+    case []:
+      {==}
+    case _h <> _t:
+      {==}
+
+law off_head:
+  for t: PP.Tally
+  for +hub: String
+  for +line: String
+  {PP.on.hub.v(PP.hubbed.of(PP.tally.offhub(line, t), hub)) == False{} : Bool}
+
+def off_head(t, hub, line):
+  match t:
+    case PP.Tally{open, offs}:
+      off_head.go(open, offs, hub, line)
+
+# LAW: a tally that is not on the hub stays so, whatever is added to it
+law off_put:
+  for s: PP.Seen
+  for p: PP.Probe
+  for t: PP.Tally
+  for +hub: String
+  for ih: {PP.on.hub.v(PP.hubbed.of(t, hub)) == False{} : Bool}
+  {PP.on.hub.v(PP.hubbed.of(PP.tally.put(s, p, t), hub)) == False{} : Bool}
+
+def off_put(s, p, t, hub, ih):
+  match s:
+    case PP.There{}:
+      ih
+    case PP.Unasked{}:
+      ask_head(p, t, hub)
+    case PP.Off{line}:
+      off_head(t, hub, line)
+
+def Laws.hub_one_off_is_off(w, hub, ds, pre, p, post, line, e):
+  match pre:
+    case []:
+      %Equal.sym(PP.Seen, PP.seen(w, hub, ds, p), PP.Off{line}, e)
+        : {PP.on.hub.v(PP.hubbed.of(PP.tally.put(_, p, PP.tally(w, hub, ds, post)), hub))
+          == False{} : Bool}
+      off_head(PP.tally(w, hub, ds, post), hub, line)
+    case +h <> +t:
+      off_put(PP.seen(w, hub, ds, h), h,
+        PP.tally(w, hub, ds, List.append(&2, PP.Probe, t, p <> post)), hub,
+        Laws.hub_one_off_is_off(w, hub, ds, t, p, post, line, e))
+
+def Laws.hub_404_is_absent(p, _who):
+  match p:
+    case PP.ProbeHash{_h}:
+      {==}
+    case PP.ProbeName{_nv, _h}:
+      {==}
+
+def Laws.hub_unreachable_is_off(p, text, who, e):
+  match p:
+    case PP.ProbeHash{_h}:
+      %Equal.sym(Bool, PP.absent(text), False{}, e)
+        : {PP.seen.miss(_, text, who) == PP.Off{PP.why.unasked(who, text)} : PP.Seen}
+      {==}
+    case PP.ProbeName{_nv, _h}:
+      %Equal.sym(Bool, PP.absent(text), False{}, e)
+        : {PP.seen.miss(_, text, who) == PP.Off{PP.why.unasked(who, text)} : PP.Seen}
+      {==}
+
+def Laws.hub_name_elsewhere_is_off(got, want, who, e0, e1):
+  %Equal.sym(Bool, String.eq(got, want), False{}, e0)
+    : {PP.seen.named.go(Bool.and(Bool.or(_, String.is_empty(want)), L.hash.ok(got)),
+      got, want, who) == PP.Off{PP.why.named(got, want, who)} : PP.Seen}
+  %Equal.sym(Bool, String.is_empty(want), False{}, e1)
+    : {PP.seen.named.go(Bool.and(Bool.or(False{}, _), L.hash.ok(got)),
+      got, want, who) == PP.Off{PP.why.named(got, want, who)} : PP.Seen}
+  {==}
+
+def Laws.hub_name_there(got, want, who, e0, e1):
+  %Equal.sym(Bool, String.eq(got, want), True{}, e0)
+    : {PP.seen.named.go(Bool.and(Bool.or(_, String.is_empty(want)), L.hash.ok(got)),
+      got, want, who) == PP.There{} : PP.Seen}
+  %Equal.sym(Bool, L.hash.ok(got), True{}, e1)
+    : {PP.seen.named.go(Bool.and(Bool.or(True{}, String.is_empty(want)), _),
+      got, want, who) == PP.There{} : PP.Seen}
   {==}
