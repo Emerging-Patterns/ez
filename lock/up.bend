@@ -1166,14 +1166,14 @@ def done(
   +ignore: String,
   fs: List<&2, Found>
 ) -> Next:
-  M.Manifest{+name, +entry, +bin, +hub, _ds, _ts} = old
+  M.Manifest{+name, +entry, +bin, +hub, +pubas, +pubver, _ds, _ts} = old
   Deps{+ds, swaps, +edits, dmoved, dsays, trees, _dasks, _dbad} = dd
   Tools{+ts, tmoved, tsays, _tasks, _tbad} = tt
   +moved = Bool.or(dmoved, tmoved)
-  +text = Rend.show(M.Manifest{name, entry, bin, hub, ds, ts})
+  +text = Rend.show(M.Manifest{name, entry, bin, hub, pubas, pubver, ds, ts})
   +allow = I.sync(ds, ignore)
-  Next{model.next(moved, M.Manifest{name, entry, bin, hub, ds, ts}, old),
-    read.next(moved, text, old), fit.why(moved, M.Manifest{name, entry, bin, hub, ds, ts}), [],
+  Next{model.next(moved, M.Manifest{name, entry, bin, hub, pubas, pubver, ds, ts}, old),
+    read.next(moved, text, old), fit.why(moved, M.Manifest{name, entry, bin, hub, pubas, pubver, ds, ts}), [],
     trees, I.vended(ds),
     List.append(&2, String, dsays, tsays),
     edit.toml(moved, text, edit.if(String.eq(allow, ignore), ".gitignore", allow, [])),
@@ -1264,7 +1264,7 @@ def known(ok: Bool, +only: String, +rs: List<&2, Reply>, +old: M.Manifest) -> Ne
     case False{}:
       stopped(M.Good{old}, "ez: no dependency or tool named " ++ only, [])
     case True{}:
-      M.Manifest{_name, _entry, _bin, +hub, +ds, +ts} = old
+      M.Manifest{_name, _entry, _bin, +hub, +pubas, +pubver, +ds, +ts} = old
       pins(deps.walk(rs, only, M.hub.or(hub), ds), tools.walk(rs, only, ts), rs, old)
 
 # `ez lock --upgrade [--package only]` over the ledger and the answers so far.
@@ -1274,5 +1274,5 @@ def next(+only: String, read: M.Read, +rs: List<&2, Reply>) -> Next:
     case M.Bad{why}:
       plain(M.Bad{why})
     case M.Good{+m}:
-      M.Manifest{_name, _entry, _bin, _hub, +ds, +ts} = m
+      M.Manifest{_name, _entry, _bin, _hub, _pubas, _pubver, +ds, +ts} = m
       known(Bool.or(U.known(only, ds), M.tool.known(only, ts)), only, rs, m)

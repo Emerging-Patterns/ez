@@ -185,7 +185,7 @@ def text.or(got: Maybe<&2, String>) -> String:
 def project.of(got: Maybe<&2, String>) -> M.Read:
   match got:
     case None{}:
-      M.Good{M.Manifest{"", "", "", "", [], []}}
+      M.Good{M.Manifest{"", "", "", "", "", "", [], []}}
     case Some{text}:
       M.parse(text)
 

@@ -9,9 +9,10 @@
 # --untracked-files=normal` among it, and `Read` for a file the package walk
 # asks for. Two are publish's: `Tracked`, every file git tracks under the
 # project with its `git ls-files -v` tag, and `Upload`, `bend <entry>
-# --publish` run and what it printed. The upload is the one question whose
-# answering is not a read: it sends the package, so the planner asks it last,
-# once every check that can be made before it has passed.
+# --publish`, with the `<name>@<version>` the ledger names the package by
+# after it when it names one, run and what it printed. The upload is the one
+# question whose answering is not a read: it sends the package, so the planner
+# asks it last, once every check that can be made before it has passed.
 import Base
 import ../tool/world.bend as TW
 
@@ -19,7 +20,7 @@ import ../tool/world.bend as TW
 type Ask is Data:
   Tool{ask: TW.Ask}         # a file's text, or what git says of a path
   Tracked{}                 # `git ls-files -v` in the project
-  Upload{entry: String}     # `bend <entry> --publish`
+  Upload{entry: String, named: String}  # `bend <entry> --publish [<named>]`
 
 # the answer to one: the tool commands' answer, or whether a program exited 0
 # and what it printed
@@ -64,7 +65,7 @@ def key(ask: Ask) -> String:
       TW.key(q)
     case Tracked{}:
       "tracked"
-    case Upload{_entry}:
+    case Upload{_entry, _named}:
       "upload"
 
 # an answer looked up, or none yet

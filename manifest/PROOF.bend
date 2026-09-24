@@ -69,9 +69,9 @@ def without_append(xs, d):
 
 def Laws.add_idem(m, d):
   match m:
-    case M.Manifest{+n, +e, +b, +hb, +ds, +ts}:
+    case M.Manifest{+n, +e, +b, +hb, +hbpa, +hbpv, +ds, +ts}:
       Equal.cong(List<&2, M.Dep>, M.Manifest,
-        y => M.Manifest{n, e, b, hb, List.append(&2, M.Dep, y, [d]), ts},
+        y => M.Manifest{n, e, b, hb, hbpa, hbpv, List.append(&2, M.Dep, y, [d]), ts},
         R.without(List.append(&2, M.Dep, R.without(ds, M.dep.name(d)), [d]),
           M.dep.name(d)),
         R.without(ds, M.dep.name(d)),
@@ -192,7 +192,7 @@ def Laws.parse_reads_the_sections(_text, _bad, _name, _pairs, sects, e):
 def Laws.show_bad_is_marked(why):
   Eq.starts_nil(why)
 
-def Laws.show_good_opens_with_name(n, e, _b, _hb, ds, _ts):
+def Laws.show_good_opens_with_name(n, e, _b, _hb, _hbpa, _hbpv, ds, _ts):
   Eq.starts_append(n,
     " " ++ e ++ " " ++ String.join(M.show.deps(ds), " "))
 
@@ -204,13 +204,13 @@ def Laws.find_first(n, h, en, s, t):
 def Laws.dep_of_unread_is_blank(_why, _name):
   {==}
 
-def Laws.rev_of_names_the_commit(_mn, _me, _mb, _mh, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
+def Laws.rev_of_names_the_commit(_mn, _me, _mb, _mh, _mhpa, _mhpv, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
   Equal.cong(M.Dep, String, d => M.source.rev(M.source.dep(d)),
     M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n),
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}},
     Laws.find_first(n, h, en, M.Git{url, rev, tag, root, nar, vend}, t))
 
-def Laws.tag_of_names_the_tag(_mn, _me, _mb, _mh, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
+def Laws.tag_of_names_the_tag(_mn, _me, _mb, _mh, _mhpa, _mhpv, n, h, en, url, rev, tag, root, nar, vend, t, _ts):
   Equal.cong(M.Dep, String, d => M.source.tag(M.source.dep(d)),
     M.find(M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, n),
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}},
@@ -249,9 +249,10 @@ def Laws.deps_splits(as, bs):
           String.append(R.dep(h), String.append(R.deps(t), R.deps(bs))),
           Eq.append_assoc(R.dep(h), R.deps(t), R.deps(bs))))
 
-def Laws.show_opens_with_package(n, e, b, hb, ds, ts):
+def Laws.show_opens_with_package(n, e, b, hb, hbpa, hbpv, ds, ts):
   Eq.starts_nil(R.line("name", n) ++ R.line("entry", e) ++ R.line("bin", b) ++
-    R.line("hub", hb) ++ R.deps(ds) ++ R.tools(ts))
+    R.line("hub", hb) ++ R.line("publish-as", hbpa) ++ R.line("version", hbpv) ++ R.deps(ds) ++
+    R.tools(ts))
 
 def Laws.render_of_unread_is_blank(_why):
   {==}
@@ -264,16 +265,16 @@ def Laws.hub_of_unread_is_bends(_why):
 def Laws.hub_of_absent_is_bends(_n, _e, _b, _ds, _ts):
   {==}
 
-def Laws.hub_of_names_the_hub(_n, _e, _b, hb, _ds, _ts, f):
+def Laws.hub_of_names_the_hub(_n, _e, _b, hb, _hbpa, _hbpv, _ds, _ts, f):
   %f : {Bool.pick(String, _, "https://hub.bend-lang.com", hb) == hb : String}
   {==}
 
 # Removing twice is the inner list dropped twice, which is `without_idem`.
 def Laws.remove_idem(m, name):
   match m:
-    case M.Manifest{n, e, b, hb, ds, ts}:
+    case M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}:
       Equal.cong(List<&2, M.Dep>, M.Manifest,
-        xs => M.Manifest{n, e, b, hb, xs, ts},
+        xs => M.Manifest{n, e, b, hb, hbpa, hbpv, xs, ts},
         R.without(R.without(ds, name), name), R.without(ds, name),
         Laws.without_idem(ds, name))
 
@@ -1125,21 +1126,21 @@ def readd_again(ds, d):
 # by `readd_again`, and adding that twice is adding it once, by `add_idem`.
 def Laws.add_keep_idem(m, d):
   match m:
-    case M.Manifest{+n, +e, +b, +hb, +ds, +ts}:
+    case M.Manifest{+n, +e, +b, +hb, +hbpa, +hbpv, +ds, +ts}:
       Equal.trans(M.Manifest,
-        R.add(R.add(M.Manifest{n, e, b, hb, ds, ts}, R.readd(ds, d)),
+        R.add(R.add(M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}, R.readd(ds, d)),
           R.readd(List.append(&2, M.Dep,
             R.without(ds, M.dep.name(R.readd(ds, d))), [R.readd(ds, d)]), d)),
-        R.add(R.add(M.Manifest{n, e, b, hb, ds, ts}, R.readd(ds, d)),
+        R.add(R.add(M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}, R.readd(ds, d)),
           R.readd(ds, d)),
-        R.add(M.Manifest{n, e, b, hb, ds, ts}, R.readd(ds, d)),
+        R.add(M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}, R.readd(ds, d)),
         Equal.cong(M.Dep, M.Manifest,
-          y => R.add(R.add(M.Manifest{n, e, b, hb, ds, ts}, R.readd(ds, d)), y),
+          y => R.add(R.add(M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}, R.readd(ds, d)), y),
           R.readd(List.append(&2, M.Dep,
             R.without(ds, M.dep.name(R.readd(ds, d))), [R.readd(ds, d)]), d),
           R.readd(ds, d),
           readd_again(ds, d)),
-        Laws.add_idem(M.Manifest{n, e, b, hb, ds, ts}, R.readd(ds, d)))
+        Laws.add_idem(M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}, R.readd(ds, d)))
 
 # The text layer of the allowlist (EZ-VEN-1). `I.sync` reads a file into its
 # lines, derives the allowlist over them, and writes them back, each ending
@@ -4988,8 +4989,8 @@ def blk_text(p, n, z, u, x, e):
 # a ledger as tables of rows
 
 # the rows of the `[package]` table
-def pkg.rows(n: String, e: String, b: String, h: String) -> List<&2, Row>:
-  [Q{"name", n}, Q{"entry", e}, Q{"bin", b}, Q{"hub", h}]
+def pkg.rows(n: String, e: String, b: String, h: String, pa: String, pv: String) -> List<&2, Row>:
+  [Q{"name", n}, Q{"entry", e}, Q{"bin", b}, Q{"hub", h}, Q{"publish-as", pa}, Q{"version", pv}]
 
 # the rows a source writes
 def src.rows(s: M.Source) -> List<&2, Row>:
@@ -5033,8 +5034,8 @@ def dsects(ds: List<&2, M.Dep>, rest: List<&2, RSect>) -> List<&2, RSect>:
 
 # a ledger's tables, in the order the renderer writes them
 def lsects(m: M.Manifest) -> List<&2, RSect>:
-  M.Manifest{n, e, b, h, ds, ts} = m
-  RSect{"package", pkg.rows(n, e, b, h)} <> dsects(ds, tsects(ts))
+  M.Manifest{n, e, b, h, hpa, hpv, ds, ts} = m
+  RSect{"package", pkg.rows(n, e, b, h, hpa, hpv)} <> dsects(ds, tsects(ts))
 
 # the text a ledger's tables after the first write: every table a newline
 # first
@@ -5278,18 +5279,19 @@ law show_text:
 
 def show_text(m, ok):
   match m:
-    case M.Manifest{+n, +e, +b, +h, +ds, +ts}:
+    case M.Manifest{+n, +e, +b, +h, +hpa, +hpv, +ds, +ts}:
       +d = dsects(ds, tsects(ts))
-      +p = pkg.rows(n, e, b, h)
+      +p = pkg.rows(n, e, b, h, hpa, hpv)
       +pk = {RSect{"package", p} : RSect}
       +dt = deps_text(ds, ts, Eq.and.right(rsect.ok(pk), rsects.ok(d), ok))
       +pt = rows_text(p, rsect_rows("package", p, Eq.and.left(rsect.ok(pk), rsects.ok(d), ok)))
-      Equal.trans(String, R.show(M.Manifest{n, e, b, h, ds, ts}),
+      Equal.trans(String, R.show(M.Manifest{n, e, b, h, hpa, hpv, ds, ts}),
         "[package]\n" ++ rows.cat(p, rjoin(d)),
         String.join(rdoc.lines(pk <> d), "\n"),
         Equal.cong(String, String,
           y => "[package]\n" ++ String.append(R.line("name", n), String.append(R.line("entry", e),
-            String.append(R.line("bin", b), String.append(R.line("hub", h), y)))),
+            String.append(R.line("bin", b), String.append(R.line("hub", h),
+              String.append(R.line("publish-as", hpa), String.append(R.line("version", hpv), y)))))),
           String.append(R.deps(ds), R.tools(ts)), rjoin(d), dt),
         Equal.trans(String, "[package]\n" ++ rows.cat(p, rjoin(d)),
           "[package]\n" ++ String.append(TP.unlines(rows.lines(keep(p))), rjoin(d)),
@@ -5499,23 +5501,32 @@ law lsects_ok:
 
 def lsects_ok(m, e):
   match m:
-    case M.Manifest{+n, +en, +b, +h, +ds, +ts}:
+    case M.Manifest{+n, +en, +b, +h, +hpa, +hpv, +ds, +ts}:
       +l = Eq.and.left(Bool.and(Bool.and(R.clean(n), R.clean(en)), Bool.and(R.clean(b), R.clean(h))),
-        Bool.and(R.deps.ok(ds), R.tools.ok(ts)), e)
-      +r = Eq.and.right(Bool.and(Bool.and(R.clean(n), R.clean(en)), Bool.and(R.clean(b), R.clean(h))),
-        Bool.and(R.deps.ok(ds), R.tools.ok(ts)), e)
+        Bool.and(Bool.and(R.clean(hpa), R.clean(hpv)), Bool.and(R.deps.ok(ds), R.tools.ok(ts))), e)
+      +rr = Eq.and.right(Bool.and(Bool.and(R.clean(n), R.clean(en)), Bool.and(R.clean(b), R.clean(h))),
+        Bool.and(Bool.and(R.clean(hpa), R.clean(hpv)), Bool.and(R.deps.ok(ds), R.tools.ok(ts))), e)
+      +pv = Eq.and.left(Bool.and(R.clean(hpa), R.clean(hpv)), Bool.and(R.deps.ok(ds), R.tools.ok(ts)), rr)
+      +r = Eq.and.right(Bool.and(R.clean(hpa), R.clean(hpv)), Bool.and(R.deps.ok(ds), R.tools.ok(ts)), rr)
       +l1 = Eq.and.left(Bool.and(R.clean(n), R.clean(en)), Bool.and(R.clean(b), R.clean(h)), l)
       +l2 = Eq.and.right(Bool.and(R.clean(n), R.clean(en)), Bool.and(R.clean(b), R.clean(h)), l)
-      Str.and_true(rsect.ok(RSect{"package", pkg.rows(n, en, b, h)}),
+      Str.and_true(rsect.ok(RSect{"package", pkg.rows(n, en, b, h, hpa, hpv)}),
         rsects.ok(dsects(ds, tsects(ts))),
-        Str.and_true(Str.clear(n, '\n'), rows.ok([Q{"entry", en}, Q{"bin", b}, Q{"hub", h}]),
+        Str.and_true(Str.clear(n, '\n'),
+          rows.ok([Q{"entry", en}, Q{"bin", b}, Q{"hub", h}, Q{"publish-as", hpa}, Q{"version", hpv}]),
           clean_nl(n, Eq.and.left(R.clean(n), R.clean(en), l1)),
-          Str.and_true(Str.clear(en, '\n'), rows.ok([Q{"bin", b}, Q{"hub", h}]),
+          Str.and_true(Str.clear(en, '\n'),
+            rows.ok([Q{"bin", b}, Q{"hub", h}, Q{"publish-as", hpa}, Q{"version", hpv}]),
             clean_nl(en, Eq.and.right(R.clean(n), R.clean(en), l1)),
-            Str.and_true(Str.clear(b, '\n'), rows.ok([Q{"hub", h}]),
+            Str.and_true(Str.clear(b, '\n'),
+              rows.ok([Q{"hub", h}, Q{"publish-as", hpa}, Q{"version", hpv}]),
               clean_nl(b, Eq.and.left(R.clean(b), R.clean(h), l2)),
-              Str.and_true(Str.clear(h, '\n'), True{},
-                clean_nl(h, Eq.and.right(R.clean(b), R.clean(h), l2)), {==})))),
+              Str.and_true(Str.clear(h, '\n'), rows.ok([Q{"publish-as", hpa}, Q{"version", hpv}]),
+                clean_nl(h, Eq.and.right(R.clean(b), R.clean(h), l2)),
+                Str.and_true(Str.clear(hpa, '\n'), rows.ok([Q{"version", hpv}]),
+                  clean_nl(hpa, Eq.and.left(R.clean(hpa), R.clean(hpv), pv)),
+                  Str.and_true(Str.clear(hpv, '\n'), True{},
+                    clean_nl(hpv, Eq.and.right(R.clean(hpa), R.clean(hpv), pv)), {==})))))),
         dsects_ok(ds, tsects(ts), Eq.and.left(R.deps.ok(ds), R.tools.ok(ts), r),
           tsects_ok(ts, Eq.and.right(R.deps.ok(ds), R.tools.ok(ts), r))))
 
@@ -5527,14 +5538,14 @@ law ledger_sections_read:
 
 def ledger_sections_read(m, e):
   match m:
-    case M.Manifest{+n, +en, +b, +h, +ds, +ts}:
-      +ok = lsects_ok(M.Manifest{n, en, b, h, ds, ts}, e)
-      %Equal.sym(String, R.show(M.Manifest{n, en, b, h, ds, ts}),
-        String.join(rdoc.lines(lsects(M.Manifest{n, en, b, h, ds, ts})), "\n"),
-        show_text(M.Manifest{n, en, b, h, ds, ts}, ok))
-        : {T.parse(_) == T.Toml{"", "", [], sects.of(lsects(M.Manifest{n, en, b, h, ds, ts}))}
+    case M.Manifest{+n, +en, +b, +h, +hpa, +hpv, +ds, +ts}:
+      +ok = lsects_ok(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}, e)
+      %Equal.sym(String, R.show(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}),
+        String.join(rdoc.lines(lsects(M.Manifest{n, en, b, h, hpa, hpv, ds, ts})), "\n"),
+        show_text(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}, ok))
+        : {T.parse(_) == T.Toml{"", "", [], sects.of(lsects(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}))}
           : T.Toml}
-      rsections_read(RSect{"package", pkg.rows(n, en, b, h)}, dsects(ds, tsects(ts)), ok)
+      rsections_read(RSect{"package", pkg.rows(n, en, b, h, hpa, hpv)}, dsects(ds, tsects(ts)), ok)
 
 # ---------------------------------------------------------------------------
 # what the reader finds in a renderable ledger's tables
@@ -6084,55 +6095,68 @@ law read_ledger:
   for +en: String
   for +b: String
   for +h: String
+  for +hpa: String
+  for +hpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +edk: {R.deps.ok(ds) == True{} : Bool}
   for +etk: {R.tools.ok(ts) == True{} : Bool}
-  {M.read("", sects.of(lsects(M.Manifest{n, en, b, h, ds, ts})))
-    == M.Good{M.Manifest{n, en, b, h, ds, ts}} : M.Read}
+  {M.read("", sects.of(lsects(M.Manifest{n, en, b, h, hpa, hpv, ds, ts})))
+    == M.Good{M.Manifest{n, en, b, h, hpa, hpv, ds, ts}} : M.Read}
 
-def read_ledger(n, en, b, h, ds, ts, edk, etk):
-  +p = pkg.rows(n, en, b, h)
+def read_ledger(n, en, b, h, hpa, hpv, ds, ts, edk, etk):
+  +p = pkg.rows(n, en, b, h, hpa, hpv)
   +d = dsects(ds, tsects(ts))
-  +s = sects.of(lsects(M.Manifest{n, en, b, h, ds, ts}))
-  +g = {M.Good{M.Manifest{n, en, b, h, ds, ts}} : M.Read}
+  +s = sects.of(lsects(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}))
+  +g = {M.Good{M.Manifest{n, en, b, h, hpa, hpv, ds, ts}} : M.Read}
   %Equal.sym(String, M.missing(sects.of(d)), "", missing_read(ds, ts, edk))
     : {M.read.go(String.is_empty(M.problem("", _)), M.problem("", _), s) == g : M.Read}
   %Equal.sym(String, M.value(rows.kvs(keep(p)), "name"), M.value(rows.kvs(p), "name"),
     value_keep(p, "name", {==}))
     : {M.Good{M.Manifest{_, M.value(rows.kvs(keep(p)), "entry"), M.value(rows.kvs(keep(p)), "bin"),
-        M.value(rows.kvs(keep(p)), "hub"), M.deps(sects.of(d)), M.tools(sects.of(d))}} == g : M.Read}
+      M.value(rows.kvs(keep(p)), "hub"), M.value(rows.kvs(keep(p)), "publish-as"), M.value(rows.kvs(keep(p)),
+      "version"), M.deps(sects.of(d)), M.tools(sects.of(d))}} == g : M.Read}
   %Equal.sym(String, M.value(rows.kvs(keep(p)), "entry"), M.value(rows.kvs(p), "entry"),
     value_keep(p, "entry", {==}))
-    : {M.Good{M.Manifest{n, _, M.value(rows.kvs(keep(p)), "bin"),
-        M.value(rows.kvs(keep(p)), "hub"), M.deps(sects.of(d)), M.tools(sects.of(d))}} == g : M.Read}
+    : {M.Good{M.Manifest{n, _, M.value(rows.kvs(keep(p)), "bin"), M.value(rows.kvs(keep(p)), "hub"),
+      M.value(rows.kvs(keep(p)), "publish-as"), M.value(rows.kvs(keep(p)), "version"), M.deps(sects.of(d)),
+      M.tools(sects.of(d))}} == g : M.Read}
   %Equal.sym(String, M.value(rows.kvs(keep(p)), "bin"), M.value(rows.kvs(p), "bin"),
     value_keep(p, "bin", {==}))
-    : {M.Good{M.Manifest{n, en, _, M.value(rows.kvs(keep(p)), "hub"), M.deps(sects.of(d)),
-        M.tools(sects.of(d))}} == g : M.Read}
+    : {M.Good{M.Manifest{n, en, _, M.value(rows.kvs(keep(p)), "hub"), M.value(rows.kvs(keep(p)), "publish-as"),
+      M.value(rows.kvs(keep(p)), "version"), M.deps(sects.of(d)), M.tools(sects.of(d))}} == g : M.Read}
   %Equal.sym(String, M.value(rows.kvs(keep(p)), "hub"), M.value(rows.kvs(p), "hub"),
     value_keep(p, "hub", {==}))
-    : {M.Good{M.Manifest{n, en, b, _, M.deps(sects.of(d)), M.tools(sects.of(d))}} == g : M.Read}
+    : {M.Good{M.Manifest{n, en, b, _, M.value(rows.kvs(keep(p)), "publish-as"), M.value(rows.kvs(keep(p)), "version"),
+      M.deps(sects.of(d)), M.tools(sects.of(d))}} == g : M.Read}
+  %Equal.sym(String, M.value(rows.kvs(keep(p)), "publish-as"), M.value(rows.kvs(p), "publish-as"),
+    value_keep(p, "publish-as", {==}))
+    : {M.Good{M.Manifest{n, en, b, h, _, M.value(rows.kvs(keep(p)), "version"), M.deps(sects.of(d)),
+      M.tools(sects.of(d))}} == g : M.Read}
+  %Equal.sym(String, M.value(rows.kvs(keep(p)), "version"), M.value(rows.kvs(p), "version"),
+    value_keep(p, "version", {==}))
+    : {M.Good{M.Manifest{n, en, b, h, hpa, _, M.deps(sects.of(d)), M.tools(sects.of(d))}} == g : M.Read}
   %Equal.sym(List<&2, M.Dep>, M.deps(sects.of(d)), ds, deps_read(ds, ts, edk))
-    : {M.Good{M.Manifest{n, en, b, h, _, M.tools(sects.of(d))}} == g : M.Read}
+    : {M.Good{M.Manifest{n, en, b, h, hpa, hpv, _, M.tools(sects.of(d))}} == g : M.Read}
   %Equal.sym(List<&2, M.Tool>, M.tools(sects.of(d)), ts,
     Equal.trans(List<&2, M.Tool>, M.tools(sects.of(d)), M.tools(sects.of(tsects(ts))), ts,
       dtools_skip(ds, tsects(ts)), tsects_read(ts, etk)))
-    : {M.Good{M.Manifest{n, en, b, h, ds, _}} == g : M.Read}
+    : {M.Good{M.Manifest{n, en, b, h, hpa, hpv, ds, _}} == g : M.Read}
   {==}
 
 # The renderable ledger, rendered and read: its tables, then the model.
 def Laws.ledger_reads_back(m, e):
   match m:
-    case M.Manifest{+n, +en, +b, +h, +ds, +ts}:
-      +s = sects.of(lsects(M.Manifest{n, en, b, h, ds, ts}))
-      +r = Eq.and.right(Bool.and(Bool.and(R.clean(n), R.clean(en)), Bool.and(R.clean(b), R.clean(h))),
-        Bool.and(R.deps.ok(ds), R.tools.ok(ts)), e)
+    case M.Manifest{+n, +en, +b, +h, +hpa, +hpv, +ds, +ts}:
+      +s = sects.of(lsects(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}))
+      +rr = Eq.and.right(Bool.and(Bool.and(R.clean(n), R.clean(en)), Bool.and(R.clean(b), R.clean(h))),
+        Bool.and(Bool.and(R.clean(hpa), R.clean(hpv)), Bool.and(R.deps.ok(ds), R.tools.ok(ts))), e)
+      +r = Eq.and.right(Bool.and(R.clean(hpa), R.clean(hpv)), Bool.and(R.deps.ok(ds), R.tools.ok(ts)), rr)
       +edk = Eq.and.left(R.deps.ok(ds), R.tools.ok(ts), r)
       +etk = Eq.and.right(R.deps.ok(ds), R.tools.ok(ts), r)
-      Equal.trans(M.Read, M.parse(R.show(M.Manifest{n, en, b, h, ds, ts})),
-        M.read("", s), M.Good{M.Manifest{n, en, b, h, ds, ts}},
+      Equal.trans(M.Read, M.parse(R.show(M.Manifest{n, en, b, h, hpa, hpv, ds, ts})),
+        M.read("", s), M.Good{M.Manifest{n, en, b, h, hpa, hpv, ds, ts}},
         Equal.cong(T.Toml, M.Read, t => M.parse.go(t),
-          T.parse(R.show(M.Manifest{n, en, b, h, ds, ts})), T.Toml{"", "", [], s},
-          ledger_sections_read(M.Manifest{n, en, b, h, ds, ts}, e)),
-        read_ledger(n, en, b, h, ds, ts, edk, etk))
+          T.parse(R.show(M.Manifest{n, en, b, h, hpa, hpv, ds, ts})), T.Toml{"", "", [], s},
+          ledger_sections_read(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}, e)),
+        read_ledger(n, en, b, h, hpa, hpv, ds, ts, edk, etk))

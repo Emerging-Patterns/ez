@@ -125,13 +125,13 @@ def read(world: World) -> M.Read:
 def manifest.of(led: M.Read) -> M.Manifest:
   match led:
     case M.Bad{_why}:
-      M.Manifest{"", "", "", "", [], []}
+      M.Manifest{"", "", "", "", "", "", [], []}
     case M.Good{m}:
       m
 
 # the dependencies of a ledger that was read
 def deps.of(manifest: M.Manifest) -> List<&2, M.Dep>:
-  M.Manifest{_n, _e, _b, _h, ds, _ts} = manifest
+  M.Manifest{_n, _e, _b, _h, _pa, _pv, ds, _ts} = manifest
   ds
 
 # the ledger's dependencies, none when it did not read

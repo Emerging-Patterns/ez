@@ -49,11 +49,13 @@ law doctor_reports_unrecorded:
   for +e: String
   for +b: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
   for +fs: List<&2, W.Source>
   for +h: String
-  for g: {M.Good{M.Manifest{n, e, b, hub, ds, ts}} == DW.read(w) : M.Read}
+  for g: {M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, ts}} == DW.read(w) : M.Read}
   for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
   for i: {DP.has(P.roots(fs), h) == True{} : Bool}
   for u: {False{} == DP.has(DP.pinned(ds), h) : Bool}
@@ -69,12 +71,14 @@ law doctor_reports_unused:
   for +e: String
   for +b: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +pre: List<&2, M.Dep>
   for +d: M.Dep
   for +post: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
   for +fs: List<&2, W.Source>
-  for g: {M.Good{M.Manifest{n, e, b, hub, List.append(&2, M.Dep, pre, d <> post), ts}}
+  for g: {M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, List.append(&2, M.Dep, pre, d <> post), ts}}
     == DW.read(w) : M.Read}
   for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
   for u: {False{} == DP.used(DP.imports(fs), d) : Bool}
@@ -88,12 +92,14 @@ law doctor_drift_fails:
   for +e: String
   for +b: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
   for +fs: List<&2, W.Source>
   for +x: String
   for +xs: List<&2, String>
-  for g: {M.Good{M.Manifest{n, e, b, hub, ds, ts}} == DW.read(w) : M.Read}
+  for g: {M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, ts}} == DW.read(w) : M.Read}
   for l: {DW.Heard{DW.Listed{W.Listed{fs}}} == DW.sources(w) : DW.Heard}
   for r: {DP.drift.of(fs, ds) == x <> xs : List<&2, String>}
   {DP.refuses(w) == True{} : Bool}
@@ -117,11 +123,13 @@ law doctor_ignores_tools:
   for +e: String
   for +b: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for ts1: List<&2, M.Tool>
   for ts2: List<&2, M.Tool>
-  for g1: {M.Good{M.Manifest{n, e, b, hub, ds, ts1}} == M.parse(t1) : M.Read}
-  for g2: {M.Good{M.Manifest{n, e, b, hub, ds, ts2}} == M.parse(t2) : M.Read}
+  for g1: {M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, ts1}} == M.parse(t1) : M.Read}
+  for g2: {M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, ts2}} == M.parse(t2) : M.Read}
   {DP.plan.of(DP.ledger.seen(M.parse(t1)), cc, lib, lock, rs, cs)
     == DP.plan.of(DP.ledger.seen(M.parse(t2)), cc, lib, lock, rs, cs) : P.Plan}
 

@@ -62,9 +62,10 @@ def tools(ts: List<&2, M.Tool>) -> String:
 
 # the ledger as an ez.toml
 def show(manifest: M.Manifest) -> String:
-  M.Manifest{n, e, b, h, ds, ts} = manifest
+  M.Manifest{n, e, b, h, pa, pv, ds, ts} = manifest
   "[package]\n" ++ line("name", n) ++ line("entry", e) ++ line("bin", b) ++
-    line("hub", h) ++ deps(ds) ++ tools(ts)
+    line("hub", h) ++ line("publish-as", pa) ++ line("version", pv) ++
+    deps(ds) ++ tools(ts)
 
 # a ledger that was read, as an ez.toml; an unreadable one renders as nothing,
 # so a failed read can never overwrite a good file with a guess
@@ -94,13 +95,13 @@ def without(ds: List<&2, M.Dep>, +name: String) -> List<&2, M.Dep>:
 # the ledger with a dependency added, replacing any of the same name, so adding
 # twice is the same as adding once
 def add(manifest: M.Manifest, +dependency: M.Dep) -> M.Manifest:
-  M.Manifest{n, e, b, h, ds, ts} = manifest
-  M.Manifest{n, e, b, h, List.append(&2, M.Dep, without(ds, M.dep.name(dependency)), [dependency]), ts}
+  M.Manifest{n, e, b, h, pa, pv, ds, ts} = manifest
+  M.Manifest{n, e, b, h, pa, pv, List.append(&2, M.Dep, without(ds, M.dep.name(dependency)), [dependency]), ts}
 
 # the ledger with a dependency dropped
 def remove(manifest: M.Manifest, name: String) -> M.Manifest:
-  M.Manifest{n, e, b, h, ds, ts} = manifest
-  M.Manifest{n, e, b, h, without(ds, name), ts}
+  M.Manifest{n, e, b, h, pa, pv, ds, ts} = manifest
+  M.Manifest{n, e, b, h, pa, pv, without(ds, name), ts}
 
 # a git source with its tree committed
 def vendored(src: M.Source) -> M.Source:
@@ -128,8 +129,8 @@ def readd(ds: List<&2, M.Dep>, dependency: M.Dep) -> M.Dep:
 # the ledger with a dependency added, keeping the vendor bit of the entry it
 # replaces
 def add.keep(manifest: M.Manifest, dependency: M.Dep) -> M.Manifest:
-  M.Manifest{n, e, b, h, +ds, ts} = manifest
-  add(M.Manifest{n, e, b, h, ds, ts}, readd(ds, dependency))
+  M.Manifest{n, e, b, h, pa, pv, +ds, ts} = manifest
+  add(M.Manifest{n, e, b, h, pa, pv, ds, ts}, readd(ds, dependency))
 
 # ---------------------------------------------------------------------------
 # what a ledger may hold to be written
@@ -203,13 +204,14 @@ def tools.ok(ts: List<&2, M.Tool>) -> Bool:
       Bool.and(tool.ok(h), rest)
 
 # whether a ledger can be written so that it reads back as itself (EZ-LED-4):
-# every name and value is clean, every dependency has a hash, and every git
-# source names its repo and its root. Every command that writes ez.toml
-# refuses a ledger that is not, so every ledger ez writes is one of these.
+# every name and value is clean, `publish-as` and `version` among them, every
+# dependency has a hash, and every git source names its repo and its root.
+# Every command that writes ez.toml refuses a ledger that is not, so every
+# ledger ez writes is one of these.
 def renderable(manifest: M.Manifest) -> Bool:
-  M.Manifest{+n, +e, +b, +h, ds, ts} = manifest
+  M.Manifest{+n, +e, +b, +h, +pa, +pv, ds, ts} = manifest
   Bool.and(Bool.and(Bool.and(clean(n), clean(e)), Bool.and(clean(b), clean(h))),
-    Bool.and(deps.ok(ds), tools.ok(ts)))
+    Bool.and(Bool.and(clean(pa), clean(pv)), Bool.and(deps.ok(ds), tools.ok(ts))))
 
 # why a ledger that is not renderable is not written
 def unrenderable() -> String:

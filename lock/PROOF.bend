@@ -5029,24 +5029,26 @@ law done_kept:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for dd: Up.Deps
   for tt: Up.Tools
   for +ignore: String
   for fs: List<&2, Up.Found>
-  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, deps.of(dd), tools.of(tt)}})
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
-  {f(Up.next.model(Up.done(M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt, ignore, fs)))
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
+  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
+  {f(Up.next.model(Up.done(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt, ignore, fs)))
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
 
-def done_kept(A, f, pn, pe, pb, hb, ods, ots, dd, tt, _ignore, _fs, pre):
+def done_kept(A, f, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, _ignore, _fs, pre):
   match dd:
     case Up.Deps{+ds, ss, es, dm, dsy, dtr, das, dbad}:
       match tt:
         case Up.Tools{+ts, tm, tsy, tas, tbad}:
-          model_kept(A, f, Bool.or(dm, tm), M.Manifest{pn, pe, pb, hb, ds, ts},
-            M.Manifest{pn, pe, pb, hb, ods, ots}, pre)
+          model_kept(A, f, Bool.or(dm, tm), M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts},
+            M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, pre)
 
 law srcs_kept:
   for A: Type
@@ -5056,20 +5058,22 @@ law srcs_kept:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for dd: Up.Deps
   for tt: Up.Tools
   for +ignore: String
-  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, deps.of(dd), tools.of(tt)}})
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
-  {f(Up.next.model(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt, ignore)))
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
+  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
+  {f(Up.next.model(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt, ignore)))
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
 
-def srcs_kept(A, f, srcs, pn, pe, pb, hb, ods, ots, dd, tt, ignore, pre):
+def srcs_kept(A, f, srcs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, ignore, pre):
   match srcs:
     case Up.Srcs{fs}:
-      done_kept(A, f, pn, pe, pb, hb, ods, ots, dd, tt, ignore, fs, pre)
+      done_kept(A, f, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, ignore, fs, pre)
     case Up.SrcsWait{_ask}:
       {==}
     case Up.SrcsNo{_why}:
@@ -5084,19 +5088,21 @@ law ignore_kept:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for dd: Up.Deps
   for tt: Up.Tools
-  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, deps.of(dd), tools.of(tt)}})
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
-  {f(Up.next.model(Up.got.ignore(said, srcs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt)))
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
+  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
+  {f(Up.next.model(Up.got.ignore(said, srcs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt)))
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
 
-def ignore_kept(A, f, said, srcs, pn, pe, pb, hb, ods, ots, dd, tt, pre):
+def ignore_kept(A, f, said, srcs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, pre):
   match said:
     case Up.Said{ignore}:
-      srcs_kept(A, f, srcs, pn, pe, pb, hb, ods, ots, dd, tt, ignore, pre)
+      srcs_kept(A, f, srcs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, ignore, pre)
     case Up.Unsaid{_why}:
       {==}
     case Up.Unasked{_ask}:
@@ -5111,21 +5117,23 @@ law asks_kept:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +dd: Up.Deps
   for tt: Up.Tools
-  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, deps.of(dd), tools.of(tt)}})
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
-  {f(Up.next.model(Up.pins.asks(asks, rs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt)))
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
+  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
+  {f(Up.next.model(Up.pins.asks(asks, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt)))
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
 
-def asks_kept(A, f, asks, rs, pn, pe, pb, hb, ods, ots, dd, tt, pre):
+def asks_kept(A, f, asks, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, pre):
   match asks:
     case []:
       ignore_kept(A, f, Up.text.said(rs, Up.Ignore{}),
         Up.ask.srcs(List.is_empty(&2, U.Swap, Up.deps.edits(dd)), rs),
-        pn, pe, pb, hb, ods, ots, dd, tt, pre)
+        pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, pre)
     case _h <> _t:
       {==}
 
@@ -5140,19 +5148,21 @@ law bad_kept:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +dd: Up.Deps
   for tt: Up.Tools
-  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, deps.of(dd), tools.of(tt)}})
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
-  {f(Up.next.model(Up.pins.bad(clean, bad, asks, rs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt)))
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
+  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
+  {f(Up.next.model(Up.pins.bad(clean, bad, asks, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt)))
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
 
-def bad_kept(A, f, clean, _bad, asks, rs, pn, pe, pb, hb, ods, ots, dd, tt, pre):
+def bad_kept(A, f, clean, _bad, asks, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, pre):
   match clean:
     case True{}:
-      asks_kept(A, f, asks, rs, pn, pe, pb, hb, ods, ots, dd, tt, pre)
+      asks_kept(A, f, asks, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, pre)
     case False{}:
       {==}
 
@@ -5166,21 +5176,23 @@ law pins_kept:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
-  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, deps.of(dd), tools.of(tt)}})
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
-  {f(Up.next.model(Up.pins(dd, tt, rs, M.Manifest{pn, pe, pb, hb, ods, ots})))
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
+  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
+  {f(Up.next.model(Up.pins(dd, tt, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots})))
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
 
-def pins_kept(A, f, dd, tt, rs, pn, pe, pb, hb, ods, ots, pre):
+def pins_kept(A, f, dd, tt, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, pre):
   match dd:
     case Up.Deps{+ds, +ss, +es, +dm, +dsy, +dtr, +das, +dbad}:
       match tt:
         case Up.Tools{+ts, +tm, +tsy, +tas, +tbad}:
           bad_kept(A, f, Bool.and(String.is_empty(dbad), String.is_empty(tbad)),
             Bool.pick(String, String.is_empty(dbad), tbad, dbad),
-            List.append(&2, Up.Ask, das, tas), rs, pn, pe, pb, hb, ods, ots,
+            List.append(&2, Up.Ask, das, tas), rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots,
             Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""}, pre)
 
 law next_kept.known:
@@ -5193,21 +5205,23 @@ law next_kept.known:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
-  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb,
+  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv,
     deps.of(Up.deps.walk(rs, only, M.hub.or(hb), ods)), tools.of(Up.tools.walk(rs, only, ots))}})
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
-  {f(Up.next.model(Up.known(ok, only, rs, M.Manifest{pn, pe, pb, hb, ods, ots})))
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
+  {f(Up.next.model(Up.known(ok, only, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots})))
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
 
-def next_kept.known(A, f, ok, only, rs, pn, pe, pb, hb, ods, ots, pre):
+def next_kept.known(A, f, ok, only, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, pre):
   match ok:
     case False{}:
       {==}
     case True{}:
       pins_kept(A, f, Up.deps.walk(rs, only, M.hub.or(hb), ods), Up.tools.walk(rs, only, ots), rs,
-        pn, pe, pb, hb, ods, ots, pre)
+        pn, pe, pb, hb, hbpa, hbpv, ods, ots, pre)
 
 # LAW: whatever `--package` named and whatever the remote said, the model an
 # upgrade leaves reads, through `f`, as ez.toml's does, once the walked lists
@@ -5221,17 +5235,19 @@ law next_kept:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
-  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb,
+  for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv,
     deps.of(Up.deps.walk(rs, only, M.hub.or(hb), ods)), tools.of(Up.tools.walk(rs, only, ots))}})
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
-  {f(Up.next.model(Up.next(only, M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, rs)))
-    == f(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}) : A}
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
+  {f(Up.next.model(Up.next(only, M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, rs)))
+    == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
 
-def next_kept(A, f, only, rs, pn, pe, pb, hb, ods, ots, pre):
+def next_kept(A, f, only, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, pre):
   next_kept.known(A, f, Bool.or(U.known(only, ods), M.tool.known(only, ots)), only, rs,
-    pn, pe, pb, hb, ods, ots, pre)
+    pn, pe, pb, hb, hbpa, hbpv, ods, ots, pre)
 
 # EZ-RES-4. A hub dependency is held whether `--package` chose it or not, so
 # the walk leaves the dependency its name finds as it was, and so does the
@@ -5251,8 +5267,8 @@ def hub_read(only, r, rs, n, pre):
       {==}
     case M.Good{m}:
       match m:
-        case M.Manifest{+pn, +pe, +pb, +hb, +ods, +ots}:
-          next_kept(M.Dep, x => M.dep(x, n), only, rs, pn, pe, pb, hb, ods, ots,
+        case M.Manifest{+pn, +pe, +pb, +hb, +hbpa, +hbpv, +ods, +ots}:
+          next_kept(M.Dep, x => M.dep(x, n), only, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots,
             find_walk(rs, only, M.hub.or(hb), ods, n,
               hub_holds(U.chosen(only, n), M.source.dep(M.find(ods, n)), pre)))
 
@@ -5285,8 +5301,8 @@ def frame_read(n, m, r, rs, ne, d):
       {==}
     case M.Good{mm}:
       match mm:
-        case M.Manifest{+pn, +pe, +pb, +hb, +ods, +ots}:
-          next_kept(M.Dep, x => M.dep(x, m), n, rs, pn, pe, pb, hb, ods, ots,
+        case M.Manifest{+pn, +pe, +pb, +hb, +hbpa, +hbpv, +ods, +ots}:
+          next_kept(M.Dep, x => M.dep(x, m), n, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots,
             find_walk(rs, n, M.hub.or(hb), ods, m,
               unchosen_holds(n, m, M.source.dep(M.find(ods, m)), ne, d)))
 
@@ -5726,8 +5742,8 @@ def tframe_read(n, m, r, rs, ne, d):
       {==}
     case M.Good{mm}:
       match mm:
-        case M.Manifest{+pn, +pe, +pb, +hb, +ods, +ots}:
-          next_kept(M.Tool, x => Laws.tool.at(x, m), n, rs, pn, pe, pb, hb, ods, ots,
+        case M.Manifest{+pn, +pe, +pb, +hb, +hbpa, +hbpv, +ods, +ots}:
+          next_kept(M.Tool, x => Laws.tool.at(x, m), n, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots,
             tfind_walk(rs, n, ots, m, unchosen(n, m, ne, d)))
 
 def Laws.upgrade_one_frames_tools(w, n, m, e, ne, d):
@@ -6065,9 +6081,9 @@ law asks_done:
 
 def asks_done(old1, old2, dd1, dd2, tt1, tt2, _ignore, _fs):
   match old1:
-    case M.Manifest{n1, e1, b1, h1, ds1, ts1}:
+    case M.Manifest{n1, e1, b1, h1, h1pa, h1pv, ds1, ts1}:
       match old2:
-        case M.Manifest{n2, e2, b2, h2, ds2, ts2}:
+        case M.Manifest{n2, e2, b2, h2, h2pa, h2pv, ds2, ts2}:
           match dd1:
             case Up.Deps{a1, s1, x1, m1, y1, r1, k1, d1}:
               match dd2:
@@ -6260,15 +6276,17 @@ law asks_known:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +ne: {String.is_empty(n) == False{} : Bool}
-  {Up.next.asks(Up.known(ok, n, rs, M.Manifest{pn, pe, pb, hb, ods, ots}))
+  {Up.next.asks(Up.known(ok, n, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}))
     == Up.next.asks(Up.known(ok, n, rs,
-      M.Manifest{pn, pe, pb, hb, Laws.deps.named(ods, n), Laws.tools.named(ots, n)}))
+      M.Manifest{pn, pe, pb, hb, hbpa, hbpv, Laws.deps.named(ods, n), Laws.tools.named(ots, n)}))
     : List<&2, Up.Ask>}
 
-def asks_known(ok, n, rs, pn, pe, pb, hb, ods, ots, ne):
+def asks_known(ok, n, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, ne):
   match ok:
     case False{}:
       {==}
@@ -6276,8 +6294,8 @@ def asks_known(ok, n, rs, pn, pe, pb, hb, ods, ots, ne):
       asks_pins(Up.deps.walk(rs, n, M.hub.or(hb), ods), Up.tools.walk(rs, n, ots),
         Up.deps.walk(rs, n, M.hub.or(hb), Laws.deps.named(ods, n)),
         Up.tools.walk(rs, n, Laws.tools.named(ots, n)), rs,
-        M.Manifest{pn, pe, pb, hb, ods, ots},
-        M.Manifest{pn, pe, pb, hb, Laws.deps.named(ods, n), Laws.tools.named(ots, n)},
+        M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots},
+        M.Manifest{pn, pe, pb, hb, hbpa, hbpv, Laws.deps.named(ods, n), Laws.tools.named(ots, n)},
         dalone_walk(rs, n, M.hub.or(hb), ods, ne), talone_walk(rs, n, ots, ne))
 
 # LAW: an upgrade of a ledger asks what an upgrade of its entries named `n`
@@ -6296,20 +6314,20 @@ def asks_next(n, r, rs, ne):
       {==}
     case M.Good{mm}:
       match mm:
-        case M.Manifest{+pn, +pe, +pb, +hb, +ods, +ots}:
+        case M.Manifest{+pn, +pe, +pb, +hb, +hbpa, +hbpv, +ods, +ots}:
           dk = dknown(n, ods, ne)
           %dk : {Up.next.asks(Up.known(Bool.or(U.known(n, ods), M.tool.known(n, ots)), n, rs,
-            M.Manifest{pn, pe, pb, hb, ods, ots}))
+            M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}))
             == Up.next.asks(Up.known(Bool.or(_, M.tool.known(n, Laws.tools.named(ots, n))), n, rs,
-              M.Manifest{pn, pe, pb, hb, Laws.deps.named(ods, n), Laws.tools.named(ots, n)}))
+              M.Manifest{pn, pe, pb, hb, hbpa, hbpv, Laws.deps.named(ods, n), Laws.tools.named(ots, n)}))
             : List<&2, Up.Ask>}
           tk = tknown(n, ots, ne)
           %tk : {Up.next.asks(Up.known(Bool.or(U.known(n, ods), M.tool.known(n, ots)), n, rs,
-            M.Manifest{pn, pe, pb, hb, ods, ots}))
+            M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}))
             == Up.next.asks(Up.known(Bool.or(U.known(n, ods), _), n, rs,
-              M.Manifest{pn, pe, pb, hb, Laws.deps.named(ods, n), Laws.tools.named(ots, n)}))
+              M.Manifest{pn, pe, pb, hb, hbpa, hbpv, Laws.deps.named(ods, n), Laws.tools.named(ots, n)}))
             : List<&2, Up.Ask>}
-          asks_known(Bool.or(U.known(n, ods), M.tool.known(n, ots)), n, rs, pn, pe, pb, hb, ods, ots,
+          asks_known(Bool.or(U.known(n, ods), M.tool.known(n, ots)), n, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots,
             ne)
 
 def Laws.upgrade_one_asks_alone(w, n, u, e, ne):
@@ -6386,18 +6404,21 @@ law ok_done.arm:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +ig: String
-  ok.edits(Up.edit.toml(moved, Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts}),
+  ok.edits(Up.edit.toml(moved, Rend.show(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts}),
       Up.edit.if(b, ".gitignore", I.sync(ds, ig), [])),
     I.vended(ds),
-    Up.model.next(moved, M.Manifest{pn, pe, pb, hb, ds, ts}, M.Manifest{pn, pe, pb, hb, ods, ots}),
+    Up.model.next(moved, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts}, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods,
+      ots}),
     ig)
 
-def ok_done.arm(moved, b, _pn, _pe, _pb, _hb, ds, _ts, _ods, _ots, ig):
+def ok_done.arm(moved, b, _pn, _pe, _pb, _hb, _hbpa, _hbpv, ds, _ts, _ods, _ots, ig):
   match moved b:
     case True{} True{}:
       ({==}, Unit{})
@@ -6415,20 +6436,22 @@ law ok_done:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for dd: Up.Deps
   for tt: Up.Tools
   for +ig: String
   for fs: List<&2, Up.Found>
-  ok.next(Up.done(M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt, ig, fs), ig)
+  ok.next(Up.done(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt, ig, fs), ig)
 
-def ok_done(pn, pe, pb, hb, ods, ots, dd, tt, ig, _fs):
+def ok_done(pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, ig, _fs):
   match dd:
     case Up.Deps{+ds, ss, es, dm, dsy, dtr, das, dbad}:
       match tt:
         case Up.Tools{+ts, tm, tsy, tas, tbad}:
-          ok_done.arm(Bool.or(dm, tm), String.eq(I.sync(ds, ig), ig), pn, pe, pb, hb,
+          ok_done.arm(Bool.or(dm, tm), String.eq(I.sync(ds, ig), ig), pn, pe, pb, hb, hbpa, hbpv,
             ds, ts, ods, ots, ig)
 
 law ok_srcs:
@@ -6437,17 +6460,19 @@ law ok_srcs:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for dd: Up.Deps
   for tt: Up.Tools
   for +ig: String
-  ok.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt, ig), ig)
+  ok.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt, ig), ig)
 
-def ok_srcs(srcs, pn, pe, pb, hb, ods, ots, dd, tt, ig):
+def ok_srcs(srcs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, ig):
   match srcs:
     case Up.Srcs{fs}:
-      ok_done(pn, pe, pb, hb, ods, ots, dd, tt, ig, fs)
+      ok_done(pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, ig, fs)
     case Up.SrcsWait{_ask}:
       Unit{}
     case Up.SrcsNo{_why}:
@@ -6460,22 +6485,24 @@ law ok_ignore:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +dd: Up.Deps
   for +tt: Up.Tools
   for +rs: List<&2, Up.Reply>
   for es: {Up.text.said(rs, Up.Ignore{}) == said : Up.Said}
-  ok.next(Up.got.ignore(said, srcs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt),
+  ok.next(Up.got.ignore(said, srcs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt),
     Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
 
-def ok_ignore(said, srcs, pn, pe, pb, hb, ods, ots, dd, tt, rs, es):
+def ok_ignore(said, srcs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, rs, es):
   match said:
     case Up.Said{+x}:
       %Equal.sym(Up.Said, Up.text.said(rs, Up.Ignore{}), Up.Said{x}, es)
-        : ok.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt, x),
+        : ok.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt, x),
           Laws.ignore.said(_))
-      ok_srcs(srcs, pn, pe, pb, hb, ods, ots, dd, tt, x)
+      ok_srcs(srcs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, x)
     case Up.Unsaid{_why}:
       Unit{}
     case Up.Unasked{_ask}:
@@ -6488,19 +6515,21 @@ law ok_asks:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +dd: Up.Deps
   for +tt: Up.Tools
-  ok.next(Up.pins.asks(asks, rs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt),
+  ok.next(Up.pins.asks(asks, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt),
     Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
 
-def ok_asks(asks, rs, pn, pe, pb, hb, ods, ots, dd, tt):
+def ok_asks(asks, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt):
   match asks:
     case []:
       ok_ignore(Up.text.said(rs, Up.Ignore{}),
         Up.ask.srcs(List.is_empty(&2, U.Swap, Up.deps.edits(dd)), rs),
-        pn, pe, pb, hb, ods, ots, dd, tt, rs, {==})
+        pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt, rs, {==})
     case _h <> _t:
       Unit{}
 
@@ -6513,17 +6542,19 @@ law ok_bad:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +dd: Up.Deps
   for +tt: Up.Tools
-  ok.next(Up.pins.bad(clean, bad, asks, rs, M.Manifest{pn, pe, pb, hb, ods, ots}, dd, tt),
+  ok.next(Up.pins.bad(clean, bad, asks, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt),
     Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
 
-def ok_bad(clean, _bad, asks, rs, pn, pe, pb, hb, ods, ots, dd, tt):
+def ok_bad(clean, _bad, asks, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt):
   match clean:
     case True{}:
-      ok_asks(asks, rs, pn, pe, pb, hb, ods, ots, dd, tt)
+      ok_asks(asks, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, dd, tt)
     case False{}:
       Unit{}
 
@@ -6535,19 +6566,21 @@ law ok_pins:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
-  ok.next(Up.pins(dd, tt, rs, M.Manifest{pn, pe, pb, hb, ods, ots}),
+  ok.next(Up.pins(dd, tt, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}),
     Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
 
-def ok_pins(dd, tt, rs, pn, pe, pb, hb, ods, ots):
+def ok_pins(dd, tt, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots):
   match dd:
     case Up.Deps{+ds, +ss, +es, +dm, +dsy, +dtr, +das, +dbad}:
       match tt:
         case Up.Tools{+ts, +tm, +tsy, +tas, +tbad}:
           ok_bad(Bool.and(String.is_empty(dbad), String.is_empty(tbad)),
             Bool.pick(String, String.is_empty(dbad), tbad, dbad),
-            List.append(&2, Up.Ask, das, tas), rs, pn, pe, pb, hb, ods, ots,
+            List.append(&2, Up.Ask, das, tas), rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots,
             Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""})
 
 law ok_known:
@@ -6558,18 +6591,20 @@ law ok_known:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
-  ok.next(Up.known(ok, only, rs, M.Manifest{pn, pe, pb, hb, ods, ots}),
+  ok.next(Up.known(ok, only, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}),
     Laws.ignore.said(Up.text.said(rs, Up.Ignore{})))
 
-def ok_known(ok, only, rs, pn, pe, pb, hb, ods, ots):
+def ok_known(ok, only, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots):
   match ok:
     case False{}:
       Unit{}
     case True{}:
       ok_pins(Up.deps.walk(rs, only, M.hub.or(hb), ods), Up.tools.walk(rs, only, ots), rs,
-        pn, pe, pb, hb, ods, ots)
+        pn, pe, pb, hb, hbpa, hbpv, ods, ots)
 
 # LAW: every decision `ez lock --upgrade` makes writes only ez.toml over the
 # ledger it renders and `.gitignore` as `I.sync` makes it
@@ -6585,9 +6620,9 @@ def ok_next(only, r, rs):
       Unit{}
     case M.Good{m}:
       match m:
-        case M.Manifest{+pn, +pe, +pb, +hb, +ods, +ots}:
+        case M.Manifest{+pn, +pe, +pb, +hb, +hbpa, +hbpv, +ods, +ots}:
           ok_known(Bool.or(U.known(only, ods), M.tool.known(only, ots)), only, rs,
-            pn, pe, pb, hb, ods, ots)
+            pn, pe, pb, hb, hbpa, hbpv, ods, ots)
 
 # LAW: and so does every decision `ez lock` makes on a World, plain or not
 law ok_world:
@@ -8588,6 +8623,8 @@ law mv.model_moved:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -8595,10 +8632,11 @@ law mv.model_moved:
   for wk: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
   for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
   {Laws.moved.ok(t, rs, M.find(ds, n), M.dep(Up.model.next(moved,
-    M.Manifest{name, entry, bin, hub, dds, tts}, M.Manifest{name, entry, bin, hub, ds, ts}), n))
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
+      ts}), n))
     == True{} : Bool}
 
-def mv.model_moved(moved, _t, _rs, _n, _name, _entry, _bin, _hub, _ds, _ts, _dds, _tts, wk, self):
+def mv.model_moved(moved, _t, _rs, _n, _name, _entry, _bin, _hub, _hubpa, _hubpv, _ds, _ts, _dds, _tts, wk, self):
   match moved:
     case True{}:
       wk
@@ -8615,6 +8653,8 @@ law mv.model_srcs:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -8629,7 +8669,7 @@ law mv.model_srcs:
   for +ig: String
   for wk: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
   for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
-  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+  {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), n))
     == True{} : Bool}
 
@@ -8642,6 +8682,8 @@ def mv.model_srcs(
   entry,
   bin,
   hub,
+  hubpa,
+  hubpv,
   ds,
   ts,
   dds,
@@ -8659,7 +8701,7 @@ def mv.model_srcs(
 ):
   match srcs:
     case Up.Srcs{_fs}:
-      mv.model_moved(Bool.or(dm, tm), t, rs, n, name, entry, bin, hub, ds, ts, dds, tts, wk, self)
+      mv.model_moved(Bool.or(dm, tm), t, rs, n, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, tts, wk, self)
     case Up.SrcsWait{_ask}:
       self
     case Up.SrcsNo{_why}:
@@ -8676,6 +8718,8 @@ law mv.model_ignore:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -8690,7 +8734,7 @@ law mv.model_ignore:
   for wk: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
   for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
   {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.got.ignore(said, srcs,
-    M.Manifest{name, entry, bin, hub, ds, ts},
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), n))
     == True{} : Bool}
 
@@ -8704,6 +8748,8 @@ def mv.model_ignore(
   entry,
   bin,
   hub,
+  hubpa,
+  hubpv,
   ds,
   ts,
   dds,
@@ -8720,7 +8766,7 @@ def mv.model_ignore(
 ):
   match said:
     case Up.Said{+ig}:
-      mv.model_srcs(srcs, t, rs, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts,
+      mv.model_srcs(srcs, t, rs, n, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dm, dsy, dtr, tts,
         tm, tsy, ig, wk, self)
     case Up.Unsaid{_why}:
       self
@@ -8738,14 +8784,16 @@ law mv.model_pins:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for wk: {mv.walk(t, rs, dd, M.find(ds, n), n) == True{} : Bool}
   for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
   {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.pins(dd, tt, rs,
-    M.Manifest{name, entry, bin, hub, ds, ts}), n)) == True{} : Bool}
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), n)) == True{} : Bool}
 
-def mv.model_pins(dd, tt, t, rs, n, name, entry, bin, hub, ds, ts, wk, self):
+def mv.model_pins(dd, tt, t, rs, n, name, entry, bin, hub, hubpa, hubpv, ds, ts, wk, self):
   match dd tt:
     case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SCon{_c, _cs}} Up.Tools{_tts, _tm, _tsy, _tasks, _tbad}:
       self
@@ -8758,7 +8806,7 @@ def mv.model_pins(dd, tt, t, rs, n, name, entry, bin, hub, ds, ts, wk, self):
     case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, [], SNil{}} Up.Tools{+tts, +tm, +tsy, [], SNil{}}:
       mv.model_ignore(Up.text.said(rs, Up.Ignore{}),
         Up.ask.srcs(List.is_empty(&2, U.Swap, es), rs), t, rs, n, name, entry,
-        bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm, tsy, wk, self)
+        bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm, tsy, wk, self)
 
 # LAW: the model, once `--package` is known to name something
 law mv.model_known:
@@ -8771,21 +8819,23 @@ law mv.model_known:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for wk: {mv.walk(t, rs, Up.deps.walk(rs, only, M.hub.or(hub), ds), M.find(ds, n), n)
     == True{} : Bool}
   for self: {Laws.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
   {Laws.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.known(k, only, rs,
-    M.Manifest{name, entry, bin, hub, ds, ts}), n)) == True{} : Bool}
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), n)) == True{} : Bool}
 
-def mv.model_known(k, t, rs, only, n, name, entry, bin, hub, ds, ts, wk, self):
+def mv.model_known(k, t, rs, only, n, name, entry, bin, hub, hubpa, hubpv, ds, ts, wk, self):
   match k:
     case False{}:
       self
     case True{}:
       mv.model_pins(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), t, rs,
-        n, name, entry, bin, hub, ds, ts, wk, self)
+        n, name, entry, bin, hub, hubpa, hubpv, ds, ts, wk, self)
 
 # LAW: a pin by its commit alone, in any ledger an upgrade reads
 law mv.fwd_top:
@@ -8803,10 +8853,10 @@ def mv.fwd_top(r, only, rs, n, bare):
       bare
     case M.Good{m}:
       match m:
-        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+        case M.Manifest{+name, +entry, +bin, +hub, +hubpa, +hubpv, +ds, +ts}:
           mv.model_known(Bool.or(U.known(only, ds), M.tool.known(only, ts)),
             Up.forward(rs, M.source.url(M.source.dep(M.find(ds, n)))), rs, only, n, name, entry,
-            bin, hub, ds, ts,
+            bin, hub, hubpa, hubpv, ds, ts,
             mv.walk_ok(Up.forward(rs, M.source.url(M.source.dep(M.find(ds, n)))), rs, only,
               M.hub.or(hub), n, ds, mv.fwd_one(rs, only, M.hub.or(hub), M.find(ds, n), bare)),
             mv.self_dep(Up.forward(rs, M.source.url(M.source.dep(M.find(ds, n)))), rs,
@@ -8829,10 +8879,10 @@ def mv.fol_top(r, only, rs, n, named):
       named
     case M.Good{m}:
       match m:
-        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+        case M.Manifest{+name, +entry, +bin, +hub, +hubpa, +hubpv, +ds, +ts}:
           mv.model_known(Bool.or(U.known(only, ds), M.tool.known(only, ts)),
             Up.follow(rs, M.source.url(M.source.dep(M.find(ds, n))),
-              M.source.tag(M.source.dep(M.find(ds, n)))), rs, only, n, name, entry, bin, hub, ds, ts,
+              M.source.tag(M.source.dep(M.find(ds, n)))), rs, only, n, name, entry, bin, hub, hubpa, hubpv, ds, ts,
             mv.walk_ok(Up.follow(rs, M.source.url(M.source.dep(M.find(ds, n))),
               M.source.tag(M.source.dep(M.find(ds, n)))), rs, only, M.hub.or(hub), n, ds,
               mv.fol_one(rs, only, M.hub.or(hub), M.find(ds, n), named)),
@@ -8924,7 +8974,7 @@ def mv.dep_named(r, n, g):
       Eq.bit.absurd(&2, {"" == n : String}, g)
     case M.Good{m}:
       match m:
-        case M.Manifest{_name, _entry, _bin, _hub, +ds, _ts}:
+        case M.Manifest{_name, _entry, _bin, _hub, _hubpa, _hubpv, +ds, _ts}:
           mv.find_named(ds, n, g)
 
 # LAW: a tip that is another commit, which the remote says does not descend
@@ -9477,16 +9527,18 @@ law mv.pins_stop:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for wb: {String.is_empty(mv.bad(dd)) == False{} : Bool}
-  {mv.stops(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds, ts})) == True{} : Bool}
+  {mv.stops(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})) == True{} : Bool}
 
-def mv.pins_stop(dd, tt, rs, name, entry, bin, hub, ds, ts, wb):
+def mv.pins_stop(dd, tt, rs, name, entry, bin, hub, hubpa, hubpv, ds, ts, wb):
   match dd tt:
     case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, +dasks, SNil{}} Up.Tools{+tts, +tm, +tsy, +tasks, +tbad}:
       Eq.bit.absurd2(&2, {mv.stops(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, ""},
-        Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, ds, ts}))
+        Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}))
         == True{} : Bool}, wb)
     case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SCon{_c, _cs}} Up.Tools{_tts, _tm, _tsy, _tasks, _tbad}:
       {==}
@@ -9500,18 +9552,20 @@ law mv.known_stop:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for wb: {String.is_empty(mv.bad(Up.deps.walk(rs, only, M.hub.or(hub), ds))) == False{} : Bool}
-  {mv.stops(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds, ts})) == True{} : Bool}
+  {mv.stops(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})) == True{} : Bool}
 
-def mv.known_stop(k, rs, only, name, entry, bin, hub, ds, ts, wb):
+def mv.known_stop(k, rs, only, name, entry, bin, hub, hubpa, hubpv, ds, ts, wb):
   match k:
     case False{}:
       {==}
     case True{}:
       mv.pins_stop(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), rs, name,
-        entry, bin, hub, ds, ts, wb)
+        entry, bin, hub, hubpa, hubpv, ds, ts, wb)
 
 # LAW: an upgrade that stops is a lock that refuses
 law mv.refuses_of:
@@ -9549,10 +9603,10 @@ def mv.refuses_top(r, only, rs, listing, replies, n, g, hl):
         replies))) == True{} : Bool}, g)
     case M.Good{m}:
       match m:
-        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
-          mv.refuses_of(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, ds, ts}}, rs), listing,
+        case M.Manifest{+name, +entry, +bin, +hub, +hubpa, +hubpv, +ds, +ts}:
+          mv.refuses_of(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}}, rs), listing,
             replies, mv.known_stop(Bool.or(U.known(only, ds), M.tool.known(only, ts)), rs, only,
-              name, entry, bin, hub, ds, ts, mv.walk_halts(rs, only, M.hub.or(hub), n, ds, hl)))
+              name, entry, bin, hub, hubpa, hubpv, ds, ts, mv.walk_halts(rs, only, M.hub.or(hub), n, ds, hl)))
 
 # `--package` names the dependency, so it is the one asked about
 def Laws.upgrade_forward_refuses_off(w, n, tip, tag, branch, up, bare, sel, head, moved, off):
@@ -10366,6 +10420,8 @@ law mv.reach_moved:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -10373,10 +10429,11 @@ law mv.reach_moved:
   for wk: {Bool.and(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
     Bool.or(dm, String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip))) == True{} : Bool}
   {String.eq(M.source.rev(M.source.dep(M.dep(Up.model.next(Bool.or(dm, tm),
-    M.Manifest{name, entry, bin, hub, dds, tts}, M.Manifest{name, entry, bin, hub, ds, ts}), n))),
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
+      ts}), n))),
     tip) == True{} : Bool}
 
-def mv.reach_moved(dm, tm, tip, n, _name, _entry, _bin, _hub, ds, _ts, dds, _tts, wk):
+def mv.reach_moved(dm, tm, tip, n, _name, _entry, _bin, _hub, _hubpa, _hubpv, ds, _ts, dds, _tts, wk):
   match dm tm:
     case True{} _:
       Eq.and.left(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip), True{}, wk)
@@ -10396,6 +10453,8 @@ law mv.reach_srcs:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -10410,9 +10469,9 @@ law mv.reach_srcs:
   for +ig: String
   for wk: {Bool.and(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
     Bool.or(dm, String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip))) == True{} : Bool}
-  for se: {String.is_empty(Up.next.stop(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+  for se: {String.is_empty(Up.next.stop(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig))) == True{} : Bool}
-  {String.eq(M.source.rev(M.source.dep(mv.dep(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+  {String.eq(M.source.rev(M.source.dep(mv.dep(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), n))), tip)
     == True{} : Bool}
 
@@ -10424,6 +10483,8 @@ def mv.reach_srcs(
   entry,
   bin,
   hub,
+  hubpa,
+  hubpv,
   ds,
   ts,
   dds,
@@ -10441,7 +10502,7 @@ def mv.reach_srcs(
 ):
   match srcs:
     case Up.Srcs{_fs}:
-      mv.reach_moved(dm, tm, tip, n, name, entry, bin, hub, ds, ts, dds, tts, wk)
+      mv.reach_moved(dm, tm, tip, n, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, tts, wk)
     case Up.SrcsWait{_ask}:
       Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool},
         se)
@@ -10459,6 +10520,8 @@ law mv.reach_ignore:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -10473,10 +10536,10 @@ law mv.reach_ignore:
   for wk: {Bool.and(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
     Bool.or(dm, String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip))) == True{} : Bool}
   for se: {String.is_empty(Up.next.stop(Up.got.ignore(said, srcs,
-    M.Manifest{name, entry, bin, hub, ds, ts},
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}))) == True{} : Bool}
   {String.eq(M.source.rev(M.source.dep(mv.dep(Up.got.ignore(said, srcs,
-    M.Manifest{name, entry, bin, hub, ds, ts},
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
     Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), n))), tip)
     == True{} : Bool}
 
@@ -10489,6 +10552,8 @@ def mv.reach_ignore(
   entry,
   bin,
   hub,
+  hubpa,
+  hubpv,
   ds,
   ts,
   dds,
@@ -10505,7 +10570,7 @@ def mv.reach_ignore(
 ):
   match said:
     case Up.Said{+ig}:
-      mv.reach_srcs(srcs, tip, n, name, entry, bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm,
+      mv.reach_srcs(srcs, tip, n, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm,
         tsy, ig, wk, se)
     case Up.Unsaid{+why}:
       Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool},
@@ -10525,15 +10590,17 @@ law mv.reach_pins:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for wk: {mv.walk_live(tip, dd, M.find(ds, n), n) == True{} : Bool}
-  for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds, ts})))
+  for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})))
     == True{} : Bool}
   {String.eq(M.source.rev(M.source.dep(mv.dep(Up.pins(dd, tt, rs,
-    M.Manifest{name, entry, bin, hub, ds, ts}), n))), tip) == True{} : Bool}
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), n))), tip) == True{} : Bool}
 
-def mv.reach_pins(dd, tt, rs, tip, n, name, entry, bin, hub, ds, ts, wk, se):
+def mv.reach_pins(dd, tt, rs, tip, n, name, entry, bin, hub, hubpa, hubpv, ds, ts, wk, se):
   match dd tt:
     case Up.Deps{_dds, _ss, _es, _dm, _dsy, _dtr, _dasks, SCon{_c, _cs}} Up.Tools{_tts, _tm, _tsy, _tasks, _tbad}:
       Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool}, se)
@@ -10546,7 +10613,7 @@ def mv.reach_pins(dd, tt, rs, tip, n, name, entry, bin, hub, ds, ts, wk, se):
     case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, [], SNil{}} Up.Tools{+tts, +tm, +tsy, [], SNil{}}:
       mv.reach_ignore(Up.text.said(rs, Up.Ignore{}),
         Up.ask.srcs(List.is_empty(&2, U.Swap, es), rs), tip, n, name, entry,
-        bin, hub, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm, tsy, wk, se)
+        bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dm, dsy, dtr, tts, tm, tsy, wk, se)
 
 # LAW: the model, once `--package` is known to name something
 law mv.reach_known:
@@ -10559,22 +10626,24 @@ law mv.reach_known:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for wk: {mv.walk_live(tip, Up.deps.walk(rs, only, M.hub.or(hub), ds), M.find(ds, n), n)
     == True{} : Bool}
-  for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds, ts})))
+  for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})))
     == True{} : Bool}
   {String.eq(M.source.rev(M.source.dep(mv.dep(Up.known(k, only, rs,
-    M.Manifest{name, entry, bin, hub, ds, ts}), n))), tip) == True{} : Bool}
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), n))), tip) == True{} : Bool}
 
-def mv.reach_known(k, rs, only, tip, n, name, entry, bin, hub, ds, ts, wk, se):
+def mv.reach_known(k, rs, only, tip, n, name, entry, bin, hub, hubpa, hubpv, ds, ts, wk, se):
   match k:
     case False{}:
       Eq.bit.absurd(&2, {String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip) == True{} : Bool}, se)
     case True{}:
       mv.reach_pins(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), rs, tip,
-        n, name, entry, bin, hub, ds, ts, wk, se)
+        n, name, entry, bin, hub, hubpa, hubpv, ds, ts, wk, se)
 
 # LAW: a lock that does not refuse has an upgrade that did not stop
 law mv.stop_empty:
@@ -10613,9 +10682,9 @@ def mv.reach_top(r, only, rs, n, tip, g, lv, se):
         tip) == True{} : Bool}, g)
     case M.Good{m}:
       match m:
-        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+        case M.Manifest{+name, +entry, +bin, +hub, +hubpa, +hubpv, +ds, +ts}:
           mv.reach_known(Bool.or(U.known(only, ds), M.tool.known(only, ts)), rs, only, tip, n, name,
-            entry, bin, hub, ds, ts, mv.walk_reaches(rs, only, M.hub.or(hub), n, tip, ds, lv), se)
+            entry, bin, hub, hubpa, hubpv, ds, ts, mv.walk_reaches(rs, only, M.hub.or(hub), n, tip, ds, lv), se)
 
 def Laws.upgrade_forward_reaches_tip(w, n, tip, tag, branch, up, bare, sel, head, ok):
   match w:
@@ -13911,7 +13980,7 @@ def vends.of(model: M.Read) -> List<&2, String>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, _b, _h, ds, _ts} = m
+      M.Manifest{_n, _e, _b, _h, _hpa, _hpv, ds, _ts} = m
       I.vended(ds)
 
 # the `.gitignore` an upgrade of a ledger model writes, given the one it reads
@@ -13920,7 +13989,7 @@ def gi.of(model: M.Read, +g: String) -> List<&2, Up.Edit>:
     case M.Bad{_why}:
       []
     case M.Good{m}:
-      M.Manifest{_n, _e, _b, _h, +ds, _ts} = m
+      M.Manifest{_n, _e, _b, _h, _hpa, _hpv, +ds, _ts} = m
       +allow = I.sync(ds, g)
       Up.edit.if(String.eq(allow, g), ".gitignore", allow, [])
 
@@ -13979,28 +14048,31 @@ law c.second:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +dds: List<&2, M.Dep>
   for +tts: List<&2, M.Tool>
   for hw: {Up.deps.walk(re(g, rs), only, M.hub.or(hub), dds) == dsettle(dds, dd.says(Up.deps.walk(re(g, rs), only,
       M.hub.or(hub), dds))) : Up.Deps}
   for tw: {Up.tools.walk(re(g, rs), only, tts) == tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only, tts))) : Up.Tools}
   for kn: {Bool.or(U.known(only, dds), M.tool.known(only, tts)) == True{} : Bool}
-  {view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, dds, tts}}, re(g,
-    rs))) == target(M.Good{M.Manifest{name, entry, bin, hub, dds, tts}}, g) : Up.Next}
+  {view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}}, re(g,
+    rs))) == target(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}}, g) : Up.Next}
 
-def c.second(g, rs, only, name, entry, bin, hub, dds, tts, hw, tw, kn):
+def c.second(g, rs, only, name, entry, bin, hub, hubpa, hubpv, dds, tts, hw, tw, kn):
   nkn = Equal.sym(Bool, Bool.or(U.known(only, dds), M.tool.known(only, tts)), True{}, kn)
-  %nkn : {view(Up.known(_, only, re(g, rs), M.Manifest{name, entry, bin, hub, dds,
-    tts})) == target(M.Good{M.Manifest{name, entry, bin, hub, dds, tts}}, g) : Up.Next}
+  %nkn : {view(Up.known(_, only, re(g, rs), M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds,
+    tts})) == target(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}}, g) : Up.Next}
   nhw = Equal.sym(Up.Deps, Up.deps.walk(re(g, rs), only, M.hub.or(hub), dds), dsettle(dds, dd.says(Up.deps.walk(re(g,
     rs), only, M.hub.or(hub), dds))), hw)
-  %nhw : {view(Up.pins(_, Up.tools.walk(re(g, rs), only, tts), re(g, rs), M.Manifest{name, entry, bin, hub, dds,
-    tts})) == target(M.Good{M.Manifest{name, entry, bin, hub, dds, tts}}, g) : Up.Next}
+  %nhw : {view(Up.pins(_, Up.tools.walk(re(g, rs), only, tts), re(g, rs), M.Manifest{name, entry, bin, hub, hubpa,
+    hubpv, dds,
+    tts})) == target(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}}, g) : Up.Next}
   ntw = Equal.sym(Up.Tools, Up.tools.walk(re(g, rs), only, tts), tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only,
     tts))), tw)
   %ntw : {view(Up.pins(dsettle(dds, dd.says(Up.deps.walk(re(g, rs), only, M.hub.or(hub), dds))), _, re(g, rs),
-    M.Manifest{name, entry, bin, hub, dds, tts}))
-    == target(M.Good{M.Manifest{name, entry, bin, hub, dds, tts}}, g) : Up.Next}
+    M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}))
+    == target(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}}, g) : Up.Next}
   {==}
 
 # LAW: and one that moved nothing is one whose pins are the ones it walked
@@ -14012,6 +14084,8 @@ law c.same:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -14022,15 +14096,16 @@ law c.same:
   for kn: {Bool.or(U.known(only, dds), M.tool.known(only, tts)) == True{} : Bool}
   for hq: {dds == ds : List<&2, M.Dep>}
   for tq: {tts == ts : List<&2, M.Tool>}
-  {view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, ds, ts}}, re(g, rs))) == target(M.Good{M.Manifest{name,
-    entry, bin, hub, ds, ts}}, g) : Up.Next}
+  {view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}}, re(g,
+    rs))) == target(M.Good{M.Manifest{name,
+    entry, bin, hub, hubpa, hubpv, ds, ts}}, g) : Up.Next}
 
-def c.same(g, rs, only, name, entry, bin, hub, _ds, ts, dds, tts, hw, tw, kn, hq, tq):
-  %hq : {view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, _, ts}}, re(g, rs)))
-    == target(M.Good{M.Manifest{name, entry, bin, hub, _, ts}}, g) : Up.Next}
-  %tq : {view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, dds, _}}, re(g, rs)))
-    == target(M.Good{M.Manifest{name, entry, bin, hub, dds, _}}, g) : Up.Next}
-  c.second(g, rs, only, name, entry, bin, hub, dds, tts, hw, tw, kn)
+def c.same(g, rs, only, name, entry, bin, hub, hubpa, hubpv, _ds, ts, dds, tts, hw, tw, kn, hq, tq):
+  %hq : {view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, _, ts}}, re(g, rs)))
+    == target(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, _, ts}}, g) : Up.Next}
+  %tq : {view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, _}}, re(g, rs)))
+    == target(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, _}}, g) : Up.Next}
+  c.second(g, rs, only, name, entry, bin, hub, hubpa, hubpv, dds, tts, hw, tw, kn)
 
 
 # LAW: the known names, walked
@@ -14068,6 +14143,8 @@ law c.done:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -14079,7 +14156,7 @@ law c.done:
   for +tsy: List<&2, String>
   for +ig: String
   for +fs: List<&2, Up.Found>
-  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, ds, ts}} : M.Read}
+  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}} : M.Read}
   for ek: {Bool.or(U.known(only, ds), M.tool.known(only, ts)) == True{} : Bool}
   for hw: {Up.deps.walk(re(g, rs), only, M.hub.or(hub), dds) == dsettle(dds, dd.says(Up.deps.walk(re(g, rs), only,
       M.hub.or(hub), dds))) : Up.Deps}
@@ -14088,8 +14165,9 @@ law c.done:
   for tw: {Up.tools.walk(re(g, rs), only, tts) == tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only, tts))) : Up.Tools}
   for tk: {M.tool.known(only, tts) == M.tool.known(only, ts) : Bool}
   for tq: {Bool.pick(List<&2, M.Tool>, tm, ts, tts) == ts : List<&2, M.Tool>}
-  {core.lhs(Up.done(M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""},
-    Up.Tools{tts, tm, tsy, [], ""}, ig, fs), only, g, rs) == core.rhs(Up.done(M.Manifest{name, entry, bin, hub, ds,
+  {core.lhs(Up.done(M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""},
+    Up.Tools{tts, tm, tsy, [], ""}, ig, fs), only, g, rs) == core.rhs(Up.done(M.Manifest{name, entry, bin, hub, hubpa,
+      hubpv, ds,
       ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig, fs), g,
         ledger) : Up.Next & M.Read}
 
@@ -14104,6 +14182,8 @@ def c.done(
   entry,
   bin,
   hub,
+  hubpa,
+  hubpv,
   ds,
   ts,
   dds,
@@ -14126,35 +14206,38 @@ def c.done(
 ):
   match dm:
     case True{}:
-      Equal.cong(Up.Next, Up.Next & M.Read, x => (x, M.parse(Rend.show(M.Manifest{name, entry, bin, hub, dds, tts}))),
-        view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, dds, tts}}, re(g, rs))),
-          target(M.Good{M.Manifest{name, entry, bin, hub, dds, tts}}, g),
-        c.second(g, rs, only, name, entry, bin, hub, dds, tts, hw, tw, c.kn(only, ds, ts, dds, tts, ek, hk, tk)))
+      Equal.cong(Up.Next, Up.Next & M.Read, x => (x, M.parse(Rend.show(M.Manifest{name, entry, bin, hub, hubpa, hubpv,
+        dds, tts}))),
+        view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}}, re(g, rs))),
+          target(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}}, g),
+        c.second(g, rs, only, name, entry, bin, hub, hubpa, hubpv, dds, tts, hw, tw, c.kn(only, ds, ts, dds, tts, ek,
+          hk, tk)))
     case False{}:
       match tm:
         case True{}:
-          Equal.cong(Up.Next, Up.Next & M.Read, x => (x, M.parse(Rend.show(M.Manifest{name, entry, bin, hub, dds,
+          Equal.cong(Up.Next, Up.Next & M.Read, x => (x, M.parse(Rend.show(M.Manifest{name, entry, bin, hub, hubpa,
+            hubpv, dds,
             tts}))),
-            view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, dds, tts}}, re(g, rs))),
-              target(M.Good{M.Manifest{name, entry, bin, hub, dds, tts}}, g),
-            c.second(g, rs, only, name, entry, bin, hub, dds, tts, hw, tw,
+            view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}}, re(g, rs))),
+              target(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, dds, tts}}, g),
+            c.second(g, rs, only, name, entry, bin, hub, hubpa, hubpv, dds, tts, hw, tw,
               c.kn(only, ds, ts, dds, tts, ek, hk, tk)))
         case False{}:
-          pair_eq(view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, ds, ts}}, re(g, rs))),
-            target(M.Good{M.Manifest{name, entry, bin, hub, ds, ts}}, g),
-            M.Good{M.Manifest{name, entry, bin, hub, ds, ts}},
+          pair_eq(view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}}, re(g, rs))),
+            target(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}}, g),
+            M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}},
             W.parsed(Laws.ledger.left(Up.edit.if(String.eq(I.sync(dds, ig), ig), ".gitignore", I.sync(dds, ig), []),
               ledger)),
-            c.same(g, rs, only, name, entry, bin, hub, ds, ts, dds, tts, hw, tw,
+            c.same(g, rs, only, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, tts, hw, tw,
               c.kn(only, ds, ts, dds, tts, ek, hk, tk), hq, tq),
             Equal.sym(M.Read,
               W.parsed(Laws.ledger.left(Up.edit.if(String.eq(I.sync(dds, ig), ig), ".gitignore", I.sync(dds, ig), []),
                 ledger)),
-              M.Good{M.Manifest{name, entry, bin, hub, ds, ts}},
+              M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}},
               Equal.trans(M.Read,
                 W.parsed(Laws.ledger.left(Up.edit.if(String.eq(I.sync(dds, ig), ig), ".gitignore",
                   I.sync(dds, ig), []), ledger)),
-                W.parsed(ledger), M.Good{M.Manifest{name, entry, bin, hub, ds, ts}},
+                W.parsed(ledger), M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}},
                 Equal.cong(Maybe<&2, String>, M.Read, x => W.parsed(x),
                   Laws.ledger.left(Up.edit.if(String.eq(I.sync(dds, ig), ig), ".gitignore", I.sync(dds, ig), []),
                     ledger), ledger, li(String.eq(I.sync(dds, ig), ig), I.sync(dds, ig), ledger)),
@@ -14174,6 +14257,8 @@ law c.srcs:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -14184,7 +14269,7 @@ law c.srcs:
   for +tts: List<&2, M.Tool>
   for +tsy: List<&2, String>
   for +ig: String
-  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, ds, ts}} : M.Read}
+  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}} : M.Read}
   for ek: {Bool.or(U.known(only, ds), M.tool.known(only, ts)) == True{} : Bool}
   for hw: {Up.deps.walk(re(g, rs), only, M.hub.or(hub), dds) == dsettle(dds, dd.says(Up.deps.walk(re(g, rs), only,
       M.hub.or(hub), dds))) : Up.Deps}
@@ -14193,10 +14278,13 @@ law c.srcs:
   for tw: {Up.tools.walk(re(g, rs), only, tts) == tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only, tts))) : Up.Tools}
   for tk: {M.tool.known(only, tts) == M.tool.known(only, ts) : Bool}
   for tq: {Bool.pick(List<&2, M.Tool>, tm, ts, tts) == ts : List<&2, M.Tool>}
-  for se: {String.is_empty(Up.next.stop(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss,
+  for se: {String.is_empty(Up.next.stop(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
+    Up.Deps{dds, ss,
       es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig))) == True{} : Bool}
-  {core.lhs(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""},
+  {core.lhs(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds, ss, es, dm, dsy,
+    dtr, [], ""},
     Up.Tools{tts, tm, tsy, [], ""}, ig), only, g, rs) == core.rhs(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub,
+      hubpa, hubpv,
       ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), g,
         ledger) : Up.Next & M.Read}
 
@@ -14212,6 +14300,8 @@ def c.srcs(
   entry,
   bin,
   hub,
+  hubpa,
+  hubpv,
   ds,
   ts,
   dds,
@@ -14234,17 +14324,21 @@ def c.srcs(
 ):
   match srcs:
     case Up.Srcs{fs}:
-      c.done(dm, tm, g, rs, only, ledger, name, entry, bin, hub, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, ig, fs, eq,
+      c.done(dm, tm, g, rs, only, ledger, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dsy, dtr, tts, tsy,
+        ig, fs, eq,
         ek, hw, hk, hq, tw, tk, tq)
     case Up.SrcsWait{ask}:
-      Eq.bit.absurd(&2, {core.lhs(Up.got.srcs(Up.SrcsWait{ask}, M.Manifest{name, entry, bin, hub, ds, ts},
+      Eq.bit.absurd(&2, {core.lhs(Up.got.srcs(Up.SrcsWait{ask}, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
         Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), only, g, rs)
-        == core.rhs(Up.got.srcs(Up.SrcsWait{ask}, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm,
+        == core.rhs(Up.got.srcs(Up.SrcsWait{ask}, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds,
+          ss, es, dm,
           dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), g, ledger) : Up.Next & M.Read}, se)
     case Up.SrcsNo{+why}:
-      Eq.bit.absurd(&2, {core.lhs(Up.got.srcs(Up.SrcsNo{why}, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds,
+      Eq.bit.absurd(&2, {core.lhs(Up.got.srcs(Up.SrcsNo{why}, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
+        Up.Deps{dds,
         ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), only, g, rs)
-        == core.rhs(Up.got.srcs(Up.SrcsNo{why}, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm,
+        == core.rhs(Up.got.srcs(Up.SrcsNo{why}, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds,
+          ss, es, dm,
           dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig), g, ledger) : Up.Next & M.Read},
         mv.halt_clash(why, se))
 
@@ -14263,6 +14357,8 @@ law c.ignore:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -14272,7 +14368,7 @@ law c.ignore:
   for +dtr: List<&2, Up.Laid>
   for +tts: List<&2, M.Tool>
   for +tsy: List<&2, String>
-  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, ds, ts}} : M.Read}
+  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}} : M.Read}
   for ek: {Bool.or(U.known(only, ds), M.tool.known(only, ts)) == True{} : Bool}
   for hw: {Up.deps.walk(re(g, rs), only, M.hub.or(hub), dds) == dsettle(dds, dd.says(Up.deps.walk(re(g, rs), only,
       M.hub.or(hub), dds))) : Up.Deps}
@@ -14281,11 +14377,14 @@ law c.ignore:
   for tw: {Up.tools.walk(re(g, rs), only, tts) == tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only, tts))) : Up.Tools}
   for tk: {M.tool.known(only, tts) == M.tool.known(only, ts) : Bool}
   for tq: {Bool.pick(List<&2, M.Tool>, tm, ts, tts) == ts : List<&2, M.Tool>}
-  for se: {String.is_empty(Up.next.stop(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+  for se: {String.is_empty(Up.next.stop(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
+    ts},
       Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}))) == True{} : Bool}
-  {core.lhs(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr,
+  {core.lhs(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds, ss, es, dm,
+    dsy, dtr,
     [], ""}, Up.Tools{tts, tm, tsy, [], ""}), only, g, rs) == core.rhs(Up.got.ignore(said, srcs, M.Manifest{name,
-      entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), g,
+      entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [],
+        ""}), g,
         ledger) : Up.Next & M.Read}
 
 def c.ignore(
@@ -14301,6 +14400,8 @@ def c.ignore(
   entry,
   bin,
   hub,
+  hubpa,
+  hubpv,
   ds,
   ts,
   dds,
@@ -14322,18 +14423,23 @@ def c.ignore(
 ):
   match said:
     case Up.Said{+ig}:
-      c.srcs(srcs, dm, tm, g, rs, only, ledger, name, entry, bin, hub, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, ig,
+      c.srcs(srcs, dm, tm, g, rs, only, ledger, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dsy, dtr,
+        tts, tsy, ig,
         eq, ek, hw, hk, hq, tw, tk, tq, se)
     case Up.Unsaid{+why}:
-      Eq.bit.absurd(&2, {core.lhs(Up.got.ignore(Up.Unsaid{why}, srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+      Eq.bit.absurd(&2, {core.lhs(Up.got.ignore(Up.Unsaid{why}, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv,
+        ds, ts},
         Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), only, g, rs)
-        == core.rhs(Up.got.ignore(Up.Unsaid{why}, srcs, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss,
+        == core.rhs(Up.got.ignore(Up.Unsaid{why}, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
+          Up.Deps{dds, ss,
           es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), g, ledger) : Up.Next & M.Read},
         mv.halt_clash(why, se))
     case Up.Unasked{ask}:
-      Eq.bit.absurd(&2, {core.lhs(Up.got.ignore(Up.Unasked{ask}, srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+      Eq.bit.absurd(&2, {core.lhs(Up.got.ignore(Up.Unasked{ask}, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv,
+        ds, ts},
         Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), only, g, rs)
-        == core.rhs(Up.got.ignore(Up.Unasked{ask}, srcs, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss,
+        == core.rhs(Up.got.ignore(Up.Unasked{ask}, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
+          Up.Deps{dds, ss,
           es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}), g, ledger) : Up.Next & M.Read}, se)
 
 
@@ -14349,9 +14455,11 @@ law c.pins:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
-  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, ds, ts}} : M.Read}
+  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}} : M.Read}
   for ek: {Bool.or(U.known(only, ds), M.tool.known(only, ts)) == True{} : Bool}
   for hw: {Up.deps.walk(re(g, rs), only, M.hub.or(hub), dd.ds(dd)) == dsettle(dd.ds(dd), dd.says(Up.deps.walk(re(g,
       rs), only, M.hub.or(hub), dd.ds(dd)))) : Up.Deps}
@@ -14361,40 +14469,69 @@ law c.pins:
       tt.ts(tt)))) : Up.Tools}
   for tk: {Bool.or(tunc(tt), M.tool.known(only, tt.ts(tt))) == Bool.or(tunc(tt), M.tool.known(only, ts)) : Bool}
   for tq: {tstay(tt, ts) == ts : List<&2, M.Tool>}
-  for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds,
+  for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
       ts}))) == True{} : Bool}
-  {core.lhs(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds, ts}), only, g, rs) == core.rhs(Up.pins(dd, tt,
-    rs, M.Manifest{name, entry, bin, hub, ds, ts}), g, ledger) : Up.Next & M.Read}
+  {core.lhs(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), only, g,
+    rs) == core.rhs(Up.pins(dd, tt,
+    rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), g, ledger) : Up.Next & M.Read}
 
-def c.pins(dd, tt, g, rs, only, ledger, name, entry, bin, hub, ds, ts, eq, ek, hw, hk, hq, tw, tk, tq, se):
+def c.pins(
+  dd,
+  tt,
+  g,
+  rs,
+  only,
+  ledger,
+  name,
+  entry,
+  bin,
+  hub,
+  hubpa,
+  hubpv,
+  ds,
+  ts,
+  eq,
+  ek,
+  hw,
+  hk,
+  hq,
+  tw,
+  tk,
+  tq,
+  se
+):
   match dd tt:
     case Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SCon{c, cs}} Up.Tools{tts, tm, tsy, tasks, tbad}:
       Eq.bit.absurd(&2, {core.lhs(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SCon{c, cs}},
-          Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, ds, ts}), only, g, rs)
+          Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), only, g,
+            rs)
         == core.rhs(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SCon{c, cs}},
-          Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, ds, ts}), g,
+          Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), g,
             ledger) : Up.Next & M.Read}, se)
     case Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SNil{}} Up.Tools{tts, tm, tsy, tasks, SCon{c, cs}}:
       Eq.bit.absurd(&2, {core.lhs(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SNil{}},
-          Up.Tools{tts, tm, tsy, tasks, SCon{c, cs}}, rs, M.Manifest{name, entry, bin, hub, ds, ts}), only, g, rs)
+          Up.Tools{tts, tm, tsy, tasks, SCon{c, cs}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}),
+            only, g, rs)
         == core.rhs(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SNil{}},
-          Up.Tools{tts, tm, tsy, tasks, SCon{c, cs}}, rs, M.Manifest{name, entry, bin, hub, ds, ts}), g,
+          Up.Tools{tts, tm, tsy, tasks, SCon{c, cs}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), g,
             ledger) : Up.Next & M.Read}, se)
     case Up.Deps{dds, ss, es, dm, dsy, dtr, a <> as, SNil{}} Up.Tools{tts, tm, tsy, tasks, SNil{}}:
       Eq.bit.absurd(&2, {core.lhs(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, a <> as, SNil{}},
-          Up.Tools{tts, tm, tsy, tasks, SNil{}}, rs, M.Manifest{name, entry, bin, hub, ds, ts}), only, g, rs)
+          Up.Tools{tts, tm, tsy, tasks, SNil{}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), only, g,
+            rs)
         == core.rhs(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, a <> as, SNil{}},
-          Up.Tools{tts, tm, tsy, tasks, SNil{}}, rs, M.Manifest{name, entry, bin, hub, ds, ts}), g,
+          Up.Tools{tts, tm, tsy, tasks, SNil{}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), g,
             ledger) : Up.Next & M.Read}, se)
     case Up.Deps{dds, ss, es, dm, dsy, dtr, [], SNil{}} Up.Tools{tts, tm, tsy, a <> as, SNil{}}:
       Eq.bit.absurd(&2, {core.lhs(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, [], SNil{}},
-          Up.Tools{tts, tm, tsy, a <> as, SNil{}}, rs, M.Manifest{name, entry, bin, hub, ds, ts}), only, g, rs)
+          Up.Tools{tts, tm, tsy, a <> as, SNil{}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), only,
+            g, rs)
         == core.rhs(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, [], SNil{}},
-          Up.Tools{tts, tm, tsy, a <> as, SNil{}}, rs, M.Manifest{name, entry, bin, hub, ds, ts}), g,
+          Up.Tools{tts, tm, tsy, a <> as, SNil{}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), g,
             ledger) : Up.Next & M.Read}, se)
     case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, [], SNil{}} Up.Tools{+tts, +tm, +tsy, [], SNil{}}:
       c.ignore(Up.text.said(rs, Up.Ignore{}), Up.ask.srcs(List.is_empty(&2, U.Swap, es), rs), dm, tm,
-        g, rs, only, ledger, name, entry, bin, hub, ds, ts, dds, ss, es, dsy, dtr, tts, tsy,
+        g, rs, only, ledger, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dsy, dtr, tts, tsy,
         eq, ek, hw, hk, hq, tw, tk, tq, se)
 
 
@@ -14409,25 +14546,29 @@ law c.known:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
-  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, ds, ts}} : M.Read}
+  for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}} : M.Read}
   for ek: {Bool.or(U.known(only, ds), M.tool.known(only, ts)) == k : Bool}
-  for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds,
+  for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
       ts}))) == True{} : Bool}
-  {core.lhs(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds, ts}), only, g, rs) == core.rhs(Up.known(k,
-    only, rs, M.Manifest{name, entry, bin, hub, ds, ts}), g, ledger) : Up.Next & M.Read}
+  {core.lhs(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), only, g,
+    rs) == core.rhs(Up.known(k,
+    only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), g, ledger) : Up.Next & M.Read}
 
-def c.known(k, g, rs, only, ledger, name, entry, bin, hub, ds, ts, eq, ek, se):
+def c.known(k, g, rs, only, ledger, name, entry, bin, hub, hubpa, hubpv, ds, ts, eq, ek, se):
   match k:
     case False{}:
-      Eq.bit.absurd(&2, {core.lhs(Up.known(False{}, only, rs, M.Manifest{name, entry, bin, hub, ds, ts}), only, g, rs)
-        == core.rhs(Up.known(False{}, only, rs, M.Manifest{name, entry, bin, hub, ds, ts}), g,
+      Eq.bit.absurd(&2, {core.lhs(Up.known(False{}, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}),
+        only, g, rs)
+        == core.rhs(Up.known(False{}, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), g,
           ledger) : Up.Next & M.Read},
         mv.halt_clash("ez: no dependency or tool named " ++ only, se))
     case True{}:
       c.pins(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), g, rs, only, ledger,
-        name, entry, bin, hub, ds, ts, eq, ek,
+        name, entry, bin, hub, hubpa, hubpv, ds, ts, eq, ek,
         w.all(g, rs, only, M.hub.or(hub), ds), kd.known(rs, only, M.hub.or(hub), ds),
         dq.all(rs, only, M.hub.or(hub), ds),
         tw.all(g, rs, only, ts), tkd.known(rs, only, ts), tq.all(rs, only, ts), se)
@@ -14453,9 +14594,9 @@ def core(r, only, rs, g, ledger, eq, se):
         Equal.sym(M.Read, W.parsed(ledger), M.Bad{why}, eq))
     case M.Good{m}:
       match m:
-        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
+        case M.Manifest{+name, +entry, +bin, +hub, +hubpa, +hubpv, +ds, +ts}:
           c.known(Bool.or(U.known(only, ds), M.tool.known(only, ts)), g, rs, only, ledger, name, entry,
-            bin, hub, ds, ts, eq, {==}, se)
+            bin, hub, hubpa, hubpv, ds, ts, eq, {==}, se)
 
 # The `.gitignore` the first upgrade left is in sync with the ledger it left,
 # so the second writes none: it is the file it read, which the first found in
@@ -14528,6 +14669,8 @@ law g.done:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -14540,11 +14683,13 @@ law g.done:
   for +ig: String
   for +fs: List<&2, Up.Found>
   for hq: {Bool.pick(List<&2, M.Dep>, dm, ds, dds) == ds : List<&2, M.Dep>}
-  {gi.ok(Up.next.model(Up.done(M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""},
-    Up.Tools{tts, tm, tsy, [], ""}, ig, fs)), Laws.ig.left(Up.next.edits(Up.done(M.Manifest{name, entry, bin, hub, ds,
+  {gi.ok(Up.next.model(Up.done(M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds, ss, es, dm, dsy,
+    dtr, [], ""},
+    Up.Tools{tts, tm, tsy, [], ""}, ig, fs)), Laws.ig.left(Up.next.edits(Up.done(M.Manifest{name, entry, bin, hub,
+      hubpa, hubpv, ds,
       ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig, fs)), ig)) == True{} : Bool}
 
-def g.done(dm, tm, name, entry, bin, hub, _ds, ts, dds, _ss, _es, _dsy, _dtr, _tts, _tsy, ig, _fs, hq):
+def g.done(dm, tm, name, entry, bin, hub, hubpa, hubpv, _ds, ts, dds, _ss, _es, _dsy, _dtr, _tts, _tsy, ig, _fs, hq):
   match dm:
     case True{}:
       g.sync.b(String.eq(I.sync(dds, ig), ig), dds, ig, {==})
@@ -14553,7 +14698,7 @@ def g.done(dm, tm, name, entry, bin, hub, _ds, ts, dds, _ss, _es, _dsy, _dtr, _t
         case True{}:
           g.sync.b(String.eq(I.sync(dds, ig), ig), dds, ig, {==})
         case False{}:
-          %hq : {gi.ok(M.Good{M.Manifest{name, entry, bin, hub, _, ts}},
+          %hq : {gi.ok(M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, _, ts}},
             Laws.ig.left(Up.edit.if(String.eq(I.sync(dds, ig), ig), ".gitignore", I.sync(dds, ig), []), ig))
             == True{} : Bool}
           g.sync.b(String.eq(I.sync(dds, ig), ig), dds, ig, {==})
@@ -14567,6 +14712,8 @@ law g.srcs:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -14578,27 +14725,34 @@ law g.srcs:
   for +tsy: List<&2, String>
   for +ig: String
   for hq: {Bool.pick(List<&2, M.Dep>, dm, ds, dds) == ds : List<&2, M.Dep>}
-  for se: {String.is_empty(Up.next.stop(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss,
+  for se: {String.is_empty(Up.next.stop(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
+    Up.Deps{dds, ss,
       es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig))) == True{} : Bool}
-  {gi.ok(Up.next.model(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr,
+  {gi.ok(Up.next.model(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds, ss, es,
+    dm, dsy, dtr,
     [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig)), Laws.ig.left(Up.next.edits(Up.got.srcs(srcs, M.Manifest{name,
-      entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig)),
+      entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [],
+        ""}, ig)),
         ig)) == True{} : Bool}
 
-def g.srcs(srcs, dm, tm, name, entry, bin, hub, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, ig, hq, se):
+def g.srcs(srcs, dm, tm, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, ig, hq, se):
   match srcs:
     case Up.Srcs{fs}:
-      g.done(dm, tm, name, entry, bin, hub, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, ig, fs, hq)
+      g.done(dm, tm, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, ig, fs, hq)
     case Up.SrcsWait{ask}:
-      Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.got.srcs(Up.SrcsWait{ask}, M.Manifest{name, entry, bin, hub, ds, ts},
+      Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.got.srcs(Up.SrcsWait{ask}, M.Manifest{name, entry, bin, hub, hubpa,
+        hubpv, ds, ts},
         Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig)),
-          Laws.ig.left(Up.next.edits(Up.got.srcs(Up.SrcsWait{ask}, M.Manifest{name, entry, bin, hub, ds, ts},
+          Laws.ig.left(Up.next.edits(Up.got.srcs(Up.SrcsWait{ask}, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
+            ts},
             Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig)), ig)) == True{} : Bool},
               se)
     case Up.SrcsNo{+why}:
-      Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.got.srcs(Up.SrcsNo{why}, M.Manifest{name, entry, bin, hub, ds, ts},
+      Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.got.srcs(Up.SrcsNo{why}, M.Manifest{name, entry, bin, hub, hubpa,
+        hubpv, ds, ts},
         Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig)),
-          Laws.ig.left(Up.next.edits(Up.got.srcs(Up.SrcsNo{why}, M.Manifest{name, entry, bin, hub, ds, ts},
+          Laws.ig.left(Up.next.edits(Up.got.srcs(Up.SrcsNo{why}, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
+            ts},
             Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig)), ig)) == True{} : Bool},
               mv.halt_clash(why, se))
 
@@ -14612,6 +14766,8 @@ law g.ignore:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +dds: List<&2, M.Dep>
@@ -14622,27 +14778,34 @@ law g.ignore:
   for +tts: List<&2, M.Tool>
   for +tsy: List<&2, String>
   for hq: {Bool.pick(List<&2, M.Dep>, dm, ds, dds) == ds : List<&2, M.Dep>}
-  for se: {String.is_empty(Up.next.stop(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+  for se: {String.is_empty(Up.next.stop(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
+    ts},
       Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}))) == True{} : Bool}
-  {gi.ok(Up.next.model(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm,
+  {gi.ok(Up.next.model(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds,
+    ss, es, dm,
     dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""})), Laws.ig.left(Up.next.edits(Up.got.ignore(said, srcs,
-      M.Manifest{name, entry, bin, hub, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy,
+      M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""},
+        Up.Tools{tts, tm, tsy,
         [], ""})), Laws.ig.said(said))) == True{} : Bool}
 
-def g.ignore(said, srcs, dm, tm, name, entry, bin, hub, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, hq, se):
+def g.ignore(said, srcs, dm, tm, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, hq, se):
   match said:
     case Up.Said{+ig}:
-      g.srcs(srcs, dm, tm, name, entry, bin, hub, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, ig, hq, se)
+      g.srcs(srcs, dm, tm, name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, ig, hq, se)
     case Up.Unsaid{+why}:
-      Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.got.ignore(Up.Unsaid{why}, srcs, M.Manifest{name, entry, bin, hub, ds,
+      Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.got.ignore(Up.Unsaid{why}, srcs, M.Manifest{name, entry, bin, hub,
+        hubpa, hubpv, ds,
         ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""})),
-          Laws.ig.left(Up.next.edits(Up.got.ignore(Up.Unsaid{why}, srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+          Laws.ig.left(Up.next.edits(Up.got.ignore(Up.Unsaid{why}, srcs, M.Manifest{name, entry, bin, hub, hubpa,
+            hubpv, ds, ts},
             Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""})),
               Laws.ig.said(Up.Unsaid{why}))) == True{} : Bool}, mv.halt_clash(why, se))
     case Up.Unasked{ask}:
       Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.got.ignore(Up.Unasked{ask}, srcs, M.Manifest{name, entry, bin, hub,
+        hubpa, hubpv,
         ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""})),
-          Laws.ig.left(Up.next.edits(Up.got.ignore(Up.Unasked{ask}, srcs, M.Manifest{name, entry, bin, hub, ds, ts},
+          Laws.ig.left(Up.next.edits(Up.got.ignore(Up.Unasked{ask}, srcs, M.Manifest{name, entry, bin, hub, hubpa,
+            hubpv, ds, ts},
             Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""})),
               Laws.ig.said(Up.Unasked{ask}))) == True{} : Bool}, se)
 
@@ -14656,43 +14819,47 @@ law g.pins:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for hq: {dstay(dd, ds) == ds : List<&2, M.Dep>}
-  for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds,
+  for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
       ts}))) == True{} : Bool}
-  {gi.ok(Up.next.model(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
-    Laws.ig.left(Up.next.edits(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
+  {gi.ok(Up.next.model(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
+    Laws.ig.left(Up.next.edits(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
       Laws.ig.read(rs))) == True{} : Bool}
 
-def g.pins(dd, tt, rs, name, entry, bin, hub, ds, ts, hq, se):
+def g.pins(dd, tt, rs, name, entry, bin, hub, hubpa, hubpv, ds, ts, hq, se):
   match dd tt:
     case Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SCon{c, cs}} Up.Tools{tts, tm, tsy, tasks, tbad}:
       Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SCon{c, cs}},
-        Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
+        Up.Tools{tts, tm, tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
           Laws.ig.left(Up.next.edits(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SCon{c, cs}}, Up.Tools{tts, tm,
-            tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, ds, ts})), Laws.ig.read(rs))) == True{} : Bool},
+            tsy, tasks, tbad}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
+              Laws.ig.read(rs))) == True{} : Bool},
               se)
     case Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SNil{}} Up.Tools{tts, tm, tsy, tasks, SCon{c, cs}}:
       Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SNil{}}, Up.Tools{tts,
-        tm, tsy, tasks, SCon{c, cs}}, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
+        tm, tsy, tasks, SCon{c, cs}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
           Laws.ig.left(Up.next.edits(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, dasks, SNil{}}, Up.Tools{tts, tm, tsy,
-            tasks, SCon{c, cs}}, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
+            tasks, SCon{c, cs}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
               Laws.ig.read(rs))) == True{} : Bool}, se)
     case Up.Deps{dds, ss, es, dm, dsy, dtr, a <> as, SNil{}} Up.Tools{tts, tm, tsy, tasks, SNil{}}:
       Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, a <> as, SNil{}},
-        Up.Tools{tts, tm, tsy, tasks, SNil{}}, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
+        Up.Tools{tts, tm, tsy, tasks, SNil{}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
           Laws.ig.left(Up.next.edits(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, a <> as, SNil{}}, Up.Tools{tts, tm,
-            tsy, tasks, SNil{}}, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
+            tsy, tasks, SNil{}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
               Laws.ig.read(rs))) == True{} : Bool}, se)
     case Up.Deps{dds, ss, es, dm, dsy, dtr, [], SNil{}} Up.Tools{tts, tm, tsy, a <> as, SNil{}}:
       Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, [], SNil{}}, Up.Tools{tts, tm,
-        tsy, a <> as, SNil{}}, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
+        tsy, a <> as, SNil{}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
           Laws.ig.left(Up.next.edits(Up.pins(Up.Deps{dds, ss, es, dm, dsy, dtr, [], SNil{}}, Up.Tools{tts, tm, tsy,
-            a <> as, SNil{}}, rs, M.Manifest{name, entry, bin, hub, ds, ts})), Laws.ig.read(rs))) == True{} : Bool}, se)
+            a <> as, SNil{}}, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
+              Laws.ig.read(rs))) == True{} : Bool}, se)
     case Up.Deps{+dds, +ss, +es, +dm, +dsy, +dtr, [], SNil{}} Up.Tools{+tts, +tm, +tsy, [], SNil{}}:
       g.ignore(Up.text.said(rs, Up.Ignore{}), Up.ask.srcs(List.is_empty(&2, U.Swap, es), rs), dm, tm,
-        name, entry, bin, hub, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, hq, se)
+        name, entry, bin, hub, hubpa, hubpv, ds, ts, dds, ss, es, dsy, dtr, tts, tsy, hq, se)
 
 
 # LAW: once `--package` is known to name something
@@ -14704,22 +14871,27 @@ law g.known:
   for +entry: String
   for +bin: String
   for +hub: String
+  for +hubpa: String
+  for +hubpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
-  for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds,
+  for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
       ts}))) == True{} : Bool}
-  {gi.ok(Up.next.model(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
-    Laws.ig.left(Up.next.edits(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
+  {gi.ok(Up.next.model(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
+    Laws.ig.left(Up.next.edits(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),
       Laws.ig.read(rs))) == True{} : Bool}
 
-def g.known(k, rs, only, name, entry, bin, hub, ds, ts, se):
+def g.known(k, rs, only, name, entry, bin, hub, hubpa, hubpv, ds, ts, se):
   match k:
     case False{}:
-      Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.known(False{}, only, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
-        Laws.ig.left(Up.next.edits(Up.known(False{}, only, rs, M.Manifest{name, entry, bin, hub, ds, ts})),
+      Eq.bit.absurd(&2, {gi.ok(Up.next.model(Up.known(False{}, only, rs, M.Manifest{name, entry, bin, hub, hubpa,
+        hubpv, ds, ts})),
+        Laws.ig.left(Up.next.edits(Up.known(False{}, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
+          ts})),
           Laws.ig.read(rs))) == True{} : Bool}, mv.halt_clash("ez: no dependency or tool named " ++ only, se))
     case True{}:
-      g.pins(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), rs, name, entry, bin, hub,
+      g.pins(Up.deps.walk(rs, only, M.hub.or(hub), ds), Up.tools.walk(rs, only, ts), rs, name, entry, bin, hub, hubpa,
+        hubpv,
         ds, ts, dq.all(rs, only, M.hub.or(hub), ds), se)
 
 # LAW: an upgrade that does not stop leaves a `.gitignore` in sync with the
@@ -14738,8 +14910,9 @@ def g.top(r, only, rs, se):
       {==}
     case M.Good{m}:
       match m:
-        case M.Manifest{+name, +entry, +bin, +hub, +ds, +ts}:
-          g.known(Bool.or(U.known(only, ds), M.tool.known(only, ts)), rs, only, name, entry, bin, hub, ds, ts,
+        case M.Manifest{+name, +entry, +bin, +hub, +hubpa, +hubpv, +ds, +ts}:
+          g.known(Bool.or(U.known(only, ds), M.tool.known(only, ts)), rs, only, name, entry, bin, hub, hubpa, hubpv,
+            ds, ts,
             se)
 
 # ---------------------------------------------------------------------------
@@ -14975,7 +15148,7 @@ def gi_put(md, g, rest, p, ng):
       {==}
     case M.Good{m}:
       match m:
-        case M.Manifest{_n, _e, _b, _h, +ds, _ts}:
+        case M.Manifest{_n, _e, _b, _h, _hpa, _hpv, +ds, _ts}:
           gi_put.b(String.eq(I.sync(ds, g), g), I.sync(ds, g), rest, p, ng)
 
 # LAW: the lock's write leaves every other path as it was
@@ -15166,9 +15339,9 @@ law rm.done:
 
 def rm.done(old, dd, tt, _ig, _fs, se):
   match old dd tt:
-    case M.Manifest{+n, +e, +b, +h, ods, ots} Up.Deps{+ds, _ss, _es, dm, _dsy, _dtr, _da, _db}
+    case M.Manifest{+n, +e, +b, +h, +hpa, +hpv, ods, ots} Up.Deps{+ds, _ss, _es, dm, _dsy, _dtr, _da, _db}
       Up.Tools{+ts, tm, _tsy, _ta, _tb}:
-      rm.fit(Bool.or(dm, tm), M.Manifest{n, e, b, h, ds, ts}, M.Manifest{n, e, b, h, ods, ots}, se)
+      rm.fit(Bool.or(dm, tm), M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, M.Manifest{n, e, b, h, hpa, hpv, ods, ots}, se)
 
 # LAW: and once the sources are asked for
 law rm.srcs:
@@ -15281,9 +15454,9 @@ def rm.known(k, only, rs, old, se):
       {==}
     case True{}:
       match old:
-        case M.Manifest{+n, +e, +b, +h, +ds, +ts}:
+        case M.Manifest{+n, +e, +b, +h, +hpa, +hpv, +ds, +ts}:
           rm.pins(Up.deps.walk(rs, only, M.hub.or(h), ds), Up.tools.walk(rs, only, ts), rs,
-            M.Manifest{n, e, b, h, ds, ts}, se)
+            M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, se)
 
 # LAW: an upgrade that does not stop makes its lock from the model it renders
 law rm.next:
@@ -15299,9 +15472,9 @@ def rm.next(only, r, rs, se):
       {==}
     case M.Good{m}:
       match m:
-        case M.Manifest{+n, +e, +b, +h, +ds, +ts}:
+        case M.Manifest{+n, +e, +b, +h, +hpa, +hpv, +ds, +ts}:
           rm.known(Bool.or(U.known(only, ds), M.tool.known(only, ts)), only, rs,
-            M.Manifest{n, e, b, h, ds, ts}, se)
+            M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, se)
 
 # LAW: so the ledger an upgrade that does not refuse leaves reads back as the
 # model it rendered
@@ -17290,18 +17463,20 @@ law kp_stop:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +why: String
   for asks: List<&2, Up.Ask>
   for +ig: String
   for +R: List<&2, P.Effect>
-  kp.next(Up.stopped(M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, why, asks),
-    M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, ig, R)
+  kp.next(Up.stopped(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, why, asks),
+    M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, ig, R)
 
-def kp_stop(pn, pe, pb, hb, ods, ots, why, _asks, ig, R):
+def kp_stop(pn, pe, pb, hb, hbpa, hbpv, ods, ots, why, _asks, ig, R):
   (({==}, {==}), es => _eg => Eq.bit.absurd(&1,
-    kp.ven([], [], M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, ig, R),
+    kp.ven([], [], M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, ig, R),
     Equal.trans(Bool, False{}, String.is_empty(Up.halt.why(why)), True{},
       Equal.sym(Bool, String.is_empty(Up.halt.why(why)), False{}, mv.halt_ne(why)), es)))
 
@@ -17376,6 +17551,8 @@ law kp_done.arm:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +ods: List<&2, M.Dep>
@@ -17385,13 +17562,14 @@ law kp_done.arm:
   for +eb: {String.eq(I.sync(ds, ig), ig) == b : Bool}
   for emv: {Bool.or(dm, tm) == moved : Bool}
   for hf: kp.facts(ds, ts, dm, ods, ots)
-  kp.parts(Up.model.next(moved, M.Manifest{pn, pe, pb, hb, ds, ts},
-      M.Manifest{pn, pe, pb, hb, ods, ots}), Up.fit.why(moved, M.Manifest{pn, pe, pb, hb, ds, ts}),
-    Up.read.next(moved, Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts}),
-      M.Manifest{pn, pe, pb, hb, ods, ots}),
-    Up.edit.toml(moved, Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts}),
+  kp.parts(Up.model.next(moved, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts},
+      M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}), Up.fit.why(moved, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds,
+        ts}),
+    Up.read.next(moved, Rend.show(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts}),
+      M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}),
+    Up.edit.toml(moved, Rend.show(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts}),
       Up.edit.if(b, ".gitignore", I.sync(ds, ig), [])),
-    I.vended(ds), M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, ig, R)
+    I.vended(ds), M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, ig, R)
 
 def kp_done.arm(
   moved,
@@ -17402,6 +17580,8 @@ def kp_done.arm(
   pe,
   pb,
   hb,
+  hbpa,
+  hbpv,
   ds,
   ts,
   ods,
@@ -17418,25 +17598,25 @@ def kp_done.arm(
       (hu, _es => _eg => (k => ev => kp_gi(b, ds, ig, R, eb,
           Equal.trans(P.Wrote,
             P.put.in(P.edits.of(Up.edit.if(b, ".gitignore", I.sync(ds, ig), []), R), ".gitignore"),
-            P.put.one(P.Write{"ez.toml", Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts})},
+            P.put.one(P.Write{"ez.toml", Rend.show(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts})},
               ".gitignore",
               P.put.in(P.edits.of(Up.edit.if(b, ".gitignore", I.sync(ds, ig), []), R),
                 ".gitignore")),
             P.Kept{},
             Equal.sym(P.Wrote,
-              P.put.one(P.Write{"ez.toml", Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts})},
+              P.put.one(P.Write{"ez.toml", Rend.show(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts})},
                 ".gitignore",
                 P.put.in(P.edits.of(Up.edit.if(b, ".gitignore", I.sync(ds, ig), []), R),
                   ".gitignore")),
               P.put.in(P.edits.of(Up.edit.if(b, ".gitignore", I.sync(ds, ig), []), R),
                 ".gitignore"),
-              put_one_other("ez.toml", Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts}),
+              put_one_other("ez.toml", Rend.show(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts}),
                 ".gitignore",
                 P.put.in(P.edits.of(Up.edit.if(b, ".gitignore", I.sync(ds, ig), []), R),
                   ".gitignore"), {==})),
             k), ev),
         k => Empty.absurd({I.vended(ds) == I.vended(ods) : List<&2, String>},
-          put_self_kept("ez.toml", Rend.show(M.Manifest{pn, pe, pb, hb, ds, ts}),
+          put_self_kept("ez.toml", Rend.show(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts}),
             P.put.in(P.edits.of(Up.edit.if(b, ".gitignore", I.sync(ds, ig), []), R), "ez.toml"),
             k))))
     case False{}:
@@ -17449,6 +17629,8 @@ law kp_done:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +ds: List<&2, M.Dep>
@@ -17464,11 +17646,11 @@ law kp_done:
   for fs: List<&2, Up.Found>
   for +R: List<&2, P.Effect>
   for hf: kp.facts(ds, ts, dm, ods, ots)
-  kp.next(Up.done(M.Manifest{pn, pe, pb, hb, ods, ots}, Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""},
-    Up.Tools{ts, tm, tsy, [], ""}, ig, fs), M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, ig, R)
+  kp.next(Up.done(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""},
+    Up.Tools{ts, tm, tsy, [], ""}, ig, fs), M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, ig, R)
 
-def kp_done(pn, pe, pb, hb, ods, ots, ds, _ss, _es, dm, _dsy, _dtr, ts, tm, _tsy, ig, _fs, R, hf):
-  kp_done.arm(Bool.or(dm, tm), String.eq(I.sync(ds, ig), ig), dm, tm, pn, pe, pb, hb, ds, ts,
+def kp_done(pn, pe, pb, hb, hbpa, hbpv, ods, ots, ds, _ss, _es, dm, _dsy, _dtr, ts, tm, _tsy, ig, _fs, R, hf):
+  kp_done.arm(Bool.or(dm, tm), String.eq(I.sync(ds, ig), ig), dm, tm, pn, pe, pb, hb, hbpa, hbpv, ds, ts,
     ods, ots, ig, R, {==}, {==}, hf)
 
 law kp_srcs:
@@ -17477,6 +17659,8 @@ law kp_srcs:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +ds: List<&2, M.Dep>
@@ -17491,19 +17675,19 @@ law kp_srcs:
   for +ig: String
   for +R: List<&2, P.Effect>
   for hf: kp.facts(ds, ts, dm, ods, ots)
-  kp.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, ods, ots},
+  kp.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots},
     Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""}, ig),
-    M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, ig, R)
+    M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, ig, R)
 
-def kp_srcs(srcs, pn, pe, pb, hb, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, ig, R, hf):
+def kp_srcs(srcs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, ig, R, hf):
   match srcs:
     case Up.Srcs{fs}:
-      kp_done(pn, pe, pb, hb, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, ig, fs, R, hf)
+      kp_done(pn, pe, pb, hb, hbpa, hbpv, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, ig, fs, R, hf)
     case Up.SrcsWait{ask}:
-      kp_stop(pn, pe, pb, hb, ods, ots, "ez: the upgrade was not given the project's sources",
+      kp_stop(pn, pe, pb, hb, hbpa, hbpv, ods, ots, "ez: the upgrade was not given the project's sources",
         [ask], ig, R)
     case Up.SrcsNo{+why}:
-      kp_stop(pn, pe, pb, hb, ods, ots, why, [], ig, R)
+      kp_stop(pn, pe, pb, hb, hbpa, hbpv, ods, ots, why, [], ig, R)
 
 law kp_ignore:
   for said: Up.Said
@@ -17512,6 +17696,8 @@ law kp_ignore:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +ds: List<&2, M.Dep>
@@ -17527,23 +17713,23 @@ law kp_ignore:
   for +R: List<&2, P.Effect>
   for e: {Up.text.said(rs, Up.Ignore{}) == said : Up.Said}
   for hf: kp.facts(ds, ts, dm, ods, ots)
-  kp.next(Up.got.ignore(said, srcs, M.Manifest{pn, pe, pb, hb, ods, ots},
+  kp.next(Up.got.ignore(said, srcs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots},
     Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""}),
-    M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
+    M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
 
-def kp_ignore(said, srcs, pn, pe, pb, hb, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, rs, R, e, hf):
+def kp_ignore(said, srcs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, rs, R, e, hf):
   match said:
     case Up.Said{+x}:
       %Equal.sym(Up.Said, Up.text.said(rs, Up.Ignore{}), Up.Said{x}, e)
-        : kp.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, ods, ots},
+        : kp.next(Up.got.srcs(srcs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots},
           Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""}, x),
-          M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, Laws.ignore.said(_), R)
-      kp_srcs(srcs, pn, pe, pb, hb, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, x, R, hf)
+          M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, Laws.ignore.said(_), R)
+      kp_srcs(srcs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, x, R, hf)
     case Up.Unasked{+ask}:
-      kp_stop(pn, pe, pb, hb, ods, ots, "ez: the upgrade was not given .gitignore",
+      kp_stop(pn, pe, pb, hb, hbpa, hbpv, ods, ots, "ez: the upgrade was not given .gitignore",
         ask <> Up.open.srcs(srcs), Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
     case Up.Unsaid{+why}:
-      kp_stop(pn, pe, pb, hb, ods, ots, why, [], Laws.ignore.said(Up.text.said(rs, Up.Ignore{})),
+      kp_stop(pn, pe, pb, hb, hbpa, hbpv, ods, ots, why, [], Laws.ignore.said(Up.text.said(rs, Up.Ignore{})),
         R)
 
 law kp_asks:
@@ -17553,6 +17739,8 @@ law kp_asks:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +ds: List<&2, M.Dep>
@@ -17566,19 +17754,19 @@ law kp_asks:
   for +tsy: List<&2, String>
   for +R: List<&2, P.Effect>
   for g: {asks == [] : List<&2, Up.Ask>} -> kp.facts(ds, ts, dm, ods, ots)
-  kp.next(Up.pins.asks(asks, rs, M.Manifest{pn, pe, pb, hb, ods, ots},
+  kp.next(Up.pins.asks(asks, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots},
     Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""}),
-    M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
+    M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
 
-def kp_asks(asks, rs, pn, pe, pb, hb, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, R, g):
+def kp_asks(asks, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, R, g):
   match asks:
     case []:
       kp_ignore(Up.text.said(rs, Up.Ignore{}),
         Up.ask.srcs(List.is_empty(&2, U.Swap, Up.deps.edits(Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""})),
           rs),
-        pn, pe, pb, hb, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, rs, R, {==}, g({==}))
+        pn, pe, pb, hb, hbpa, hbpv, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, rs, R, {==}, g({==}))
     case +h <> +t:
-      kp_stop(pn, pe, pb, hb, ods, ots, "ez: the upgrade still has questions for the remote",
+      kp_stop(pn, pe, pb, hb, hbpa, hbpv, ods, ots, "ez: the upgrade still has questions for the remote",
         h <> t, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
 
 law kp_bad:
@@ -17590,6 +17778,8 @@ law kp_bad:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +ds: List<&2, M.Dep>
@@ -17607,9 +17797,9 @@ law kp_bad:
   for +ec: {Bool.and(String.is_empty(dbad), String.is_empty(tbad)) == clean : Bool}
   for f: {String.is_empty(dbad) == True{} : Bool} -> {String.is_empty(tbad) == True{} : Bool} ->
     {asks == [] : List<&2, Up.Ask>} -> kp.facts(ds, ts, dm, ods, ots)
-  kp.next(Up.pins.bad(clean, bad, asks, rs, M.Manifest{pn, pe, pb, hb, ods, ots},
+  kp.next(Up.pins.bad(clean, bad, asks, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots},
     Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""}),
-    M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
+    M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
 
 def kp_bad(
   clean,
@@ -17620,6 +17810,8 @@ def kp_bad(
   pe,
   pb,
   hb,
+  hbpa,
+  hbpv,
   ods,
   ots,
   ds,
@@ -17639,11 +17831,11 @@ def kp_bad(
 ):
   match clean:
     case True{}:
-      kp_asks(asks, rs, pn, pe, pb, hb, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, R,
+      kp_asks(asks, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, ds, ss, es, dm, dsy, dtr, ts, tm, tsy, R,
         f(Eq.and.left(String.is_empty(dbad), String.is_empty(tbad), ec),
           Eq.and.right(String.is_empty(dbad), String.is_empty(tbad), ec)))
     case False{}:
-      kp_stop(pn, pe, pb, hb, ods, ots, bad, [], Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
+      kp_stop(pn, pe, pb, hb, hbpa, hbpv, ods, ots, bad, [], Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
 
 # LAW: questions joined into none are none on the left
 law app_nil_l:
@@ -17700,20 +17892,22 @@ law kp_pins:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +R: List<&2, P.Effect>
   for sd: st.deps(dd, ods)
   for stt: st.tools(tt, ots)
-  kp.next(Up.pins(dd, tt, rs, M.Manifest{pn, pe, pb, hb, ods, ots}),
-    M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
+  kp.next(Up.pins(dd, tt, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}),
+    M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
 
-def kp_pins(dd, tt, rs, pn, pe, pb, hb, ods, ots, R, sd, stt):
+def kp_pins(dd, tt, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, R, sd, stt):
   match dd tt:
     case Up.Deps{+ds, +ss, +es, +dm, +dsy, +dtr, +das, +dbad} Up.Tools{+ts, +tm, +tsy, +tas, +tbad}:
       kp_bad(Bool.and(String.is_empty(dbad), String.is_empty(tbad)),
         Bool.pick(String, String.is_empty(dbad), tbad, dbad),
-        List.append(&2, Up.Ask, das, tas), rs, pn, pe, pb, hb, ods, ots, ds, ss, es, dm, dsy, dtr,
+        List.append(&2, Up.Ask, das, tas), rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, ds, ss, es, dm, dsy, dtr,
         ts, tm, tsy, R, dbad, tbad, {==},
         e1 => e2 => +ea => kp.mk(ds, ts, dm, ods, ots, sd(app_nil_l(das, tas, ea))(e1),
           stt(app_nil_r(das, tas, ea))(e2)))
@@ -17726,20 +17920,22 @@ law kp_known:
   for +pe: String
   for +pb: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for +ods: List<&2, M.Dep>
   for +ots: List<&2, M.Tool>
   for +R: List<&2, P.Effect>
-  kp.next(Up.known(ok, only, rs, M.Manifest{pn, pe, pb, hb, ods, ots}),
-    M.Good{M.Manifest{pn, pe, pb, hb, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
+  kp.next(Up.known(ok, only, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}),
+    M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
 
-def kp_known(ok, only, rs, pn, pe, pb, hb, ods, ots, R):
+def kp_known(ok, only, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots, R):
   match ok:
     case False{}:
-      kp_stop(pn, pe, pb, hb, ods, ots, "ez: no dependency or tool named " ++ only, [],
+      kp_stop(pn, pe, pb, hb, hbpa, hbpv, ods, ots, "ez: no dependency or tool named " ++ only, [],
         Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R)
     case True{}:
       kp_pins(Up.deps.walk(rs, only, M.hub.or(hb), ods), Up.tools.walk(rs, only, ots), rs,
-        pn, pe, pb, hb, ods, ots, R, st.walk(rs, only, M.hub.or(hb), ods),
+        pn, pe, pb, hb, hbpa, hbpv, ods, ots, R, st.walk(rs, only, M.hub.or(hb), ods),
         st.twalk(rs, only, ots))
 
 # LAW: every decision `ez lock --upgrade` makes keeps what `kp.next` says of
@@ -17758,8 +17954,8 @@ def kp_next(only, r, rs, R):
         kp.ven([], [], M.Bad{why}, Laws.ignore.said(Up.text.said(rs, Up.Ignore{})), R), eg))
     case M.Good{m}:
       match m:
-        case M.Manifest{+pn, +pe, +pb, +hb, +ods, +ots}:
-          kp_known(Bool.or(U.known(only, ods), M.tool.known(only, ots)), only, rs, pn, pe, pb, hb,
+        case M.Manifest{+pn, +pe, +pb, +hb, +hbpa, +hbpv, +ods, +ots}:
+          kp_known(Bool.or(U.known(only, ods), M.tool.known(only, ots)), only, rs, pn, pe, pb, hb, hbpa, hbpv,
             ods, ots, R)
 
 # the dependencies' sources a decision keeps
@@ -18018,11 +18214,11 @@ def Laws.upgrade_unmoved_vends_the_ledger(w, up, ok, kept):
 # EZ-LED-5: the origins are read off the parsed ledger's dependencies, so
 # the ledger is rewritten into the model the premise names and the tools are
 # never looked at.
-def Laws.lock_origins_skip_tools(_s, _n, _e, _b, _h, ds, _ts, g):
+def Laws.lock_origins_skip_tools(_s, _n, _e, _b, _h, _hpa, _hpv, ds, _ts, g):
   %g : {L.ledger.read(_) == L.ledger.origins(ds) : List<&2, L.Origin>}
   {==}
 
-def Laws.upgrade_origins_skip_tools(_nx, _n, _e, _b, _h, ds, _ts, g):
+def Laws.upgrade_origins_skip_tools(_nx, _n, _e, _b, _h, _hpa, _hpv, ds, _ts, g):
   %g : {L.ledger.read(_) == L.ledger.origins(ds) : List<&2, L.Origin>}
   {==}
 

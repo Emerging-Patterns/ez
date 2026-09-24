@@ -194,9 +194,11 @@ law show_good_opens_with_name:
   for e: String
   for b: String
   for hb: String
+  for hbpa: String
+  for hbpv: String
   for ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {String.starts_with(M.show(M.Good{M.Manifest{n, e, b, hb, ds, ts}}), n) == True{}
+  {String.starts_with(M.show(M.Good{M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}}), n) == True{}
     : Bool}
 
 # LAW: a lookup answers with the first dependency of that name, whole
@@ -223,6 +225,8 @@ law rev_of_names_the_commit:
   for me: String
   for mb: String
   for mh: String
+  for mhpa: String
+  for mhpv: String
   for +n: String
   for h: String
   for en: String
@@ -234,7 +238,7 @@ law rev_of_names_the_commit:
   for vend: Bool
   for t: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {M.rev_of(M.Good{M.Manifest{mn, me, mb, mh,
+  {M.rev_of(M.Good{M.Manifest{mn, me, mb, mh, mhpa, mhpv,
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, ts}}, n) == rev
     : String}
 
@@ -244,6 +248,8 @@ law tag_of_names_the_tag:
   for me: String
   for mb: String
   for mh: String
+  for mhpa: String
+  for mhpv: String
   for +n: String
   for h: String
   for en: String
@@ -255,7 +261,7 @@ law tag_of_names_the_tag:
   for vend: Bool
   for t: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {M.tag_of(M.Good{M.Manifest{mn, me, mb, mh,
+  {M.tag_of(M.Good{M.Manifest{mn, me, mb, mh, mhpa, mhpv,
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, ts}}, n) == tag
     : String}
 
@@ -310,9 +316,11 @@ law show_opens_with_package:
   for e: String
   for b: String
   for hb: String
+  for hbpa: String
+  for hbpv: String
   for ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {String.starts_with(R.show(M.Manifest{n, e, b, hb, ds, ts}), "[package]\n") == True{}
+  {String.starts_with(R.show(M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}), "[package]\n") == True{}
     : Bool}
 
 # LAW: a ledger that did not read renders as nothing. `ez add` and `ez remove`
@@ -344,7 +352,7 @@ law hub_of_absent_is_bends:
   for b: String
   for ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {M.hub_of(M.Good{M.Manifest{n, e, b, "", ds, ts}})
+  {M.hub_of(M.Good{M.Manifest{n, e, b, "", "", "", ds, ts}})
     == "https://hub.bend-lang.com" : String}
 
 # LAW: a hub the ledger names is the hub, whatever else the ledger holds.
@@ -355,10 +363,12 @@ law hub_of_names_the_hub:
   for e: String
   for b: String
   for +hb: String
+  for +hbpa: String
+  for +hbpv: String
   for ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
   for f: {False{} == String.is_empty(hb) : Bool}
-  {M.hub_of(M.Good{M.Manifest{n, e, b, hb, ds, ts}}) == hb : String}
+  {M.hub_of(M.Good{M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}}) == hb : String}
 
 # LAW: a git section's vendor bit is its `vendor` key read as `true`, and
 # nothing else. This is the bit the allowlist is derived from.
@@ -377,7 +387,7 @@ law source_of_vendor:
 law vendor_reads_back:
   for v: Bool
   {M.source.vendor(M.source.dep(M.dep(M.parse(R.show(M.Manifest{"app", "", "",
-    "", [M.Dep{"dep", "0x1", "", M.Git{"u", "r", "", ".", "n", v}}], []})),
+    "", "", "", [M.Dep{"dep", "0x1", "", M.Git{"u", "r", "", ".", "n", v}}], []})),
     "dep"))) == v : Bool}
 
 # LAW: a ledger ez can write, rendered, parses back to the model it was

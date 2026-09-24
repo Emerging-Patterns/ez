@@ -8,9 +8,10 @@
 # What git says of the project and a file's text are answered as the tool
 # commands answer them (`ToolRun.answer`). What git tracks is `git ls-files
 # -v` in the project, with paths written as they are rather than quoted. The
-# upload is `bend <entry> --publish` with the project's packages on BEND_LIB,
-# the way every other `bend` ez starts has them; the planner asks for it last,
-# once every other check has passed. It decides nothing; that it reads and
+# upload is `bend <entry> --publish`, followed by the `<name>@<version>` the
+# planner put in the question when the ledger names one, with the project's
+# packages on BEND_LIB, the way every other `bend` ez starts has them; the
+# planner asks for it last, once every other check has passed. It decides nothing; that it reads and
 # executes faithfully is EZ-TRUST-2.
 import Base
 import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
@@ -37,9 +38,9 @@ def answer(+lib: String, ask: PW.Ask) -> IO(PW.Answer):
       do IO<PW.Answer>:
         +out : String <- R.exec(["git", "-c", "core.quotePath=false", "ls-files", "-v"])
         return ran(out)
-    case PW.Upload{+entry}:
+    case PW.Upload{+entry, +named}:
       do IO<PW.Answer>:
-        +out : String <- R.exec(Env.line(lib, PP.upload.line(entry)))
+        +out : String <- R.exec(Env.line(lib, PP.upload.line(entry, named)))
         return ran(out)
 
 # every question, answered

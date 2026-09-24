@@ -8,7 +8,8 @@
 #
 # Publishing is irreversible and public, so every check that can be made
 # before the upload is made first, in this order: there is a ledger that
-# parses, and it names the entry; git answers `git status --porcelain
+# parses, and it names the entry, and the name it publishes under, if any, is
+# one bend takes (EZ-PUB-3); git answers `git status --porcelain
 # --untracked-files=normal` about the project and names no path (EZ-PUB-1);
 # the walk from the entry makes a package; and git tracks every file of that
 # package. Only then is the upload asked for, and its answer is checked
@@ -149,21 +150,123 @@ def dirty(text: String) -> Bool:
   dirty.lines(String.lines(text))
 
 # ---------------------------------------------------------------------------
+# the name a package is published under
+
+# one character of a version: a digit or a dot
+def semver.char(+ch: Char) -> Bool:
+  Bool.or(Char.is_digit(ch), Char.is_eq(ch, '.'))
+
+# whether every character of a version is a digit or a dot. A pre-release
+# (`1.0.0-rc.1`) or build (`1.0.0+abc`) suffix holds a character that is
+# neither, so this is where one is refused, whatever follows it.
+def semver.chars(text: String) -> Bool:
+  match text:
+    case SNil{}:
+      True{}
+    case SCon{+h, t}:
+      +rest = semver.chars(t)
+      Bool.and(semver.char(h), rest)
+
+# whether a version is MAJOR.MINOR.PATCH: digits and dots only, and three
+# numbers, none with a leading zero (`K.ver.num`, the rule bend's NAMED
+# holds each of its four numbers to)
+def semver(+text: String) -> Bool:
+  +ps = String.split(text, '.')
+  Bool.and(semver.chars(text),
+    Bool.and(Nat.is_eq(List.length(&2, String, ps), 3n), K.ver.nums(ps)))
+
+# how the ledger names the package on the hub: not at all, so it is
+# published by its hash alone; by `<name>@<version>`, as bend's `--publish`
+# takes it; or in a way ez refuses, and why
+type Named is Data:
+  ByHash{}
+  ByName{nv: String}
+  Unnamed{why: String}
+
+# why a `publish-as` with no `version` is refused
+def why.nover(+name: String) -> String:
+  "ez: ez.toml's [package] has publish-as = \"" ++ name ++ "\" and no version; " ++
+    "a named publish needs both, and one with neither publishes by hash"
+
+# why a `version` with no `publish-as` is refused
+def why.noname(+ver: String) -> String:
+  "ez: ez.toml's [package] has version = \"" ++ ver ++ "\" and no publish-as; " ++
+    "a named publish needs both, and one with neither publishes by hash"
+
+# why a `publish-as` the hub would not take is refused
+def why.name(+name: String) -> String:
+  "ez: publish-as = \"" ++ name ++ "\" is not a hub name: a lowercase letter, " ++
+    "then a-z, 0-9 and -, 12 to 64 characters in all"
+
+# why a `version` that is not MAJOR.MINOR.PATCH is refused
+def why.ver(+ver: String) -> String:
+  "ez: version = \"" ++ ver ++ "\" is not MAJOR.MINOR.PATCH: three numbers " ++
+    "with no leading zeros and no pre-release or build suffix, which ez " ++
+    "publishes as bend's four-part MAJOR.MINOR.PATCH.0"
+
+# both keys given: the name first, then the version, then the name bend is
+# asked for, the version with bend's fourth number, `0`, after it
+def naming.both(name: Bool, ver: Bool, +pa: String, +pv: String) -> Named:
+  match name:
+    case False{}:
+      Unnamed{why.name(pa)}
+    case True{}:
+      match ver:
+        case False{}:
+          Unnamed{why.ver(pv)}
+        case True{}:
+          ByName{pa ++ "@" ++ pv ++ ".0"}
+
+# which of the two keys the ledger gives. Neither is a publish by hash, as
+# before the keys existed; one without the other is refused rather than
+# guessed at, as `cargo publish` refuses a package with no version.
+def naming.go(noname: Bool, nover: Bool, +pa: String, +pv: String) -> Named:
+  match noname:
+    case True{}:
+      match nover:
+        case True{}:
+          ByHash{}
+        case False{}:
+          Unnamed{why.noname(pv)}
+    case False{}:
+      match nover:
+        case True{}:
+          Unnamed{why.nover(pa)}
+        case False{}:
+          naming.both(K.name.part(pa), semver(pv), pa, pv)
+
+# how `publish-as` and `version` name the package
+def naming(+pa: String, +pv: String) -> Named:
+  naming.go(String.is_empty(pa), String.is_empty(pv), pa, pv)
+
+# ---------------------------------------------------------------------------
 # the ledger
 
-# what the ledger says: the entry it names, or why there is none
+# what the ledger says: the entry it names and how the package is named on
+# the hub, by its hash or by a `<name>@<version>`, or why there is none
 type Led is Data:
-  Led{entry: String}
+  Led{entry: String, named: Named}
   LedNo{why: String}
 
-# the entry a parsed ledger names, `main.bend` when it names none
+# the entry, with the name the package goes under, or why it goes under none
+def led.named(+entry: String, got: Named) -> Led:
+  match got:
+    case ByHash{}:
+      Led{entry, ByHash{}}
+    case ByName{nv}:
+      Led{entry, ByName{nv}}
+    case Unnamed{why}:
+      LedNo{why}
+
+# the entry a parsed ledger names, `main.bend` when it names none, and the
+# name its `publish-as` and `version` give it
 def led.read(ledger: M.Read) -> Led:
   match ledger:
     case M.Bad{why}:
       LedNo{"ez: " ++ M.show(M.Bad{why})}
     case M.Good{m}:
-      M.Manifest{_n, +e, _b, _h, _ds, _ts} = m
-      Led{Bool.pick(String, String.is_empty(e), "main.bend", e)}
+      M.Manifest{_n, +e, _b, _h, +pa, +pv, _ds, _ts} = m
+      led.named(Bool.pick(String, String.is_empty(e), "main.bend", e), naming(pa, pv))
 
 # the ledger read. With no ez.toml there is no package, and nothing is
 # guessed in its place (`cargo publish` refuses a directory with no
@@ -183,9 +286,32 @@ def led(world: PW.World) -> Led:
 # the entry, as the walk takes it, "" when the ledger names none
 def entry.of(ledger: Led) -> String:
   match ledger:
-    case Led{e}:
+    case Led{e, _nv}:
       Path.norm(e)
     case LedNo{_why}:
+      ""
+
+# how the package goes on the hub; a ledger that names no entry sends
+# nothing, so it is taken for one that goes by hash
+def named.of(ledger: Led) -> Named:
+  match ledger:
+    case Led{_e, got}:
+      got
+    case LedNo{_why}:
+      ByHash{}
+
+# how a World's package goes on the hub
+def named(world: PW.World) -> Named:
+  named.of(led(world))
+
+# the `<name>@<version>` the upload names the package by, "" for none
+def named.word(got: Named) -> String:
+  match got:
+    case ByName{nv}:
+      nv
+    case ByHash{}:
+      ""
+    case Unnamed{_why}:
       ""
 
 # the entry of a World
@@ -431,15 +557,23 @@ def stray(+world: PW.World) -> Kept:
 # ---------------------------------------------------------------------------
 # the upload
 
-# the words the upload runs: the entry alone. bend 2.0.27 also takes a
-# `<name>@<version>` after `--publish` to name the package; ez does not ask
-# for a name yet, and a publish that does reads it from here.
-def upload.line(+entry: String) -> List<&2, String>:
-  ["bend", entry, "--publish"]
+# the words the upload runs: the entry, and after `--publish` the
+# `<name>@<version>` the package goes under when it has one, which is how
+# bend 2.0.27 publishes and names a package in one run (`bend <file>
+# --publish <name>@<version>`). With no name it is the upload by hash alone.
+def upload.go(bare: Bool, +entry: String, +named: String) -> List<&2, String>:
+  match bare:
+    case True{}:
+      ["bend", entry, "--publish"]
+    case False{}:
+      ["bend", entry, "--publish", named]
 
-# the question: the entry sent
+def upload.line(+entry: String, +named: String) -> List<&2, String>:
+  upload.go(String.is_empty(named), entry, named)
+
+# the question: the entry sent, under the name the ledger gives it
 def upload(+world: PW.World) -> PW.Ask:
-  PW.Upload{entry(world)}
+  PW.Upload{entry(world), named.word(named(world))}
 
 # the upload's answer, looked up
 def uploaded(+world: PW.World) -> PW.Heard:
@@ -478,33 +612,35 @@ def why.read(+ours: String, +text: String) -> String:
       ". One of the two package walks has drifted from the other, so " ++
       "neither name is safe to write down and ez has reported none.")
 
-# why an upload refuses. bend has sent the package by the time it answers,
-# since it cannot report the hash without sending it, so this is said after
-# the fact.
-def why.ran(ok: Bool, +entry: String, +ours: String, +text: String) -> String:
+# why an upload refuses, `words` being the line it ran. bend has sent the
+# package by the time it answers, since it cannot report the hash without
+# sending it, so this is said after the fact.
+def why.ran(ok: Bool, +words: String, +ours: String, +text: String) -> String:
   match ok:
     case False{}:
-      "ez: bend " ++ entry ++ " --publish: " ++ text
+      "ez: " ++ words ++ ": " ++ text
     case True{}:
       why.read(ours, text)
 
-def why.answer(got: PW.Answer, +entry: String, +ours: String) -> String:
+def why.answer(got: PW.Answer, +words: String, +ours: String) -> String:
   match got:
     case PW.Ran{ok, text}:
-      why.ran(ok, entry, ours, text)
+      why.ran(ok, words, ours, text)
     case PW.Told{_t}:
       "ez: bend was not asked to publish"
 
-def why.of(got: PW.Heard, +entry: String, +ours: String) -> String:
+def why.of(got: PW.Heard, +words: String, +ours: String) -> String:
   match got:
     case PW.Open{}:
       "ez: bend was not asked to publish"
     case PW.Heard{a}:
-      why.answer(a, entry, ours)
+      why.answer(a, words, ours)
 
 # why the World's upload refuses
 def why.upload(+world: PW.World) -> String:
-  why.of(uploaded(world), entry(world), hash(world))
+  why.of(uploaded(world),
+    String.join(upload.line(entry(world), named.word(named(world))), " "),
+    hash(world))
 
 # ---------------------------------------------------------------------------
 # where a World stands
@@ -586,7 +722,7 @@ def decide.status(said: Status, +world: PW.World) -> Verdict:
 # the ledger: an entry, or why there is none
 def decide.led(ledger: Led, +world: PW.World) -> Verdict:
   match ledger:
-    case Led{_e}:
+    case Led{_e, _nv}:
       decide.status(status(world), world)
     case LedNo{why}:
       Stop{why}
@@ -598,11 +734,27 @@ def decide(+world: PW.World) -> Verdict:
 # ---------------------------------------------------------------------------
 # the plan
 
+# what the import line names the package by: its `<name>@<version>` when it
+# was published under one, its hash otherwise
+def called.of(got: Named, +hash: String) -> String:
+  match got:
+    case ByName{nv}:
+      nv
+    case ByHash{}:
+      hash
+    case Unnamed{_why}:
+      hash
+
+# what a World's import line names the package by
+def called(+world: PW.World) -> String:
+  called.of(named(world), hash(world))
+
 # what a publish that agreed says: the hash ez computed, then the import line
 # for the entry's path inside the package (`G.import.line`, which `ez add`
-# prints too). It writes nothing.
+# prints too), by the name the package was published under when it has one.
+# It writes nothing.
 def made(+world: PW.World) -> P.Plan:
-  P.Plan{[P.Say{hash(world)}, P.Say{G.import.line(hash(world), at(world))}],
+  P.Plan{[P.Say{hash(world)}, P.Say{G.import.line(called(world), at(world))}],
     P.Success{}}
 
 # the plan for where a World stands. One that still asks is a World the
@@ -677,7 +829,7 @@ def stops(+world: PW.World) -> Bool:
 # whether a question is the upload
 def is.upload(ask: PW.Ask) -> Bool:
   match ask:
-    case PW.Upload{_entry}:
+    case PW.Upload{_entry, _named}:
       True{}
     case PW.Tool{_q}:
       False{}

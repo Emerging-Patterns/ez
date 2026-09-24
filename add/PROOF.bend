@@ -1401,8 +1401,8 @@ def Laws.add_pins_head_rev(w, none, text, t, c, b, ok):
 
 # EZ-LED-5: `Rend.add.keep` edits the dependencies and hands the tools on as
 # they are, so the ledger `add_edits_ledger` names is this one.
-def Laws.add_keeps_tools(w, n, e, b, h, ds, ts, good, ok):
-  Laws.add_edits_ledger(w, M.Manifest{n, e, b, h, ds, ts}, good, ok)
+def Laws.add_keeps_tools(w, n, e, b, h, hpa, hpv, ds, ts, good, ok):
+  Laws.add_edits_ledger(w, M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, good, ok)
 
 # ---------------------------------------------------------------------------
 # EZ-OUT-1

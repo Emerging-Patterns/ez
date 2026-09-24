@@ -728,11 +728,13 @@ law run_starts_entry:
   for +e: String
   for +b: String
   for +h: String
+  for +hpa: String
+  for +hpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +a: String
   for +ws: List<&2, String>
-  for good: {M.Good{M.Manifest{n, e, b, h, ds, ts}} == M.parse(t) : M.Read}
+  for good: {M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} == M.parse(t) : M.Read}
   for named: {False{} == String.is_empty(e) : Bool}
   {S.start(S.Run{a <> ws}, Some{t}) == S.Starts{"bend" <> (e <> ws)} : S.Start}
 
@@ -743,11 +745,13 @@ law run_starts_main:
   for +n: String
   for +b: String
   for +h: String
+  for +hpa: String
+  for +hpv: String
   for +ds: List<&2, M.Dep>
   for +ts: List<&2, M.Tool>
   for +a: String
   for +ws: List<&2, String>
-  for good: {M.Good{M.Manifest{n, "", b, h, ds, ts}} == M.parse(t) : M.Read}
+  for good: {M.Good{M.Manifest{n, "", b, h, hpa, hpv, ds, ts}} == M.parse(t) : M.Read}
   {S.start(S.Run{a <> ws}, Some{t}) == S.Starts{"bend" <> ("main.bend" <> ws)}
     : S.Start}
 

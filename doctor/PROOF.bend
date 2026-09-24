@@ -440,13 +440,13 @@ def unused_has(pre, d, post, hs, e):
 # ---------------------------------------------------------------------------
 # EZ-VEN-5
 
-def Laws.doctor_reports_unrecorded(w, n, e, b, hub, ds, _ts, fs, h, g, l, i, u):
+def Laws.doctor_reports_unrecorded(w, n, e, b, hub, hubpa, hubpv, ds, _ts, fs, h, g, l, i, u):
   %g : {DP.said(DP.plan.of(DP.ledger.seen(_), DW.cc(w), DW.lib(w), DW.lock(w),
     DW.replies(w), DP.checked(w)), DP.unrecorded.line(h)) == True{} : Bool}
-  %l : {DP.said.in(DP.says(DP.notes.of(M.Good{M.Manifest{n, e, b, hub, ds, []}}, _,
+  %l : {DP.said.in(DP.says(DP.notes.of(M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, []}}, _,
     DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w))), DP.unrecorded.line(h))
     == True{} : Bool}
-  said_notes(M.Good{M.Manifest{n, e, b, hub, ds, []}}, DW.Heard{DW.Listed{W.Listed{fs}}},
+  said_notes(M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, []}}, DW.Heard{DW.Listed{W.Listed{fs}}},
     DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w), DP.unrecorded.line(h),
     said_drift(DP.imports(fs), DP.drift(DP.imports(fs), ds), DP.unrecorded.line(h),
       has_append_left(DP.unrecorded(DP.missing(DP.imports(fs), DP.pinned(ds))),
@@ -459,14 +459,14 @@ def Laws.doctor_reports_unrecorded(w, n, e, b, hub, ds, _ts, fs, h, g, l, i, u):
               has_append_left(P.roots(fs), P.roots.named(fs), h, i)),
             u)))))
 
-def Laws.doctor_reports_unused(w, n, e, b, hub, pre, d, post, _ts, fs, g, l, u):
+def Laws.doctor_reports_unused(w, n, e, b, hub, hubpa, hubpv, pre, d, post, _ts, fs, g, l, u):
   %g : {DP.said(DP.plan.of(DP.ledger.seen(_), DW.cc(w), DW.lib(w), DW.lock(w),
     DW.replies(w), DP.checked(w)), DP.unused.line(d)) == True{} : Bool}
   %l : {DP.said.in(DP.says(DP.notes.of(
-    M.Good{M.Manifest{n, e, b, hub, List.append(&2, M.Dep, pre, d <> post), []}}, _,
+    M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, List.append(&2, M.Dep, pre, d <> post), []}}, _,
     DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w))), DP.unused.line(d))
     == True{} : Bool}
-  said_notes(M.Good{M.Manifest{n, e, b, hub, List.append(&2, M.Dep, pre, d <> post), []}},
+  said_notes(M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, List.append(&2, M.Dep, pre, d <> post), []}},
     DW.Heard{DW.Listed{W.Listed{fs}}},
     DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w), DP.unused.line(d),
     said_drift(DP.imports(fs),
@@ -535,21 +535,21 @@ def refuses_wrong(ns, e):
     : {DP.refuses.plan(P.Plan{DP.says(ns), DP.outcome.of(_)}) == True{} : Bool}
   {==}
 
-def Laws.doctor_drift_fails(w, n, e, b, hub, ds, _ts, fs, x, xs, g, l, r):
+def Laws.doctor_drift_fails(w, n, e, b, hub, hubpa, hubpv, ds, _ts, fs, x, xs, g, l, r):
   %g : {DP.refuses.plan(DP.plan.of(DP.ledger.seen(_), DW.cc(w), DW.lib(w), DW.lock(w),
     DW.replies(w), DP.checked(w))) == True{} : Bool}
-  %l : {DP.refuses.plan(DP.plan.notes(DP.notes.of(M.Good{M.Manifest{n, e, b, hub, ds, []}},
+  %l : {DP.refuses.plan(DP.plan.notes(DP.notes.of(M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, []}},
     _, DW.cc(w), DW.lib(w), DW.lock(w), DW.replies(w), DP.checked(w)))) == True{} : Bool}
   %Equal.sym(List<&2, String>, DP.drift.of(fs, ds), x <> xs, r)
     : {DP.refuses.plan(DP.plan.notes(List.append(&2, DP.Note,
-      DP.head.notes(M.Good{M.Manifest{n, e, b, hub, ds, []}}, DW.cc(w), DW.lib(w), DW.lock(w),
+      DP.head.notes(M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, []}}, DW.cc(w), DW.lib(w), DW.lock(w),
         DW.replies(w), DP.checked(w)),
       DP.drift.notes(DP.imports(fs), _)))) == True{} : Bool}
   refuses_wrong(List.append(&2, DP.Note,
-      DP.head.notes(M.Good{M.Manifest{n, e, b, hub, ds, []}}, DW.cc(w), DW.lib(w), DW.lock(w),
+      DP.head.notes(M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, []}}, DW.cc(w), DW.lib(w), DW.lock(w),
         DW.replies(w), DP.checked(w)),
       DP.flag(x <> xs)),
-    wrong_append(DP.head.notes(M.Good{M.Manifest{n, e, b, hub, ds, []}}, DW.cc(w), DW.lib(w),
+    wrong_append(DP.head.notes(M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, []}}, DW.cc(w), DW.lib(w),
       DW.lock(w), DW.replies(w), DP.checked(w)), DP.flag(x <> xs), {==}))
 
 # ---------------------------------------------------------------------------
@@ -591,10 +591,10 @@ def Laws.doctor_refuses_unread(cc, lib, lock, rs, s, why, bad):
 # EZ-LED-5
 
 # Both ledgers are seen without their tools, which is the same ledger.
-def Laws.doctor_ignores_tools(cc, lib, lock, rs, cs, _t1, t2, n, e, b, hub, ds, ts1, _ts2, g1, g2):
+def Laws.doctor_ignores_tools(cc, lib, lock, rs, cs, _t1, t2, n, e, b, hub, hubpa, hubpv, ds, ts1, _ts2, g1, g2):
   %g1 : {DP.plan.of(DP.ledger.seen(_), cc, lib, lock, rs, cs)
     == DP.plan.of(DP.ledger.seen(M.parse(t2)), cc, lib, lock, rs, cs) : P.Plan}
-  %g2 : {DP.plan.of(DP.ledger.seen(M.Good{M.Manifest{n, e, b, hub, ds, ts1}}), cc, lib, lock,
+  %g2 : {DP.plan.of(DP.ledger.seen(M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, ts1}}), cc, lib, lock,
     rs, cs) == DP.plan.of(DP.ledger.seen(_), cc, lib, lock, rs, cs) : P.Plan}
   {==}
 

@@ -48,3 +48,13 @@ law init_ledger_reads_back:
   for +text: String
   for put: {P.put.plan(IP.plan(IP.World{n, e, led, ig, mn}), "ez.toml") == P.Put{text} : P.Wrote}
   {M.parse(text) == M.Good{IP.model(IP.name.or(n), IP.entry.or(e))} : M.Read}
+
+# LAW: the ledger `ez init` makes names no `publish-as` and no `version`,
+# whatever the package and entry: with `init_ledger_reads_back` it reads back
+# with both empty, so the project publishes by hash (`neither_is_hash`) until
+# its author names both
+# EZ-PUB-3
+law init_publishes_by_hash:
+  for +n: String
+  for +e: String
+  {IP.model(n, e) == M.Manifest{n, e, "", "", "", "", [], []} : M.Manifest}

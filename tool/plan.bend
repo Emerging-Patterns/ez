@@ -72,7 +72,7 @@ def links.act(act: TW.Act) -> Bool:
 
 # the tools of a ledger that was read
 def tools.of(manifest: M.Manifest) -> List<&2, M.Tool>:
-  M.Manifest{_n, _e, _b, _h, _ds, ts} = manifest
+  M.Manifest{_n, _e, _b, _h, _pa, _pv, _ds, ts} = manifest
   ts
 
 # the pins a lock's text records
@@ -538,7 +538,7 @@ def label(+world: TW.World) -> String:
 def led.of(got: Maybe<&2, String>) -> M.Read:
   match got:
     case None{}:
-      M.Good{M.Manifest{"", "", "", "", [], []}}
+      M.Good{M.Manifest{"", "", "", "", "", "", [], []}}
     case Some{text}:
       M.parse(text)
 
@@ -562,7 +562,7 @@ def lib(+world: TW.World) -> String:
 def man.of(parsed: M.Read) -> M.Manifest:
   match parsed:
     case M.Bad{_why}:
-      M.Manifest{"", "", "", "", [], []}
+      M.Manifest{"", "", "", "", "", "", [], []}
     case M.Good{m}:
       m
 
@@ -572,17 +572,17 @@ def man(+world: TW.World) -> M.Manifest:
 
 # the checkout's `[package] name`, `bin` and `entry`
 def man.name(manifest: M.Manifest) -> String:
-  M.Manifest{n, _e, _b, _h, _ds, _ts} = manifest
+  M.Manifest{n, _e, _b, _h, _pa, _pv, _ds, _ts} = manifest
   n
 
 # a ledger's `bin`
 def man.bin(manifest: M.Manifest) -> String:
-  M.Manifest{_n, _e, b, _h, _ds, _ts} = manifest
+  M.Manifest{_n, _e, b, _h, _pa, _pv, _ds, _ts} = manifest
   b
 
 # a ledger's `entry`
 def man.entry(manifest: M.Manifest) -> String:
-  M.Manifest{_n, e, _b, _h, _ds, _ts} = manifest
+  M.Manifest{_n, e, _b, _h, _pa, _pv, _ds, _ts} = manifest
   e
 
 # a file's last component without its `.bend`: `src/cli.bend` is `cli`

@@ -139,7 +139,7 @@ def probes(ns: List<&2, String>, +rs: List<&2, DW.Reply>) -> List<&2, Note>:
 
 # the dependencies of a ledger that was read
 def deps.of(manifest: M.Manifest) -> List<&2, M.Dep>:
-  M.Manifest{_n, _e, _b, _h, ds, _ts} = manifest
+  M.Manifest{_n, _e, _b, _h, _pa, _pv, ds, _ts} = manifest
   ds
 
 # how many dependencies a ledger names; one that did not read names none
@@ -156,7 +156,7 @@ def ledger.note(ledger: M.Read) -> Note:
     case M.Bad{why}:
       Note{True{}, DW.toml() ++ ": " ++ why}
     case M.Good{m}:
-      M.Manifest{n, e, _b, _h, ds, _ts} = m
+      M.Manifest{n, e, _b, _h, _pa, _pv, ds, _ts} = m
       Note{False{}, DW.toml() ++ ": " ++ n ++ ", entry " ++ e ++ ", " ++
         plural(List.length(&2, M.Dep, ds), "dependency", "dependencies")}
 
@@ -797,8 +797,8 @@ def ledger.seen(ledger: M.Read) -> M.Read:
     case M.Bad{why}:
       M.Bad{why}
     case M.Good{m}:
-      M.Manifest{n, e, b, h, ds, _ts} = m
-      M.Good{M.Manifest{n, e, b, h, ds, []}}
+      M.Manifest{n, e, b, h, pa, pv, ds, _ts} = m
+      M.Good{M.Manifest{n, e, b, h, pa, pv, ds, []}}
 
 # the toolchain, the ledger, the lock and the library, each on its line, and
 # the lock check's line after them

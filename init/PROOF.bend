@@ -176,3 +176,6 @@ def Laws.init_ledger_reads_back(n, e, led, ig, mn, text, put):
     case None{}:
       new_reads(Rend.renderable(IP.model(IP.name.or(n), IP.entry.or(e))),
         IP.name.or(n), IP.entry.or(e), {==}, ig, mn, text, put)
+
+def Laws.init_publishes_by_hash(_n, _e):
+  {==}

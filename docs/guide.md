@@ -70,6 +70,8 @@ entry = "src/lib.bend"
 - A CLI is a `[tools.*]` pin. It is not imported and not put on `BEND_LIB`
   (see [Tools](#tools)).
 - `bin` is the file the tool commands build. With no `bin`, that is the entry.
+- `publish-as` and `version` name the package on the hub when it is published
+  (see [Publish](#publish)). `ez init` writes neither.
 - `root` and `narHash` are there so that `ez lock` never has to consult
   anything a clone does not have (see [Lock](#lock)).
 
@@ -522,7 +524,8 @@ since the hub cannot list a name's versions.
 `0x` name. Publishing is irreversible and public, so every check that can be
 made before the upload is made first:
 
-1. there is a ledger that parses, and it names the entry;
+1. there is a ledger that parses, and it names the entry, and the name it
+   publishes under, if any, is one bend takes (EZ-PUB-3);
 2. `git status --porcelain --untracked-files=normal` names no path, and git
    could answer it (EZ-PUB-1);
 3. the walk from the entry makes a package;
@@ -537,6 +540,39 @@ path inside the package. Any other answer exits 1, with no import line
 (EZ-PUB-2).
 
 `bend --publish` reads the hub from `BEND_HUB` itself.
+
+### Publishing by name
+
+A package can also go on the hub under a name, so that others import it as
+`<name>@<version>` (see [Named imports](#named-imports)). Give the ledger's
+`[package]` table both keys:
+
+```toml
+[package]
+name = "tensors"
+entry = "tensors.bend"
+publish-as = "bend-tensors"
+version = "1.2.0"
+```
+
+`ez publish` then runs `bend tensors.bend --publish bend-tensors@1.2.0.0`,
+which publishes the package and names it in one run, and on success prints
+the hash and `import bend-tensors@1.2.0.0/tensors.bend as Tensors`. bend asks
+you to `bend login` the first time, and the hub refuses a name that is
+someone else's or a version that does not go up.
+
+- `publish-as` is a hub name, as bend's rule reads one: a lowercase letter,
+  then a-z, 0-9 and `-`, 12 to 64 characters in all. It is not `name`, which
+  is the ledger's own and may be anything, and not `hub`, which is the hub's
+  URL.
+- `version` is `MAJOR.MINOR.PATCH`, three numbers with no leading zeros.
+  bend's versions have four numbers, so ez publishes `1.2.0` as `1.2.0.0`. A
+  pre-release or build suffix, such as `1.2.0-rc.1` or `1.2.0+abc`, is
+  refused: the hub has no way to write one.
+- With only one of the two keys, or with either one malformed, `ez publish`
+  refuses with exit 1 before it asks git anything or runs bend, and says which
+  key is missing or wrong.
+- With neither, it publishes by hash as above.
 
 ## Doctor
 

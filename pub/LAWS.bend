@@ -16,6 +16,8 @@ import ./world.bend as PW
 import ./plan.bend as PP
 import ../lock/plan.bend as P
 import ../git/git.bend as G
+import ../manifest/manifest.bend as M
+import ../pkg/pkg.bend as K
 
 # whether any line of a list is a `0x` name. This is the vocabulary the
 # answer laws need and nothing else uses: it says here what "bend printed a
@@ -243,12 +245,12 @@ law pub_needs_agreement:
 
 # LAW: and a publish that succeeds says the hash ez computed, never the one
 # bend printed, and then the import line for the entry's path inside the
-# package
+# package, by the name it was published under or by that hash (`PP.called`)
 # EZ-PUB-2
 law pub_reports_ours:
   for +w: PW.World
   for ok: {PP.succeeds(w) == True{} : Bool}
-  {P.said(PP.plan(w)) == [PP.hash(w), G.import.line(PP.hash(w), PP.at(w))]
+  {P.said(PP.plan(w)) == [PP.hash(w), G.import.line(PP.called(w), PP.at(w))]
     : List<&2, String>}
 
 # LAW: `ez publish` that refuses writes nothing: its plan has no effect but
@@ -272,3 +274,230 @@ law pub_needs_ledger:
   for +here: String
   for rs: List<&2, PW.Reply>
   {PP.stops(PW.World{here, None{}, rs}) == True{} : Bool}
+
+# ---------------------------------------------------------------------------
+# the name a package is published under
+
+# LAW: a version with a character that is neither a digit nor a dot is not
+# MAJOR.MINOR.PATCH, wherever the character stands and whatever is around it
+# EZ-PUB-3
+law semver_needs_digits:
+  for +pre: String
+  for +c: Char
+  for +post: String
+  for e: {False{} == PP.semver.char(c) : Bool}
+  {PP.semver(String.append(pre, SCon{c, post})) == False{} : Bool}
+
+# LAW: so a version with a pre-release suffix is refused, `1.0.0-rc.1` among
+# them
+# EZ-PUB-3
+law prerelease_refused:
+  for +pre: String
+  for +post: String
+  {PP.semver(String.append(pre, "-" ++ post)) == False{} : Bool}
+
+# LAW: and so is one with build metadata, `1.0.0+abc` among them
+# EZ-PUB-3
+law build_refused:
+  for +pre: String
+  for +post: String
+  {PP.semver(String.append(pre, "+" ++ post)) == False{} : Bool}
+
+# LAW: a ledger that gives neither `publish-as` nor `version` publishes by
+# hash, as it did before the keys existed
+# EZ-PUB-3
+law neither_is_hash:
+  for +pa: String
+  for +pv: String
+  for e0: {True{} == String.is_empty(pa) : Bool}
+  for e1: {True{} == String.is_empty(pv) : Bool}
+  {PP.naming(pa, pv) == PP.ByHash{} : PP.Named}
+
+# LAW: `publish-as` with no `version` is refused, naming the missing key
+# EZ-PUB-3
+law name_needs_version:
+  for +pa: String
+  for +pv: String
+  for e0: {False{} == String.is_empty(pa) : Bool}
+  for e1: {True{} == String.is_empty(pv) : Bool}
+  {PP.naming(pa, pv) == PP.Unnamed{PP.why.nover(pa)} : PP.Named}
+
+# LAW: and `version` with no `publish-as`
+# EZ-PUB-3
+law version_needs_name:
+  for +pa: String
+  for +pv: String
+  for e0: {True{} == String.is_empty(pa) : Bool}
+  for e1: {False{} == String.is_empty(pv) : Bool}
+  {PP.naming(pa, pv) == PP.Unnamed{PP.why.noname(pv)} : PP.Named}
+
+# LAW: a `publish-as` that is not a hub name as bend's NAMED rule reads one
+# (`K.name.part`) is refused, whatever the version
+# EZ-PUB-3
+law bad_name_refused:
+  for +pa: String
+  for +pv: String
+  for e0: {False{} == String.is_empty(pa) : Bool}
+  for e1: {False{} == String.is_empty(pv) : Bool}
+  for en: {False{} == K.name.part(pa) : Bool}
+  {PP.naming(pa, pv) == PP.Unnamed{PP.why.name(pa)} : PP.Named}
+
+# LAW: and a good name with a version that is not MAJOR.MINOR.PATCH is refused
+# EZ-PUB-3
+law bad_version_refused:
+  for +pa: String
+  for +pv: String
+  for e0: {False{} == String.is_empty(pa) : Bool}
+  for e1: {False{} == String.is_empty(pv) : Bool}
+  for en: {True{} == K.name.part(pa) : Bool}
+  for ev: {False{} == PP.semver(pv) : Bool}
+  {PP.naming(pa, pv) == PP.Unnamed{PP.why.ver(pv)} : PP.Named}
+
+# LAW: a good name and a good version name the package
+# `<publish-as>@<version>.0`, the version with bend's fourth number after it
+# EZ-PUB-3
+law named_is_four_part:
+  for +pa: String
+  for +pv: String
+  for e0: {False{} == String.is_empty(pa) : Bool}
+  for e1: {False{} == String.is_empty(pv) : Bool}
+  for en: {True{} == K.name.part(pa) : Bool}
+  for ev: {True{} == PP.semver(pv) : Bool}
+  {PP.naming(pa, pv) == PP.ByName{pa ++ "@" ++ pv ++ ".0"} : PP.Named}
+
+# LAW: the upload of a package with no name runs `bend <entry> --publish`,
+# the words ez ran before a package could have one
+# EZ-PUB-3
+law upload_by_hash:
+  for +entry: String
+  {PP.upload.line(entry, "") == ["bend", entry, "--publish"] : List<&2, String>}
+
+# LAW: and one with a name runs `bend <entry> --publish <name>@<version>`,
+# which is how bend publishes and names a package in one run
+# EZ-PUB-3
+law upload_by_name:
+  for +entry: String
+  for +nv: String
+  for e: {False{} == String.is_empty(nv) : Bool}
+  {PP.upload.line(entry, nv) == ["bend", entry, "--publish", nv] : List<&2, String>}
+
+# LAW: `ez publish` on a World whose ledger names the package in a way ez
+# refuses refuses outright: it asks git nothing, reads no file and sends
+# nothing
+# EZ-PUB-3
+law pub_misnamed_stops:
+  for +here: String
+  for +text: String
+  for +rs: List<&2, PW.Reply>
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +pa: String
+  for +pv: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +why: String
+  for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
+  for u: {PP.naming(pa, pv) == PP.Unnamed{why} : PP.Named}
+  {PP.stops(PW.World{here, Some{text}, rs}) == True{} : Bool}
+
+# LAW: and its plan is that refusal and nothing else, so it writes nothing
+# EZ-OUT-2
+law pub_misnamed_writes_nothing:
+  for +here: String
+  for +text: String
+  for +rs: List<&2, PW.Reply>
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +pa: String
+  for +pv: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +why: String
+  for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
+  for u: {PP.naming(pa, pv) == PP.Unnamed{why} : PP.Named}
+  {PP.plan(PW.World{here, Some{text}, rs}) == P.Plan{[], P.Refused{why}} : P.Plan}
+
+# LAW: a World whose ledger names the package asks for the upload under that
+# name
+# EZ-PUB-3
+law pub_named_uploads_named:
+  for +here: String
+  for +text: String
+  for +rs: List<&2, PW.Reply>
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +pa: String
+  for +pv: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +nv: String
+  for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
+  for u: {PP.naming(pa, pv) == PP.ByName{nv} : PP.Named}
+  {PP.upload(PW.World{here, Some{text}, rs}) == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), nv} : PW.Ask}
+
+# LAW: and one whose ledger names none asks for the upload by hash
+# EZ-PUB-3
+law pub_unnamed_uploads_by_hash:
+  for +here: String
+  for +text: String
+  for +rs: List<&2, PW.Reply>
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +pa: String
+  for +pv: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
+  for u: {PP.naming(pa, pv) == PP.ByHash{} : PP.Named}
+  {PP.upload(PW.World{here, Some{text}, rs}) == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), ""} : PW.Ask}
+
+# LAW: a named publish that succeeds says the hash ez computed, then the
+# import line by the name it was published under
+# EZ-PUB-3
+law pub_reports_name:
+  for +here: String
+  for +text: String
+  for +rs: List<&2, PW.Reply>
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +pa: String
+  for +pv: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +nv: String
+  for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
+  for u: {PP.naming(pa, pv) == PP.ByName{nv} : PP.Named}
+  for ok: {PP.succeeds(PW.World{here, Some{text}, rs}) == True{} : Bool}
+  {P.said(PP.plan(PW.World{here, Some{text}, rs})) == [PP.hash(PW.World{here, Some{text}, rs}),
+    G.import.line(nv, PP.at(PW.World{here, Some{text}, rs}))] : List<&2, String>}
+
+# LAW: and one by hash says the hash and the import line by the hash, as
+# `ez publish` said before a package could have a name
+# EZ-PUB-2
+law pub_reports_hash:
+  for +here: String
+  for +text: String
+  for +rs: List<&2, PW.Reply>
+  for +n: String
+  for +e: String
+  for +b: String
+  for +h: String
+  for +pa: String
+  for +pv: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
+  for u: {PP.naming(pa, pv) == PP.ByHash{} : PP.Named}
+  for ok: {PP.succeeds(PW.World{here, Some{text}, rs}) == True{} : Bool}
+  {P.said(PP.plan(PW.World{here, Some{text}, rs})) == [PP.hash(PW.World{here, Some{text}, rs}),
+    G.import.line(PP.hash(PW.World{here, Some{text}, rs}), PP.at(PW.World{here, Some{text}, rs}))] : List<&2, String>}
