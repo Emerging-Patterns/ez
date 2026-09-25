@@ -4,8 +4,8 @@ import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
 import ./up.bend as Up
-import ../manifest/manifest.bend as M
-import ../manifest/upgrade.bend as U
+import ../ledger/manifest.bend as M
+import ../ledger/upgrade.bend as U
 import ../toml/toml.bend as T
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
@@ -13,10 +13,10 @@ import ../pkg/pkg.bend as K
 import ../hub/hub.bend as Web
 import ../pkg/LAWS.bend as KL
 import ../pkg/PROOF.bend as KP
-import ../manifest/ignore.bend as I
-import ../manifest/render.bend as Rend
-import ../manifest/LAWS.bend as ML
-import ../manifest/PROOF.bend as MP
+import ../ledger/ignore.bend as I
+import ../ledger/render.bend as Rend
+import ../ledger/LAWS.bend as ML
+import ../ledger/PROOF.bend as MP
 import ../git/git.bend as Git
 import ./LAWS.bend as Laws
 

@@ -21,10 +21,10 @@
 # hashes to the pin is `Drift` and refused.
 import Base
 import ./lock.bend as L
-import ../manifest/manifest.bend as M
-import ../manifest/render.bend as Rend
-import ../manifest/upgrade.bend as U
-import ../manifest/ignore.bend as I
+import ../ledger/manifest.bend as M
+import ../ledger/render.bend as Rend
+import ../ledger/upgrade.bend as U
+import ../ledger/ignore.bend as I
 import ../git/git.bend as Git
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path

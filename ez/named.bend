@@ -7,7 +7,7 @@
 # one `[deps.main]`. A name the ledger gives to another source is refused
 # rather than written over.
 import Base
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../ez/target.bend as Tgt
 import ../pkg/pkg.bend as K
 

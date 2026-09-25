@@ -17,9 +17,9 @@ import ../lock/world.bend as W
 import ../lock/up.bend as Up
 import ../lock/lock.bend as L
 import ../hub/hub.bend as Web
-import ../manifest/manifest.bend as M
-import ../manifest/render.bend as Rend
-import ../manifest/ignore.bend as I
+import ../ledger/manifest.bend as M
+import ../ledger/render.bend as Rend
+import ../ledger/ignore.bend as I
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../git/git.bend as Git
@@ -29,8 +29,8 @@ import ../sha/sha.bend as Sha
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
 import ../pkg/PROOF.bend as Pk
-import ../manifest/LAWS.bend as ML
-import ../manifest/PROOF.bend as MP
+import ../ledger/LAWS.bend as ML
+import ../ledger/PROOF.bend as MP
 import ./LAWS.bend as Laws
 
 # ---------------------------------------------------------------------------

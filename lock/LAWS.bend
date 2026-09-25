@@ -7,15 +7,15 @@ import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
 import ./up.bend as Up
-import ../manifest/upgrade.bend as U
-import ../manifest/manifest.bend as M
+import ../ledger/upgrade.bend as U
+import ../ledger/manifest.bend as M
 import ../toml/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/LAWS.bend as KL
 import ../hub/hub.bend as Web
-import ../manifest/upgrade.bend as U
-import ../manifest/ignore.bend as I
-import ../manifest/LAWS.bend as ML
+import ../ledger/upgrade.bend as U
+import ../ledger/ignore.bend as I
+import ../ledger/LAWS.bend as ML
 import ../check/str.bend as Str
 
 # LAW: a package resolves to the origin recorded for it, whatever origins
@@ -830,7 +830,7 @@ law relock_lays_nothing:
 # makes it from the file it read over the dependencies it leaves, and each
 # source it read with every moved hash rewritten (`U.reimport.many`), when
 # that changes it. The laws below say so of the plan, `P.put`, and the laws
-# of `manifest/LAWS.bend` say what `I.sync` and `U.reimport.many` do to a
+# of `ledger/LAWS.bend` say what `I.sync` and `U.reimport.many` do to a
 # text. A source is one the interpreter listed, a `.bend` file outside `.ez`
 # and `.git`; the laws take the ones the upgrade read, and a path the World
 # names once, as the interpreter lists each file once.
@@ -932,7 +932,7 @@ law upgrade_vends_the_ledger:
 
 # LAW: a `.bend` source the upgrade read, once, holds afterwards its text
 # with every moved hash rewritten, when `ez lock --upgrade` does not refuse.
-# The laws of `manifest/LAWS.bend` say what that rewriting does to the text.
+# The laws of `ledger/LAWS.bend` say what that rewriting does to the text.
 law upgrade_rewrites_sources:
   for +w: W.World
   for +at: String

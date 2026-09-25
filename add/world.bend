@@ -17,7 +17,7 @@
 import Base
 import ../lock/up.bend as Up
 import ../lock/world.bend as W
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../pkg/path.bend as P
 import ../ez/target.bend as Tgt
 import ../ez/named.bend as Named

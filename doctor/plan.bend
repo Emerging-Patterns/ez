@@ -55,7 +55,7 @@ import ./world.bend as DW
 import ../lock/plan.bend as P
 import ../lock/world.bend as W
 import ../lock/lock.bend as L
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../ez/args.bend as Args
 
 # one thing doctor looked at: what to print, and whether it is a problem

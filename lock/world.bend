@@ -17,8 +17,8 @@
 import Base
 import ./lock.bend as L
 import ./up.bend as Up
-import ../manifest/upgrade.bend as U
-import ../manifest/manifest.bend as M
+import ../ledger/upgrade.bend as U
+import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../hub/hub.bend as Web
 import ../sha/sha.bend as Sha

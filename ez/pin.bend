@@ -3,7 +3,7 @@
 # with no commit or no NAR hash stops it, naming the upgrade that fills the
 # pin. Filling and moving a pin is `ez lock --upgrade`'s, in lock/up.bend.
 import Base
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 
 # why a plain lock cannot copy a git pin as it stands, or "" when it can. The
 # lock copies `rev` and `narHash` out of the ledger and never asks a remote

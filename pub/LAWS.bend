@@ -16,7 +16,7 @@ import ./world.bend as PW
 import ./plan.bend as PP
 import ../lock/plan.bend as P
 import ../git/git.bend as G
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ./blurb.bend as B
 import ../lock/lock.bend as L

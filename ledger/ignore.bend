@@ -1,4 +1,4 @@
-# manifest/ignore: the gitignore allowlist, derived from the ledger. A
+# ledger/ignore: the gitignore allowlist, derived from the ledger. A
 # dependency marked `vendor = true` has its tree committed under
 # `.ez/lib/<hash>`, and git only keeps it when `.gitignore` says so with a
 # `!.ez/lib/<hash>` line. That line has to follow the ledger exactly: a hash

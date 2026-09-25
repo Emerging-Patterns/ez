@@ -18,7 +18,7 @@ import ./plan.bend as DP
 import ../lock/plan.bend as P
 import ../lock/world.bend as W
 import ../lock/lock.bend as L
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
 import ./LAWS.bend as Laws

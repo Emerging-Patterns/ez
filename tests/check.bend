@@ -10,6 +10,6 @@ def main() -> IO(Unit):
   do IO<Unit>:
     +out : String <- R.exec(["bin/ez.bin", "check"])
     Check.eq_str("ez checks the repo's own ledger", Q.chomp(R.text(out)),
-      "ok manifest/manifest.bend")
+      "ok ledger/manifest.bend")
 
 #|ok ez checks the repo's own ledger

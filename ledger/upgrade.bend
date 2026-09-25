@@ -1,10 +1,10 @@
-# manifest/upgrade: what `ez lock --upgrade` may do to one dependency, before
+# ledger/upgrade: what `ez lock --upgrade` may do to one dependency, before
 # it talks to a remote. The ledger pins exact commits. A tag is the only
 # floating name a person wrote down, so that is what gets re-resolved. A pin
 # with no tag fast-forwards to the default branch tip when the commit is an
 # ancestor of it, and stays a commit pin. A hub package is the hash itself.
 # `vend` says the tree under `.ez/lib/<hash>` is committed, so a move lays the
-# new tree there; the allowlist that names it is `manifest/ignore.bend`'s,
+# new tree there; the allowlist that names it is `ledger/ignore.bend`'s,
 # derived from the ledger the move writes. A move also rewrites an
 # `import 0x<hash>/` line that names the old hash.
 import Base

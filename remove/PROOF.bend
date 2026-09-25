@@ -2,13 +2,13 @@
 import Base
 import ./plan.bend as RP
 import ../lock/plan.bend as P
-import ../manifest/manifest.bend as M
-import ../manifest/render.bend as Rend
-import ../manifest/ignore.bend as I
+import ../ledger/manifest.bend as M
+import ../ledger/render.bend as Rend
+import ../ledger/ignore.bend as I
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
-import ../manifest/LAWS.bend as ML
-import ../manifest/PROOF.bend as MP
+import ../ledger/LAWS.bend as ML
+import ../ledger/PROOF.bend as MP
 import ./LAWS.bend as Laws
 
 # LAW: removing committed trees writes nothing at any path

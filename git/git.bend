@@ -13,7 +13,7 @@ import Base
 import ../io/file.bend as F
 import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../toml/toml.bend as T
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
 import ../sha/nar.bend as Nar

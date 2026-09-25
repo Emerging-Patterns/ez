@@ -23,7 +23,7 @@ import ./world.bend as DW
 import ./plan.bend as DP
 import ../lock/plan.bend as P
 import ../lock/world.bend as W
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 
 # LAW: `ez doctor` writes, lays and removes nothing, whatever it found: its
 # plan is lines said and how the command ends, so no source file, ledger,

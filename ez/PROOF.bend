@@ -13,7 +13,7 @@ import ../ez/named.bend as Named
 import ../pkg/pkg.bend as Pkg
 import ../ez/env.bend as Env
 import ../pkg/path.bend as P
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ./key.bend as K
 import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
 import ../ez/line.bend as L

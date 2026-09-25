@@ -248,7 +248,7 @@ How much of today's code moves unchanged:
 | :---- | ----: | :---- |
 | `lock/lock.bend` pure half: `Src`, `Pack`, `Origin`, `ledger.read`, `origin`, `known`, `has`, `specs`, `kids`, `manifest.files`, `nar.why`, `render.tools`, `doc`, `pack.sort`, and the readers `packs`, `pack_of`, `lock.hub` | about 465 of 929 | unchanged; the planner and `restore.bend` both use it |
 | `lock/lock.bend` IO half: `files.judge`, `fetch.*`, `disk.*`, `read.*`, `resolve.*`, `root.*`, `roots`, `lib`, `lock.at` | about 460 | the checks become `accept` (planner); the reads become `answer` (interpreter); the two continuation-passing walks become one pure walk |
-| `manifest/upgrade.bend` (`U.aim`, `U.judge`, `U.agree`, `U.retarget`, `U.reimport.many`) and `manifest/ignore.bend` (`I.sync`) | 576 | unchanged; the upgrade planner calls them |
+| `ledger/upgrade.bend` (`U.aim`, `U.judge`, `U.agree`, `U.retarget`, `U.reimport.many`) and `ledger/ignore.bend` (`I.sync`) | 576 | unchanged; the upgrade planner calls them |
 | `ez/upgrade.bend` | 532 | `Done`, `Out`, `join`, `swap.of`, `swap.hash` move to `lock/up.bend` unchanged; `walk`, `one`, `follow`, `forward`, `ask`, `judged`, `confirm`, `advanced` become pure functions of replies; `go.out` and the writers become effects |
 | `ez/pin.bend` | 424 | `set`, `join`, `gap`, `gaps` move unchanged; the IO walk becomes pure, like the dependency walk |
 | `git/git.bend` pure parsers `rows`, `exact`, `tip.rev`, `tip.branch`, `choose` | | unchanged; the planner reads `Printed` answers with them |
@@ -361,7 +361,7 @@ law upgrade_settles:
 
 For a plain lock this is a corollary of `clone_reproduces` read backwards: the only thing a plain plan changes that the lock reads is which trees are under BEND_LIB. Under `--upgrade` the second run asks each moved pin's remote again, gets the same tip, finds the pin equal to it, confirms the checkout with `U.agree` against the hash, narHash and root the first run wrote, and so keeps it (`U.Keep`), and a ledger with nothing moved is not rewritten.
 
-Reuses `clone_reproduces`, `check/eq.bend string_eq_self`. Replaces `manifest/LAWS.bend same_rev_keeps` (toward EZ-DOC-4). Effort: small for the plain lock, medium to large for the upgrade, whose key lemma is that a dependency's verdict on its own tip is `Keep` with agreement.
+Reuses `clone_reproduces`, `check/eq.bend string_eq_self`. Replaces `ledger/LAWS.bend same_rev_keeps` (toward EZ-DOC-4). Effort: small for the plain lock, medium to large for the upgrade, whose key lemma is that a dependency's verdict on its own tip is `Keep` with agreement.
 
 **Update:** WP5a has landed the plain half as `lock/LAWS.bend lock_idempotent` and `relock_lays_nothing`. Where it differs from the sketch: `after` is law vocabulary in `lock/LAWS.bend`, not `P.after`, and a refused lock leaves the World it read, so `lock_idempotent` needs no premise. The second law is about BEND_LIB rather than ez.toml, which a plain lock never writes (EZ-DOC-5): after a lock that succeeded, no tree arrives by a clone that passes, so none is laid again. `upgrade_settles` is WP5b's.
 
@@ -436,9 +436,9 @@ These are pointwise facts about a walk over the ledger's dependencies, so each p
 
 | Law | Reuses | Replaces | Effort |
 | :---- | :---- | :---- | :---- |
-| EZ-RES-4 | `U.aim` of a hub source is `Hold` | `manifest/LAWS.bend hub_holds` | small |
+| EZ-RES-4 | `U.aim` of a hub source is `Hold` | `ledger/LAWS.bend hub_holds` | small |
 | EZ-RES-5 | `U.judge`, `U.retarget`, `Git.tip.*` | `sha256_aims_forward`, `sha256_advances`, `sha256_retarget` (manifest); `sha256_remote_tip`, `sha256_remote_branch` (git), once a quantified `tip.rev` law is in | medium; key lemma: a `Forward` pin's verdict is `Advance` exactly when the tip differs and is onward |
-| EZ-RES-6 | `U.chosen`, `U.aim(False, _) == Hold` | `manifest/LAWS.bend unselected_holds` | small for the frame, medium for the asks, whose key lemma is that `wants` only asks resolution questions about a selected entry |
+| EZ-RES-6 | `U.chosen`, `U.aim(False, _) == Hold` | `ledger/LAWS.bend unselected_holds` | small for the frame, medium for the asks, whose key lemma is that `wants` only asks resolution questions about a selected entry |
 | EZ-RES-8 | `U.judge` with its agreement bit live, `U.agree` | `tag_follows`, `same_rev_drifts`, `tag_moved_off` (manifest) | medium |
 
 **Update:** WP6's second half has landed EZ-RES-5 and EZ-RES-8, proved relative to EZ-LED-4 and EZ-RES-7. Where the laws differ from the sketches above:
@@ -492,12 +492,12 @@ law upgrade_writes_only_hits:
 
 `ignore.lines(w)` is the lines of the `.gitignore` the plan leaves (written or not), `source.next(w, at)` the text of source `at` after the plan, and `swapped(w, at, i, s)` says line `i` of the old text named `s.old` at column 0. Only `ez lock --upgrade` is in this phase; `ez add` and `ez remove` meet EZ-VEN-1 when they are converted.
 
-EZ-VEN-1's line-level half is proved (`manifest/LAWS.bend allowlist_is_the_ledger`, `allowlist_keeps_other_lines`). What is left is the text layer of `I.sync`, which is "Left to prove" in `SPEC.md`: that `String.lines` of `String.join(ls, "\n")` is `ls` when no line holds a newline, which is the dual of the spike's `join_split`, and that a file left unwritten is the file `I.sync` would have made, which needs string equality reflected. EZ-VEN-2 and EZ-VEN-3 need the same `lines` after `join` lemma to go from `reimport` to its lines, then a lemma about one rewritten line, then an induction over the swaps with their old and new hashes disjoint, which is the premise the RFC already calls for.
+EZ-VEN-1's line-level half is proved (`ledger/LAWS.bend allowlist_is_the_ledger`, `allowlist_keeps_other_lines`). What is left is the text layer of `I.sync`, which is "Left to prove" in `SPEC.md`: that `String.lines` of `String.join(ls, "\n")` is `ls` when no line holds a newline, which is the dual of the spike's `join_split`, and that a file left unwritten is the file `I.sync` would have made, which needs string equality reflected. EZ-VEN-2 and EZ-VEN-3 need the same `lines` after `join` lemma to go from `reimport` to its lines, then a lemma about one rewritten line, then an induction over the swaps with their old and new hashes disjoint, which is the premise the RFC already calls for.
 
 | Law | Reuses | Replaces | Effort |
 | :---- | :---- | :---- | :---- |
 | EZ-VEN-1 | `allowlist_is_the_ledger`, `allowlist_keeps_other_lines`, the spike's `join_split` | nothing; its laws are already tagged | medium |
-| EZ-VEN-2 | the spike's `char_eq_true`, lifted to strings | `manifest/LAWS.bend imports_follow_hash` | medium to large; key lemma: `reimport.hash` of a rewritten line is the new hash |
+| EZ-VEN-2 | the spike's `char_eq_true`, lifted to strings | `ledger/LAWS.bend imports_follow_hash` | medium to large; key lemma: `reimport.hash` of a rewritten line is the new hash |
 | EZ-VEN-3 | `join_split` with `\n`, `string_eq_self` | shares `imports_follow_hash` with EZ-VEN-2 | medium |
 
 ### EZ-HASH-2: NAR order
@@ -517,7 +517,7 @@ Reuses `sort_perm`, `perm`, `distinct`. Replaces no trail. Effort: small. It doe
 
 ### Trails this phase deletes
 
-`lock/LAWS.bend`: `hashes_sorted`, `lock_roundtrip`, `tool_pin_reads_back`. `manifest/LAWS.bend`: `sha256_aims_forward`, `hub_holds`, `tag_follows`, `unselected_holds`, `sha256_advances`, `same_rev_keeps`, `same_rev_drifts`, `tag_moved_off`, `sha256_retarget`, `imports_follow_hash`. `git/LAWS.bend`: `sha256_remote_tip`, `sha256_remote_branch`. Each goes in the change that lands the law naming it above. The trails toward EZ-LED-4, EZ-LED-5, EZ-VEN-5, EZ-TOOL-* and EZ-FETCH-1 stay.
+`lock/LAWS.bend`: `hashes_sorted`, `lock_roundtrip`, `tool_pin_reads_back`. `ledger/LAWS.bend`: `sha256_aims_forward`, `hub_holds`, `tag_follows`, `unselected_holds`, `sha256_advances`, `same_rev_keeps`, `same_rev_drifts`, `tag_moved_off`, `sha256_retarget`, `imports_follow_hash`. `git/LAWS.bend`: `sha256_remote_tip`, `sha256_remote_branch`. Each goes in the change that lands the law naming it above. The trails toward EZ-LED-4, EZ-LED-5, EZ-VEN-5, EZ-TOOL-* and EZ-FETCH-1 stay.
 
 **Update:** these trails, and every other trail, are already gone. We deleted all 40 remaining `# toward` laws in one change, ahead of the laws that were to replace them, so that ez could move to the bolt whose strict `closed` and `trace` rules check `SPEC.md` (see the RFC's "Retiring closed laws"). Where a WP above says it replaces a closed law, there is nothing left to delete: the WP lands its quantified law and tags it.
 
@@ -554,7 +554,7 @@ $ bolt.bin --gpu off
 
 We also ran the planner, outside the gate, on a two-package sample in which the project imports `0xb` and `0xb` imports `0xa`: with no replies it asked for `0xb`; with `0xb` answered it asked for `0xa`; with both answered it returned the lock, both packages in hash order; and with one file's text changed by a byte it refused.
 
-What the spike tells us. The World and the planner are total pure terms with no `unsafe` def; the checker needed no fuel tricks beyond the walk's own. EZ-DOC-3 and the walk half of EZ-DOC-5 are small once the planner is shaped for them. The string layer of EZ-DOC-1, which we expected to be the hardest part of the phase, went through at about the rate `lock/PROOF.bend` and `manifest/PROOF.bend` were written: every failure was linearity (`+` on a binder used twice), definition order, or a def that matched on a value it had not been given as a parameter, and each was fixed in one edit.
+What the spike tells us. The World and the planner are total pure terms with no `unsafe` def; the checker needed no fuel tricks beyond the walk's own. EZ-DOC-3 and the walk half of EZ-DOC-5 are small once the planner is shaped for them. The string layer of EZ-DOC-1, which we expected to be the hardest part of the phase, went through at about the rate `lock/PROOF.bend` and `ledger/PROOF.bend` were written: every failure was linearity (`+` on a binder used twice), definition order, or a def that matched on a value it had not been given as a parameter, and each was fixed in one edit.
 
 What it does not tell us. It has no upgrade, no interpreter, and no performance measurement. The upgrade laws are pointwise over dependencies and look like the walk invariant it did prove, but they read `Printed` answers through git's parsers, which the spike did not exercise. The re-verification cost of the demand loop is an estimate from the round count, not a measurement.
 
