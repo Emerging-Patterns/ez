@@ -11,7 +11,7 @@
 # process effect the rest of ez uses: arguments execvp'd, no shell between.
 import Base
 import ../io/file.bend as F
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
 import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K

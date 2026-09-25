@@ -9,7 +9,7 @@
 # of a path is what nix's dumper takes: the owner's exec bit of the mode,
 # every name and link target as it is, and a file's bytes.
 import Base
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
 import ../pkg/pkg.bend as K
 import ../sha/sha.bend as Sha

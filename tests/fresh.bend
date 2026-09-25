@@ -52,7 +52,7 @@
 # was not needed, and is not allowed to pass a binary from a toolchain that is
 # gone.
 import Base
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
 import ../ez/cache.bend as C
 import ../check/kit.bend as Check

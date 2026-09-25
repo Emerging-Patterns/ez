@@ -19,7 +19,7 @@
 # `sync` asks the planner which pins to install (`TP.sync`) and installs
 # each in turn as `ez tool install <name>` would.
 import Base
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../lock/plan.bend as LP

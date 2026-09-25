@@ -5,7 +5,7 @@
 # is a law (EZ-OUT-1); ez/main.bend prints and exits as `line` and `status`
 # say, and runs the command a line names, whose own end decides the rest.
 import Base
-import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
+import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
 
 # a subcommand
 type Sub is Data:
@@ -135,75 +135,35 @@ def is.help(sub: Sub) -> Bool:
 def path(matched: Shake.Matched) -> String:
   String.join(Shake.path_of(matched), "/")
 
-# ---------------------------------------------------------------------------
-# a help path
+# the Matched of the command the path names, whose bindings are the ones the
+# line made for that command (SHAKE-GET-2: `at(m, path_of(m))` follows the
+# selected path). A None here would be a Matched `parse` never answers.
+def leaf(+matched: Shake.Matched) -> Shake.Matched:
+  Maybe.default(&2, Shake.Matched, Shake.at(matched, Shake.path_of(matched)), matched)
 
-# the commands a program has
-def subs(app: Shake.Cli) -> List<&2, Shake.Sub>:
-  Shake.Cli{_n, _a, _v, _args, ss} = app
-  ss
-
-# the commands under a command
-def sub.subs(sub: Shake.Sub) -> List<&2, Shake.Sub>:
-  Shake.Sub{_n, _a, _args, ss} = sub
-  ss
-
-# once a word was looked up: that word, when it named no command, or the
-# rest of the path looked up under the command it named
-def unknown.next(
-  found: Maybe<&2, Shake.Sub>,
-  +word: String,
-  go: List<&2, Shake.Sub> -> Maybe<&2, String>
-) -> Maybe<&2, String>:
-  match found:
-    case None{}:
-      Some{word}
-    case Some{s}:
-      go(sub.subs(s))
-
-# the first word of a help path that names no command under the words before
-# it, or None when every word names one. `ez help tool run` names `ez tool
-# run`; `ez help bogus` names nothing.
-def unknown.word(path: List<&2, String>, ss: List<&2, Shake.Sub>) -> Maybe<&2, String>:
-  match path:
-    case []:
-      None{}
-    case +h <> t:
-      unknown.next(Shake.find_sub(ss, h), h, under => unknown.word(t, under))
+# the value the command bound to `name`, or "" when it bound none
+def get(found: Shake.Matched, +name: String) -> String:
+  Maybe.default(&2, String, Shake.get(found, name), "")
 
 # ---------------------------------------------------------------------------
 # how a line ends
 
-# a command runs, with what the line bound; help is shown, on stdout; or the
-# line is misused, and says so on stderr. `word` is the word that named no
-# command, "" when none did, so the interpreter can hint at `ez tool sync`.
+# a command runs, with what the line bound for it; help is shown, on stdout;
+# or the line is misused, and says so on stderr
 type Line is Data:
   Runs{sub: Sub, matched: Shake.Matched}
   Shows{text: String}
-  Misuse{text: String, word: String}
+  Misuse{text: String}
 
-# help for a path whose words each name a command, and a misuse naming the
-# first that does not
-def line.help(miss: Maybe<&2, String>, +app: Shake.Cli, path: List<&2, String>) -> Line:
-  match miss:
-    case None{}:
+# a line Shake would not parse: a request for help, whose path Shake has
+# already checked word by word (SHAKE-PARSE-8: `help bogus` fails as
+# `Unexpected`, not as a request for help), or a usage error
+def line.err(help: Maybe<&2, List<&2, String>>, +app: Shake.Cli, err: Shake.ParseErr) -> Line:
+  match help:
+    case Some{path}:
       Shows{Shake.help(app, path)}
-    case Some{+w}:
-      Misuse{Shake.err_text(app, Shake.Unexpected{w}), w}
-
-# a line Shake would not parse: `help`, or a usage error
-def line.err(+app: Shake.Cli, err: Shake.ParseErr) -> Line:
-  match err:
-    case Shake.NeedHelp{+path}:
-      line.help(unknown.word(path, subs(app)), app, path)
-    case Shake.Unexpected{+arg}:
-      Misuse{Shake.err_text(app, Shake.Unexpected{arg}), arg}
-    case Shake.UnknownFlag{+flag}:
-      Misuse{Shake.err_text(app, Shake.UnknownFlag{flag}), ""}
-    case Shake.Missing{+name}:
-      Misuse{Shake.err_text(app, Shake.Missing{name}), ""}
-    case Shake.BadValue{+name, +value}:
-      Misuse{Shake.err_text(app, Shake.BadValue{name, value}), ""}
+    case None{}:
+      Misuse{Shake.err_text(app, err)}
 
 # a path that names no command: a bare `ez` is help, as a bare `cargo` is,
 # and a bare group such as `ez tool` is a line that did not say which of its
@@ -214,7 +174,7 @@ def line.group(bare: Bool, +app: Shake.Cli, +matched: Shake.Matched) -> Line:
     case True{}:
       Shows{Shake.help(app, [])}
     case False{}:
-      Misuse{Shake.help(app, Shake.path_of(matched)), ""}
+      Misuse{Shake.help(app, Shake.path_of(matched))}
 
 # a line Shake parsed: the command its path names runs, or it names none
 def line.run(help: Bool, sub: Sub, +app: Shake.Cli, +matched: Shake.Matched) -> Line:
@@ -222,13 +182,13 @@ def line.run(help: Bool, sub: Sub, +app: Shake.Cli, +matched: Shake.Matched) -> 
     case True{}:
       line.group(String.is_empty(path(matched)), app, matched)
     case False{}:
-      Runs{sub, matched}
+      Runs{sub, leaf(matched)}
 
 # how a line ends, from what Shake made of it
 def line(+app: Shake.Cli, parsed: Result<&2, &2, Shake.ParseErr, Shake.Matched>) -> Line:
   match parsed:
-    case Fail{e}:
-      line.err(app, e)
+    case Fail{+e}:
+      line.err(Shake.help_path(e), app, e)
     case Done{+m}:
       +sub = command(path(m))
       line.run(is.help(sub), sub, app, m)
@@ -249,19 +209,5 @@ def status(how: Line) -> Status:
       Ends{}
     case Shows{_text}:
       Exits{0}
-    case Misuse{_text, _word}:
+    case Misuse{_text}:
       Exits{1}
-
-# whether a parse error is `help`, which is no error
-def asks.help(err: Shake.ParseErr) -> Bool:
-  match err:
-    case Shake.NeedHelp{_path}:
-      True{}
-    case Shake.Unexpected{_arg}:
-      False{}
-    case Shake.UnknownFlag{_flag}:
-      False{}
-    case Shake.Missing{_name}:
-      False{}
-    case Shake.BadValue{_name, _value}:
-      False{}

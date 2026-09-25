@@ -15,12 +15,12 @@ import ../ez/env.bend as Env
 import ../pkg/path.bend as P
 import ../manifest/manifest.bend as M
 import ./key.bend as K
-import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
+import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
@@ -1535,31 +1535,23 @@ def Laws.gap_of_narless_pin(n, _e, _b, _url, _rev, _tag, _root, _vend, fr):
 # line: each law is the premise rewritten into the one match `L.line` turns
 # on, or, for a parse error, a case split on the error
 
-def Laws.help_exits_zero(app, path, known):
-  %Equal.sym(Maybe<&2, String>, L.unknown.word(path, L.subs(app)), None{}, known)
-    : {L.status(L.line.help(_, app, path)) == L.Exits{0} : L.Status}
-  {==}
-
-def Laws.help_unknown_exits_one(app, path, w, miss):
-  %Equal.sym(Maybe<&2, String>, L.unknown.word(path, L.subs(app)), Some{w}, miss)
-    : {L.status(L.line.help(_, app, path)) == L.Exits{1} : L.Status}
+def Laws.help_exits_zero(app, e, path, asks):
+  %Equal.sym(Maybe<&2, List<&2, String>>, Shake.help_path(e), Some{path}, asks)
+    : {L.status(L.line.err(_, app, e)) == L.Exits{0} : L.Status}
   {==}
 
 def Laws.usage_error_exits_one(app, e, no):
-  match e:
-    case Shake.NeedHelp{path}:
-      Eq.bit.absurd2(&2, {L.status(L.line(app, Fail{Shake.NeedHelp{path}})) == L.Exits{1}
-        : L.Status}, no)
-    case Shake.Unexpected{_arg}:
-      {==}
-    case Shake.UnknownFlag{_flag}:
-      {==}
-    case Shake.Missing{_name}:
-      {==}
-    case Shake.BadValue{_name, _value}:
-      {==}
+  %Equal.sym(Maybe<&2, List<&2, String>>, Shake.help_path(e), None{}, no)
+    : {L.status(L.line.err(_, app, e)) == L.Exits{1} : L.Status}
+  {==}
 
-def Laws.bare_exits_zero(_app, _bs):
+def Laws.bare_exits_zero(app, m, bare):
+  %Equal.sym(List<&2, String>, Shake.path_of(m), [], bare)
+    : {L.status(L.line.run(L.is.help(L.command(String.join(_, "/"))),
+        L.command(String.join(_, "/")), app, m)) == L.Exits{0} : L.Status}
+  %Equal.sym(List<&2, String>, Shake.path_of(m), [], bare)
+    : {L.status(L.line.group(String.is_empty(String.join(_, "/")), app, m))
+        == L.Exits{0} : L.Status}
   {==}
 
 def Laws.group_exits_one(app, m, none, some):
@@ -1571,13 +1563,13 @@ def Laws.group_exits_one(app, m, none, some):
 
 def Laws.command_runs(app, m, named):
   %Equal.sym(Bool, L.is.help(L.command(L.path(m))), False{}, named)
-    : {L.line.run(_, L.command(L.path(m)), app, m) == L.Runs{L.command(L.path(m)), m}
-      : L.Line}
+    : {L.line.run(_, L.command(L.path(m)), app, m)
+      == L.Runs{L.command(L.path(m)), L.leaf(m)} : L.Line}
   {==}
 
 def Laws.command_ends_its_own(app, m, named):
   Equal.cong(L.Line, L.Status, l => L.status(l), L.line(app, Done{m}),
-    L.Runs{L.command(L.path(m)), m}, Laws.command_runs(app, m, named))
+    L.Runs{L.command(L.path(m)), L.leaf(m)}, Laws.command_runs(app, m, named))
 
 # ---------------------------------------------------------------------------
 # ends: each command's outcome is `E.outcome.of` of whether it passed, so one

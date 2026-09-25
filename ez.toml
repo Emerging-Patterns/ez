@@ -4,21 +4,30 @@ entry = "manifest/manifest.bend"
 bin = "ez/main.bend"
 
 [deps.sha256]
-hash = "0x33de775bd13bab25b3e2d6f5bbcb8776"
+hash = "0xda83506fb9f059ead7afcfa2f498df5f"
 git = "https://github.com/Giulio2002/bend-sha256"
 rev = "5887e7cefa273ff7f90e3edfd6e90b815bbc79ed"
 root = "."
 narHash = "sha256-FLTyFw5HkOrl/T6E8hbs/XVwL05oGmcJARW9I9eHdgA="
-entry = "sha256.bend"
+entry = "package.bend"
 
 [deps.shake]
-hash = "0xebdf72b20ad527103f6efc0d2aa8f1ec"
+hash = "0x085b03c84ca37125e38dddede7b91e55"
 git = "https://github.com/Emerging-Patterns/shake"
-rev = "3424b39197335f0aa741e8928dbe5c27b3bde0ef"
-tag = "v0.1.0"
-root = "shake"
-narHash = "sha256-JXsEnp4NFlBxM7dNPSCU4TDBuF+d76h5bYgwOd6iu+0="
-entry = "shake/main.bend"
+rev = "ddb93921dea168aed7a37d3e56e00c4732cf9082"
+tag = "v0.2.0"
+root = "."
+narHash = "sha256-o5NRUjz6OBNMecXY8CZzYQpqoGFxdolD/ST8rIgAnLo="
+entry = "main.bend"
+
+[deps.snap]
+hash = "0x103d0af04de36ab98b311e537366ec67"
+git = "https://github.com/Emerging-Patterns/snap"
+rev = "ced24e103db518e37f565c577ef312602c217cf5"
+tag = "v1.0.0"
+root = "."
+narHash = "sha256-dEO94GFkcgssyzOqz4A5VveB3npPq4/zpDpI+EvqnvI="
+entry = "main.bend"
 
 [deps.eztoml]
 hash = "0x04b9afdd6d6a56039c5ce6dfb1e55294"
@@ -29,21 +38,13 @@ root = "eztoml"
 narHash = "sha256-lSFpfmFwEHUHT9w0J16Dr6n0PbkKPEYNvVrUOZtMyI8="
 entry = "eztoml/main.bend"
 
-[deps.snap]
-hash = "0x9bfd9d57916f3439316c2775fd1f10b4"
-git = "https://github.com/Emerging-Patterns/snap"
-rev = "0ce9a0fd709e5aa819b984b6bacbfb18729d94b0"
-root = "snap"
-narHash = "sha256-DmpBuSpjZ3WdPAEQzWcS/BjsNxiCXbxRb8tZB0pYh+Q="
-entry = "snap/main.bend"
-
 [deps.ezhttp]
 hash = "0x0a372da4a053652f70ded7d6e0d19330"
 git = "https://github.com/Emerging-Patterns/ezhttp"
-rev = "68419d690f8d81919ae9c7ada1830e10ed31c2ca"
-tag = "v0.4.0"
+rev = "f71ca6b9e7857212a485ae2bbfb71aa31ff99b38"
+tag = "v0.5.0"
 root = "ezhttp"
-narHash = "sha256-qZgitdcapYx7uE23KbzWeVIxAjefvNZ6cBh3iSbUyVc="
+narHash = "sha256-KEv4FQyH584qdm+JKmOI13f/ry9XB2O47TLxQTDbRvo="
 entry = "ezhttp/main.bend"
 
 [tools.bolt]

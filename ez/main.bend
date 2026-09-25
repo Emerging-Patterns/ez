@@ -8,7 +8,7 @@
 # native (`bend ez/main.bend -o bin/ez.bin`); interpreted, bend's own CLI
 # would take the flags meant for ez.
 import Base
-import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
+import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
 import ../ez/args.bend as Args
 import ./cmd.bend as Cmd
 import ./test.bend as Test
@@ -28,32 +28,32 @@ import ../ez/line.bend as L
 def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
   match sub:
     case L.CInit{}:
-      Cmd.init(Shake.get(matched, "name"), Shake.get(matched, "entry"),
-        Shake.get(matched, "description"))
+      Cmd.init(L.get(matched, "name"), L.get(matched, "entry"),
+        L.get(matched, "description"))
     case L.CAdd{}:
-      Cmd.add(Shake.get(matched, "target"), Shake.get(matched, "ref"),
-        Shake.get(matched, "entry"), Shake.get(matched, "rename"))
+      Cmd.add(L.get(matched, "target"), L.get(matched, "ref"),
+        L.get(matched, "entry"), L.get(matched, "rename"))
     case L.CRemove{}:
-      Cmd.remove(Shake.get(matched, "name"))
+      Cmd.remove(L.get(matched, "name"))
     case L.CLock{}:
-      Cmd.lock(Shake.on(matched, "upgrade"), Shake.get(matched, "package"))
+      Cmd.lock(Shake.on(matched, "upgrade"), L.get(matched, "package"))
     case L.CFetch{}:
       Cmd.fetch()
     case L.CCheck{}:
       Cmd.check()
     case L.CBuild{}:
-      Cmd.build(Shake.get(matched, "out"))
+      Cmd.build(L.get(matched, "out"))
     case L.CRun{}:
       Cmd.run(as)
     case L.CToolSync{}:
       ToolRun.sync()
     case L.CToolRun{}:
-      ToolRun.run(TW.Run{Args.tool.rest(as)}, Shake.get(matched, "target"),
-        Shake.get(matched, "entry"))
+      ToolRun.run(TW.Run{Args.tool.rest(as)}, L.get(matched, "target"),
+        L.get(matched, "entry"))
     case L.CToolInstall{}:
-      ToolRun.run(TW.Install{}, Shake.get(matched, "target"), Shake.get(matched, "entry"))
+      ToolRun.run(TW.Install{}, L.get(matched, "target"), L.get(matched, "entry"))
     case L.CToolUpgrade{}:
-      ToolRun.run(TW.Upgrade{}, Shake.get(matched, "target"), Shake.get(matched, "entry"))
+      ToolRun.run(TW.Upgrade{}, L.get(matched, "target"), L.get(matched, "entry"))
     case L.CPublish{}:
       Cmd.publish()
     case L.CTest{}:
@@ -84,10 +84,10 @@ def go.say(how: L.Line, +as: List<&2, String>) -> IO(Unit):
       dispatch(sub, m, as)
     case L.Shows{text}:
       IO.write(text)
-    case L.Misuse{text, word}:
+    case L.Misuse{text}:
       do IO<Unit>:
         IO.print_err(text)
-        hint.sync(String.eq(word, "sync"))
+        hint.sync(String.eq(Args.at(as, 0n), "sync"))
 
 # a status that is 0 ends nothing, and any other exits with it
 def go.exit(zero: Bool, +code: U32) -> IO(Unit):
