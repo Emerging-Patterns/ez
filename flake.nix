@@ -31,7 +31,7 @@
       ezBin = ez.mkPackage {
         inherit bend;
         src = self;
-        version = "1.0.0"; # x-release-please-version
+        version = "1.1.0"; # x-release-please-version
         nativeBuildInputs = [ llvm.clang ];
         extraPath = [ pkgs.git pkgs.findutils pkgs.coreutils ];
         wrapEnv = {

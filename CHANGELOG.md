@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.0](https://github.com/Emerging-Patterns/ez/compare/v1.0.0...v1.1.0) (2026-09-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** ez.toml and ez.lock.toml are now written in eztoml 0.4.0's layout (implied [deps]/[packages] headers, bare 0x table names, no blank lines between sections); the next `ez lock` rewrites an old-format lock once. Old-format files still read. ez before 1.1 can fetch and check from a new-format lock, but its doctor calls it out of date and its lock writes the old layout back. Usage errors show the failing command's usage line, and a repeated option (e.g. `--package x --package y`) is refused (shake 0.2.0).
+
+### Features
+
+* **deps:** shake 0.2.0, snap 1.0.0, eztoml 0.4.0, ezhttp 0.5.0, sha256 from the hub ([#118](https://github.com/Emerging-Patterns/ez/issues/118)) ([04bcef8](https://github.com/Emerging-Patterns/ez/commit/04bcef89d63d45b8bb171617a94efc6e9f880091))
+
+
+### Bug Fixes
+
+* build the fresh check after ez so CI does not run out of memory ([#115](https://github.com/Emerging-Patterns/ez/issues/115)) ([df6d616](https://github.com/Emerging-Patterns/ez/commit/df6d61683c3a20767ad87f89bfa5f446a5075a02))
+
 ## [1.0.0](https://github.com/Emerging-Patterns/ez/compare/v0.1.0...v1.0.0) (2026-09-24)
 
 
