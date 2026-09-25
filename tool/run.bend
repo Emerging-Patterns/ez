@@ -24,6 +24,7 @@ import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../lock/plan.bend as LP
 import ../lock/up.bend as Up
+import ../git/git.bend as Git
 import ../fetch/run.bend as FetchRun
 import ../pkg/path.bend as P
 import ../run/bend.bend as Bend
@@ -44,9 +45,45 @@ def line0(ls: List<&2, String>) -> String:
     case h <> _t:
       h
 
-# what a git command printed, trimmed, or "" when it failed
-def said(+out: String) -> String:
-  Bool.pick(String, R.ok(out), String.trim(R.text(out)), "")
+# git can write a `warning:` line to stderr and still exit 0, and snap
+# answers stdout and stderr together (SNAP-ANS-4), so an answer is read by the
+# shape of the line it wants, never by where that line stands.
+
+# the line found, or the walk gone on past a line of another shape
+def said.next(hit: Bool, +h: String, go: Unit -> String) -> String:
+  match hit:
+    case True{}:
+      h
+    case False{}:
+      go(Unit{})
+
+# the first line that is a commit, or ""
+def said.rev(ls: List<&2, String>) -> String:
+  match ls:
+    case []:
+      ""
+    case +h <> t:
+      said.next(Git.is_rev(h), h, _u => said.rev(t))
+
+# a line that is an absolute path, as `rev-parse --show-toplevel` prints one
+def line.abs(+line: String) -> Bool:
+  String.eq(String.take(line, 1n), "/")
+
+# the first line that is an absolute path, or ""
+def said.abs(ls: List<&2, String>) -> String:
+  match ls:
+    case []:
+      ""
+    case +h <> t:
+      said.next(line.abs(h), h, _u => said.abs(t))
+
+# the commit `git rev-parse HEAD` answered, or "" when it failed
+def said.head(+out: String) -> String:
+  Bool.pick(String, R.ok(out), said.rev(String.lines(R.text(out))), "")
+
+# the top `git rev-parse --show-toplevel` answered, or "" when it failed
+def said.top(+out: String) -> String:
+  Bool.pick(String, R.ok(out), said.abs(String.lines(R.text(out))), "")
 
 # what git says of a path that has a real path: the top of its checkout,
 # HEAD, and what `git status` names, untracked files included whatever the
@@ -57,7 +94,8 @@ def located(+abs: String) -> IO(TW.Answer):
     +head : String <- R.exec(["git", "-C", abs, "rev-parse", "HEAD"])
     +st : String <- R.exec(["git", "-C", abs, "status", "--porcelain",
       "--untracked-files=normal"])
-    return TW.Located{abs, said(top), said(head), R.ok(st), String.trim(R.text(st))}
+    return TW.Located{abs, said.top(top), said.head(head), R.ok(st),
+      String.trim(R.text(st))}
 
 # a path that has a real path, or why it has none
 def locate.real(ok: Bool, +path: String, +text: String) -> IO(TW.Answer):
