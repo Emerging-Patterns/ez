@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/Emerging-Patterns/ez/compare/v1.1.0...v1.2.0) (2026-09-25)
+
+
+### Bug Fixes
+
+* move the library from manifest/ to ledger/ so ez can go on the hub ([#119](https://github.com/Emerging-Patterns/ez/issues/119)) ([f702841](https://github.com/Emerging-Patterns/ez/commit/f70284165b77a0416a77a649f5ca7ab55e135e4b))
+
 ## [1.1.0](https://github.com/Emerging-Patterns/ez/compare/v1.0.0...v1.1.0) (2026-09-25)
 
 
