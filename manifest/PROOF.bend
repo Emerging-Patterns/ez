@@ -1,13 +1,12 @@
 # manifest: the proofs. `bend PROOF.bend` is the gate.
 import Base
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ./manifest.bend as M
 import ./render.bend as R
 import ./ignore.bend as I
 import ../check/eq.bend as Eq
 import ./upgrade.bend as U
 import ../check/str.bend as Str
-import ../check/toml.bend as TP
 import ./LAWS.bend as Laws
 
 # LAW: one step of the drop, with the branch the pick takes given as a
@@ -999,15 +998,6 @@ def Laws.allowlist_keeps_other_lines(ds, ls):
     rules_are_ez(I.has(I.tag(ls), I.Star{}), I.has(I.tag(ls), I.Lib{}),
       I.has(I.tag(ls), I.Pkgs{})),
     block_others(ds, I.tag(ls)))
-
-# The vendor bit read back. Each bit renders one fixed ledger, and parsing
-# that text is a computation the checker runs to its end.
-def Laws.vendor_reads_back(v):
-  match v:
-    case True{}:
-      {==}
-    case False{}:
-      {==}
 
 # LAW: one step of the lookup past the drop, with the branch the drop takes
 # given as a parameter and the equation that put it there alongside. A
@@ -4285,18 +4275,11 @@ def Laws.tool_needs_no_hash(ss1, n, ps, ss2):
         Laws.tool_needs_no_hash(t, n, ps, ss2))
 
 # ---------------------------------------------------------------------------
-# EZ-LED-4: a ledger ez renders parses back to the model it was rendered from.
-# The proof has the shape of the lock's (EZ-DOC-1, lock/PROOF.bend). First the
-# text: the renderer writes the lines of a document of tables (`show_text`),
-# each table its header and the rows that have a value, and eztoml v0.1.0 cuts
-# the text back into those lines and reads them into the tables
-# (`ledger_sections_read`), as check/toml.bend's `sections_read` does for a
-# document eztoml itself renders. The ledger's one difference is `vendor =
-# true`, written bare, which a row of its own carries (`step_vendor`). Then
-# the model: `M.build` finds in the tables the fields they were written from
-# (`read_ledger`), since every row with no value was left out and every key is
-# written once in its table (`value_keep`). `R.renderable` is what makes both
-# halves hold.
+# EZ-LED-4's text layer, the ledger read back from the text eztoml writes, is
+# trusted through eztoml's round trip (EZ-TRUST-8, `ML.ReadsBack`). What is
+# here is ez's side of the model: `M.build` finds in the tables the fields
+# they were written from (`read_ledger`), since every row with no value is
+# left out and every key is written once in its table (`value_keep`).
 
 # a line of a rendered ledger: a key with its value quoted, or a key with its
 # value written bare, as `vendor = true` is. Proof vocabulary.
@@ -4325,14 +4308,6 @@ def row.kv(r: Row) -> T.Kv:
       T.Kv{k, v}
     case B{k, v}:
       T.Kv{k, v}
-
-# the row's line, without its newline
-def row.line(r: Row) -> String:
-  match r:
-    case Q{k, v}:
-      TP.pair.line(T.Kv{k, v})
-    case B{k, v}:
-      k ++ " = " ++ v
 
 # the row as the renderer writes it: nothing when its value is empty
 def row.text(r: Row) -> String:
@@ -4385,13 +4360,6 @@ def keep.acc(empty: Bool, r: Row, acc: List<&2, T.Kv>) -> List<&2, T.Kv>:
     case False{}:
       row.kv(r) <> acc
 
-def rows.lines(rs: List<&2, Row>) -> List<&2, String>:
-  match rs:
-    case []:
-      []
-    case h <> t:
-      row.line(h) <> rows.lines(t)
-
 def rows.kvs(rs: List<&2, Row>) -> List<&2, T.Kv>:
   match rs:
     case []:
@@ -4406,137 +4374,11 @@ def rows.text(rs: List<&2, Row>) -> String:
     case h <> t:
       row.text(h) ++ rows.text(t)
 
-# LAW: the one bare line a ledger holds, read into a table being filled, adds
-# its pair
-law step_vendor:
-  for bad: String
-  for +n: String
-  for acc: List<&2, T.Kv>
-  for done: List<&2, T.Sect>
-  for en: {String.is_empty(n) == False{} : Bool}
-  {T.step(T.Toml{bad, n, acc, done}, "vendor = true")
-    == T.Toml{bad, n, T.Kv{"vendor", "true"} <> acc, done} : T.Toml}
-
-def step_vendor(bad, n, acc, done, en):
-  %Equal.sym(Bool, String.is_empty(n), False{}, en)
-    : {T.put.go(_, bad, n, acc, done, "vendor", "true")
-      == T.Toml{bad, n, T.Kv{"vendor", "true"} <> acc, done} : T.Toml}
-  {==}
-
-# LAW: a row with a value, read into a table being filled, adds its pair
-law step_row:
-  for bad: String
-  for +n: String
-  for acc: List<&2, T.Kv>
-  for done: List<&2, T.Sect>
-  for +r: Row
-  for en: {String.is_empty(n) == False{} : Bool}
-  for ev: {String.is_empty(row.val(r)) == False{} : Bool}
-  for ok: {row.ok(r) == True{} : Bool}
-  {T.step(T.Toml{bad, n, acc, done}, row.line(r))
-    == T.Toml{bad, n, row.kv(r) <> acc, done} : T.Toml}
-
-def step_row(bad, n, acc, done, r, en, ev, ok):
-  match r:
-    case Q{+k, +v}:
-      +ok2 = Eq.and.right(T.bare(k), Bool.and(Str.clear(k, '='), Bool.and(Str.clear(k, '"'),
-        Bool.and(Str.clear(k, '\n'), Str.clear(v, '\n')))), ok)
-      TP.step_pair(bad, n, acc, done, k, v, en,
-        Eq.and.left(Str.clear(k, '='), Bool.and(Str.clear(k, '"'),
-          Bool.and(Str.clear(k, '\n'), Str.clear(v, '\n'))), ok2),
-        Eq.and.left(Str.clear(k, '"'), Bool.and(Str.clear(k, '\n'), Str.clear(v, '\n')),
-          Eq.and.right(Str.clear(k, '='), Bool.and(Str.clear(k, '"'),
-            Bool.and(Str.clear(k, '\n'), Str.clear(v, '\n'))), ok2)))
-    case B{+k, +v}:
-      +ab = Equal.trans(Bool, Bool.and(String.eq(k, "vendor"), String.eq(v, "true")),
-        Bool.or(String.is_empty(v), Bool.and(String.eq(k, "vendor"), String.eq(v, "true"))),
-        True{},
-        Equal.cong(Bool, Bool, x => Bool.or(x, Bool.and(String.eq(k, "vendor"), String.eq(v, "true"))),
-          False{}, String.is_empty(v), Equal.sym(Bool, String.is_empty(v), False{}, ev)),
-        ok)
-      ek = Str.string_eq_true(k, "vendor", Eq.and.left(String.eq(k, "vendor"), String.eq(v, "true"), ab))
-      evv = Str.string_eq_true(v, "true", Eq.and.right(String.eq(k, "vendor"), String.eq(v, "true"), ab))
-      %Equal.sym(String, k, "vendor", ek) : {T.step(T.Toml{bad, n, acc, done}, _ ++ " = " ++ v)
-        == T.Toml{bad, n, T.Kv{_, v} <> acc, done} : T.Toml}
-      %Equal.sym(String, v, "true", evv) : {T.step(T.Toml{bad, n, acc, done}, "vendor = " ++ _)
-        == T.Toml{bad, n, T.Kv{"vendor", _} <> acc, done} : T.Toml}
-      step_vendor(bad, n, acc, done, en)
-
-
-# LAW: one row, kept or dropped, read into a table being filled, with whether
-# its value is empty given as a parameter
-law walk_rows.arm:
-  for +r: Row
-  for +t: List<&2, Row>
-  for +rest: List<&2, String>
-  for +bad: String
-  for +n: String
-  for +acc: List<&2, T.Kv>
-  for +done: List<&2, T.Sect>
-  for b: Bool
-  for eb: {String.is_empty(row.val(r)) == b : Bool}
-  for +en: {String.is_empty(n) == False{} : Bool}
-  for +ok: {row.ok(r) == True{} : Bool}
-  for ih: {T.parse.walk(List.append(&2, String, rows.lines(keep(t)), rest),
-      T.Toml{bad, n, keep.acc(b, r, acc), done})
-    == T.parse.walk(rest, T.Toml{bad, n, List.reverse.go(&2, T.Kv, rows.kvs(keep(t)),
-      keep.acc(b, r, acc)), done}) : T.Toml}
-  {T.parse.walk(List.append(&2, String, rows.lines(keep.put(b, r, keep(t))), rest),
-      T.Toml{bad, n, acc, done})
-    == T.parse.walk(rest, T.Toml{bad, n, List.reverse.go(&2, T.Kv,
-      rows.kvs(keep.put(b, r, keep(t))), acc), done}) : T.Toml}
-
-def walk_rows.arm(r, t, rest, bad, n, acc, done, b, eb, en, ok, ih):
-  match b:
-    case True{}:
-      ih
-    case False{}:
-      s = Equal.sym(T.Toml, T.step(T.Toml{bad, n, acc, done}, row.line(r)),
-        T.Toml{bad, n, row.kv(r) <> acc, done},
-        step_row(bad, n, acc, done, r, en, eb, ok))
-      %s : {T.parse.walk(List.append(&2, String, rows.lines(keep(t)), rest), _)
-        == T.parse.walk(rest, T.Toml{bad, n, List.reverse.go(&2, T.Kv,
-          rows.kvs(keep(t)), row.kv(r) <> acc), done}) : T.Toml}
-      ih
-
-# LAW: the rows a table writes, read into it, add their pairs, reversed
-law walk_rows:
-  for +rs: List<&2, Row>
-  for +rest: List<&2, String>
-  for +bad: String
-  for +n: String
-  for +acc: List<&2, T.Kv>
-  for +done: List<&2, T.Sect>
-  for +en: {String.is_empty(n) == False{} : Bool}
-  for +eok: {rows.ok(rs) == True{} : Bool}
-  {T.parse.walk(List.append(&2, String, rows.lines(keep(rs)), rest), T.Toml{bad, n, acc, done})
-    == T.parse.walk(rest, T.Toml{bad, n, List.reverse.go(&2, T.Kv, rows.kvs(keep(rs)), acc), done})
-    : T.Toml}
-
-# by induction on the rows, each one kept or dropped
-def walk_rows(rs, rest, bad, n, acc, done, en, eok):
-  match rs:
-    case []:
-      {==}
-    case +r <> +t:
-      walk_rows.arm(r, t, rest, bad, n, acc, done, String.is_empty(row.val(r)), {==}, en,
-        Eq.and.left(row.ok(r), rows.ok(t), eok),
-        walk_rows(t, rest, bad, n, keep.acc(String.is_empty(row.val(r)), r, acc), done, en,
-          Eq.and.right(row.ok(r), rows.ok(t), eok)))
 
 # a table of a rendered ledger: its name and every row it may write. Proof
 # vocabulary.
 type RSect is Data:
   RSect{name: String, rows: List<&2, Row>}
-
-# the lines of a ledger: each table's header, the rows it writes, and a blank
-# line
-def rdoc.lines(ss: List<&2, RSect>) -> List<&2, String>:
-  match ss:
-    case []:
-      []
-    case RSect{n, rs} <> t:
-      TP.head.line(n) <> List.append(&2, String, rows.lines(keep(rs)), "" <> rdoc.lines(t))
 
 # the table a table of rows reads back as
 def sect.of(s: RSect) -> T.Sect:
@@ -4564,87 +4406,6 @@ def rsects.ok(ss: List<&2, RSect>) -> Bool:
       rest = rsects.ok(t)
       Bool.and(rsect.ok(h), rest)
 
-# LAW: a table's lines, read, fill it and file the one before it
-law walk_rsect:
-  for +n: String
-  for +rs: List<&2, Row>
-  for +t: List<&2, RSect>
-  for +bad: String
-  for +name: String
-  for +pairs: List<&2, T.Kv>
-  for +done: List<&2, T.Sect>
-  for +en: {String.is_empty(n) == False{} : Bool}
-  for +eok: {rows.ok(rs) == True{} : Bool}
-  {T.parse.walk(rdoc.lines(RSect{n, rs} <> t), T.Toml{bad, name, pairs, done})
-    == T.parse.walk(rdoc.lines(t),
-      T.Toml{bad, n, List.reverse.go(&2, T.Kv, rows.kvs(keep(rs)), []), T.flush(name, pairs, done)})
-    : T.Toml}
-
-# the header, then the rows; the blank line changes nothing
-def walk_rsect(n, rs, t, bad, name, pairs, done, en, eok):
-  h = Equal.sym(T.Toml, T.step(T.Toml{bad, name, pairs, done}, TP.head.line(n)),
-    T.Toml{bad, n, [], T.flush(name, pairs, done)}, TP.step_head(bad, name, pairs, done, n))
-  %h : {T.parse.walk(List.append(&2, String, rows.lines(keep(rs)), "" <> rdoc.lines(t)), _)
-    == T.parse.walk(rdoc.lines(t),
-      T.Toml{bad, n, List.reverse.go(&2, T.Kv, rows.kvs(keep(rs)), []), T.flush(name, pairs, done)})
-    : T.Toml}
-  walk_rows(rs, "" <> rdoc.lines(t), bad, n, [], T.flush(name, pairs, done), en, eok)
-
-# LAW: a ledger's lines, read from any state with no error, file the tables
-# it already filed and then every table the ledger holds
-law walk_rdoc:
-  for +ss: List<&2, RSect>
-  for +bad: String
-  for +name: String
-  for +pairs: List<&2, T.Kv>
-  for +done: List<&2, T.Sect>
-  for +eok: {rsects.ok(ss) == True{} : Bool}
-  {T.parse.fin(T.parse.walk(rdoc.lines(ss), T.Toml{bad, name, pairs, done}))
-    == T.Toml{bad, "", [], List.append(&2, T.Sect,
-      List.reverse(&2, T.Sect, T.flush(name, pairs, done)), sects.of(ss))} : T.Toml}
-
-# by induction on the tables
-def walk_rdoc(ss, bad, name, pairs, done, eok):
-  match ss:
-    case []:
-      Equal.cong(List<&2, T.Sect>, T.Toml, x => T.Toml{bad, "", [], x},
-        List.reverse(&2, T.Sect, T.flush(name, pairs, done)),
-        List.append(&2, T.Sect, List.reverse(&2, T.Sect, T.flush(name, pairs, done)), []),
-        Equal.sym(List<&2, T.Sect>,
-          List.append(&2, T.Sect, List.reverse(&2, T.Sect, T.flush(name, pairs, done)), []),
-          List.reverse(&2, T.Sect, T.flush(name, pairs, done)),
-          Str.list_append_nil(T.Sect, List.reverse(&2, T.Sect, T.flush(name, pairs, done)))))
-    case RSect{+n, +rs} <> +t:
-      +ok = Eq.and.left(rsect.ok(RSect{n, rs}), rsects.ok(t), eok)
-      +en = Eq.not.true(String.is_empty(n), Eq.and.left(Bool.not(String.is_empty(n)),
-        Bool.and(Str.clear(n, '\n'), rows.ok(rs)), ok))
-      ep = Eq.and.right(Str.clear(n, '\n'), rows.ok(rs),
-        Eq.and.right(Bool.not(String.is_empty(n)), Bool.and(Str.clear(n, '\n'), rows.ok(rs)), ok))
-      w = Equal.sym(T.Toml,
-        T.parse.walk(rdoc.lines(RSect{n, rs} <> t), T.Toml{bad, name, pairs, done}),
-        T.parse.walk(rdoc.lines(t),
-          T.Toml{bad, n, List.reverse.go(&2, T.Kv, rows.kvs(keep(rs)), []), T.flush(name, pairs, done)}),
-        walk_rsect(n, rs, t, bad, name, pairs, done, en, ep))
-      %w : {T.parse.fin(_) == T.Toml{bad, "", [], List.append(&2, T.Sect,
-        List.reverse(&2, T.Sect, T.flush(name, pairs, done)), sects.of(RSect{n, rs} <> t))} : T.Toml}
-      Equal.trans(T.Toml,
-        T.parse.fin(T.parse.walk(rdoc.lines(t),
-          T.Toml{bad, n, List.reverse.go(&2, T.Kv, rows.kvs(keep(rs)), []), T.flush(name, pairs, done)})),
-        T.Toml{bad, "", [], List.append(&2, T.Sect, List.reverse(&2, T.Sect,
-          T.flush(n, List.reverse.go(&2, T.Kv, rows.kvs(keep(rs)), []), T.flush(name, pairs, done))),
-          sects.of(t))},
-        T.Toml{bad, "", [], List.append(&2, T.Sect,
-          List.reverse(&2, T.Sect, T.flush(name, pairs, done)), sects.of(RSect{n, rs} <> t))},
-        walk_rdoc(t, bad, n, List.reverse.go(&2, T.Kv, rows.kvs(keep(rs)), []),
-          T.flush(name, pairs, done), Eq.and.right(rsect.ok(RSect{n, rs}), rsects.ok(t), eok)),
-        Equal.cong(List<&2, T.Sect>, T.Toml, x => T.Toml{bad, "", [], x},
-          List.append(&2, T.Sect, List.reverse(&2, T.Sect,
-            T.flush(n, List.reverse.go(&2, T.Kv, rows.kvs(keep(rs)), []), T.flush(name, pairs, done))),
-            sects.of(t)),
-          List.append(&2, T.Sect,
-            List.reverse(&2, T.Sect, T.flush(name, pairs, done)), sects.of(RSect{n, rs} <> t)),
-          TP.flush_filed(n, rows.kvs(keep(rs)), T.flush(name, pairs, done), sects.of(t), en)))
-
 # LAW: a bare row with a value that reads back is `vendor = true`
 law vendor_row:
   for +k: String
@@ -4668,107 +4429,6 @@ def vendor_row(k, v, ev, ok):
   %Equal.sym(String, v, "true", evv) : {B{"vendor", _} == B{"vendor", "true"} : Row}
   {==}
 
-# LAW: a row with a value that reads back writes a line with no newline
-law row_clear:
-  for +r: Row
-  for ev: {String.is_empty(row.val(r)) == False{} : Bool}
-  for ok: {row.ok(r) == True{} : Bool}
-  {Str.clear(row.line(r), '\n') == True{} : Bool}
-
-def row_clear(r, ev, ok):
-  match r:
-    case Q{+k, +v}:
-      +ok3 = Eq.and.right(Str.clear(k, '"'), Bool.and(Str.clear(k, '\n'), Str.clear(v, '\n')),
-        Eq.and.right(Str.clear(k, '='), Bool.and(Str.clear(k, '"'),
-          Bool.and(Str.clear(k, '\n'), Str.clear(v, '\n'))),
-          Eq.and.right(T.bare(k), Bool.and(Str.clear(k, '='), Bool.and(Str.clear(k, '"'),
-            Bool.and(Str.clear(k, '\n'), Str.clear(v, '\n')))), ok)))
-      Str.clear_append(T.key(k), " = " ++ T.quote(v), '\n',
-        TP.key_clear.go(k, T.bare(k), Eq.and.left(Str.clear(k, '\n'), Str.clear(v, '\n'), ok3)),
-        Str.clear_append(v, "\"", '\n',
-          Eq.and.right(Str.clear(k, '\n'), Str.clear(v, '\n'), ok3), {==}))
-    case B{+k, +v}:
-      %Equal.sym(Row, B{k, v}, B{"vendor", "true"}, vendor_row(k, v, ev, ok))
-        : {Str.clear(row.line(_), '\n') == True{} : Bool}
-      {==}
-
-# LAW: one row, kept or dropped, with whether its value is empty given
-law rows_clear.arm:
-  for +r: Row
-  for +t: List<&2, Row>
-  for b: Bool
-  for eb: {String.is_empty(row.val(r)) == b : Bool}
-  for ok: {row.ok(r) == True{} : Bool}
-  for ih: {Str.clear.all(rows.lines(keep(t)), '\n') == True{} : Bool}
-  {Str.clear.all(rows.lines(keep.put(b, r, keep(t))), '\n') == True{} : Bool}
-
-def rows_clear.arm(r, t, b, eb, ok, ih):
-  match b:
-    case True{}:
-      ih
-    case False{}:
-      Str.and_true(Str.clear(row.line(r), '\n'), Str.clear.all(rows.lines(keep(t)), '\n'),
-        row_clear(r, eb, ok), ih)
-
-# LAW: no line a table's rows write holds a newline
-law rows_clear:
-  for +rs: List<&2, Row>
-  for +eok: {rows.ok(rs) == True{} : Bool}
-  {Str.clear.all(rows.lines(keep(rs)), '\n') == True{} : Bool}
-
-def rows_clear(rs, eok):
-  match rs:
-    case []:
-      {==}
-    case +r <> +t:
-      rows_clear.arm(r, t, String.is_empty(row.val(r)), {==},
-        Eq.and.left(row.ok(r), rows.ok(t), eok),
-        rows_clear(t, Eq.and.right(row.ok(r), rows.ok(t), eok)))
-
-# LAW: no line of a ledger that reads back holds a newline
-law rlines_clear:
-  for +ss: List<&2, RSect>
-  for +eok: {rsects.ok(ss) == True{} : Bool}
-  {Str.clear.all(rdoc.lines(ss), '\n') == True{} : Bool}
-
-# by induction on the tables
-def rlines_clear(ss, eok):
-  match ss:
-    case []:
-      {==}
-    case RSect{+n, +rs} <> +t:
-      +ok = Eq.and.right(Bool.not(String.is_empty(n)), Bool.and(Str.clear(n, '\n'), rows.ok(rs)),
-        Eq.and.left(rsect.ok(RSect{n, rs}), rsects.ok(t), eok))
-      Str.and_true(Str.clear(TP.head.line(n), '\n'),
-        Str.clear.all(List.append(&2, String, rows.lines(keep(rs)), "" <> rdoc.lines(t)), '\n'),
-        Str.clear_append(n, "]", '\n', Eq.and.left(Str.clear(n, '\n'), rows.ok(rs), ok), {==}),
-        Str.clear_all_append(rows.lines(keep(rs)), "" <> rdoc.lines(t), '\n',
-          rows_clear(rs, Eq.and.right(Str.clear(n, '\n'), rows.ok(rs), ok)),
-          rlines_clear(t, Eq.and.right(rsect.ok(RSect{n, rs}), rsects.ok(t), eok))))
-
-# LAW: parsing a ledger's lines joined by newlines gives back its tables, and
-# no error, when every table reads back and there is at least one
-law rsections_read:
-  for +s: RSect
-  for +t: List<&2, RSect>
-  for +eok: {rsects.ok(s <> t) == True{} : Bool}
-  {T.parse(String.join(rdoc.lines(s <> t), "\n")) == T.Toml{"", "", [], sects.of(s <> t)}
-    : T.Toml}
-
-# the text is the lines joined, which cut back into the lines
-def rsections_read(s, t, eok):
-  match s:
-    case RSect{+n, +rs}:
-      sp = Equal.sym(List<&2, String>,
-        String.split(String.join(rdoc.lines(RSect{n, rs} <> t), "\n"), '\n'),
-        rdoc.lines(RSect{n, rs} <> t),
-        Str.split_join(TP.head.line(n),
-          List.append(&2, String, rows.lines(keep(rs)), "" <> rdoc.lines(t)), '\n',
-          rlines_clear(RSect{n, rs} <> t, eok)))
-      %sp : {T.parse.fin(T.parse.walk(_, T.Toml{"", "", [], []}))
-        == T.Toml{"", "", [], sects.of(RSect{n, rs} <> t)} : T.Toml}
-      walk_rdoc(RSect{n, rs} <> t, "", "", [], [], eok)
-
 # ---------------------------------------------------------------------------
 # the renderer's text as lines
 
@@ -4788,104 +4448,6 @@ def text_empty(r, eb):
       %Equal.sym(Bool, String.is_empty(v), True{}, eb)
         : {Bool.pick(String, _, "", k ++ " = " ++ v ++ "\n") == "" : String}
       {==}
-
-# LAW: a quoted row with a value writes its line and a newline, ahead of
-# whatever follows
-law text_line.q:
-  for +k: String
-  for +v: String
-  for +x: String
-  for ev: {String.is_empty(v) == False{} : Bool}
-  for ek: {T.bare(k) == True{} : Bool}
-  {String.append(row.line(Q{k, v}), SCon{'\n', x}) == String.append(row.text(Q{k, v}), x)
-    : String}
-
-def text_line.q(k, v, x, ev, ek):
-  %Equal.sym(Bool, String.is_empty(v), False{}, ev)
-    : {String.append(row.line(Q{k, v}), SCon{'\n', x})
-      == String.append(Bool.pick(String, _, "", k ++ " = \"" ++ v ++ "\"\n"), x) : String}
-  %Equal.sym(Bool, T.bare(k), True{}, ek)
-    : {String.append(String.append(Bool.pick(String, _, k, T.quote(k)), " = " ++ T.quote(v)),
-        SCon{'\n', x})
-      == String.append(k ++ " = \"" ++ v ++ "\"\n", x) : String}
-  a1 = Equal.sym(String, String.append(String.append(k, " = " ++ T.quote(v)), SCon{'\n', x}),
-    String.append(k, String.append(" = " ++ T.quote(v), SCon{'\n', x})),
-    Eq.append_assoc(k, " = " ++ T.quote(v), SCon{'\n', x}))
-  %a1 : {_ == String.append(k ++ " = \"" ++ v ++ "\"\n", x) : String}
-  a2 = Equal.sym(String, String.append(k ++ " = \"" ++ v ++ "\"\n", x),
-    String.append(k, String.append(" = \"" ++ v ++ "\"\n", x)),
-    Eq.append_assoc(k, " = \"" ++ v ++ "\"\n", x))
-  %a2 : {String.append(k, String.append(" = " ++ T.quote(v), SCon{'\n', x})) == _ : String}
-  a3 = Equal.sym(String, String.append(String.append(v, "\""), SCon{'\n', x}),
-    String.append(v, String.append("\"", SCon{'\n', x})),
-    Eq.append_assoc(v, "\"", SCon{'\n', x}))
-  %a3 : {String.append(k, " = \"" ++ _)
-    == String.append(k, String.append(" = \"" ++ v ++ "\"\n", x)) : String}
-  a4 = Equal.sym(String, String.append(String.append(v, "\"\n"), x),
-    String.append(v, String.append("\"\n", x)),
-    Eq.append_assoc(v, "\"\n", x))
-  %a4 : {String.append(k, " = \"" ++ String.append(v, String.append("\"", SCon{'\n', x})))
-    == String.append(k, " = \"" ++ _) : String}
-  {==}
-
-# LAW: a row with a value that reads back writes its line and a newline,
-# ahead of whatever follows
-law text_line:
-  for +r: Row
-  for +x: String
-  for ev: {String.is_empty(row.val(r)) == False{} : Bool}
-  for ok: {row.ok(r) == True{} : Bool}
-  {String.append(row.line(r), SCon{'\n', x}) == String.append(row.text(r), x) : String}
-
-def text_line(r, x, ev, ok):
-  match r:
-    case Q{+k, +v}:
-      text_line.q(k, v, x, ev,
-        Eq.and.left(T.bare(k), Bool.and(Str.clear(k, '='), Bool.and(Str.clear(k, '"'),
-          Bool.and(Str.clear(k, '\n'), Str.clear(v, '\n')))), ok))
-    case B{+k, +v}:
-      %Equal.sym(Row, B{k, v}, B{"vendor", "true"}, vendor_row(k, v, ev, ok))
-        : {String.append(row.line(_), SCon{'\n', x}) == String.append(row.text(_), x) : String}
-      {==}
-
-# LAW: one row, kept or dropped, written, with whether its value is empty given
-law rows_text.arm:
-  for +r: Row
-  for +t: List<&2, Row>
-  for b: Bool
-  for eb: {String.is_empty(row.val(r)) == b : Bool}
-  for ok: {row.ok(r) == True{} : Bool}
-  for ih: {TP.unlines(rows.lines(keep(t))) == rows.text(t) : String}
-  {TP.unlines(rows.lines(keep.put(b, r, keep(t)))) == String.append(row.text(r), rows.text(t))
-    : String}
-
-def rows_text.arm(r, t, b, eb, ok, ih):
-  match b:
-    case True{}:
-      %Equal.sym(String, row.text(r), "", text_empty(r, eb))
-        : {TP.unlines(rows.lines(keep(t))) == String.append(_, rows.text(t)) : String}
-      ih
-    case False{}:
-      %Equal.sym(String, TP.unlines(rows.lines(keep(t))), rows.text(t), ih)
-        : {String.append(row.line(r), SCon{'\n', _})
-          == String.append(row.text(r), rows.text(t)) : String}
-      text_line(r, rows.text(t), eb, ok)
-
-# LAW: the lines a table's rows write, each ended by a newline, are the text
-# the renderer writes for them
-law rows_text:
-  for +rs: List<&2, Row>
-  for +eok: {rows.ok(rs) == True{} : Bool}
-  {TP.unlines(rows.lines(keep(rs))) == rows.text(rs) : String}
-
-def rows_text(rs, eok):
-  match rs:
-    case []:
-      {==}
-    case +r <> +t:
-      rows_text.arm(r, t, String.is_empty(row.val(r)), {==},
-        Eq.and.left(row.ok(r), rows.ok(t), eok),
-        rows_text(t, Eq.and.right(row.ok(r), rows.ok(t), eok)))
 
 # rows written ahead of a text. Proof vocabulary.
 def rows.cat(rs: List<&2, Row>, x: String) -> String:
@@ -5037,11 +4599,6 @@ def lsects(m: M.Manifest) -> List<&2, RSect>:
   M.Manifest{n, e, b, h, hpa, hpv, ds, ts} = m
   RSect{"package", pkg.rows(n, e, b, h, hpa, hpv)} <> dsects(ds, tsects(ts))
 
-# the text a ledger's tables after the first write: every table a newline
-# first
-def rjoin(ss: List<&2, RSect>) -> String:
-  String.join.go(rdoc.lines(ss), "", "\n")
-
 # LAW: a table's rows read back when the table does
 law rsect_rows:
   for +n: String
@@ -5070,243 +4627,6 @@ def src_text(s):
         String.append(R.line.bare("vendor", R.vendor.word(vend)), ""),
         R.line.bare("vendor", R.vendor.word(vend)),
         Str.append_nil(R.line.bare("vendor", R.vendor.word(vend))))
-
-# LAW: a table, a blank line first, then the tables after it
-law rjoin_cons:
-  for +n: String
-  for +rs: List<&2, Row>
-  for +t: List<&2, RSect>
-  {rjoin(RSect{n, rs} <> t)
-    == SCon{'\n', String.append(TP.unlines(TP.head.line(n) <> rows.lines(keep(rs))), rjoin(t))}
-    : String}
-
-def rjoin_cons(n, rs, t):
-  Equal.cong(String, String, y => SCon{'\n', y},
-    String.join.go(List.append(&2, String, rows.lines(keep(rs)), "" <> rdoc.lines(t)),
-      TP.head.line(n), "\n"),
-    String.append(TP.unlines(TP.head.line(n) <> rows.lines(keep(rs))), rjoin(t)),
-    TP.join_lines(rows.lines(keep(rs)), TP.head.line(n), rdoc.lines(t)))
-
-# LAW: a dependency as the renderer writes it, ahead of whatever follows, is a
-# newline and its table's lines
-law dep_text:
-  for +n: String
-  for +h: String
-  for +e: String
-  for +s: M.Source
-  for +x: String
-  for ok: {rows.ok(dep.rows(h, e, s)) == True{} : Bool}
-  {String.append(R.dep(M.Dep{n, h, e, s}), x)
-    == SCon{'\n', String.append(TP.unlines(TP.head.line("deps." ++ n)
-      <> rows.lines(keep(dep.rows(h, e, s)))), x)} : String}
-
-def dep_text(n, h, e, s, x, ok):
-  +u = TP.unlines(rows.lines(keep(dep.rows(h, e, s))))
-  +lh = R.line("hash", h)
-  +le = R.line("entry", e)
-  eu = Equal.trans(String, String.append(u, x),
-    rows.cat(dep.rows(h, e, s), x),
-    String.append(lh, String.append(R.source(s), String.append(le, x))),
-    Equal.trans(String, String.append(u, x),
-      String.append(rows.text(dep.rows(h, e, s)), x),
-      rows.cat(dep.rows(h, e, s), x),
-      Equal.cong(String, String, y => String.append(y, x), u, rows.text(dep.rows(h, e, s)),
-        rows_text(dep.rows(h, e, s), ok)),
-      Equal.sym(String, rows.cat(dep.rows(h, e, s), x),
-        String.append(rows.text(dep.rows(h, e, s)), x), rows_cat(dep.rows(h, e, s), x))),
-    Equal.cong(String, String, y => String.append(lh, y),
-      rows.cat(List.append(&2, Row, src.rows(s), [Q{"entry", e}]), x),
-      String.append(R.source(s), String.append(le, x)),
-      Equal.trans(String,
-        rows.cat(List.append(&2, Row, src.rows(s), [Q{"entry", e}]), x),
-        rows.cat(src.rows(s), String.append(le, x)),
-        String.append(R.source(s), String.append(le, x)),
-        rows_cat_append(src.rows(s), [Q{"entry", e}], x),
-        Equal.trans(String,
-          rows.cat(src.rows(s), String.append(le, x)),
-          String.append(rows.text(src.rows(s)), String.append(le, x)),
-          String.append(R.source(s), String.append(le, x)),
-          rows_cat(src.rows(s), String.append(le, x)),
-          Equal.cong(String, String, y => String.append(y, String.append(le, x)),
-            rows.text(src.rows(s)), R.source(s), src_text(s))))))
-  ez = Equal.trans(String,
-    String.append(String.append(lh, String.append(R.source(s), le)), x),
-    String.append(lh, String.append(String.append(R.source(s), le), x)),
-    String.append(lh, String.append(R.source(s), String.append(le, x))),
-    Eq.append_assoc(lh, String.append(R.source(s), le), x),
-    Equal.cong(String, String, y => String.append(lh, y),
-      String.append(String.append(R.source(s), le), x),
-      String.append(R.source(s), String.append(le, x)),
-      Eq.append_assoc(R.source(s), le, x)))
-  blk_text("deps.", n, String.append(lh, String.append(R.source(s), le)), u, x,
-    Equal.trans(String, String.append(u, x),
-      String.append(lh, String.append(R.source(s), String.append(le, x))),
-      String.append(String.append(lh, String.append(R.source(s), le)), x),
-      eu,
-      Equal.sym(String, String.append(String.append(lh, String.append(R.source(s), le)), x),
-        String.append(lh, String.append(R.source(s), String.append(le, x))), ez)))
-
-# LAW: and so is a pinned CLI
-law tool_text:
-  for +n: String
-  for +e: String
-  for +b: String
-  for +s: M.Source
-  for +x: String
-  for ok: {rows.ok(tool.rows(e, b, s)) == True{} : Bool}
-  {String.append(R.tool(M.Tool{n, e, b, s}), x)
-    == SCon{'\n', String.append(TP.unlines(TP.head.line("tools." ++ n)
-      <> rows.lines(keep(tool.rows(e, b, s)))), x)} : String}
-
-def tool_text(n, e, b, s, x, ok):
-  +u = TP.unlines(rows.lines(keep(tool.rows(e, b, s))))
-  +le = R.line("entry", e)
-  +lb = R.line("bin", b)
-  eu = Equal.trans(String, String.append(u, x),
-    rows.cat(tool.rows(e, b, s), x),
-    String.append(R.source(s), String.append(le, String.append(lb, x))),
-    Equal.trans(String, String.append(u, x),
-      String.append(rows.text(tool.rows(e, b, s)), x),
-      rows.cat(tool.rows(e, b, s), x),
-      Equal.cong(String, String, y => String.append(y, x), u, rows.text(tool.rows(e, b, s)),
-        rows_text(tool.rows(e, b, s), ok)),
-      Equal.sym(String, rows.cat(tool.rows(e, b, s), x),
-        String.append(rows.text(tool.rows(e, b, s)), x), rows_cat(tool.rows(e, b, s), x))),
-    Equal.trans(String,
-      rows.cat(tool.rows(e, b, s), x),
-      rows.cat(src.rows(s), String.append(le, String.append(lb, x))),
-      String.append(R.source(s), String.append(le, String.append(lb, x))),
-      rows_cat_append(src.rows(s), [Q{"entry", e}, Q{"bin", b}], x),
-      Equal.trans(String,
-        rows.cat(src.rows(s), String.append(le, String.append(lb, x))),
-        String.append(rows.text(src.rows(s)), String.append(le, String.append(lb, x))),
-        String.append(R.source(s), String.append(le, String.append(lb, x))),
-        rows_cat(src.rows(s), String.append(le, String.append(lb, x))),
-        Equal.cong(String, String, y => String.append(y, String.append(le, String.append(lb, x))),
-          rows.text(src.rows(s)), R.source(s), src_text(s)))))
-  ez = Equal.trans(String,
-    String.append(String.append(R.source(s), String.append(le, lb)), x),
-    String.append(R.source(s), String.append(String.append(le, lb), x)),
-    String.append(R.source(s), String.append(le, String.append(lb, x))),
-    Eq.append_assoc(R.source(s), String.append(le, lb), x),
-    Equal.cong(String, String, y => String.append(R.source(s), y),
-      String.append(String.append(le, lb), x),
-      String.append(le, String.append(lb, x)),
-      Eq.append_assoc(le, lb, x)))
-  blk_text("tools.", n, String.append(R.source(s), String.append(le, lb)), u, x,
-    Equal.trans(String, String.append(u, x),
-      String.append(R.source(s), String.append(le, String.append(lb, x))),
-      String.append(String.append(R.source(s), String.append(le, lb)), x),
-      eu,
-      Equal.sym(String, String.append(String.append(R.source(s), String.append(le, lb)), x),
-        String.append(R.source(s), String.append(le, String.append(lb, x))), ez)))
-
-# LAW: the pinned CLIs as the renderer writes them are their tables' lines,
-# each table a newline first
-law tools_text:
-  for +ts: List<&2, M.Tool>
-  for +ok: {rsects.ok(tsects(ts)) == True{} : Bool}
-  {R.tools(ts) == rjoin(tsects(ts)) : String}
-
-def tools_text(ts, ok):
-  match ts:
-    case []:
-      {==}
-    case M.Tool{+n, +e, +b, +s} <> +r:
-      +ih = tools_text(r, Eq.and.right(rsect.ok(tool.sect(M.Tool{n, e, b, s})), rsects.ok(tsects(r)), ok))
-      Equal.trans(String, R.tools(M.Tool{n, e, b, s} <> r),
-        String.append(R.tool(M.Tool{n, e, b, s}), rjoin(tsects(r))),
-        rjoin(tsects(M.Tool{n, e, b, s} <> r)),
-        Equal.cong(String, String, y => String.append(R.tool(M.Tool{n, e, b, s}), y),
-          R.tools(r), rjoin(tsects(r)), ih),
-        Equal.trans(String,
-          String.append(R.tool(M.Tool{n, e, b, s}), rjoin(tsects(r))),
-          SCon{'\n', String.append(TP.unlines(TP.head.line("tools." ++ n)
-            <> rows.lines(keep(tool.rows(e, b, s)))), rjoin(tsects(r)))},
-          rjoin(tsects(M.Tool{n, e, b, s} <> r)),
-          tool_text(n, e, b, s, rjoin(tsects(r)),
-            rsect_rows("tools." ++ n, tool.rows(e, b, s),
-              Eq.and.left(rsect.ok(tool.sect(M.Tool{n, e, b, s})), rsects.ok(tsects(r)), ok))),
-          Equal.sym(String, rjoin(tsects(M.Tool{n, e, b, s} <> r)),
-            SCon{'\n', String.append(TP.unlines(TP.head.line("tools." ++ n)
-              <> rows.lines(keep(tool.rows(e, b, s)))), rjoin(tsects(r)))},
-            rjoin_cons("tools." ++ n, tool.rows(e, b, s), tsects(r)))))
-
-# LAW: and the dependencies, then the pinned CLIs
-law deps_text:
-  for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
-  for +ok: {rsects.ok(dsects(ds, tsects(ts))) == True{} : Bool}
-  {String.append(R.deps(ds), R.tools(ts)) == rjoin(dsects(ds, tsects(ts))) : String}
-
-def deps_text(ds, ts, ok):
-  match ds:
-    case []:
-      tools_text(ts, ok)
-    case M.Dep{+n, +h, +e, +s} <> +t:
-      +rest = dsects(t, tsects(ts))
-      +ih = deps_text(t, ts, Eq.and.right(rsect.ok(dep.sect(M.Dep{n, h, e, s})), rsects.ok(rest), ok))
-      Equal.trans(String,
-        String.append(String.append(R.dep(M.Dep{n, h, e, s}), R.deps(t)), R.tools(ts)),
-        String.append(R.dep(M.Dep{n, h, e, s}), rjoin(rest)),
-        rjoin(dsects(M.Dep{n, h, e, s} <> t, tsects(ts))),
-        Equal.trans(String,
-          String.append(String.append(R.dep(M.Dep{n, h, e, s}), R.deps(t)), R.tools(ts)),
-          String.append(R.dep(M.Dep{n, h, e, s}), String.append(R.deps(t), R.tools(ts))),
-          String.append(R.dep(M.Dep{n, h, e, s}), rjoin(rest)),
-          Eq.append_assoc(R.dep(M.Dep{n, h, e, s}), R.deps(t), R.tools(ts)),
-          Equal.cong(String, String, y => String.append(R.dep(M.Dep{n, h, e, s}), y),
-            String.append(R.deps(t), R.tools(ts)), rjoin(rest), ih)),
-        Equal.trans(String,
-          String.append(R.dep(M.Dep{n, h, e, s}), rjoin(rest)),
-          SCon{'\n', String.append(TP.unlines(TP.head.line("deps." ++ n)
-            <> rows.lines(keep(dep.rows(h, e, s)))), rjoin(rest))},
-          rjoin(dsects(M.Dep{n, h, e, s} <> t, tsects(ts))),
-          dep_text(n, h, e, s, rjoin(rest),
-            rsect_rows("deps." ++ n, dep.rows(h, e, s),
-              Eq.and.left(rsect.ok(dep.sect(M.Dep{n, h, e, s})), rsects.ok(rest), ok))),
-          Equal.sym(String, rjoin(dsects(M.Dep{n, h, e, s} <> t, tsects(ts))),
-            SCon{'\n', String.append(TP.unlines(TP.head.line("deps." ++ n)
-              <> rows.lines(keep(dep.rows(h, e, s)))), rjoin(rest))},
-            rjoin_cons("deps." ++ n, dep.rows(h, e, s), rest))))
-
-# LAW: a ledger as the renderer writes it is its tables' lines joined by
-# newlines
-law show_text:
-  for +m: M.Manifest
-  for +ok: {rsects.ok(lsects(m)) == True{} : Bool}
-  {R.show(m) == String.join(rdoc.lines(lsects(m)), "\n") : String}
-
-def show_text(m, ok):
-  match m:
-    case M.Manifest{+n, +e, +b, +h, +hpa, +hpv, +ds, +ts}:
-      +d = dsects(ds, tsects(ts))
-      +p = pkg.rows(n, e, b, h, hpa, hpv)
-      +pk = {RSect{"package", p} : RSect}
-      +dt = deps_text(ds, ts, Eq.and.right(rsect.ok(pk), rsects.ok(d), ok))
-      +pt = rows_text(p, rsect_rows("package", p, Eq.and.left(rsect.ok(pk), rsects.ok(d), ok)))
-      Equal.trans(String, R.show(M.Manifest{n, e, b, h, hpa, hpv, ds, ts}),
-        "[package]\n" ++ rows.cat(p, rjoin(d)),
-        String.join(rdoc.lines(pk <> d), "\n"),
-        Equal.cong(String, String,
-          y => "[package]\n" ++ String.append(R.line("name", n), String.append(R.line("entry", e),
-            String.append(R.line("bin", b), String.append(R.line("hub", h),
-              String.append(R.line("publish-as", hpa), String.append(R.line("version", hpv), y)))))),
-          String.append(R.deps(ds), R.tools(ts)), rjoin(d), dt),
-        Equal.trans(String, "[package]\n" ++ rows.cat(p, rjoin(d)),
-          "[package]\n" ++ String.append(TP.unlines(rows.lines(keep(p))), rjoin(d)),
-          String.join(rdoc.lines(pk <> d), "\n"),
-          Equal.cong(String, String, y => "[package]\n" ++ y,
-            rows.cat(p, rjoin(d)), String.append(TP.unlines(rows.lines(keep(p))), rjoin(d)),
-            Equal.trans(String, rows.cat(p, rjoin(d)), String.append(rows.text(p), rjoin(d)),
-              String.append(TP.unlines(rows.lines(keep(p))), rjoin(d)),
-              rows_cat(p, rjoin(d)),
-              Equal.cong(String, String, y => String.append(y, rjoin(d)),
-                rows.text(p), TP.unlines(rows.lines(keep(p))),
-                Equal.sym(String, TP.unlines(rows.lines(keep(p))), rows.text(p), pt)))),
-          Equal.sym(String, String.join(rdoc.lines(pk <> d), "\n"),
-            String.append(TP.unlines("[package]" <> rows.lines(keep(p))), rjoin(d)),
-            TP.join_lines(rows.lines(keep(p)), "[package]", rdoc.lines(d)))))
 
 # ---------------------------------------------------------------------------
 # a renderable ledger's tables read back
@@ -5529,23 +4849,6 @@ def lsects_ok(m, e):
                     clean_nl(hpv, Eq.and.right(R.clean(hpa), R.clean(hpv), pv)), {==})))))),
         dsects_ok(ds, tsects(ts), Eq.and.left(R.deps.ok(ds), R.tools.ok(ts), r),
           tsects_ok(ts, Eq.and.right(R.deps.ok(ds), R.tools.ok(ts), r))))
-
-# LAW: a renderable ledger's text, parsed, is its tables, with no error
-law ledger_sections_read:
-  for +m: M.Manifest
-  for +e: {R.renderable(m) == True{} : Bool}
-  {T.parse(R.show(m)) == T.Toml{"", "", [], sects.of(lsects(m))} : T.Toml}
-
-def ledger_sections_read(m, e):
-  match m:
-    case M.Manifest{+n, +en, +b, +h, +hpa, +hpv, +ds, +ts}:
-      +ok = lsects_ok(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}, e)
-      %Equal.sym(String, R.show(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}),
-        String.join(rdoc.lines(lsects(M.Manifest{n, en, b, h, hpa, hpv, ds, ts})), "\n"),
-        show_text(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}, ok))
-        : {T.parse(_) == T.Toml{"", "", [], sects.of(lsects(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}))}
-          : T.Toml}
-      rsections_read(RSect{"package", pkg.rows(n, en, b, h, hpa, hpv)}, dsects(ds, tsects(ts)), ok)
 
 # ---------------------------------------------------------------------------
 # what the reader finds in a renderable ledger's tables
@@ -6143,20 +5446,3 @@ def read_ledger(n, en, b, h, hpa, hpv, ds, ts, edk, etk):
       dtools_skip(ds, tsects(ts)), tsects_read(ts, etk)))
     : {M.Good{M.Manifest{n, en, b, h, hpa, hpv, ds, _}} == g : M.Read}
   {==}
-
-# The renderable ledger, rendered and read: its tables, then the model.
-def Laws.ledger_reads_back(m, e):
-  match m:
-    case M.Manifest{+n, +en, +b, +h, +hpa, +hpv, +ds, +ts}:
-      +s = sects.of(lsects(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}))
-      +rr = Eq.and.right(Bool.and(Bool.and(R.clean(n), R.clean(en)), Bool.and(R.clean(b), R.clean(h))),
-        Bool.and(Bool.and(R.clean(hpa), R.clean(hpv)), Bool.and(R.deps.ok(ds), R.tools.ok(ts))), e)
-      +r = Eq.and.right(Bool.and(R.clean(hpa), R.clean(hpv)), Bool.and(R.deps.ok(ds), R.tools.ok(ts)), rr)
-      +edk = Eq.and.left(R.deps.ok(ds), R.tools.ok(ts), r)
-      +etk = Eq.and.right(R.deps.ok(ds), R.tools.ok(ts), r)
-      Equal.trans(M.Read, M.parse(R.show(M.Manifest{n, en, b, h, hpa, hpv, ds, ts})),
-        M.read("", s), M.Good{M.Manifest{n, en, b, h, hpa, hpv, ds, ts}},
-        Equal.cong(T.Toml, M.Read, t => M.parse.go(t),
-          T.parse(R.show(M.Manifest{n, en, b, h, hpa, hpv, ds, ts})), T.Toml{"", "", [], s},
-          ledger_sections_read(M.Manifest{n, en, b, h, hpa, hpv, ds, ts}, e)),
-        read_ledger(n, en, b, h, hpa, hpv, ds, ts, edk, etk))

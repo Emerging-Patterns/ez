@@ -39,7 +39,7 @@ import ./world.bend as TW
 import ../lock/plan.bend as P
 import ../lock/up.bend as Up
 import ../manifest/manifest.bend as M
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../git/git.bend as Git

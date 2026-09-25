@@ -6,7 +6,7 @@
 # the person, and ez only waits for it and exits with its status (`S.code`
 # and `TP.code`, EZ-OUT-1).
 import Base
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 
 # the program and its arguments, newline separated, run with no shell between
 # and nothing captured. The answer is the status it exited with: 128 plus the

@@ -18,12 +18,12 @@ import ../ez/env.bend as Env
 import ../pkg/path.bend as P
 import ../ez/named.bend as Named
 import ../pkg/pkg.bend as Pkg
-import 0xebdf72b20ad527103f6efc0d2aa8f1ec/main.bend as Shake
+import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 
 # quiet: bend's chatter is not the program's output
 
@@ -603,41 +603,38 @@ law gap_of_narless_pin:
 # ez/main.bend exits with `L.status` of `L.line` of what Shake parsed, and a
 # line that names a command runs it, whose plan's end is its own status.
 
-# LAW: `ez help`, and `ez help <path>` whose every word names a command under
-# the one before it, shows help and exits 0
+# LAW: a request for help, `ez help` or `ez help <path>`, shows help and
+# exits 0. Shake answers a request for help only for a path whose every word
+# names a command under the one before it; `ez help bogus` fails as
+# `Unexpected` and so is a usage error below. That is shake's guarantee
+# (SHAKE-PARSE-8, with `help_path` of its interface), trusted as EZ-TRUST-7.
 # EZ-OUT-1
 law help_exits_zero:
   for +app: Shake.Cli
+  for +e: Shake.ParseErr
   for +path: List<&2, String>
-  for known: {L.unknown.word(path, L.subs(app)) == None{} : Maybe<&2, String>}
-  {L.status(L.line(app, Fail{Shake.NeedHelp{path}})) == L.Exits{0} : L.Status}
-
-# LAW: `ez help <path>` with a word that names no command there, `ez help
-# bogus`, is a usage error and exits 1
-# EZ-OUT-1
-law help_unknown_exits_one:
-  for +app: Shake.Cli
-  for +path: List<&2, String>
-  for +w: String
-  for miss: {L.unknown.word(path, L.subs(app)) == Some{w} : Maybe<&2, String>}
-  {L.status(L.line(app, Fail{Shake.NeedHelp{path}})) == L.Exits{1} : L.Status}
+  for asks: {Shake.help_path(e) == Some{path} : Maybe<&2, List<&2, String>>}
+  {L.status(L.line(app, Fail{e})) == L.Exits{0} : L.Status}
 
 # LAW: every other line Shake refuses exits 1: an unknown command or a word
-# too many (`Unexpected`), an unknown flag, a missing argument or value, or a
-# value it does not allow
+# too many (`Unexpected`), `ez help` of a word that names no command there,
+# an unknown flag, a missing argument or value, a value it does not allow, or
+# an option given twice
 # EZ-OUT-1
 law usage_error_exits_one:
   for +app: Shake.Cli
-  for e: Shake.ParseErr
-  for no: {L.asks.help(e) == False{} : Bool}
+  for +e: Shake.ParseErr
+  for no: {Shake.help_path(e) == None{} : Maybe<&2, List<&2, String>>}
   {L.status(L.line(app, Fail{e})) == L.Exits{1} : L.Status}
 
-# LAW: a bare `ez` shows help and exits 0, whatever Shake bound
+# LAW: a bare `ez`, a line that selected no command, shows help and exits 0,
+# whatever Shake bound
 # EZ-OUT-1
 law bare_exits_zero:
   for +app: Shake.Cli
-  for +bs: List<&2, Shake.Bind>
-  {L.status(L.line(app, Done{Shake.Matched{[], bs}})) == L.Exits{0} : L.Status}
+  for +m: Shake.Matched
+  for +bare: {Shake.path_of(m) == [] : List<&2, String>}
+  {L.status(L.line(app, Done{m})) == L.Exits{0} : L.Status}
 
 # LAW: a path that names no command and is not empty, a bare `ez tool`,
 # exits 1
@@ -650,12 +647,13 @@ law group_exits_one:
   {L.status(L.line(app, Done{m})) == L.Exits{1} : L.Status}
 
 # LAW: a path that names a command runs that command, with what Shake bound
+# for that command (`L.leaf`: its Matched, at the end of the selected path)
 # EZ-OUT-1
 law command_runs:
   for +app: Shake.Cli
   for +m: Shake.Matched
   for named: {L.is.help(L.command(L.path(m))) == False{} : Bool}
-  {L.line(app, Done{m}) == L.Runs{L.command(L.path(m)), m} : L.Line}
+  {L.line(app, Done{m}) == L.Runs{L.command(L.path(m)), L.leaf(m)} : L.Line}
 
 # LAW: and the line decides no status for it: the command's own end does
 # EZ-OUT-1

@@ -9,7 +9,7 @@ import ./plan.bend as P
 import ./up.bend as Up
 import ../manifest/upgrade.bend as U
 import ../manifest/manifest.bend as M
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/LAWS.bend as KL
 import ../hub/hub.bend as Web
@@ -825,18 +825,6 @@ law relock_lays_nothing:
 # and strips the quotes off every value; these two laws are the first step: a
 # quoted value survives both, whatever it holds.
 
-# LAW: a quoted value is already trimmed. Its first and last characters are
-# quotes, so no space it holds is at an end.
-law trim_quoted:
-  for +v: String
-  {T.trim(T.quote(v)) == T.quote(v) : String}
-
-# LAW: and stripping the quotes off gives the value back, even one that holds
-# quotes of its own
-law strip_quoted:
-  for +v: String
-  {T.strip(T.quote(v), '"', '"') == v : String}
-
 # What an upgrade writes around the ledger (EZ-VEN-1's `ez lock --upgrade`
 # half, EZ-VEN-2, EZ-VEN-3). The upgrade writes `.gitignore` as `I.sync`
 # makes it from the file it read over the dependencies it leaves, and each
@@ -1038,18 +1026,13 @@ law upgrade_writes_only_hits:
   for +bend: {String.ends_with(at, ".bend") == True{} : Bool}
   for none: {ML.names.none.all(swaps(w), String.lines(text)) == True{} : Bool}
   {P.put(w, at) == P.Kept{} : P.Wrote}
-# The rest is proved in two steps, as the design laid out. The first is about
-# tables: the lock's text is eztoml's text for a document of tables
-# (`render_is_doc`), and parsing it gives the tables back
-# (`lock_sections_read_back`), which check/toml.bend proves for any document
-# whose names and keys the reader can take back. `lockable` is what makes the
-# lock's document one of those, and the planner refuses a lock that is not
-# lockable, so the premise holds of every lock ez writes. The second is about
-# what ez reads out of the tables: `L.packs`, `L.lock.hub` and `M.tools` find
-# what was written. What they give back is not always the list given: the
-# packages come back in hash order with their files in path order and each
-# once, which is `canon`, and the lock does not write a tool's `vendor`,
-# which is `tools.canon`. Law vocabulary: ez never calls these.
+# That the lock's text reads back as its tables is EZ-DOC-1, trusted through
+# eztoml's round trip (EZ-TRUST-8): ez writes it as eztoml's `render` of the
+# document it assembles. What is left here is ez's side: what ez reads out of
+# the tables, `L.packs`, `L.lock.hub` and `M.tools`, and what it gives back:
+# the packages in hash order with their files in path order and each once,
+# which is `canon`, and each tool without `vendor`, which the lock does not
+# write, which is `tools.canon`. Law vocabulary: ez never calls these.
 
 # the tables a lock renders after its packages: the `[names]` table, when it
 # resolved a name, then every tool's table. Law vocabulary.
@@ -1135,71 +1118,6 @@ def canon.all(ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
 # order and each once
 def canon(ps: List<&2, L.Pack>) -> List<&2, L.Pack>:
   canon.all(L.pack.sort(ps))
-
-# LAW: the lock's text is eztoml's text for its document. The lock writes
-# each package as a block of text and sorts the blocks; that is the text of
-# the packages sorted, one table after another.
-law render_is_doc:
-  for +nms: List<&2, L.Name>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +ps: List<&2, L.Pack>
-  {L.render.names(nms, ts, hub, ps) == T.render(lock.doc(nms, ts, hub, ps)) : String}
-
-# LAW: parsing the lock `ez lock` renders gives back the tables it rendered:
-# the `[lock]` table, every package's two tables in hash order, its names and
-# every tool's table
-law lock_sections_read_back:
-  for +nms: List<&2, L.Name>
-  for +ps: List<&2, L.Pack>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
-  {T.sects(T.parse(L.render.names(nms, ts, hub, ps))) == lock.doc(nms, ts, hub, ps)
-    : List<&2, T.Sect>}
-
-# LAW: parsing the lock `ez lock` renders gives back its packages, in hash
-# order with their files in path order, whatever order they were given in
-# EZ-DOC-1
-law lock_reads_back:
-  for +nms: List<&2, L.Name>
-  for +ps: List<&2, L.Pack>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
-  {L.packs(T.sects(T.parse(L.render.names(nms, ts, hub, ps)))) == canon(ps) : List<&2, L.Pack>}
-
-# LAW: and the hub it was resolved against
-# EZ-DOC-1
-law lock_hub_reads_back:
-  for +nms: List<&2, L.Name>
-  for +ps: List<&2, L.Pack>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
-  {L.lock.hub(T.sects(T.parse(L.render.names(nms, ts, hub, ps)))) == hub : String}
-
-# LAW: and its tool pins, as the lock gives them back
-# EZ-DOC-1
-law lock_tools_read_back:
-  for +nms: List<&2, L.Name>
-  for +ps: List<&2, L.Pack>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
-  {M.tools(T.sects(T.parse(L.render.names(nms, ts, hub, ps)))) == tools.canon(ts) : List<&2, M.Tool>}
-
-# LAW: and every name it resolved, with the hash it names, in name order and
-# each once
-# EZ-DOC-1
-law lock_names_read_back:
-  for +nms: List<&2, L.Name>
-  for +ps: List<&2, L.Pack>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +ok: {P.lockable.named(nms, ps, ts, hub) == True{} : Bool}
-  {L.names(T.sects(T.parse(L.render.names(nms, ts, hub, ps)))) == names.canon(nms)
-    : List<&2, L.Name>}
 
 # The upgrade's moves. `ez lock --upgrade` asks the remote about each selected
 # pin with a commit: one with a tag re-resolves the tag (a `Refs` answer, read
@@ -1423,25 +1341,13 @@ law upgrade_tag_resolves:
 # EZ-LED-4). An upgrade that moved nothing wrote no ledger, and reads back as
 # it is. The upgrade laws of EZ-RES-4 to 8 are stated over the same model.
 
-# LAW: `ez lock --upgrade` that does not refuse leaves an ez.toml that reads
-# back as the ledger model it rendered, `P.ledger.next`: the one it wrote when
-# a pin moved, or the one it read when none did. An upgrade whose model is not
-# renderable (`Rend.renderable`) stops, with no effect, rather than write a
-# ledger that reads back as something else. So every law stated over
-# `P.ledger.next` holds of ez.toml's bytes.
-# EZ-LED-4
-law upgrade_reads_back:
-  for +w: W.World
-  for u: {W.args.upgrade(w) == True{} : Bool}
-  for +ok: {P.refuses(w) == False{} : Bool}
-  {W.parsed(W.ledger.of(after(w))) == P.ledger.next(w) : M.Read}
-
 # LAW: `ez lock --upgrade`, run again on the World it leaves, writes the same
 # bytes to ez.lock.toml, or, when it refused, refuses again and writes none
 # EZ-DOC-4
 law upgrade_idempotent:
   for +w: W.World
   for u: {W.args.upgrade(w) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {P.put(after(w), "ez.lock.toml") == P.put(w, "ez.lock.toml") : P.Wrote}
 
 # LAW: and it moves nothing: the ledger model it renders is the one the first
@@ -1450,6 +1356,7 @@ law upgrade_idempotent:
 law reupgrade_moves_nothing:
   for +w: W.World
   for u: {W.args.upgrade(w) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {P.ledger.next(after(w)) == P.ledger.next(w) : M.Read}
 
 # LAW: so, after one that succeeded, it does not write ez.toml
@@ -1458,6 +1365,7 @@ law upgrade_settles:
   for +w: W.World
   for u: {W.args.upgrade(w) == True{} : Bool}
   for +ok: {P.refuses(w) == False{} : Bool}
+  for rb: ML.ReadsBack()
   {P.put(after(w), "ez.toml") == P.Kept{} : P.Wrote}
 
 # LAW: and it lays nothing new: every tree the first run laid is read from
@@ -1467,6 +1375,7 @@ law reupgrade_lays_nothing:
   for +w: W.World
   for u: {W.args.upgrade(w) == True{} : Bool}
   for +ok: {P.refuses(w) == False{} : Bool}
+  for rb: ML.ReadsBack()
   {fresh(after(w)) == [] : List<&2, String>}
 
 # LAW: and it writes no path but the lock: no ez.toml, no source and no
@@ -1481,6 +1390,7 @@ law reupgrade_writes_only_lock:
   for +ok: {P.refuses(w) == False{} : Bool}
   for ev: {Str.clear.all(I.vended(ledger.deps(P.ledger.next(w))), '\n') == True{} : Bool}
   for ne: {String.eq("ez.lock.toml", p) == False{} : Bool}
+  for rb: ML.ReadsBack()
   {P.put(after(w), p) == P.Kept{} : P.Wrote}
 
 # LAW: with no ez.toml, `ez lock` refuses, plain or `--upgrade`, whatever

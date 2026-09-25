@@ -50,7 +50,7 @@
 # The Effect, Plan and Outcome types are the lock's (lock/plan.bend), as for
 # the other commands.
 import Base
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ./world.bend as DW
 import ../lock/plan.bend as P
 import ../lock/world.bend as W

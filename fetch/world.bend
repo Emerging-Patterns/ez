@@ -19,7 +19,7 @@
 # A name the lock records is asked about too: the file bend reads its hash
 # from, `$BEND_LIB/names/<nv>` (`Named`), as it is, or that there is none.
 import Base
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ../lock/lock.bend as L
 import ../lock/world.bend as W
 import ../lock/up.bend as Up

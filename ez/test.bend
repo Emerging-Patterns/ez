@@ -7,7 +7,7 @@
 #
 # Tests are not the proof gate. `ez prove` is, and nothing here runs a proof.
 import Base
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
 import ../ez/env.bend as Env
 import ../ez/cap.bend as Cap

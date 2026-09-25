@@ -11,7 +11,7 @@
 # walk over the lock's hashes, and a package asks for a checkout only through
 # `fetch.ask` of the source the lock records for it.
 import Base
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ./world.bend as F
 import ./plan.bend as FP
 import ../lock/plan.bend as P

@@ -3,12 +3,22 @@
 # with what was written for it, and that the two edits `ez add` and
 # `ez remove` make are the edits they claim to be.
 import Base
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ./manifest.bend as M
 import ./render.bend as R
 import ./ignore.bend as I
 import ./upgrade.bend as U
 import ../check/str.bend as Str
+
+# EZ-LED-4, as the premise a law takes when it is about the file a ledger is
+# written to: every ledger `R.renderable` accepts reads back, from the text
+# `R.show` writes, as itself. `R.show` is eztoml's `render` of the document ez
+# assembles (`R.text`), and `M.parse` reads through eztoml's `parse`, so this
+# rests on eztoml's round trip (TOML-RT-1, pending in eztoml v0.4.0) and is
+# trusted as EZ-TRUST-8, not proved here. A law that takes it holds of the
+# file's bytes wherever the round trip does.
+def ReadsBack() -> Type:
+  @m:M.Manifest -> {R.renderable(m) == True{} : Bool} -> {M.parse(R.show(m)) == M.Good{m} : M.Read}
 
 # LAW: dropping a dependency drops every entry of that name, so dropping twice
 # is dropping once. `ez remove` on a ledger it already edited is a no-op.
@@ -309,8 +319,8 @@ law deps_splits:
   for +bs: List<&2, M.Dep>
   {R.deps(List.append(&2, M.Dep, as, bs)) == R.deps(as) ++ R.deps(bs) : String}
 
-# LAW: a rendered ledger opens with the package table, so what it writes is a
-# document `parse` reads back as a ledger and not as a loose pair.
+# LAW: the ledger ez assembles opens with the package table, so what it hands
+# eztoml to write is a document of tables and not a loose pair.
 law show_opens_with_package:
   for n: String
   for e: String
@@ -320,7 +330,7 @@ law show_opens_with_package:
   for hbpv: String
   for ds: List<&2, M.Dep>
   for ts: List<&2, M.Tool>
-  {String.starts_with(R.show(M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}), "[package]\n") == True{}
+  {String.starts_with(R.text(M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}), "[package]\n") == True{}
     : Bool}
 
 # LAW: a ledger that did not read renders as nothing. `ez add` and `ez remove`
@@ -377,31 +387,6 @@ law source_of_vendor:
   for e: {False{} == String.is_empty(M.value(pairs, "git")) : Bool}
   {M.source.vendor(M.source_of(pairs)) == M.flag(M.value(pairs, "vendor"))
     : Bool}
-
-# LAW: the vendor bit ez renders reads back as the bit it rendered. The key is
-# written bare, `vendor = true`, which TOML reads as a boolean and ez reads as
-# the same bit it reads from the quoted spelling an older ez wrote; a bit that
-# is not set leaves no key, which reads as not set. This is stated for one
-# fixed ledger around the dependency, so it checks the spelling and carries
-# no requirement; `ledger_reads_back` is the round trip for every ledger.
-law vendor_reads_back:
-  for v: Bool
-  {M.source.vendor(M.source.dep(M.dep(M.parse(R.show(M.Manifest{"app", "", "",
-    "", "", "", [M.Dep{"dep", "0x1", "", M.Git{"u", "r", "", ".", "n", v}}], []})),
-    "dep"))) == v : Bool}
-
-# LAW: a ledger ez can write, rendered, parses back to the model it was
-# rendered from, whole: every field, every dependency and every tool pin in
-# order. This is stated against the pinned eztoml v0.1.0 reader, for every
-# ledger `R.renderable` accepts: no name or value holds `"`, `\` or a
-# newline, every dependency has a hash, and every git source names its repo
-# and its root. Every command that writes ez.toml refuses a ledger that is not
-# renderable, so this holds of every ledger ez writes.
-# EZ-LED-4
-law ledger_reads_back:
-  for +m: M.Manifest
-  for +e: {R.renderable(m) == True{} : Bool}
-  {M.parse(R.show(m)) == M.Good{m} : M.Read}
 
 # LAW: a dependency added again keeps the `vendor = true` the ledger already
 # gave it. `ez add` has no way to say it, so dropping it would drop the tree

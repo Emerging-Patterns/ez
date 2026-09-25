@@ -8,7 +8,7 @@
 # since a dirty tree is refused before anything is sent, or reach
 # check/liar.bend, a `bend` that uploads nothing.
 import Base
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
 import ../ez/quiet.bend as Q
 import ../pub/plan.bend as P
@@ -22,6 +22,20 @@ def yes(name: String, ok: Bool) -> IO(Unit):
 # what a program printed, with bend's check report and the trailing blank gone
 def said(+out: String) -> List<&2, String>:
   String.lines(Q.filter(R.text(out)))
+
+# the lines publish writes on stdout. snap answers stdout and stderr in the
+# order they were written (SNAP-ANS-4), and the hub description goes to stderr
+# before the upload, so it is set aside wherever it lands.
+def reported.go(ls: List<&2, String>) -> List<&2, String>:
+  match ls:
+    case []:
+      []
+    case +h <> t:
+      +rest = reported.go(t)
+      Bool.pick(List<&2, String>, String.contains(h, "hub description: "), rest, h <> rest)
+
+def reported(+out: String) -> List<&2, String>:
+  reported.go(said(out))
 
 # an environment variable's text; unset, ""
 def text_of(res: Result<&1, &1, U32 & String, String>) -> String:
@@ -118,7 +132,7 @@ def publishes(+repo: String, +app: String, +root: String, +hub: String) -> IO(St
     +out : String <- R.exec(ez(repo, app, ["BEND_HUB=" ++ hub], ["publish"]))
     yes("publish sends from a tree whose only extra files are ignored",
       R.ok(out))
-    +ls : List<&2, String> <- IO.pure(List<&2, String>, said(out))
+    +ls : List<&2, String> <- IO.pure(List<&2, String>, reported(out))
     +hash : String <- IO.pure(String, W.nth(ls, 0n))
     yes("and reports a 0x name and nothing else on its first line",
       P.is_name(hash))

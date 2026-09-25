@@ -4,7 +4,7 @@
 # The dependency hashes packed big-endian words and returns eight of them, or
 # nothing when the declared length does not fit the array.
 import Base
-import 0x33de775bd13bab25b3e2d6f5bbcb8776/sha256.bend as S
+import 0xda83506fb9f059ead7afcfa2f498df5f/sha256.bend as S
 
 # four big-endian bytes in one word, each kept to eight bits
 def pack(first: U32, second: U32, third: U32, fourth: U32) -> U32:

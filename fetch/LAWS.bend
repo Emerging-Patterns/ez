@@ -9,7 +9,7 @@ import Base
 import ./world.bend as F
 import ./plan.bend as FP
 import ../lock/plan.bend as P
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ../lock/lock.bend as L
 import ../lock/up.bend as Up
 import ../lock/world.bend as W

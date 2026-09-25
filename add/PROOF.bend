@@ -1506,7 +1506,7 @@ def wrote.text(x: P.Wrote) -> String:
 # An add that does not refuse writes `Rend.add.keep`'s ledger
 # (`add_edits_ledger`), whose walk ended in success, so the ledger is
 # renderable and the manifest's round trip reads it back.
-def Laws.add_ledger_reads_back(w, m, good, ok, text, put):
+def Laws.add_ledger_reads_back(w, m, good, ok, text, put, rb):
   +fit = Equal.trans(Bool, Rend.renderable(Rend.add.keep(m, AP.added(w))),
     Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.added(w))), True{},
     Equal.cong(M.Manifest, Bool, x => Rend.renderable(Rend.add.keep(x, AP.added(w))),
@@ -1521,7 +1521,7 @@ def Laws.add_ledger_reads_back(w, m, good, ok, text, put):
   +t = Equal.cong(P.Wrote, String, x => wrote.text(x),
     P.Put{Rend.show(Rend.add.keep(m, AP.added(w)))}, P.Put{text}, p)
   %t : {M.parse(_) == M.Good{Rend.add.keep(m, AP.added(w))} : M.Read}
-  ML.ledger_reads_back(Rend.add.keep(m, AP.added(w)), fit)
+  rb(Rend.add.keep(m, AP.added(w)), fit)
 
 # ---------------------------------------------------------------------------
 # a hub package's `<name>@<version>` (`H.plan`)
@@ -2065,7 +2065,7 @@ def hentry_fit(held, fit, _at, _w, s):
 
 # An add that does not refuse writes `Rend.add.keep`'s ledger, whose outcome
 # was a success, so the ledger is renderable and reads back.
-def Laws.add_named_reads_back(w, m, good, ok, text, put):
+def Laws.add_named_reads_back(w, m, good, ok, text, put, rb):
   +fit = Equal.trans(Bool, Rend.renderable(Rend.add.keep(m, H.added(w))),
     Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), H.added(w))), True{},
     Equal.cong(M.Manifest, Bool, x => Rend.renderable(Rend.add.keep(x, H.added(w))),
@@ -2083,7 +2083,7 @@ def Laws.add_named_reads_back(w, m, good, ok, text, put):
   +t = Equal.cong(P.Wrote, String, x => wrote.text(x),
     P.Put{Rend.show(Rend.add.keep(m, H.added(w)))}, P.Put{text}, p)
   %t : {M.parse(_) == M.Good{Rend.add.keep(m, H.added(w))} : M.Read}
-  ML.ledger_reads_back(Rend.add.keep(m, H.added(w)), fit)
+  rb(Rend.add.keep(m, H.added(w)), fit)
 
 # LAW: the lines a hub add tells lay no name's file
 law hsays_unnamed:

@@ -13,7 +13,7 @@
 # from its entry here, by `K.pkg_of`, which is interpreter code under
 # EZ-TRUST-2 until `ez add` is converted.
 import Base
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
 import ../hub/hub.bend as Web
 import ../git/git.bend as Git
@@ -467,6 +467,22 @@ def whole.read(+work: String, ps: List<&2, String>) -> IO(List<&2, K.Source>):
 
 # the checkout, its `.git` removed, weighed, and every file of it read; then
 # removed. Nothing is laid: `ez add` lays the tree from its plan.
+# the files of a checkout, read, once `find` has listed them. A listing that
+# failed is refused rather than read: `find` writes what it could not reach
+# to stderr, which snap answers beside the paths (SNAP-ANS-4), and such a
+# line is no path of the package.
+def whole.listed(ok: Bool, +work: String, +nar: String, +text: String) -> IO(Up.Answer):
+  match ok:
+    case True{}:
+      do IO<Up.Answer>:
+        fs : List<&2, K.Source> <- whole.read(work, nonempty(String.lines(text)))
+        _rm : String <- R.exec(["rm", "-rf", work])
+        return Up.Cloned{nar, fs}
+    case False{}:
+      do IO<Up.Answer>:
+        _rm : String <- R.exec(["rm", "-rf", work])
+        return Up.Miss{"ez: could not list the checkout: " ++ String.trim(text)}
+
 def whole.weigh(+work: String, +rev: String) -> IO(Up.Answer):
   do IO<Up.Answer>:
     _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
@@ -474,9 +490,7 @@ def whole.weigh(+work: String, +rev: String) -> IO(Up.Answer):
     +nar : String <- Git.nar(work)
     Say.done(s)
     +out : String <- R.exec(["find", work, "(", "-type", "f", "-o", "-type", "l", ")"])
-    fs : List<&2, K.Source> <- whole.read(work, nonempty(String.lines(R.text(out))))
-    _rm : String <- R.exec(["rm", "-rf", work])
-    return Up.Cloned{nar, fs}
+    whole.listed(R.ok(out), work, nar, R.text(out))
 
 # a scratch directory made, or why it could not be
 def whole.dir(ok: Bool, +work: String, +url: String, +rev: String) -> IO(Up.Answer):

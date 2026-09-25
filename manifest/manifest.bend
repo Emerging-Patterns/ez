@@ -3,7 +3,7 @@
 # from, and nothing in a repo lists them. ez.toml is that list: every package
 # the repo imports, by name, with its hash and its origin.
 import Base
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 
 # where a package's bytes come from. A hub package needs nothing else, though
 # one added by its `<name>@<version>` keeps it, which is what its import lines

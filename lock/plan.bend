@@ -335,11 +335,10 @@ def pack.values(pack: L.Pack) -> List<&2, String>:
   hash <> List.append(&2, String, src.values(src), file.values(fs))
 
 # whether a file path holds no `=`. A path is written as a quoted key, and
-# the pinned eztoml reader (v0.1.0) cuts a pair line at its first `=`, even
-# one inside a quoted key
-# (https://github.com/Emerging-Patterns/eztoml/issues/24), so a path holding
-# one would read back as another path with another sum. The restriction can
-# lift once ez moves to eztoml 0.2.x.
+# `bootstrap.sh`, which reads the lock without ez, cuts a pair line at its
+# first `=`, so a path holding one would read back there as another path with
+# another sum. eztoml 0.4 reads a quoted key whole; the restriction lifts when
+# bootstrap.sh does too.
 def path.eqless(text: String) -> Bool:
   match text:
     case SNil{}:

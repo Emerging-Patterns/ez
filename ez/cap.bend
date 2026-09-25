@@ -7,7 +7,7 @@
 # kills for memory looks exactly like one that succeeded and happened to write
 # no binary. The cap is what turns that into a legible exit 137.
 import Base
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../ez/env.bend as Env
 import ../ez/args.bend as Args
 

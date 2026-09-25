@@ -3,7 +3,7 @@
 # checked, run, tested, and removed again. The remote is taken away before the
 # check, so nothing here can quietly be falling back to the network.
 import Base
-import 0x9bfd9d57916f3439316c2775fd1f10b4/main.bend as R
+import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
 import ../ez/quiet.bend as Q
 import ../check/kit.bend as Check
