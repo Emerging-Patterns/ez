@@ -23,6 +23,7 @@ import ../lock/world.bend as W
 import ../lock/lock.bend as L
 import ../hub/hub.bend as Web
 import ../manifest/manifest.bend as M
+import ../manifest/LAWS.bend as ML
 import ../manifest/render.bend as Rend
 import ../manifest/ignore.bend as I
 import ../pkg/pkg.bend as K
@@ -123,6 +124,7 @@ law add_ledger_reads_back:
   for +ok: {AP.refuses(w) == False{} : Bool}
   for +text: String
   for put: {P.put.plan(AP.plan(w), "ez.toml") == P.Put{text} : P.Wrote}
+  for rb: ML.ReadsBack()
   {M.parse(text) == M.Good{Rend.add.keep(m, AP.added(w))} : M.Read}
 
 # LAW: and leaves `.gitignore` holding exactly the file `I.sync` derives from
@@ -395,6 +397,7 @@ law add_named_reads_back:
   for +ok: {H.refuses(w) == False{} : Bool}
   for +text: String
   for put: {P.put.plan(H.plan(w), "ez.toml") == P.Put{text} : P.Wrote}
+  for rb: ML.ReadsBack()
   {M.parse(text) == M.Good{Rend.add.keep(m, H.added(w))} : M.Read}
 
 # LAW: the dependency recorded is the name as it was given, under `hub`,

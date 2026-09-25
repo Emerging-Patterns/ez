@@ -110,7 +110,7 @@ published:
 [package]
 name = "myapp"
 entry = "src/main.bend"
-
+[deps]
 [deps.wire]
 hash = "0x7e63a5b990a375c304ed462c071214a6"
 git = "https://github.com/owner/repo"

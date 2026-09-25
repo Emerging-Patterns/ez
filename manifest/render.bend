@@ -3,6 +3,7 @@
 # is the file it would read back.
 import Base
 import ./manifest.bend as M
+import ../toml/toml.bend as T
 
 # a key line, or nothing at all when the value is empty, so an absent tag,
 # entry or bin leaves no trace
@@ -60,12 +61,16 @@ def tools(ts: List<&2, M.Tool>) -> String:
     case h <> t:
       tool(h) ++ tools(t)
 
-# the ledger as an ez.toml
-def show(manifest: M.Manifest) -> String:
+# the ledger as ez assembles it, in the TOML ez wrote before eztoml 0.4
+def text(manifest: M.Manifest) -> String:
   M.Manifest{n, e, b, h, pa, pv, ds, ts} = manifest
   "[package]\n" ++ line("name", n) ++ line("entry", e) ++ line("bin", b) ++
     line("hub", h) ++ line("publish-as", pa) ++ line("version", pv) ++
     deps(ds) ++ tools(ts)
+
+# the ledger as an ez.toml: ez's text, written as eztoml writes it
+def show(manifest: M.Manifest) -> String:
+  T.normal(text(manifest))
 
 # a ledger that was read, as an ez.toml; an unreadable one renders as nothing,
 # so a failed read can never overwrite a good file with a guess

@@ -83,7 +83,7 @@ never published:
 name = "myapp"
 entry = "src/main.bend"
 bin = "src/main.bend"
-
+[deps]
 [deps.wire]
 hash = "0x7e63a5b990a375c304ed462c071214a6"
 git = "https://github.com/owner/repo"
@@ -237,6 +237,36 @@ writes nothing, as `cargo remove` does.
 function of the ledger and the committed tree, so someone who has just cloned
 your repo can run `ez lock` and get your lock back to the byte, without
 re-running `ez add` (EZ-DOC-3).
+
+ez writes ez.toml and ez.lock.toml through [eztoml](https://github.com/Emerging-Patterns/eztoml)'s
+renderer, which writes the table each dotted header implies and no blank
+lines. A package's tables are headed by its bare hash:
+
+```toml
+[lock]
+version = "2"
+hub = "https://hub.bend-lang.com"
+[packages]
+[packages.0x7e63a5b990a375c304ed462c071214a6]
+[packages.0x7e63a5b990a375c304ed462c071214a6.source]
+kind = "git"
+url = "https://github.com/owner/repo"
+rev = "16773c0aa9914b5f04d062469d50100111eb9c9c"
+entry = "src/lib.bend"
+root = "."
+narHash = "sha256-..."
+tag = "v1.0"
+[packages.0x7e63a5b990a375c304ed462c071214a6.files]
+LICENSE = "309f5aae..."
+"src/lib.bend" = "fff16a9f..."
+```
+
+A ledger or lock in the layout ez wrote before 1.1, with a quoted hash
+(`[packages."0x…".source]`) and a blank line before each table, reads to the
+same model, and the next `ez lock` or `ez add` writes it in this layout.
+`bootstrap.sh` reads both. An ez older than 1.1 reads this layout too (its
+`ez fetch` and `ez check` work), but its `ez doctor` calls the lock out of
+date, and its `ez lock` writes the old layout back.
 
 What it reads:
 

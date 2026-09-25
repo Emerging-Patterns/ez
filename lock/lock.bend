@@ -12,7 +12,7 @@
 # World lock/world.bend describes, and reading and writing are
 # lock/run.bend's. `ez fetch` reads a lock back in fetch/plan.bend.
 import Base
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ../manifest/manifest.bend as M
 import ../pkg/pkg.bend as K
 
@@ -519,12 +519,12 @@ def block.texts(bs: List<&2, K.File>) -> List<&2, String>:
       text <> block.texts(t)
 
 # the lock's text: the `[lock]` table, each block in the order given, then the
-# rest, one blank line between tables. A block is its two tables with the
-# same blank line between them, so this is the text eztoml renders for the
-# document.
+# rest, assembled as ez's document text (`T.render`) and written as eztoml
+# writes it (`T.normal`). Every part of it is fixed by the blocks' order, so
+# the order the walk found packages in does not reach the file (EZ-DOC-2).
 def text.of(hub: String, bs: List<&2, K.File>, rest: List<&2, String>) -> String:
-  String.join(T.render.sect(lock.sect(hub)) <>
-    List.append(&2, String, block.texts(bs), rest), "\n")
+  T.normal(String.join(T.render.sect(lock.sect(hub)) <>
+    List.append(&2, String, block.texts(bs), rest), "\n"))
 
 # the lock as the text written to ez.lock.toml, its packages in hash order
 def render(hub: String, ps: List<&2, Pack>) -> String:

@@ -6,10 +6,9 @@ import ./plan.bend as P
 import ./up.bend as Up
 import ../manifest/manifest.bend as M
 import ../manifest/upgrade.bend as U
-import 0x04b9afdd6d6a56039c5ce6dfb1e55294/toml.bend as T
+import ../toml/toml.bend as T
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
-import ../check/toml.bend as Toml
 import ../pkg/pkg.bend as K
 import ../hub/hub.bend as Web
 import ../pkg/LAWS.bend as KL
@@ -2272,14 +2271,6 @@ def Laws.relock_lays_nothing(w, e, ok):
             case False{}:
               relock.plain(W.World{W.Args{False{}, only, here}, ledger, listing, replies, ups}, ok)
 
-# The lock document's first step: a quoted value is its own trim, and its
-# quotes strip off. Both are check/toml.bend's, for any value.
-def Laws.trim_quoted(v):
-  Toml.trim_ends('"', v, '"', {==}, {==})
-
-def Laws.strip_quoted(v):
-  Toml.unquote(v)
-
 # What the lock may hold. A path holding `=` makes its package's `paths.ok`
 # False, and an `and` with a False half is False whichever side it is on.
 
@@ -2330,11 +2321,9 @@ def Laws.path_eq_named(hash, _src, at, _sum, fs, rest, e):
     == P.path.eq.why(hash, at) : String}
   {==}
 
-# The lock document reads back (EZ-DOC-1). check/toml.bend proves that a
-# document of tables the reader can take back parses back as those tables;
-# what is left is the lock's side: that its text is such a document, that
-# `lockable` makes every name and key one the reader takes back, and that
-# ez's readers find what was written.
+# What `lockable` lets through, and what ez's readers find in the tables.
+# That the lock's text reads back as its tables is EZ-DOC-1, trusted through
+# eztoml's round trip (EZ-TRUST-8).
 
 # LAW: a path the planner lets through holds no `=`
 law eqless_clear:
@@ -2479,44 +2468,6 @@ def blocks_join(qs, rest):
     case +q <> +t:
       blocks_join.cons(q, t, rest, blocks_join(t, rest))
 
-def Laws.render_is_doc(nms, ts, hub, ps):
-  b = Equal.sym(List<&2, K.File>, K.file.sort(L.pack.blocks(ps)),
-    L.pack.blocks(L.pack.sort(ps)), blocks_sort(ps))
-  %b : {String.join.go(List.append(&2, String, L.block.texts(_), T.render.all(Laws.tail(nms, ts))),
-    T.render.sect(L.lock.sect(hub)), "\n") == T.render(Laws.lock.doc(nms, ts, hub, ps)) : String}
-  ra = Equal.sym(List<&2, String>,
-    T.render.all(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts))),
-    List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))),
-    Toml.render_all_append(L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts)))
-  %ra : {String.join.go(List.append(&2, String, L.block.texts(L.pack.blocks(L.pack.sort(ps))),
-    T.render.all(Laws.tail(nms, ts))), T.render.sect(L.lock.sect(hub)), "\n")
-    == String.join.go(_, T.render.sect(L.lock.sect(hub)), "\n") : String}
-  f1 = Equal.sym(String, String.join.go(List.append(&2, String,
-      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))),
-      T.render.sect(L.lock.sect(hub)), "\n"),
-    String.append(T.render.sect(L.lock.sect(hub)), String.join.go(List.append(&2, String,
-      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))), "", "\n")),
-    Str.join_fold(List.append(&2, String, L.block.texts(L.pack.blocks(L.pack.sort(ps))),
-      T.render.all(Laws.tail(nms, ts))), T.render.sect(L.lock.sect(hub))))
-  %f1 : {_ == String.join.go(List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))),
-    T.render.all(Laws.tail(nms, ts))), T.render.sect(L.lock.sect(hub)), "\n") : String}
-  f2 = Equal.sym(String, String.join.go(List.append(&2, String,
-      T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))),
-      T.render.sect(L.lock.sect(hub)), "\n"),
-    String.append(T.render.sect(L.lock.sect(hub)), String.join.go(List.append(&2, String,
-      T.render.all(L.pack.all(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))), "", "\n")),
-    Str.join_fold(List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))),
-      T.render.all(Laws.tail(nms, ts))), T.render.sect(L.lock.sect(hub))))
-  %f2 : {String.append(T.render.sect(L.lock.sect(hub)), String.join.go(List.append(&2, String,
-      L.block.texts(L.pack.blocks(L.pack.sort(ps))), T.render.all(Laws.tail(nms, ts))), "", "\n"))
-    == _ : String}
-  Equal.cong(String, String, x => String.append(T.render.sect(L.lock.sect(hub)), x),
-    String.join.go(List.append(&2, String, L.block.texts(L.pack.blocks(L.pack.sort(ps))),
-      T.render.all(Laws.tail(nms, ts))), "", "\n"),
-    String.join.go(List.append(&2, String, T.render.all(L.pack.all(L.pack.sort(ps))),
-      T.render.all(Laws.tail(nms, ts))), "", "\n"),
-    blocks_join(L.pack.sort(ps), T.render.all(Laws.tail(nms, ts))))
-
 # LAW: and the right half
 law or_right:
   for a: Bool
@@ -2600,537 +2551,9 @@ def clean_all_right(xs, ys, e):
       clean_all_right(t, ys,
         Eq.and.right(P.clean(h), P.clean.all(List.append(&2, String, t, ys)), e))
 
-# LAW: a pair the lock writes only when its value is not empty reads back
-# with the rest, when it and the rest do
-law kvs_kv:
-  for +k: String
-  for +v: String
-  for +rest: List<&2, T.Kv>
-  for ek: {Toml.kv.ok(T.Kv{k, v}) == True{} : Bool}
-  for er: {Toml.kvs.ok(rest) == True{} : Bool}
-  {Toml.kvs.ok(List.append(&2, T.Kv, L.kv(k, v), rest)) == True{} : Bool}
-
-def kvs_kv(k, v, rest, ek, er):
-  match v:
-    case SNil{}:
-      er
-    case SCon{+h, +t}:
-      and_true(Toml.kv.ok(T.Kv{k, SCon{h, t}}), Toml.kvs.ok(rest), ek, er)
-
-# whether every file of a list reads back as a pair. Proof vocabulary.
-def fok(fs: List<&2, K.File>) -> Bool:
-  Toml.kvs.ok(L.file.pairs(fs))
-
-# LAW: files the planner lets through read back as pairs
-law files_ok:
-  for +fs: List<&2, K.File>
-  for +ep: {P.paths.ok(fs) == True{} : Bool}
-  for +ec: {P.clean.all(P.file.values(fs)) == True{} : Bool}
-  {fok(fs) == True{} : Bool}
-
-def files_ok(fs, ep, ec):
-  match fs:
-    case []:
-      {==}
-    case K.File{+at, +sum} <> +t:
-      and_true(Toml.kv.ok(T.Kv{at, sum}), fok(t),
-        and_true(Str.clear(at, '='), Bool.and(Str.clear(at, '"'),
-          Bool.and(Str.clear(at, '\n'), Str.clear(sum, '\n'))),
-          eqless_clear(at, Eq.and.left(P.path.eqless(at), P.paths.ok(t), ep)),
-          and_true(Str.clear(at, '"'), Bool.and(Str.clear(at, '\n'), Str.clear(sum, '\n')),
-            clean_quote(at, Eq.and.left(P.clean(at),
-              Bool.and(P.clean(sum), P.clean.all(P.file.values(t))), ec)),
-            and_true(Str.clear(at, '\n'), Str.clear(sum, '\n'),
-              clean_nl(at, Eq.and.left(P.clean(at),
-                Bool.and(P.clean(sum), P.clean.all(P.file.values(t))), ec)),
-              clean_nl(sum, Eq.and.left(P.clean(sum), P.clean.all(P.file.values(t)),
-                Eq.and.right(P.clean(at),
-                  Bool.and(P.clean(sum), P.clean.all(P.file.values(t))), ec)))))),
-        files_ok(t, Eq.and.right(P.path.eqless(at), P.paths.ok(t), ep),
-          Eq.and.right(P.clean(sum), P.clean.all(P.file.values(t)),
-            Eq.and.right(P.clean(at),
-              Bool.and(P.clean(sum), P.clean.all(P.file.values(t))), ec))))
-
-# LAW: a file inserted among files that read back, when it reads back, one
-# step, with how it compares given
-law fins_ok.step:
-  for +x: K.File
-  for +h: K.File
-  for +t: List<&2, K.File>
-  for b: Bool
-  for +ex: {fok(h <> t) == True{} : Bool}
-  for +e1: {fok([x]) == True{} : Bool}
-  for ih: {fok(K.file.ins(t, x)) == True{} : Bool}
-  {fok(K.file.ins.put(b, x, h, t, K.file.ins(t, x))) == True{} : Bool}
-
-def fins_ok.step(x, h, t, b, ex, e1, ih):
-  match b:
-    case True{}:
-      and_true(Toml.kv.ok(L.file.pair(x)), fok(h <> t),
-        Eq.and.left(Toml.kv.ok(L.file.pair(x)), True{}, e1), ex)
-    case False{}:
-      and_true(Toml.kv.ok(L.file.pair(h)), fok(K.file.ins(t, x)),
-        Eq.and.left(Toml.kv.ok(L.file.pair(h)), fok(t), ex), ih)
-
-# LAW: a file inserted among files that read back, when it reads back
-law fins_ok:
-  for +xs: List<&2, K.File>
-  for +x: K.File
-  for +ex: {fok(xs) == True{} : Bool}
-  for +e1: {fok([x]) == True{} : Bool}
-  {fok(K.file.ins(xs, x)) == True{} : Bool}
-
-def fins_ok(xs, x, ex, e1):
-  match xs:
-    case []:
-      e1
-    case +h <> +t:
-      fins_ok.step(x, h, t, K.file.le(x, h), ex, e1,
-        fins_ok(t, x, Eq.and.right(Toml.kv.ok(L.file.pair(h)), fok(t), ex), e1))
-
-# LAW: files that read back, sorted, read back
-law fsort_ok:
-  for +fs: List<&2, K.File>
-  for +e: {fok(fs) == True{} : Bool}
-  {fok(K.file.sort(fs)) == True{} : Bool}
-
-def fsort_ok(fs, e):
-  match fs:
-    case []:
-      {==}
-    case +h <> +t:
-      fins_ok(K.file.sort(t), h,
-        fsort_ok(t, Eq.and.right(Toml.kv.ok(L.file.pair(h)), fok(t), e)),
-        and_true(Toml.kv.ok(L.file.pair(h)), True{},
-          Eq.and.left(Toml.kv.ok(L.file.pair(h)), fok(t), e), {==}))
-
-# LAW: a file against deduplicated files that read back, when it reads back,
-# with whether it repeats the next given
-law dedup_ok.pick:
-  for +h: K.File
-  for +b: K.File
-  for +t: List<&2, K.File>
-  for same: Bool
-  for +eh: {Toml.kv.ok(L.file.pair(h)) == True{} : Bool}
-  for +er: {fok(b <> t) == True{} : Bool}
-  {fok(K.dedup.pick(same, h, b <> t)) == True{} : Bool}
-
-def dedup_ok.pick(h, b, t, same, eh, er):
-  match same:
-    case True{}:
-      er
-    case False{}:
-      and_true(Toml.kv.ok(L.file.pair(h)), fok(b <> t), eh, er)
-
-# LAW: and one step of the deduplication
-law dedup_ok.head:
-  for +h: K.File
-  for +r: List<&2, K.File>
-  for +eh: {Toml.kv.ok(L.file.pair(h)) == True{} : Bool}
-  for +er: {fok(r) == True{} : Bool}
-  {fok(K.dedup.head(h, r)) == True{} : Bool}
-
-def dedup_ok.head(h, r, eh, er):
-  match r:
-    case []:
-      and_true(Toml.kv.ok(L.file.pair(h)), True{}, eh, {==})
-    case +b <> +t:
-      dedup_ok.pick(h, b, t, String.eq(K.file.at(h), K.file.at(b)), eh, er)
-
-# LAW: files that read back, deduplicated, read back
-law dedup_ok:
-  for +fs: List<&2, K.File>
-  for +e: {fok(fs) == True{} : Bool}
-  {fok(K.dedup(fs)) == True{} : Bool}
-
-def dedup_ok(fs, e):
-  match fs:
-    case []:
-      {==}
-    case +h <> +t:
-      dedup_ok.head(h, K.dedup(t), Eq.and.left(Toml.kv.ok(L.file.pair(h)), fok(t), e),
-        dedup_ok(t, Eq.and.right(Toml.kv.ok(L.file.pair(h)), fok(t), e)))
-
-# LAW: a package's source table reads back, when its values can be written
-law src_ok:
-  for +src: L.Src
-  for +e: {P.clean.all(P.src.values(src)) == True{} : Bool}
-  {Toml.kvs.ok(L.src.pairs(src)) == True{} : Bool}
-
-def src_ok(src, e):
-  match src:
-    case L.Hub{}:
-      {==}
-    case L.Git{+url, +rev, +entry, +root, +nar, +tag}:
-      +e1 = Eq.and.right(P.clean(url), P.clean.all([rev, entry, root, nar, tag]), e)
-      +e2 = Eq.and.right(P.clean(rev), P.clean.all([entry, root, nar, tag]), e1)
-      +e3 = Eq.and.right(P.clean(entry), P.clean.all([root, nar, tag]), e2)
-      +e4 = Eq.and.right(P.clean(root), P.clean.all([nar, tag]), e3)
-      +e5 = Eq.and.right(P.clean(nar), P.clean.all([tag]), e4)
-      kvs_kv("url", url, List.concat(&2, T.Kv, [L.kv("rev", rev), L.kv("entry", entry),
-          L.kv("root", root), L.kv("narHash", nar), L.kv("tag", tag)]),
-        clean_nl(url, Eq.and.left(P.clean(url), P.clean.all([rev, entry, root, nar, tag]), e)),
-        kvs_kv("rev", rev, List.concat(&2, T.Kv, [L.kv("entry", entry),
-            L.kv("root", root), L.kv("narHash", nar), L.kv("tag", tag)]),
-          clean_nl(rev, Eq.and.left(P.clean(rev), P.clean.all([entry, root, nar, tag]),
-            Eq.and.right(P.clean(url), P.clean.all([rev, entry, root, nar, tag]), e))),
-          kvs_kv("entry", entry, List.concat(&2, T.Kv, [L.kv("root", root),
-              L.kv("narHash", nar), L.kv("tag", tag)]),
-            clean_nl(entry, Eq.and.left(P.clean(entry), P.clean.all([root, nar, tag]),
-              Eq.and.right(P.clean(rev), P.clean.all([entry, root, nar, tag]),
-                Eq.and.right(P.clean(url), P.clean.all([rev, entry, root, nar, tag]), e)))),
-            kvs_kv("root", root, List.concat(&2, T.Kv, [L.kv("narHash", nar), L.kv("tag", tag)]),
-              clean_nl(root, Eq.and.left(P.clean(root), P.clean.all([nar, tag]), e3)),
-              kvs_kv("narHash", nar, List.concat(&2, T.Kv, [L.kv("tag", tag)]),
-                clean_nl(nar, Eq.and.left(P.clean(nar), P.clean.all([tag]), e4)),
-                kvs_kv("tag", tag, [],
-                  clean_nl(tag, Eq.and.left(P.clean(tag), True{}, e5)), {==}))))))
-
-# LAW: a package's two tables read back, when the planner lets it through
-law pack_ok:
-  for +hash: String
-  for +src: L.Src
-  for +fs: List<&2, K.File>
-  for +ep: {P.paths.ok(fs) == True{} : Bool}
-  for +ev: {P.clean.all(hash <> List.append(&2, String, P.src.values(src), P.file.values(fs)))
-    == True{} : Bool}
-  {Toml.sects.ok(L.pack.sects(L.Pack{hash, src, fs})) == True{} : Bool}
-
-def pack_ok(hash, src, fs, ep, ev):
-  +eh = Eq.and.left(P.clean(hash),
-    P.clean.all(List.append(&2, String, P.src.values(src), P.file.values(fs))), ev)
-  +er = Eq.and.right(P.clean(hash),
-    P.clean.all(List.append(&2, String, P.src.values(src), P.file.values(fs))), ev)
-  +hn = clean_nl(hash, eh)
-  and_true(
-    Toml.sect.ok(T.Sect{"packages." ++ T.quote(hash) ++ ".source", L.src.pairs(src)}),
-    Bool.and(Toml.sect.ok(T.Sect{"packages." ++ T.quote(hash) ++ ".files",
-      L.file.pairs(K.files_of(fs))}), True{}),
-    and_true(Str.clear(String.append(String.append(hash, "\""), ".source"), '\n'),
-      Toml.kvs.ok(L.src.pairs(src)),
-      Str.clear_append(String.append(hash, "\""), ".source", '\n',
-        Str.clear_append(hash, "\"", '\n', hn, {==}), {==}),
-      src_ok(src, clean_all_left(P.src.values(src), P.file.values(fs), er))),
-    and_true(Toml.sect.ok(T.Sect{"packages." ++ T.quote(hash) ++ ".files",
-        L.file.pairs(K.files_of(fs))}), True{},
-      and_true(Str.clear(String.append(String.append(hash, "\""), ".files"), '\n'),
-        fok(K.files_of(fs)),
-        Str.clear_append(String.append(hash, "\""), ".files", '\n',
-          Str.clear_append(hash, "\"", '\n', hn, {==}), {==}),
-        dedup_ok(K.file.sort(fs), fsort_ok(fs,
-          files_ok(fs, ep, clean_all_right(P.src.values(src), P.file.values(fs), er))))),
-      {==}))
-
-# LAW: every package the planner lets through writes tables that read back,
-# one package, taken apart
-law packs_ok.cons:
-  for +h: L.Pack
-  for +t: List<&2, L.Pack>
-  for +e: {P.packs.ok(h <> t) == True{} : Bool}
-  for ih: {Toml.sects.ok(L.pack.all(t)) == True{} : Bool}
-  {Toml.sects.ok(L.pack.all(h <> t)) == True{} : Bool}
-
-def packs_ok.cons(h, t, e, ih):
-  match h:
-    case L.Pack{+hash, +src, +fs}:
-      +ok = Eq.and.left(Bool.and(P.paths.ok(fs), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src, fs})),
-          Bool.not(L.has(t, hash)))), P.packs.ok(t), e)
-      Toml.sects_ok_append(L.pack.sects(L.Pack{hash, src, fs}), L.pack.all(t),
-        pack_ok(hash, src, fs,
-          Eq.and.left(P.paths.ok(fs), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src, fs})),
-            Bool.not(L.has(t, hash))), ok),
-          Eq.and.left(P.clean.all(P.pack.values(L.Pack{hash, src, fs})), Bool.not(L.has(t, hash)),
-            Eq.and.right(P.paths.ok(fs), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src, fs})),
-              Bool.not(L.has(t, hash))), ok))),
-        ih)
-
-# LAW: every package the planner lets through writes tables that read back
-law packs_ok:
-  for +ps: List<&2, L.Pack>
-  for +e: {P.packs.ok(ps) == True{} : Bool}
-  {Toml.sects.ok(L.pack.all(ps)) == True{} : Bool}
-
-def packs_ok(ps, e):
-  match ps:
-    case []:
-      {==}
-    case +h <> +t:
-      packs_ok.cons(h, t, e, packs_ok(t, Eq.and.right(
-        Bool.and(P.paths.ok(L.pack.files(h)), Bool.and(P.clean.all(P.pack.values(h)),
-          Bool.not(L.has(t, L.pack.hash(h))))), P.packs.ok(t), e)))
-
-# LAW: a package inserted among packages whose tables read back, when its own
-# do, one step, with how it compares given
-law pins_ok.step:
-  for +p: L.Pack
-  for +h: L.Pack
-  for +t: List<&2, L.Pack>
-  for b: Bool
-  for +eq: {Toml.sects.ok(L.pack.all(h <> t)) == True{} : Bool}
-  for +ep: {Toml.sects.ok(L.pack.sects(p)) == True{} : Bool}
-  for ih: {Toml.sects.ok(L.pack.all(L.pack.ins(t, p))) == True{} : Bool}
-  {Toml.sects.ok(L.pack.all(L.pack.ins.put(b, p, h, t, L.pack.ins(t, p)))) == True{} : Bool}
-
-def pins_ok.step(p, h, t, b, eq, ep, ih):
-  match b:
-    case True{}:
-      Toml.sects_ok_append(L.pack.sects(p), L.pack.all(h <> t), ep, eq)
-    case False{}:
-      Toml.sects_ok_append(L.pack.sects(h), L.pack.all(L.pack.ins(t, p)),
-        Toml.sects_ok_left(L.pack.sects(h), L.pack.all(t), eq), ih)
-
-# LAW: a package inserted among packages whose tables read back, when its own
-# do
-law pins_ok:
-  for +qs: List<&2, L.Pack>
-  for +p: L.Pack
-  for +eq: {Toml.sects.ok(L.pack.all(qs)) == True{} : Bool}
-  for +ep: {Toml.sects.ok(L.pack.sects(p)) == True{} : Bool}
-  {Toml.sects.ok(L.pack.all(L.pack.ins(qs, p))) == True{} : Bool}
-
-def pins_ok(qs, p, eq, ep):
-  match qs:
-    case []:
-      Toml.sects_ok_append(L.pack.sects(p), [], ep, {==})
-    case +h <> +t:
-      pins_ok.step(p, h, t, L.pack.le(p, h), eq, ep,
-        pins_ok(t, p, Toml.sects_ok_right(L.pack.sects(h), L.pack.all(t), eq), ep))
-
-# LAW: packages whose tables read back, sorted, still do
-law psort_ok:
-  for +ps: List<&2, L.Pack>
-  for +e: {Toml.sects.ok(L.pack.all(ps)) == True{} : Bool}
-  {Toml.sects.ok(L.pack.all(L.pack.sort(ps))) == True{} : Bool}
-
-def psort_ok(ps, e):
-  match ps:
-    case []:
-      {==}
-    case +h <> +t:
-      pins_ok(L.pack.sort(t), h,
-        psort_ok(t, Toml.sects_ok_right(L.pack.sects(h), L.pack.all(t), e)),
-        Toml.sects_ok_left(L.pack.sects(h), L.pack.all(t), e))
-
-# LAW: a tool's table reads back, when the planner lets its pin through, with
-# its source taken apart
-law tool_ok.src:
-  for +n: String
-  for +e: String
-  for +b: String
-  for +s: M.Source
-  for +ev: {P.clean.all(P.tool.values(M.Tool{n, e, b, s})) == True{} : Bool}
-  {Toml.sect.ok(L.tool.sect(M.Tool{n, e, b, s})) == True{} : Bool}
-
-def tool_ok.src(n, e, b, s, ev):
-  match s:
-    case M.Hub{hv}:
-      +e1 = Eq.and.right(P.clean(n), P.clean.all([e, b]), ev)
-      and_true(Str.clear(n, '\n'),
-        Toml.kvs.ok(List.concat(&2, T.Kv, [L.kv("entry", e), L.kv("bin", b)])),
-        clean_nl(n, Eq.and.left(P.clean(n), P.clean.all([e, b]), ev)),
-        kvs_kv("entry", e, List.concat(&2, T.Kv, [L.kv("bin", b)]),
-          clean_nl(e, Eq.and.left(P.clean(e), P.clean.all([b]), e1)),
-          kvs_kv("bin", b, [],
-            clean_nl(b, Eq.and.left(P.clean(b), True{},
-              Eq.and.right(P.clean(e), P.clean.all([b]), e1))), {==})))
-    case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
-      +e1 = Eq.and.right(P.clean(n), P.clean.all([e, b, url, rev, tag, root, nar]), ev)
-      +e2 = Eq.and.right(P.clean(e), P.clean.all([b, url, rev, tag, root, nar]), e1)
-      +e3 = Eq.and.right(P.clean(b), P.clean.all([url, rev, tag, root, nar]), e2)
-      +e4 = Eq.and.right(P.clean(url), P.clean.all([rev, tag, root, nar]), e3)
-      +e5 = Eq.and.right(P.clean(rev), P.clean.all([tag, root, nar]), e4)
-      +e6 = Eq.and.right(P.clean(tag), P.clean.all([root, nar]), e5)
-      +e7 = Eq.and.right(P.clean(root), P.clean.all([nar]), e6)
-      and_true(Str.clear(n, '\n'),
-        Toml.kvs.ok(List.concat(&2, T.Kv, [L.kv("git", url), L.kv("rev", rev), L.kv("tag", tag),
-          L.kv("root", root), L.kv("narHash", nar), L.kv("entry", e), L.kv("bin", b)])),
-        clean_nl(n, Eq.and.left(P.clean(n), P.clean.all([e, b, url, rev, tag, root, nar]), ev)),
-        kvs_kv("git", url, List.concat(&2, T.Kv, [L.kv("rev", rev), L.kv("tag", tag),
-            L.kv("root", root), L.kv("narHash", nar), L.kv("entry", e), L.kv("bin", b)]),
-          clean_nl(url, Eq.and.left(P.clean(url), P.clean.all([rev, tag, root, nar]), e3)),
-        kvs_kv("rev", rev, List.concat(&2, T.Kv, [L.kv("tag", tag),
-            L.kv("root", root), L.kv("narHash", nar), L.kv("entry", e), L.kv("bin", b)]),
-          clean_nl(rev, Eq.and.left(P.clean(rev), P.clean.all([tag, root, nar]), e4)),
-        kvs_kv("tag", tag, List.concat(&2, T.Kv, [L.kv("root", root), L.kv("narHash", nar),
-            L.kv("entry", e), L.kv("bin", b)]),
-          clean_nl(tag, Eq.and.left(P.clean(tag), P.clean.all([root, nar]), e5)),
-        kvs_kv("root", root, List.concat(&2, T.Kv, [L.kv("narHash", nar),
-            L.kv("entry", e), L.kv("bin", b)]),
-          clean_nl(root, Eq.and.left(P.clean(root), P.clean.all([nar]), e6)),
-        kvs_kv("narHash", nar, List.concat(&2, T.Kv, [L.kv("entry", e), L.kv("bin", b)]),
-          clean_nl(nar, Eq.and.left(P.clean(nar), True{}, e7)),
-        kvs_kv("entry", e, List.concat(&2, T.Kv, [L.kv("bin", b)]),
-          clean_nl(e, Eq.and.left(P.clean(e), P.clean.all([b, url, rev, tag, root, nar]), e1)),
-        kvs_kv("bin", b, [],
-          clean_nl(b, Eq.and.left(P.clean(b), P.clean.all([url, rev, tag, root, nar]), e2)),
-          {==}))))))))
-
-# LAW: a tool's table reads back, when the planner lets its pin through
-law tool_ok:
-  for +tool: M.Tool
-  for +ev: {P.clean.all(P.tool.values(tool)) == True{} : Bool}
-  {Toml.sect.ok(L.tool.sect(tool)) == True{} : Bool}
-
-def tool_ok(tool, ev):
-  match tool:
-    case M.Tool{+n, +e, +b, +s}:
-      tool_ok.src(n, e, b, s, ev)
-
-# LAW: every tool's table reads back, when the planner lets every pin through
-law tools_ok:
-  for +ts: List<&2, M.Tool>
-  for +e: {P.tools.ok(ts) == True{} : Bool}
-  {Toml.sects.ok(L.tool.sects(ts)) == True{} : Bool}
-
-def tools_ok(ts, e):
-  match ts:
-    case []:
-      {==}
-    case +h <> +t:
-      and_true(Toml.sect.ok(L.tool.sect(h)), Toml.sects.ok(L.tool.sects(t)),
-        tool_ok(h, Eq.and.left(P.clean.all(P.tool.values(h)), P.tools.ok(t), e)),
-        tools_ok(t, Eq.and.right(P.clean.all(P.tool.values(h)), P.tools.ok(t), e)))
-
-# LAW: the `[names]` table reads back, when every name can be written as the
-# pair a package's file is written as
-law names_ok:
-  for +nms: List<&2, L.Name>
-  for +e: {P.names.ok(nms) == True{} : Bool}
-  {Toml.sects.ok(L.names.sects(nms)) == True{} : Bool}
-
-def names_ok(nms, e):
-  match nms:
-    case []:
-      {==}
-    case +h <> +t:
-      +fs = L.name.files(h <> t)
-      and_true(Toml.sect.ok(T.Sect{"names", L.file.pairs(K.files_of(fs))}), True{},
-        and_true(Str.clear("names", '\n'), fok(K.files_of(fs)), {==},
-          dedup_ok(K.file.sort(fs), fsort_ok(fs,
-            files_ok(fs, Eq.and.left(P.paths.ok(fs), P.clean.all(P.file.values(fs)), e),
-              Eq.and.right(P.paths.ok(fs), P.clean.all(P.file.values(fs)), e))))),
-        {==})
-
-# LAW: the document of a lock the planner lets through reads back
-law doc_ok:
-  for +nms: List<&2, L.Name>
-  for +ps: List<&2, L.Pack>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +en: {P.names.ok(nms) == True{} : Bool}
-  for +e: {P.lockable(ps, ts, hub) == True{} : Bool}
-  {Toml.sects.ok(Laws.lock.doc(nms, ts, hub, ps)) == True{} : Bool}
-
-def doc_ok(nms, ps, ts, hub, en, e):
-  +er = Eq.and.right(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), e)
-  and_true(Toml.sect.ok(L.lock.sect(hub)),
-    Toml.sects.ok(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts))),
-    and_true(Str.clear(hub, '\n'), True{},
-      clean_nl(hub, Eq.and.left(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), e)),
-      {==}),
-    Toml.sects_ok_append(L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts),
-      psort_ok(ps, packs_ok(ps, Eq.and.left(P.packs.ok(ps), P.tools.ok(ts), er))),
-      Toml.sects_ok_append(L.names.sects(nms), L.tool.sects(ts), names_ok(nms, en),
-        tools_ok(ts, Eq.and.right(P.packs.ok(ps), P.tools.ok(ts), er)))))
-
-def Laws.lock_sections_read_back(nms, ps, ts, hub, ok):
-  r = Equal.sym(String, L.render.names(nms, ts, hub, ps), T.render(Laws.lock.doc(nms, ts, hub, ps)),
-    Laws.render_is_doc(nms, ts, hub, ps))
-  %r : {T.sects(T.parse(_)) == Laws.lock.doc(nms, ts, hub, ps) : List<&2, T.Sect>}
-  Toml.sections_read(L.lock.sect(hub),
-    List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts)),
-    doc_ok(nms, ps, ts, hub, Eq.and.left(P.names.ok(nms), P.lockable(ps, ts, hub), ok),
-      Eq.and.right(P.names.ok(nms), P.lockable(ps, ts, hub), ok)))
-
 # the header of one of a package's tables. Proof vocabulary.
 def pack.name(h: String, x: String) -> String:
   "packages." ++ T.quote(h) ++ SCon{'.', x}
-
-# LAW: a package table's header is three segments: `packages`, the hash and
-# the table's own name, when the hash holds no quote and the name no quote
-# and no dot
-law seg_pack:
-  for +h: String
-  for +x: String
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  for +eq: {Str.clear(x, '"') == True{} : Bool}
-  for +ed: {Str.clear(x, '.') == True{} : Bool}
-  {T.segments(pack.name(h, x)) == ["packages", h, x] : List<&2, String>}
-
-def seg_pack(h, x, eh, eq, ed):
-  a1 = Equal.sym(List<&2, Char>,
-    String.to_list(String.append(String.append(h, "\""), SCon{'.', x})),
-    List.append(&2, Char, String.to_list(String.append(h, "\"")), '.' <> String.to_list(x)),
-    Str.to_list_append(String.append(h, "\""), SCon{'.', x}))
-  %a1 : {T.seg.fin(T.seg.walk(_, T.Split{True{}, [], ["packages"]})) == ["packages", h, x]
-    : List<&2, String>}
-  a2 = Equal.sym(List<&2, Char>, String.to_list(String.append(h, "\"")),
-    List.append(&2, Char, String.to_list(h), ['"']), Str.to_list_append(h, "\""))
-  %a2 : {T.seg.fin(T.seg.walk(List.append(&2, Char, _, '.' <> String.to_list(x)),
-    T.Split{True{}, [], ["packages"]})) == ["packages", h, x] : List<&2, String>}
-  a3 = Equal.sym(List<&2, Char>,
-    List.append(&2, Char, List.append(&2, Char, String.to_list(h), ['"']), '.' <> String.to_list(x)),
-    List.append(&2, Char, String.to_list(h), '"' <> '.' <> String.to_list(x)),
-    Str.list_append_assoc(Char, String.to_list(h), ['"'], '.' <> String.to_list(x)))
-  %a3 : {T.seg.fin(T.seg.walk(_, T.Split{True{}, [], ["packages"]})) == ["packages", h, x]
-    : List<&2, String>}
-  a4 = Equal.sym(T.Split,
-    T.seg.walk(List.append(&2, Char, String.to_list(h), '"' <> '.' <> String.to_list(x)),
-      T.Split{True{}, [], ["packages"]}),
-    T.seg.walk('"' <> '.' <> String.to_list(x),
-      T.seg.walk(String.to_list(h), T.Split{True{}, [], ["packages"]})),
-    Toml.seg_walk_append(String.to_list(h), '"' <> '.' <> String.to_list(x), T.Split{True{}, [], ["packages"]}))
-  %a4 : {T.seg.fin(_) == ["packages", h, x] : List<&2, String>}
-  a5 = Equal.sym(T.Split, T.seg.walk(String.to_list(h), T.Split{True{}, [], ["packages"]}),
-    T.Split{True{}, List.reverse.go(&2, Char, String.to_list(h), []), ["packages"]},
-    Toml.seg_quoted(h, [], ["packages"], eh))
-  %a5 : {T.seg.fin(T.seg.walk('"' <> '.' <> String.to_list(x), _)) == ["packages", h, x]
-    : List<&2, String>}
-  a6 = Equal.sym(T.Split,
-    T.seg.walk(String.to_list(x), T.Split{False{}, [],
-      [T.seg.done(List.reverse.go(&2, Char, String.to_list(h), [])), "packages"]}),
-    T.Split{False{}, List.reverse.go(&2, Char, String.to_list(x), []),
-      [T.seg.done(List.reverse.go(&2, Char, String.to_list(h), [])), "packages"]},
-    Toml.seg_plain(x, [], [T.seg.done(List.reverse.go(&2, Char, String.to_list(h), [])), "packages"],
-      eq, ed))
-  %a6 : {T.seg.fin(_) == ["packages", h, x] : List<&2, String>}
-  b1 = Equal.sym(String, T.seg.done(List.reverse.go(&2, Char, String.to_list(h), [])), h,
-    Toml.seg_done_rev(h))
-  b2 = Equal.sym(String, T.seg.done(List.reverse.go(&2, Char, String.to_list(x), [])), x,
-    Toml.seg_done_rev(x))
-  %b1 : {["packages", _, T.seg.done(List.reverse.go(&2, Char, String.to_list(x), []))]
-    == ["packages", h, x] : List<&2, String>}
-  %b2 : {["packages", h, _] == ["packages", h, x] : List<&2, String>}
-  {==}
-
-# LAW: the first segment of a walk that had one segment behind it is that one
-law fin_frame:
-  for +st: T.Split
-  for +x: String
-  {K.word(T.seg.fin(Toml.seg.frame(st, [x])), 0n) == x : String}
-
-def fin_frame(st, x):
-  match st:
-    case T.Split{+q, +cur, +o}:
-      r = Equal.sym(List<&2, String>,
-        List.reverse.go(&2, String, List.append(&2, String, o, [x]), [T.seg.done(cur)]),
-        x <> List.reverse.go(&2, String, o, [T.seg.done(cur)]),
-        Str.list_rev_last(String, o, x, [T.seg.done(cur)]))
-      %r : {K.word(_, 0n) == x : String}
-      {==}
-
-# LAW: a tool table's header starts with `tools`, whatever the tool is named
-law seg_tools:
-  for +n: String
-  {K.word(T.segments("tools." ++ n), 0n) == "tools" : String}
-
-def seg_tools(n):
-  f = Equal.sym(T.Split,
-    T.seg.walk(String.to_list(n), Toml.seg.frame(T.Split{False{}, [], []}, ["tools"])),
-    Toml.seg.frame(T.seg.walk(String.to_list(n), T.Split{False{}, [], []}), ["tools"]),
-    Toml.walk_frame(String.to_list(n), T.Split{False{}, [], []}, ["tools"]))
-  %f : {K.word(T.seg.fin(_), 0n) == "tools" : String}
-  fin_frame(T.seg.walk(String.to_list(n), T.Split{False{}, [], []}), "tools")
 
 # ---------------------------------------------------------------------------
 # the values a table's pairs give back
@@ -3950,125 +3373,6 @@ def hash.all(qs: List<&2, L.Pack>) -> List<&2, String>:
     case h <> t:
       L.pack.hash(h) <> hash.all(t)
 
-# LAW: a package's source table names no hash of its own
-law hput_source:
-  for +h: String
-  for +s: L.Src
-  for +rest: List<&2, String>
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  {L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "source"), L.src.pairs(s)}), "packages", "files"),
-    T.Sect{pack.name(h, "source"), L.src.pairs(s)}, rest) == rest : List<&2, String>}
-
-def hput_source(h, s, rest, eh):
-  g = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
-    seg_pack(h, "source", eh, {==}, {==}))
-  %g : {L.hash.put(L.named3(_, "packages", "files"),
-    T.Sect{pack.name(h, "source"), L.src.pairs(s)}, rest) == rest : List<&2, String>}
-  {==}
-
-# LAW: and its files table names its hash
-law hput_files:
-  for +h: String
-  for +fs: List<&2, K.File>
-  for +rest: List<&2, String>
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  {L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "files"), L.file.pairs(fs)}), "packages", "files"),
-    T.Sect{pack.name(h, "files"), L.file.pairs(fs)}, rest) == h <> rest : List<&2, String>}
-
-def hput_files(h, fs, rest, eh):
-  g = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
-    seg_pack(h, "files", eh, {==}, {==}))
-  %g : {L.hash.put(L.named3(_, "packages", "files"),
-    T.Sect{pack.name(h, "files"), L.file.pairs(fs)}, rest) == h <> rest : List<&2, String>}
-  g2 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
-    seg_pack(h, "files", eh, {==}, {==}))
-  %g2 : {K.word(_, 1n) <> rest == h <> rest : List<&2, String>}
-  {==}
-
-# LAW: the hashes the packages' tables name, then whatever follows names
-law hashes_packs:
-  for +qs: List<&2, L.Pack>
-  for +ys: List<&2, T.Sect>
-  for +e: {hashes.clean(qs) == True{} : Bool}
-  {L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))
-    == List.append(&2, String, hash.all(qs), L.hashes(ys)) : List<&2, String>}
-
-# one package, taken apart
-law hashes_packs.cons:
-  for +q: L.Pack
-  for +qs: List<&2, L.Pack>
-  for +ys: List<&2, T.Sect>
-  for +eh: {Str.clear(L.pack.hash(q), '"') == True{} : Bool}
-  for ih: {L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))
-    == List.append(&2, String, hash.all(qs), L.hashes(ys)) : List<&2, String>}
-  {L.hashes(List.append(&2, T.Sect, L.pack.all(q <> qs), ys))
-    == List.append(&2, String, hash.all(q <> qs), L.hashes(ys)) : List<&2, String>}
-
-def hashes_packs.cons(q, qs, ys, eh, ih):
-  match q:
-    case L.Pack{+h, +s, +f}:
-      Equal.trans(List<&2, String>,
-        L.hashes(List.append(&2, T.Sect, L.pack.all(L.Pack{h, s, f} <> qs), ys)),
-        L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))}),
-          "packages", "files"), T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))},
-          L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))),
-        List.append(&2, String, hash.all(L.Pack{h, s, f} <> qs), L.hashes(ys)),
-        hput_source(h, s, L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "files"),
-          L.file.pairs(K.files_of(f))}), "packages", "files"),
-          T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))},
-          L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))), eh),
-        Equal.trans(List<&2, String>,
-          L.hash.put(L.named3(L.segs(T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))}),
-            "packages", "files"), T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))},
-            L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys))),
-          h <> L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys)),
-          List.append(&2, String, hash.all(L.Pack{h, s, f} <> qs), L.hashes(ys)),
-          hput_files(h, K.files_of(f), L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys)), eh),
-          Equal.cong(List<&2, String>, List<&2, String>, r => h <> r,
-            L.hashes(List.append(&2, T.Sect, L.pack.all(qs), ys)),
-            List.append(&2, String, hash.all(qs), L.hashes(ys)), ih)))
-
-def hashes_packs(qs, ys, e):
-  match qs:
-    case []:
-      {==}
-    case +q <> +t:
-      hashes_packs.cons(q, t, ys,
-        Eq.and.left(Str.clear(L.pack.hash(q), '"'), hashes.clean(t), e),
-        hashes_packs(t, ys, Eq.and.right(Str.clear(L.pack.hash(q), '"'), hashes.clean(t), e)))
-
-# LAW: a tool's table names no hash
-law hashes_tools:
-  for +ts: List<&2, M.Tool>
-  {L.hashes(L.tool.sects(ts)) == [] : List<&2, String>}
-
-# one tool, taken apart
-law hashes_tools.cons:
-  for +h: M.Tool
-  for +t: List<&2, M.Tool>
-  for ih: {L.hashes(L.tool.sects(t)) == [] : List<&2, String>}
-  {L.hashes(L.tool.sects(h <> t)) == [] : List<&2, String>}
-
-def hashes_tools.cons(h, t, ih):
-  match h:
-    case M.Tool{+n, +e, +b, +s}:
-      w = Equal.sym(String, K.word(T.segments("tools." ++ n), 0n), "tools", seg_tools(n))
-      %w : {L.hash.put(Bool.and(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 3n),
-        Bool.and(String.eq(_, "packages"), String.eq(K.word(T.segments("tools." ++ n), 2n), "files"))),
-        L.tool.sect(M.Tool{n, e, b, s}), L.hashes(L.tool.sects(t))) == [] : List<&2, String>}
-      a = Equal.sym(Bool, Bool.and(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 3n),
-        False{}), False{}, and_false(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 3n)))
-      %a : {L.hash.put(_, L.tool.sect(M.Tool{n, e, b, s}), L.hashes(L.tool.sects(t))) == []
-        : List<&2, String>}
-      ih
-
-def hashes_tools(ts):
-  match ts:
-    case []:
-      {==}
-    case +h <> +t:
-      hashes_tools.cons(h, t, hashes_tools(t))
-
 # a package's two tables, spelled as the proofs spell them. Proof vocabulary.
 def pk.src(h: String, s: L.Src) -> T.Sect:
   T.Sect{pack.name(h, "source"), L.src.pairs(s)}
@@ -4076,244 +3380,9 @@ def pk.src(h: String, s: L.Src) -> T.Sect:
 def pk.files(h: String, f: List<&2, K.File>) -> T.Sect:
   T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))}
 
-# LAW: a lookup for another hash passes over a package's two tables
-law at_skip:
-  for +h: String
-  for +s: L.Src
-  for +f: List<&2, K.File>
-  for +r: List<&2, T.Sect>
-  for +k: String
-  for +x: String
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  for +e: {String.eq(h, k) == False{} : Bool}
-  {L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), r), "packages", k, x)
-    == L.at3(r, "packages", k, x) : List<&2, T.Kv>}
-
-def at_skip(h, s, f, r, k, x, eh, e):
-  g1 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
-    seg_pack(h, "source", eh, {==}, {==}))
-  %g1 : {L.at.pick(L.is3(_, "packages", k, x), pk.src(h, s),
-    L.at.pick(L.is3(L.segs(pk.files(h, f)), "packages", k, x), pk.files(h, f), L.at3(r, "packages", k, x)))
-    == L.at3(r, "packages", k, x) : List<&2, T.Kv>}
-  g2 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
-    seg_pack(h, "files", eh, {==}, {==}))
-  %g2 : {L.at.pick(L.is3(["packages", h, "source"], "packages", k, x), pk.src(h, s),
-    L.at.pick(L.is3(_, "packages", k, x), pk.files(h, f), L.at3(r, "packages", k, x)))
-    == L.at3(r, "packages", k, x) : List<&2, T.Kv>}
-  f1 = Equal.sym(Bool, String.eq(h, k), False{}, e)
-  %f1 : {L.at.pick(Bool.and(_, String.eq("source", x)), pk.src(h, s),
-    L.at.pick(Bool.and(_, String.eq("files", x)), pk.files(h, f), L.at3(r, "packages", k, x)))
-    == L.at3(r, "packages", k, x) : List<&2, T.Kv>}
-  {==}
-
-# LAW: a lookup for a package's own source finds its source table
-law at_hit_src:
-  for +h: String
-  for +s: L.Src
-  for +f: List<&2, K.File>
-  for +r: List<&2, T.Sect>
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  {L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), r), "packages", h, "source")
-    == L.src.pairs(s) : List<&2, T.Kv>}
-
-def at_hit_src(h, s, f, r, eh):
-  g1 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
-    seg_pack(h, "source", eh, {==}, {==}))
-  %g1 : {L.at.pick(L.is3(_, "packages", h, "source"), pk.src(h, s),
-    L.at.pick(L.is3(L.segs(pk.files(h, f)), "packages", h, "source"), pk.files(h, f),
-      L.at3(r, "packages", h, "source"))) == L.src.pairs(s) : List<&2, T.Kv>}
-  q = Equal.sym(Bool, String.eq(h, h), True{}, Eq.string_eq_self(h))
-  %q : {L.at.pick(Bool.and(_, True{}), pk.src(h, s),
-    L.at.pick(L.is3(L.segs(pk.files(h, f)), "packages", h, "source"), pk.files(h, f),
-      L.at3(r, "packages", h, "source"))) == L.src.pairs(s) : List<&2, T.Kv>}
-  {==}
-
-# LAW: and a lookup for its files finds its files table
-law at_hit_files:
-  for +h: String
-  for +s: L.Src
-  for +f: List<&2, K.File>
-  for +r: List<&2, T.Sect>
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  {L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), r), "packages", h, "files")
-    == L.file.pairs(K.files_of(f)) : List<&2, T.Kv>}
-
-def at_hit_files(h, s, f, r, eh):
-  g1 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
-    seg_pack(h, "source", eh, {==}, {==}))
-  %g1 : {L.at.pick(L.is3(_, "packages", h, "files"), pk.src(h, s),
-    L.at.pick(L.is3(L.segs(pk.files(h, f)), "packages", h, "files"), pk.files(h, f),
-      L.at3(r, "packages", h, "files"))) == L.file.pairs(K.files_of(f)) : List<&2, T.Kv>}
-  g2 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
-    seg_pack(h, "files", eh, {==}, {==}))
-  %g2 : {L.at.pick(L.is3(["packages", h, "source"], "packages", h, "files"), pk.src(h, s),
-    L.at.pick(L.is3(_, "packages", h, "files"), pk.files(h, f),
-      L.at3(r, "packages", h, "files"))) == L.file.pairs(K.files_of(f)) : List<&2, T.Kv>}
-  q = Equal.sym(Bool, String.eq(h, h), True{}, Eq.string_eq_self(h))
-  %q : {L.at.pick(Bool.and(_, False{}), pk.src(h, s),
-    L.at.pick(Bool.and(_, True{}), pk.files(h, f),
-      L.at3(r, "packages", h, "files"))) == L.file.pairs(K.files_of(f)) : List<&2, T.Kv>}
-  {==}
-
 # the document from its packages' tables on. Proof vocabulary.
 def doc.at(hub: String, qs: List<&2, L.Pack>, ys: List<&2, T.Sect>) -> List<&2, T.Sect>:
   L.lock.sect(hub) <> List.append(&2, T.Sect, L.pack.all(qs), ys)
-
-# LAW: the package a lock records under a hash, when it is the first
-# package, is that package as the lock gives it back
-law pack_of_hit:
-  for +hub: String
-  for +h: String
-  for +s: L.Src
-  for +f: List<&2, K.File>
-  for +qs: List<&2, L.Pack>
-  for +ys: List<&2, T.Sect>
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  {L.pack_of(doc.at(hub, L.Pack{h, s, f} <> qs, ys), h) == L.Pack{h, s, K.files_of(f)} : L.Pack}
-
-def pack_of_hit(_hub, h, s, f, qs, ys, eh):
-  a1 = Equal.sym(List<&2, T.Kv>,
-    L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), List.append(&2, T.Sect, L.pack.all(qs), ys)),
-      "packages", h, "source"),
-    L.src.pairs(s), at_hit_src(h, s, f, List.append(&2, T.Sect, L.pack.all(qs), ys), eh))
-  %a1 : {L.Pack{h, L.src_of(_), L.pair.files(L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}),
-    List.append(&2, T.Sect, L.pack.all(qs), ys)), "packages", h, "files"))}
-    == L.Pack{h, s, K.files_of(f)} : L.Pack}
-  a2 = Equal.sym(List<&2, T.Kv>,
-    L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), List.append(&2, T.Sect, L.pack.all(qs), ys)),
-      "packages", h, "files"),
-    L.file.pairs(K.files_of(f)), at_hit_files(h, s, f, List.append(&2, T.Sect, L.pack.all(qs), ys), eh))
-  %a2 : {L.Pack{h, L.src_of(L.src.pairs(s)), L.pair.files(_)} == L.Pack{h, s, K.files_of(f)} : L.Pack}
-  a3 = Equal.sym(L.Src, L.src_of(L.src.pairs(s)), s, src_read(s))
-  %a3 : {L.Pack{h, _, L.pair.files(L.file.pairs(K.files_of(f)))} == L.Pack{h, s, K.files_of(f)} : L.Pack}
-  a4 = Equal.sym(List<&2, K.File>, L.pair.files(L.file.pairs(K.files_of(f))), K.files_of(f),
-    pair_files(K.files_of(f)))
-  %a4 : {L.Pack{h, s, _} == L.Pack{h, s, K.files_of(f)} : L.Pack}
-  {==}
-
-# LAW: a lookup for another hash passes over the first package
-law pack_of_skip:
-  for +hub: String
-  for +h: String
-  for +s: L.Src
-  for +f: List<&2, K.File>
-  for +qs: List<&2, L.Pack>
-  for +ys: List<&2, T.Sect>
-  for +k: String
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  for +e: {String.eq(h, k) == False{} : Bool}
-  {L.pack_of(doc.at(hub, L.Pack{h, s, f} <> qs, ys), k) == L.pack_of(doc.at(hub, qs, ys), k) : L.Pack}
-
-def pack_of_skip(hub, h, s, f, qs, ys, k, eh, e):
-  a1 = Equal.sym(List<&2, T.Kv>,
-    L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), List.append(&2, T.Sect, L.pack.all(qs), ys)),
-      "packages", k, "source"),
-    L.at3(List.append(&2, T.Sect, L.pack.all(qs), ys), "packages", k, "source"),
-    at_skip(h, s, f, List.append(&2, T.Sect, L.pack.all(qs), ys), k, "source", eh, e))
-  %a1 : {L.Pack{k, L.src_of(_), L.pair.files(L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}),
-    List.append(&2, T.Sect, L.pack.all(qs), ys)), "packages", k, "files"))}
-    == L.pack_of(doc.at(hub, qs, ys), k) : L.Pack}
-  a2 = Equal.sym(List<&2, T.Kv>,
-    L.at3(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), List.append(&2, T.Sect, L.pack.all(qs), ys)),
-      "packages", k, "files"),
-    L.at3(List.append(&2, T.Sect, L.pack.all(qs), ys), "packages", k, "files"),
-    at_skip(h, s, f, List.append(&2, T.Sect, L.pack.all(qs), ys), k, "files", eh, e))
-  %a2 : {L.Pack{k, L.src_of(L.at3(List.append(&2, T.Sect, L.pack.all(qs), ys), "packages", k, "source")),
-    L.pair.files(_)} == L.pack_of(doc.at(hub, qs, ys), k) : L.Pack}
-  {==}
-
-# LAW: the packages a lock records under hashes the first package's is fresh
-# to are the ones recorded without it
-law packs_at_skip:
-  for +hub: String
-  for +h: String
-  for +s: L.Src
-  for +f: List<&2, K.File>
-  for +qs: List<&2, L.Pack>
-  for +ys: List<&2, T.Sect>
-  for +rs: List<&2, L.Pack>
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  for +ef: {Laws.hash.fresh(h, rs) == True{} : Bool}
-  {L.packs.at(doc.at(hub, L.Pack{h, s, f} <> qs, ys), hash.all(rs))
-    == L.packs.at(doc.at(hub, qs, ys), hash.all(rs)) : List<&2, L.Pack>}
-
-def packs_at_skip(hub, h, s, f, qs, ys, rs, eh, ef):
-  match rs:
-    case []:
-      {==}
-    case +r <> +rt:
-      p1 = Equal.sym(L.Pack, L.pack_of(doc.at(hub, L.Pack{h, s, f} <> qs, ys), L.pack.hash(r)),
-        L.pack_of(doc.at(hub, qs, ys), L.pack.hash(r)),
-        pack_of_skip(hub, h, s, f, qs, ys, L.pack.hash(r), eh,
-          Eq.not.true(String.eq(h, L.pack.hash(r)),
-            Eq.and.left(Bool.not(String.eq(h, L.pack.hash(r))), Laws.hash.fresh(h, rt), ef))))
-      %p1 : {_ <> L.packs.at(doc.at(hub, L.Pack{h, s, f} <> qs, ys), hash.all(rt))
-        == L.pack_of(doc.at(hub, qs, ys), L.pack.hash(r)) <> L.packs.at(doc.at(hub, qs, ys), hash.all(rt))
-        : List<&2, L.Pack>}
-      Equal.cong(List<&2, L.Pack>, List<&2, L.Pack>,
-        x => L.pack_of(doc.at(hub, qs, ys), L.pack.hash(r)) <> x,
-        L.packs.at(doc.at(hub, L.Pack{h, s, f} <> qs, ys), hash.all(rt)),
-        L.packs.at(doc.at(hub, qs, ys), hash.all(rt)),
-        packs_at_skip(hub, h, s, f, qs, ys, rt, eh,
-          Eq.and.right(Bool.not(String.eq(h, L.pack.hash(r))), Laws.hash.fresh(h, rt), ef)))
-
-# LAW: the packages a lock records under its packages' hashes are its
-# packages as it gives them back, one package, taken apart
-law packs_at_all.cons:
-  for +hub: String
-  for +q: L.Pack
-  for +t: List<&2, L.Pack>
-  for +ys: List<&2, T.Sect>
-  for +eh: {Str.clear(L.pack.hash(q), '"') == True{} : Bool}
-  for +ef: {Laws.hash.fresh(L.pack.hash(q), t) == True{} : Bool}
-  for ih: {L.packs.at(doc.at(hub, t, ys), hash.all(t)) == Laws.canon.all(t) : List<&2, L.Pack>}
-  {L.packs.at(doc.at(hub, q <> t, ys), hash.all(q <> t)) == Laws.canon.all(q <> t) : List<&2, L.Pack>}
-
-def packs_at_all.cons(hub, q, t, ys, eh, ef, ih):
-  match q:
-    case L.Pack{+h, +s, +f}:
-      p1 = Equal.sym(L.Pack, L.pack_of(doc.at(hub, L.Pack{h, s, f} <> t, ys), h),
-        L.Pack{h, s, K.files_of(f)}, pack_of_hit(hub, h, s, f, t, ys, eh))
-      %p1 : {_ <> L.packs.at(doc.at(hub, L.Pack{h, s, f} <> t, ys), hash.all(t))
-        == Laws.canon.all(L.Pack{h, s, f} <> t) : List<&2, L.Pack>}
-      p2 = Equal.sym(List<&2, L.Pack>, L.packs.at(doc.at(hub, L.Pack{h, s, f} <> t, ys), hash.all(t)),
-        L.packs.at(doc.at(hub, t, ys), hash.all(t)),
-        packs_at_skip(hub, h, s, f, t, ys, t, eh, ef))
-      %p2 : {L.Pack{h, s, K.files_of(f)} <> _ == Laws.canon.all(L.Pack{h, s, f} <> t) : List<&2, L.Pack>}
-      Equal.cong(List<&2, L.Pack>, List<&2, L.Pack>, x => L.Pack{h, s, K.files_of(f)} <> x,
-        L.packs.at(doc.at(hub, t, ys), hash.all(t)), Laws.canon.all(t), ih)
-
-# LAW: the packages a lock records under its packages' hashes are its
-# packages as it gives them back, when the hashes are distinct and hold no
-# quote
-law packs_at_all:
-  for +hub: String
-  for +qs: List<&2, L.Pack>
-  for +ys: List<&2, T.Sect>
-  for +ed: {Laws.distinct(qs) == True{} : Bool}
-  for +ec: {hashes.clean(qs) == True{} : Bool}
-  {L.packs.at(doc.at(hub, qs, ys), hash.all(qs)) == Laws.canon.all(qs) : List<&2, L.Pack>}
-
-def packs_at_all(hub, qs, ys, ed, ec):
-  match qs:
-    case []:
-      {==}
-    case +q <> +t:
-      packs_at_all.cons(hub, q, t, ys,
-        Eq.and.left(Str.clear(L.pack.hash(q), '"'), hashes.clean(t), ec),
-        Eq.and.left(Laws.hash.fresh(L.pack.hash(q), t), Laws.distinct(t), ed),
-        packs_at_all(hub, t, ys,
-          Eq.and.right(Laws.hash.fresh(L.pack.hash(q), t), Laws.distinct(t), ed),
-          Eq.and.right(Str.clear(L.pack.hash(q), '"'), hashes.clean(t), ec)))
-
-# LAW: the hashes a lock's document names are its packages', in hash order
-law hashes_doc:
-  for +nms: List<&2, L.Name>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +ps: List<&2, L.Pack>
-  for +e: {hashes.clean(L.pack.sort(ps)) == True{} : Bool}
-  {L.hashes(Laws.lock.doc(nms, ts, hub, ps)) == hash.all(L.pack.sort(ps)) : List<&2, String>}
 
 # LAW: the `[names]` table names no hash
 law hashes_skip_names:
@@ -4327,56 +3396,6 @@ def hashes_skip_names(nms, _rest):
       {==}
     case _h <> _t:
       {==}
-
-def hashes_doc(nms, ts, _hub, ps, e):
-  h1 = Equal.sym(List<&2, String>,
-    L.hashes(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts))),
-    List.append(&2, String, hash.all(L.pack.sort(ps)), L.hashes(Laws.tail(nms, ts))),
-    hashes_packs(L.pack.sort(ps), Laws.tail(nms, ts), e))
-  %h1 : {_ == hash.all(L.pack.sort(ps)) : List<&2, String>}
-  h2 = Equal.sym(List<&2, String>, L.hashes(Laws.tail(nms, ts)), [],
-    Equal.trans(List<&2, String>, L.hashes(Laws.tail(nms, ts)), L.hashes(L.tool.sects(ts)), [],
-      hashes_skip_names(nms, L.tool.sects(ts)), hashes_tools(ts)))
-  %h2 : {List.append(&2, String, hash.all(L.pack.sort(ps)), _) == hash.all(L.pack.sort(ps))
-    : List<&2, String>}
-  Str.list_append_nil(String, hash.all(L.pack.sort(ps)))
-
-# LAW: the packages a lockable lock's document gives back are its packages
-# as the lock gives them back
-law lock_packs_read:
-  for +nms: List<&2, L.Name>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +ps: List<&2, L.Pack>
-  for +ok: {P.lockable(ps, ts, hub) == True{} : Bool}
-  {L.packs(Laws.lock.doc(nms, ts, hub, ps)) == Laws.canon(ps) : List<&2, L.Pack>}
-
-def lock_packs_read(nms, ts, hub, ps, ok):
-  +pk = Eq.and.left(P.packs.ok(ps), P.tools.ok(ts),
-    Eq.and.right(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), ok))
-  +hc = hclean_sort(ps, hashes_clean_ok(ps, pk))
-  h = Equal.sym(List<&2, String>, L.hashes(Laws.lock.doc(nms, ts, hub, ps)), hash.all(L.pack.sort(ps)),
-    hashes_doc(nms, ts, hub, ps, hc))
-  %h : {L.packs.at(Laws.lock.doc(nms, ts, hub, ps), _) == Laws.canon(ps) : List<&2, L.Pack>}
-  packs_at_all(hub, L.pack.sort(ps), Laws.tail(nms, ts), distinct_sort(ps, packs_distinct(ps, pk)), hc)
-
-def Laws.lock_reads_back(nms, ps, ts, hub, ok):
-  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.names(nms, ts, hub, ps))),
-    Laws.lock.doc(nms, ts, hub, ps), Laws.lock_sections_read_back(nms, ps, ts, hub, ok))
-  %s : {L.packs(_) == Laws.canon(ps) : List<&2, L.Pack>}
-  lock_packs_read(nms, ts, hub, ps, Eq.and.right(P.names.ok(nms), P.lockable(ps, ts, hub), ok))
-
-def Laws.lock_hub_reads_back(nms, ps, ts, hub, ok):
-  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.names(nms, ts, hub, ps))),
-    Laws.lock.doc(nms, ts, hub, ps), Laws.lock_sections_read_back(nms, ps, ts, hub, ok))
-  %s : {L.lock.hub(_) == hub : String}
-  lock_hub_read(nms, ts, hub, ps)
-
-def Laws.lock_tools_read_back(nms, ps, ts, hub, ok):
-  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.names(nms, ts, hub, ps))),
-    Laws.lock.doc(nms, ts, hub, ps), Laws.lock_sections_read_back(nms, ps, ts, hub, ok))
-  %s : {M.tools(_) == Laws.tools.canon(ts) : List<&2, M.Tool>}
-  lock_tools_read(nms, ts, hub, ps)
 
 # ---------------------------------------------------------------------------
 # the names a lock gives back
@@ -4394,77 +3413,6 @@ def pair_names_back(fs):
       Equal.cong(List<&2, L.Name>, List<&2, L.Name>, r => L.Name{at, sum} <> r,
         L.pair.names(L.file.pairs(t)), Laws.names.back(t), pair_names_back(t))
 
-# LAW: a package's tables are not the names table, when its hash holds no
-# quote
-law names_skip_pack:
-  for +h: String
-  for +s: L.Src
-  for +f: List<&2, K.File>
-  for +rest: List<&2, T.Sect>
-  for +eh: {Str.clear(h, '"') == True{} : Bool}
-  {L.names.pairs(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}), rest))
-    == L.names.pairs(rest) : List<&2, T.Kv>}
-
-def names_skip_pack(h, s, f, rest, eh):
-  g = Equal.sym(List<&2, String>, T.segments(pack.name(h, "source")), ["packages", h, "source"],
-    seg_pack(h, "source", eh, {==}, {==}))
-  %g : {L.at.pick(L.named1(_, "names"), T.Sect{pack.name(h, "source"), L.src.pairs(s)},
-    L.names.pairs(T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))} <> rest))
-    == L.names.pairs(rest) : List<&2, T.Kv>}
-  g2 = Equal.sym(List<&2, String>, T.segments(pack.name(h, "files")), ["packages", h, "files"],
-    seg_pack(h, "files", eh, {==}, {==}))
-  %g2 : {L.at.pick(L.named1(_, "names"), T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))},
-    L.names.pairs(rest)) == L.names.pairs(rest) : List<&2, T.Kv>}
-  {==}
-
-# LAW: no package's table is the names table, when no hash holds a quote
-law names_skip_packs:
-  for +qs: List<&2, L.Pack>
-  for +rest: List<&2, T.Sect>
-  for +e: {hashes.clean(qs) == True{} : Bool}
-  {L.names.pairs(List.append(&2, T.Sect, L.pack.all(qs), rest)) == L.names.pairs(rest)
-    : List<&2, T.Kv>}
-
-def names_skip_packs(qs, rest, e):
-  match qs:
-    case []:
-      {==}
-    case +q <> +t:
-      match q:
-        case L.Pack{+h, +s, +f}:
-          Equal.trans(List<&2, T.Kv>,
-            L.names.pairs(List.append(&2, T.Sect, L.pack.sects(L.Pack{h, s, f}),
-              List.append(&2, T.Sect, L.pack.all(t), rest))),
-            L.names.pairs(List.append(&2, T.Sect, L.pack.all(t), rest)),
-            L.names.pairs(rest),
-            names_skip_pack(h, s, f, List.append(&2, T.Sect, L.pack.all(t), rest),
-              Eq.and.left(Str.clear(h, '"'), hashes.clean(t), e)),
-            names_skip_packs(t, rest, Eq.and.right(Str.clear(h, '"'), hashes.clean(t), e)))
-
-# LAW: a lock that resolved no name has no names table, and its tools are
-# none
-law names_none:
-  for +ts: List<&2, M.Tool>
-  {L.pair.names(L.names.pairs(L.tool.sects(ts))) == [] : List<&2, L.Name>}
-
-def names_none(ts):
-  match ts:
-    case []:
-      {==}
-    case +h <> +t:
-      match h:
-        case M.Tool{+n, +e, +b, +s}:
-          w = Equal.sym(String, K.word(T.segments("tools." ++ n), 0n), "tools", seg_tools(n))
-          %w : {L.pair.names(L.at.pick(Bool.and(Nat.is_eq(List.length(&2, String,
-            T.segments("tools." ++ n)), 1n), String.eq(_, "names")),
-            L.tool.sect(M.Tool{n, e, b, s}), L.names.pairs(L.tool.sects(t)))) == []
-            : List<&2, L.Name>}
-          a = Equal.sym(Bool, Bool.and(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 1n),
-            False{}), False{}, and_false(Nat.is_eq(List.length(&2, String, T.segments("tools." ++ n)), 1n)))
-          %a : {L.pair.names(L.at.pick(_, L.tool.sect(M.Tool{n, e, b, s}), L.names.pairs(L.tool.sects(t))))
-            == [] : List<&2, L.Name>}
-          names_none(t)
-
 # LAW: the lock writes each name as the law's file of it
 law name_files_as:
   for nms: List<&2, L.Name>
@@ -4477,48 +3425,6 @@ def name_files_as(nms):
     case L.Name{nv, hash} <> t:
       Equal.cong(List<&2, K.File>, List<&2, K.File>, x => K.File{nv, hash} <> x,
         L.name.files(t), Laws.names.as.files(t), name_files_as(t))
-
-# LAW: and the names table is the first of the tables after the packages
-law names_tail:
-  for nms: List<&2, L.Name>
-  for +ts: List<&2, M.Tool>
-  {L.pair.names(L.names.pairs(Laws.tail(nms, ts))) == Laws.names.canon(nms) : List<&2, L.Name>}
-
-def names_tail(nms, ts):
-  match nms:
-    case []:
-      names_none(ts)
-    case +h <> +t:
-      %name_files_as(h <> t)
-        : {L.pair.names(L.names.pairs(Laws.tail(h <> t, ts))) == Laws.names.back(K.files_of(_))
-          : List<&2, L.Name>}
-      pair_names_back(K.files_of(L.name.files(h <> t)))
-
-# LAW: the names table of a lock's document is the names it resolved, in
-# name order and each once
-law lock_names_read:
-  for +nms: List<&2, L.Name>
-  for +ts: List<&2, M.Tool>
-  for +hub: String
-  for +ps: List<&2, L.Pack>
-  for +e: {hashes.clean(L.pack.sort(ps)) == True{} : Bool}
-  {L.names(Laws.lock.doc(nms, ts, hub, ps)) == Laws.names.canon(nms) : List<&2, L.Name>}
-
-def lock_names_read(nms, ts, _hub, ps, e):
-  p = Equal.sym(List<&2, T.Kv>,
-    L.names.pairs(List.append(&2, T.Sect, L.pack.all(L.pack.sort(ps)), Laws.tail(nms, ts))),
-    L.names.pairs(Laws.tail(nms, ts)), names_skip_packs(L.pack.sort(ps), Laws.tail(nms, ts), e))
-  %p : {L.pair.names(_) == Laws.names.canon(nms) : List<&2, L.Name>}
-  names_tail(nms, ts)
-
-def Laws.lock_names_read_back(nms, ps, ts, hub, ok):
-  +lk = Eq.and.right(P.names.ok(nms), P.lockable(ps, ts, hub), ok)
-  +pk = Eq.and.left(P.packs.ok(ps), P.tools.ok(ts),
-    Eq.and.right(P.clean(hub), Bool.and(P.packs.ok(ps), P.tools.ok(ts)), lk))
-  s = Equal.sym(List<&2, T.Sect>, T.sects(T.parse(L.render.names(nms, ts, hub, ps))),
-    Laws.lock.doc(nms, ts, hub, ps), Laws.lock_sections_read_back(nms, ps, ts, hub, ok))
-  %s : {L.names(_) == Laws.names.canon(nms) : List<&2, L.Name>}
-  lock_names_read(nms, ts, hub, ps, hclean_sort(ps, hashes_clean_ok(ps, pk)))
 
 # The upgrade's decisions: what it keeps (EZ-RES-4, EZ-RES-6) and what it
 # asks (EZ-RES-6). The upgrade walks the ledger's dependencies and tools one
@@ -15302,12 +14208,13 @@ law rm.ren:
   for +next: M.Manifest
   for ef: {Rend.renderable(next) == f : Bool}
   for se: {String.is_empty(Bool.pick(String, f, "", Rend.unrenderable())) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {M.parse(Rend.show(next)) == M.Good{next} : M.Read}
 
-def rm.ren(f, next, ef, se):
+def rm.ren(f, next, ef, se, rb):
   match f:
     case True{}:
-      ML.ledger_reads_back(next, ef)
+      rb(next, ef)
     case False{}:
       Eq.bit.absurd(&2, {M.parse(Rend.show(next)) == M.Good{next} : M.Read}, se)
 
@@ -15318,12 +14225,13 @@ law rm.fit:
   for +next: M.Manifest
   for old: M.Manifest
   for se: {String.is_empty(Up.fit.why(moved, next)) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {Up.read.next(moved, Rend.show(next), old) == Up.model.next(moved, next, old) : M.Read}
 
-def rm.fit(moved, next, _old, se):
+def rm.fit(moved, next, _old, se, rb):
   match moved:
     case True{}:
-      rm.ren(Rend.renderable(next), next, {==}, se)
+      rm.ren(Rend.renderable(next), next, {==}, se, rb)
     case False{}:
       {==}
 
@@ -15335,13 +14243,15 @@ law rm.done:
   for +ig: String
   for fs: List<&2, Up.Found>
   for se: {String.is_empty(Up.next.stop(Up.done(old, dd, tt, ig, fs))) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {Up.next.read(Up.done(old, dd, tt, ig, fs)) == Up.next.model(Up.done(old, dd, tt, ig, fs)) : M.Read}
 
-def rm.done(old, dd, tt, _ig, _fs, se):
+def rm.done(old, dd, tt, _ig, _fs, se, rb):
   match old dd tt:
     case M.Manifest{+n, +e, +b, +h, +hpa, +hpv, ods, ots} Up.Deps{+ds, _ss, _es, dm, _dsy, _dtr, _da, _db}
       Up.Tools{+ts, tm, _tsy, _ta, _tb}:
-      rm.fit(Bool.or(dm, tm), M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, M.Manifest{n, e, b, h, hpa, hpv, ods, ots}, se)
+      rm.fit(Bool.or(dm, tm), M.Manifest{n, e, b, h, hpa, hpv, ds, ts},
+        M.Manifest{n, e, b, h, hpa, hpv, ods, ots}, se, rb)
 
 # LAW: and once the sources are asked for
 law rm.srcs:
@@ -15351,13 +14261,14 @@ law rm.srcs:
   for tt: Up.Tools
   for +ig: String
   for se: {String.is_empty(Up.next.stop(Up.got.srcs(srcs, old, dd, tt, ig))) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {Up.next.read(Up.got.srcs(srcs, old, dd, tt, ig)) == Up.next.model(Up.got.srcs(srcs, old, dd, tt, ig))
     : M.Read}
 
-def rm.srcs(srcs, old, dd, tt, ig, se):
+def rm.srcs(srcs, old, dd, tt, ig, se, rb):
   match srcs:
     case Up.Srcs{fs}:
-      rm.done(old, dd, tt, ig, fs, se)
+      rm.done(old, dd, tt, ig, fs, se, rb)
     case Up.SrcsWait{_a}:
       {==}
     case Up.SrcsNo{_w}:
@@ -15371,13 +14282,14 @@ law rm.ignore:
   for dd: Up.Deps
   for tt: Up.Tools
   for se: {String.is_empty(Up.next.stop(Up.got.ignore(said, srcs, old, dd, tt))) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {Up.next.read(Up.got.ignore(said, srcs, old, dd, tt)) == Up.next.model(Up.got.ignore(said, srcs, old, dd, tt))
     : M.Read}
 
-def rm.ignore(said, srcs, old, dd, tt, se):
+def rm.ignore(said, srcs, old, dd, tt, se, rb):
   match said:
     case Up.Said{+ig}:
-      rm.srcs(srcs, old, dd, tt, ig, se)
+      rm.srcs(srcs, old, dd, tt, ig, se, rb)
     case Up.Unsaid{_w}:
       {==}
     case Up.Unasked{_a}:
@@ -15391,14 +14303,15 @@ law rm.asks:
   for +dd: Up.Deps
   for tt: Up.Tools
   for se: {String.is_empty(Up.next.stop(Up.pins.asks(asks, rs, old, dd, tt))) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {Up.next.read(Up.pins.asks(asks, rs, old, dd, tt)) == Up.next.model(Up.pins.asks(asks, rs, old, dd, tt))
     : M.Read}
 
-def rm.asks(asks, rs, old, dd, tt, se):
+def rm.asks(asks, rs, old, dd, tt, se, rb):
   match asks:
     case []:
       rm.ignore(Up.text.said(rs, Up.Ignore{}), Up.ask.srcs(List.is_empty(&2, U.Swap, Up.deps.edits(dd)), rs),
-        old, dd, tt, se)
+        old, dd, tt, se, rb)
     case _h <> _t:
       {==}
 
@@ -15412,13 +14325,14 @@ law rm.bad:
   for +dd: Up.Deps
   for tt: Up.Tools
   for se: {String.is_empty(Up.next.stop(Up.pins.bad(clean, bad, asks, rs, old, dd, tt))) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {Up.next.read(Up.pins.bad(clean, bad, asks, rs, old, dd, tt))
     == Up.next.model(Up.pins.bad(clean, bad, asks, rs, old, dd, tt)) : M.Read}
 
-def rm.bad(clean, _bad, asks, rs, old, dd, tt, se):
+def rm.bad(clean, _bad, asks, rs, old, dd, tt, se, rb):
   match clean:
     case True{}:
-      rm.asks(asks, rs, old, dd, tt, se)
+      rm.asks(asks, rs, old, dd, tt, se, rb)
     case False{}:
       {==}
 
@@ -15429,15 +14343,16 @@ law rm.pins:
   for +rs: List<&2, Up.Reply>
   for +old: M.Manifest
   for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, old))) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {Up.next.read(Up.pins(dd, tt, rs, old)) == Up.next.model(Up.pins(dd, tt, rs, old)) : M.Read}
 
-def rm.pins(dd, tt, rs, old, se):
+def rm.pins(dd, tt, rs, old, se, rb):
   match dd tt:
     case Up.Deps{ds, ss, es, dm, dsy, dtr, dasks, +dbad} Up.Tools{ts, tm, tsy, tasks, +tbad}:
       rm.bad(Bool.and(String.is_empty(dbad), String.is_empty(tbad)),
         Bool.pick(String, String.is_empty(dbad), tbad, dbad),
         List.append(&2, Up.Ask, dasks, tasks), rs, old,
-        Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""}, se)
+        Up.Deps{ds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{ts, tm, tsy, [], ""}, se, rb)
 
 # LAW: whether `--package` names something
 law rm.known:
@@ -15446,9 +14361,10 @@ law rm.known:
   for +rs: List<&2, Up.Reply>
   for +old: M.Manifest
   for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, old))) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {Up.next.read(Up.known(k, only, rs, old)) == Up.next.model(Up.known(k, only, rs, old)) : M.Read}
 
-def rm.known(k, only, rs, old, se):
+def rm.known(k, only, rs, old, se, rb):
   match k:
     case False{}:
       {==}
@@ -15456,7 +14372,7 @@ def rm.known(k, only, rs, old, se):
       match old:
         case M.Manifest{+n, +e, +b, +h, +hpa, +hpv, +ds, +ts}:
           rm.pins(Up.deps.walk(rs, only, M.hub.or(h), ds), Up.tools.walk(rs, only, ts), rs,
-            M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, se)
+            M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, se, rb)
 
 # LAW: an upgrade that does not stop makes its lock from the model it renders
 law rm.next:
@@ -15464,9 +14380,10 @@ law rm.next:
   for r: M.Read
   for +rs: List<&2, Up.Reply>
   for se: {String.is_empty(Up.next.stop(Up.next(only, r, rs))) == True{} : Bool}
+  for rb: ML.ReadsBack()
   {Up.next.read(Up.next(only, r, rs)) == Up.next.model(Up.next(only, r, rs)) : M.Read}
 
-def rm.next(only, r, rs, se):
+def rm.next(only, r, rs, se, rb):
   match r:
     case M.Bad{_why}:
       {==}
@@ -15474,7 +14391,7 @@ def rm.next(only, r, rs, se):
       match m:
         case M.Manifest{+n, +e, +b, +h, +hpa, +hpv, +ds, +ts}:
           rm.known(Bool.or(U.known(only, ds), M.tool.known(only, ts)), only, rs,
-            M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, se)
+            M.Manifest{n, e, b, h, hpa, hpv, ds, ts}, se, rb)
 
 # LAW: so the ledger an upgrade that does not refuse leaves reads back as the
 # model it rendered
@@ -15486,10 +14403,11 @@ law u.rb0:
   for +replies: List<&2, W.Reply>
   for +ups: List<&2, Up.Reply>
   for +ok: {P.refuses(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}) == False{} : Bool}
+  for rb: ML.ReadsBack()
   {W.parsed(W.ledger.of(Laws.after(W.World{W.Args{True{}, only, here}, ledger, listing, replies,
       ups}))) == P.ledger.next(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}) : M.Read}
 
-def u.rb0(only, here, ledger, listing, replies, ups, ok):
+def u.rb0(only, here, ledger, listing, replies, ups, ok, rb):
   +nx = Up.next(only, W.parsed(ledger), ups)
   +g = Laws.ig.left(Up.next.edits(nx), Laws.ig.read(ups))
   Equal.trans(M.Read,
@@ -15506,7 +14424,7 @@ def u.rb0(only, here, ledger, listing, replies, ups, ok):
         Equal.cong(Up.Next & M.Read, M.Read, q => core.snd(q),
           core.lhs(nx, only, g, ups), core.rhs(nx, g, ledger),
           core(W.parsed(ledger), only, ups, g, ledger, {==}, u.se(only, here, ledger, listing, replies, ups, ok)))),
-      rm.next(only, W.parsed(ledger), ups, u.se(only, here, ledger, listing, replies, ups, ok))))
+      rm.next(only, W.parsed(ledger), ups, u.se(only, here, ledger, listing, replies, ups, ok), rb)))
 
 # LAW: the second upgrade decides the target
 law u.e2:
@@ -15632,11 +14550,12 @@ law u.idem:
   for +replies: List<&2, W.Reply>
   for +ups: List<&2, Up.Reply>
   for +e: {P.refuses(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}) == b : Bool}
+  for rb: ML.ReadsBack()
   {P.put(Laws.after(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}),
     "ez.lock.toml") == P.put(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups},
       "ez.lock.toml") : P.Wrote}
 
-def u.idem(b, only, here, ledger, listing, replies, ups, e):
+def u.idem(b, only, here, ledger, listing, replies, ups, e, rb):
   match b:
     case True{}:
       ne = Equal.sym(Bool, P.refuses(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}), True{}, e)
@@ -15655,9 +14574,9 @@ def u.idem(b, only, here, ledger, listing, replies, ups, e):
             replies, ups}),
           u.after(only, here, ledger, listing, replies, ups, e)),
         u.idem.ok(only, here, ledger, listing, replies, ups, e,
-          u.rb0(only, here, ledger, listing, replies, ups, e)))
+          u.rb0(only, here, ledger, listing, replies, ups, e, rb)))
 
-def Laws.upgrade_idempotent(w, u):
+def Laws.upgrade_idempotent(w, u, rb):
   match w:
     case W.World{args, +ledger, +listing, +replies, +ups}:
       match args:
@@ -15670,7 +14589,7 @@ def Laws.upgrade_idempotent(w, u):
             case True{}:
               u.idem(P.refuses(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}), only, here,
                 ledger, listing,
-                replies, ups, {==})
+                replies, ups, {==}, rb)
 
 # LAW: the model, either way
 law u.moves:
@@ -15682,10 +14601,11 @@ law u.moves:
   for +replies: List<&2, W.Reply>
   for +ups: List<&2, Up.Reply>
   for +e: {P.refuses(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}) == b : Bool}
+  for rb: ML.ReadsBack()
   {P.ledger.next(Laws.after(W.World{W.Args{True{}, only, here}, ledger, listing, replies,
     ups})) == P.ledger.next(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}) : M.Read}
 
-def u.moves(b, only, here, ledger, listing, replies, ups, e):
+def u.moves(b, only, here, ledger, listing, replies, ups, e, rb):
   match b:
     case True{}:
       ne = Equal.sym(Bool, P.refuses(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}), True{}, e)
@@ -15720,9 +14640,9 @@ def u.moves(b, only, here, ledger, listing, replies, ups, e):
                 target(Up.next.model(Up.next(only, W.parsed(ledger), ups)), Laws.ig.left(Up.next.edits(Up.next(only,
                   W.parsed(ledger), ups)), Laws.ig.read(ups))),
             u.e2(only, here, ledger, listing, replies, ups, e,
-              u.rb0(only, here, ledger, listing, replies, ups, e)))))
+              u.rb0(only, here, ledger, listing, replies, ups, e, rb)))))
 
-def Laws.reupgrade_moves_nothing(w, u):
+def Laws.reupgrade_moves_nothing(w, u, rb):
   match w:
     case W.World{args, +ledger, +listing, +replies, +ups}:
       match args:
@@ -15735,7 +14655,7 @@ def Laws.reupgrade_moves_nothing(w, u):
             case True{}:
               u.moves(P.refuses(W.World{W.Args{True{}, only, here}, ledger, listing, replies, ups}), only,
                 here, ledger, listing,
-                replies, ups, {==})
+                replies, ups, {==}, rb)
 
 # LAW: what the second upgrade's plan leaves at a path, through its view
 law u.put:
@@ -15804,7 +14724,7 @@ def or_not_true(c, x, ec, e):
     case False{}:
       Eq.bit.absurd(&2, {x == True{} : Bool}, ec)
 
-def Laws.upgrade_settles(w, u, ok):
+def Laws.upgrade_settles(w, u, ok, rb):
   match w:
     case W.World{args, +ledger, +listing, +replies, +ups}:
       match args:
@@ -15831,9 +14751,9 @@ def Laws.upgrade_settles(w, u, ok):
                   Up.next.model(Up.next(only, W.parsed(ledger), ups)), Laws.ig.left(Up.next.edits(Up.next(only,
                     W.parsed(ledger), ups)), Laws.ig.read(ups)), "ez.toml", u.e2(only, here, ledger, listing,
                       replies, ups,
-                      ok, u.rb0(only, here, ledger, listing, replies, ups, ok)), {==}, {==}))
+                      ok, u.rb0(only, here, ledger, listing, replies, ups, ok, rb)), {==}, {==}))
 
-def Laws.reupgrade_writes_only_lock(w, p, u, ok, ev, ne):
+def Laws.reupgrade_writes_only_lock(w, p, u, ok, ev, ne, rb):
   match w:
     case W.World{args, +ledger, +listing, +replies, +ups}:
       match args:
@@ -15859,7 +14779,7 @@ def Laws.reupgrade_writes_only_lock(w, p, u, ok, ev, ne):
                     W.parsed(ledger), ups)), W.replies.of(Up.next(only, W.parsed(ledger), ups), replies)),
                   Up.next.model(Up.next(only, W.parsed(ledger), ups)), Laws.ig.left(Up.next.edits(Up.next(only,
                     W.parsed(ledger), ups)), Laws.ig.read(ups)), p, u.e2(only, here, ledger, listing, replies,
-                      ups, ok, u.rb0(only, here, ledger, listing, replies, ups, ok)),
+                      ups, ok, u.rb0(only, here, ledger, listing, replies, ups, ok, rb)),
                   edits_nil(gi.of(Up.next.model(Up.next(only, W.parsed(ledger), ups)),
                     Laws.ig.left(Up.next.edits(Up.next(only, W.parsed(ledger), ups)), Laws.ig.read(ups))),
                     or_not_true(Str.clear.all(I.vended(Laws.ledger.deps(Up.next.model(Up.next(only, W.parsed(ledger),
@@ -15932,7 +14852,7 @@ def u.fresh(only, here, ledger, listing, replies, ups, ok, rb):
       fresh.all_after(W.next.origins(Up.next(only, W.parsed(ledger), ups)), W.next.hub(Up.next(only, W.parsed(ledger),
         ups)), rs1)))
 
-def Laws.reupgrade_lays_nothing(w, u, ok):
+def Laws.reupgrade_lays_nothing(w, u, ok, rb):
   match w:
     case W.World{args, +ledger, +listing, +replies, +ups}:
       match args:
@@ -15943,7 +14863,7 @@ def Laws.reupgrade_lays_nothing(w, u, ok):
                 ups})) == [] : List<&2, String>}, u)
             case True{}:
               u.fresh(only, here, ledger, listing, replies, ups, ok,
-                u.rb0(only, here, ledger, listing, replies, ups, ok))
+                u.rb0(only, here, ledger, listing, replies, ups, ok, rb))
 
 # No ledger reads as a `Bad`, which a plain lock takes as it is and an
 # upgrade leaves as it is, and `need.why` refuses it.
@@ -18221,21 +17141,6 @@ def Laws.lock_origins_skip_tools(_s, _n, _e, _b, _h, _hpa, _hpv, ds, _ts, g):
 def Laws.upgrade_origins_skip_tools(_nx, _n, _e, _b, _h, _hpa, _hpv, ds, _ts, g):
   %g : {L.ledger.read(_) == L.ledger.origins(ds) : List<&2, L.Origin>}
   {==}
-
-# An upgrade that does not refuse leaves the ledger `after.up.laid` says,
-# which reads back as the model (`u.rb0`).
-def Laws.upgrade_reads_back(w, u, ok):
-  match w:
-    case W.World{args, +ledger, +listing, +replies, +ups}:
-      match args:
-        case W.Args{up, +only, +here}:
-          match up:
-            case False{}:
-              Eq.bit.absurd(&2, {W.parsed(W.ledger.of(Laws.after(W.World{W.Args{False{}, only, here}, ledger,
-                listing, replies, ups}))) == P.ledger.next(W.World{W.Args{False{}, only, here}, ledger, listing,
-                  replies, ups}) : M.Read}, u)
-            case True{}:
-              u.rb0(only, here, ledger, listing, replies, ups, ok)
 
 def Laws.git_named_without_license(hash, manifest, ss, unnamed):
   %unnamed : {W.git.rule(_, hash, manifest, ss)

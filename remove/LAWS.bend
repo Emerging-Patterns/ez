@@ -6,6 +6,7 @@ import Base
 import ./plan.bend as RP
 import ../lock/plan.bend as P
 import ../manifest/manifest.bend as M
+import ../manifest/LAWS.bend as ML
 import ../manifest/render.bend as Rend
 import ../manifest/ignore.bend as I
 
@@ -138,4 +139,5 @@ law remove_ledger_reads_back:
   for +ok: {RP.refuses(RP.World{name, Some{s}, ignore}) == False{} : Bool}
   for put: {P.put.plan(RP.plan(RP.World{name, Some{s}, ignore}), "ez.toml") == P.Put{text}
     : P.Wrote}
+  for rb: ML.ReadsBack()
   {M.parse(text) == M.Good{Rend.remove(m, name)} : M.Read}

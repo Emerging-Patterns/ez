@@ -33,10 +33,13 @@ trap 'rm -rf "$tmp" "$stage"' EXIT
 trap 'exit 1' INT TERM
 
 # the lock, flattened: `<hash> src <key> <value>` for each source key and
-# `<hash> file <path> <sum>` for each file
+# `<hash> file <path> <sum>` for each file. A package's tables are headed
+# `[packages.0x<hash>.source]`, or `[packages."0x<hash>".source]` in a lock
+# written before ez used eztoml 0.4; the tables a dotted header implies
+# (`[packages]`, `[packages.0x<hash>]`) hold no key, and are passed over.
 awk '
-  /^\[packages\."0x[0-9a-f]+"\.(source|files)\]$/ {
-    split($0, p, "\""); h = p[2]
+  /^\[packages\."?0x[0-9a-f]+"?\.(source|files)\]$/ {
+    match($0, /0x[0-9a-f]+/); h = substr($0, RSTART, RLENGTH)
     t = ($0 ~ /\.source\]$/) ? "src" : "file"
     next
   }

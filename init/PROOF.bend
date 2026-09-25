@@ -208,9 +208,10 @@ law new_reads:
   for +lb: Maybe<&2, String>
   for +text: String
   for put: {P.put.plan(IP.plan.new(ok, name, at, desc, ig, mn, lb), "ez.toml") == P.Put{text} : P.Wrote}
+  for rb: ML.ReadsBack()
   {M.parse(text) == M.Good{IP.model(name, at)} : M.Read}
 
-def new_reads(ok, name, at, desc, eok, ig, mn, lb, text, put):
+def new_reads(ok, name, at, desc, eok, ig, mn, lb, text, put, rb):
   match ok:
     case False{}:
       Eq.bit.absurd(&2, {M.parse(text) == M.Good{IP.model(name, at)} : M.Read},
@@ -228,19 +229,19 @@ def new_reads(ok, name, at, desc, eok, ig, mn, lb, text, put):
         put)
       +t = Equal.cong(P.Wrote, String, w => wrote.text(w), P.Put{IP.fresh(name, at)}, P.Put{text}, p)
       %t : {M.parse(_) == M.Good{IP.model(name, at)} : M.Read}
-      ML.ledger_reads_back(IP.model(name, at),
+      rb(IP.model(name, at),
         Eq.and.left(Rend.renderable(IP.model(name, at)), Bool.not(B.has.nl(IP.header(name, desc))), eok))
 
 # A ledger that is there leaves ez.toml as it was; one that is not is the
 # ledger the plan made, which it writes only once the project fits.
-def Laws.init_ledger_reads_back(n, e, d, led, ig, mn, lb, text, put):
+def Laws.init_ledger_reads_back(n, e, d, led, ig, mn, lb, text, put, rb):
   match led:
     case Some{_s}:
       Eq.bit.absurd(&2, {M.parse(text) == M.Good{IP.model(IP.name.or(n), IP.entry.or(e))} : M.Read},
         kept_not_put(text, put))
     case None{}:
       new_reads(IP.fits(IP.name.or(n), IP.entry.or(e), d),
-        IP.name.or(n), IP.entry.or(e), d, {==}, ig, mn, lb, text, put)
+        IP.name.or(n), IP.entry.or(e), d, {==}, ig, mn, lb, text, put, rb)
 
 def Laws.init_publishes_by_hash(_n, _e):
   {==}

@@ -264,7 +264,7 @@ def has_ok(h, _m, _name, _ignore, ok):
 
 # A remove that does not refuse writes `Rend.remove`'s ledger, which it made
 # sure is renderable, so the manifest's round trip reads it back.
-def Laws.remove_ledger_reads_back(name, s, ignore, m, text, good, ok, put):
+def Laws.remove_ledger_reads_back(name, s, ignore, m, text, good, ok, put, rb):
   +ok2 = Equal.trans(Bool,
     RP.refuses.plan(RP.plan.read(M.Good{m}, name, ignore)),
     RP.refuses.plan(RP.plan.read(M.parse(s), name, ignore)),
@@ -283,4 +283,4 @@ def Laws.remove_ledger_reads_back(name, s, ignore, m, text, good, ok, put):
   +t = Equal.cong(P.Wrote, String, w => wrote.text(w), P.Put{Rend.show(Rend.remove(m, name))},
     P.Put{text}, p)
   %t : {M.parse(_) == M.Good{Rend.remove(m, name)} : M.Read}
-  ML.ledger_reads_back(Rend.remove(m, name), er)
+  rb(Rend.remove(m, name), er)

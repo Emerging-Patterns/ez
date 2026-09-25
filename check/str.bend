@@ -668,9 +668,8 @@ def split_join(p, ps, c, e):
   split_join.go(ps, p, c, Eq.and.left(clear(p, c), clear.all(ps, c), e),
     Eq.and.right(clear(p, c), clear.all(ps, c), e))
 
-# Orders, lists of any data, and more string facts. The lock's round trip
-# (lock/PROOF.bend, through check/toml.bend) needs them; none is about the
-# lock.
+# Orders, lists of any data, and more string facts, for the lock's proofs
+# (lock/PROOF.bend); none is about the lock.
 
 # the type that is empty exactly where a comparison answered LT
 def cmp.lt_emp(ans: Cmp) -> Type:

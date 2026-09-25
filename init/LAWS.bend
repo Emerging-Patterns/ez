@@ -6,6 +6,7 @@ import Base
 import ./plan.bend as IP
 import ../lock/plan.bend as P
 import ../manifest/manifest.bend as M
+import ../manifest/LAWS.bend as ML
 import ../pub/blurb.bend as B
 
 # LAW: `ez init` that refuses writes nothing: not ez.toml, not `.gitignore`,
@@ -52,6 +53,7 @@ law init_ledger_reads_back:
   for lb: Maybe<&2, String>
   for +text: String
   for put: {P.put.plan(IP.plan(IP.World{n, e, d, led, ig, mn, lb}), "ez.toml") == P.Put{text} : P.Wrote}
+  for rb: ML.ReadsBack()
   {M.parse(text) == M.Good{IP.model(IP.name.or(n), IP.entry.or(e))} : M.Read}
 
 # LAW: the ledger `ez init` makes names no `publish-as` and no `version`,
