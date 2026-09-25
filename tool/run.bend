@@ -50,10 +50,10 @@ def line0(ls: List<&2, String>) -> String:
 # shape of the line it wants, never by where that line stands.
 
 # the line found, or the walk gone on past a line of another shape
-def said.next(hit: Bool, +h: String, go: Unit -> String) -> String:
+def said.next(hit: Bool, +found: String, go: Unit -> String) -> String:
   match hit:
     case True{}:
-      h
+      found
     case False{}:
       go(Unit{})
 
@@ -77,13 +77,21 @@ def said.abs(ls: List<&2, String>) -> String:
     case +h <> t:
       said.next(line.abs(h), h, _u => said.abs(t))
 
+# what a command that succeeded answered, read only then; "" when it failed
+def said.when(ok: Bool, read: Unit -> String) -> String:
+  match ok:
+    case True{}:
+      read(Unit{})
+    case False{}:
+      ""
+
 # the commit `git rev-parse HEAD` answered, or "" when it failed
 def said.head(+out: String) -> String:
-  Bool.pick(String, R.ok(out), said.rev(String.lines(R.text(out))), "")
+  said.when(R.ok(out), _u => said.rev(String.lines(R.text(out))))
 
 # the top `git rev-parse --show-toplevel` answered, or "" when it failed
 def said.top(+out: String) -> String:
-  Bool.pick(String, R.ok(out), said.abs(String.lines(R.text(out))), "")
+  said.when(R.ok(out), _u => said.abs(String.lines(R.text(out))))
 
 # what git says of a path that has a real path: the top of its checkout,
 # HEAD, and what `git status` names, untracked files included whatever the
