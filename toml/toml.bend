@@ -265,12 +265,14 @@ def head.of(segs: List<&2, String>) -> String:
 # a table's section, when it holds a pair or no table. A table that holds
 # only tables is the parent a dotted header implies, which ez never writes a
 # pair into; old ledgers and locks name no such table, so it is no section.
+# (segs arrive innermost first, as `tables` builds them; the header reads
+# them outermost first)
 def sect.put(skip: Bool, +ps: List<&2, Kv>, +segs: List<&2, String>) -> List<&2, Sect>:
   match skip:
     case True{}:
       []
     case False{}:
-      [Sect{head.of(segs), ps}]
+      [Sect{head.of(List.reverse(&2, String, segs)), ps}]
 
 def sect.keep(+ps: List<&2, Kv>, parent: Bool, +segs: List<&2, String>) -> List<&2, Sect>:
   sect.put(Bool.and(List.is_empty(&2, Kv, ps), parent), ps, segs)
@@ -280,13 +282,14 @@ def table.sects(+segs: List<&2, String>, +sub: List<&2, E.Val>, inner: List<&2, 
   List.append(&2, Sect, sect.keep(pairs.of(sub), has.table(sub), segs), inner)
 
 # the sections of every table among a table's rows, in document order: each
-# table's own section, then the tables in it, then the tables after it
+# table's own section, then the tables in it, then the tables after it. The
+# path to the table is kept innermost first, so a level prepends its name.
 def tables(rows: List<&2, E.Val>, +segs: List<&2, String>) -> List<&2, Sect>:
   match rows:
     case []:
       []
     case E.VPair{name, E.VHead{_path, +sub}} <> tl:
-      +at = List.append(&2, String, segs, [name])
+      +at : List<&2, String> = name <> segs
       List.append(&2, Sect, table.sects(at, sub, tables(sub, at)), tables(tl, segs))
     case _hd <> tl:
       tables(tl, segs)
