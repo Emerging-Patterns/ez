@@ -48,6 +48,22 @@ nix profile install github:Emerging-Patterns/ez
 That install provides `ez` and `ezx`. `nix develop` gives a shell with bend,
 git, openssl and `BEND_LIB` already set.
 
+### The ledger library, from the hub
+
+ez's ledger library, which reads and writes `ez.toml`, is on the Bend hub.
+At v1.2.0 it is `0xb618c7a3b7cc335880c0ff4267b5bd98`, and any Bend program
+can import it with nothing but `bend`:
+
+```bend
+import 0xb618c7a3b7cc335880c0ff4267b5bd98/ledger/manifest.bend as Ledger
+
+def main() -> String:
+  Ledger.show(Ledger.parse("[package]\nname = \"app\"\nentry = \"main.bend\"\n"))
+```
+
+`bend` fetches it from the hub on first run. The `ez` command itself is
+built from a clone, as above.
+
 ## Quickstart
 
 ```bash
