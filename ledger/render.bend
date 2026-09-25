@@ -1,4 +1,4 @@
-# manifest/render: a ledger written back out as ez.toml, and the two edits the
+# ledger/render: a ledger written back out as ez.toml, and the two edits the
 # command line makes to it. Rendering is from the model, so the file it writes
 # is the file it would read back.
 import Base

@@ -31,9 +31,9 @@ import ./world.bend as A
 import ../lock/plan.bend as P
 import ../lock/world.bend as W
 import ../lock/lock.bend as L
-import ../manifest/manifest.bend as M
-import ../manifest/render.bend as Rend
-import ../manifest/ignore.bend as I
+import ../ledger/manifest.bend as M
+import ../ledger/render.bend as Rend
+import ../ledger/ignore.bend as I
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../git/git.bend as Git

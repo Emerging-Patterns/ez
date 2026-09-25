@@ -12,7 +12,7 @@ import ./gate.bend as G
 import ./clock.bend as Clock
 import ../ez/target.bend as Tgt
 import ./key.bend as K
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../ez/pin.bend as Pin
 import ../ez/env.bend as Env
 import ../pkg/path.bend as P

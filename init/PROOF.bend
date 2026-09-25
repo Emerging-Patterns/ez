@@ -2,10 +2,10 @@
 import Base
 import ./plan.bend as IP
 import ../lock/plan.bend as P
-import ../manifest/manifest.bend as M
-import ../manifest/render.bend as Rend
-import ../manifest/LAWS.bend as ML
-import ../manifest/PROOF.bend as MP
+import ../ledger/manifest.bend as M
+import ../ledger/render.bend as Rend
+import ../ledger/LAWS.bend as ML
+import ../ledger/PROOF.bend as MP
 import ../pub/blurb.bend as B
 import ../pub/LAWS.bend as PL
 import ../pub/PROOF.bend as PPr

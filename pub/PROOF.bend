@@ -15,7 +15,7 @@ import ../pkg/pkg.bend as K
 import ./blurb.bend as B
 import ../git/git.bend as G
 import ../check/eq.bend as Eq
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../lock/lock.bend as L
 import ./LAWS.bend as Laws
 

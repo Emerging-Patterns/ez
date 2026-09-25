@@ -23,8 +23,8 @@
 # A4)" in docs/rfc/ez-add-planner.md.
 import Base
 import ../lock/plan.bend as P
-import ../manifest/manifest.bend as M
-import ../manifest/render.bend as Rend
+import ../ledger/manifest.bend as M
+import ../ledger/render.bend as Rend
 import ../pub/blurb.bend as B
 
 # what `ez init` reads: the name, entry file and description asked for (""

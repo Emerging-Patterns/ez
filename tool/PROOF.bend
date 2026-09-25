@@ -15,7 +15,7 @@ import ./world.bend as TW
 import ./plan.bend as TP
 import ../lock/plan.bend as P
 import ../lock/up.bend as Up
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../git/git.bend as Git
 import ../pkg/path.bend as Path
 import ../ez/target.bend as Tgt

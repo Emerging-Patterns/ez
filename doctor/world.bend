@@ -17,7 +17,7 @@
 # `$BEND_LIB/names/<nv>`, as it is.
 import Base
 import ../lock/world.bend as W
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 
 # a question the planner asks
 type Ask is Data:

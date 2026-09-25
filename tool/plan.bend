@@ -38,7 +38,7 @@ import Base
 import ./world.bend as TW
 import ../lock/plan.bend as P
 import ../lock/up.bend as Up
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../toml/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path

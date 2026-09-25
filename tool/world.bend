@@ -16,7 +16,7 @@
 # Everything else here is a projection: what a World says, read one way.
 import Base
 import ../lock/up.bend as Up
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../pkg/path.bend as P
 
 # what the command does with the binary once it is current: `Run` starts it

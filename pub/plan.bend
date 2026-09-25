@@ -24,7 +24,7 @@
 import Base
 import ../lock/plan.bend as P
 import ../tool/world.bend as TW
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../git/git.bend as G

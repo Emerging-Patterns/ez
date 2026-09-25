@@ -22,10 +22,10 @@ import ../lock/up.bend as Up
 import ../lock/world.bend as W
 import ../lock/lock.bend as L
 import ../hub/hub.bend as Web
-import ../manifest/manifest.bend as M
-import ../manifest/LAWS.bend as ML
-import ../manifest/render.bend as Rend
-import ../manifest/ignore.bend as I
+import ../ledger/manifest.bend as M
+import ../ledger/LAWS.bend as ML
+import ../ledger/render.bend as Rend
+import ../ledger/ignore.bend as I
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../git/git.bend as Git

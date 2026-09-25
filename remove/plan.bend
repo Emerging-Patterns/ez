@@ -17,9 +17,9 @@
 # A4)" in docs/rfc/ez-add-planner.md.
 import Base
 import ../lock/plan.bend as P
-import ../manifest/manifest.bend as M
-import ../manifest/render.bend as Rend
-import ../manifest/ignore.bend as I
+import ../ledger/manifest.bend as M
+import ../ledger/render.bend as Rend
+import ../ledger/ignore.bend as I
 
 # what `ez remove` reads: the name it was given, the ledger's text or None,
 # and the ignore file's text, "" when there is none

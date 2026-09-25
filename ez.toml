@@ -1,6 +1,6 @@
 [package]
 name = "ez"
-entry = "manifest/manifest.bend"
+entry = "ledger/manifest.bend"
 bin = "ez/main.bend"
 [deps]
 [deps.sha256]

@@ -13,7 +13,7 @@
 # lock/run.bend's. `ez fetch` reads a lock back in fetch/plan.bend.
 import Base
 import ../toml/toml.bend as T
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 
 # where a package's bytes come from. A hub package needs nothing else; a git

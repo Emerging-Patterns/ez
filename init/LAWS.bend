@@ -5,8 +5,8 @@
 import Base
 import ./plan.bend as IP
 import ../lock/plan.bend as P
-import ../manifest/manifest.bend as M
-import ../manifest/LAWS.bend as ML
+import ../ledger/manifest.bend as M
+import ../ledger/LAWS.bend as ML
 import ../pub/blurb.bend as B
 
 # LAW: `ez init` that refuses writes nothing: not ez.toml, not `.gitignore`,

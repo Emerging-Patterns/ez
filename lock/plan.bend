@@ -34,7 +34,7 @@ import Base
 import ./world.bend as W
 import ./up.bend as Up
 import ./lock.bend as L
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../ez/pin.bend as Pin

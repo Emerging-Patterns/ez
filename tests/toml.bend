@@ -6,8 +6,8 @@
 # document and ez's sections, which no law covers (EZ-TRUST-8).
 import Base
 import ../toml/toml.bend as T
-import ../manifest/manifest.bend as M
-import ../manifest/render.bend as Rend
+import ../ledger/manifest.bend as M
+import ../ledger/render.bend as Rend
 import ../check/kit.bend as Check
 
 # a ledger as ez wrote it before: quoted strings, a bare `vendor = true`, and

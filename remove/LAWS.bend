@@ -5,10 +5,10 @@
 import Base
 import ./plan.bend as RP
 import ../lock/plan.bend as P
-import ../manifest/manifest.bend as M
-import ../manifest/LAWS.bend as ML
-import ../manifest/render.bend as Rend
-import ../manifest/ignore.bend as I
+import ../ledger/manifest.bend as M
+import ../ledger/LAWS.bend as ML
+import ../ledger/render.bend as Rend
+import ../ledger/ignore.bend as I
 
 # LAW: `ez remove` that refuses writes, lays and removes nothing: not
 # ez.toml, not `.gitignore`, and no committed tree. Its plan has no effect at

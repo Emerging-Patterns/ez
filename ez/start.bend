@@ -6,7 +6,7 @@
 # project's BEND_LIB in front of the line (`Env.line`), runs it and exits;
 # that it does so faithfully is EZ-TRUST-2.
 import Base
-import ../manifest/manifest.bend as M
+import ../ledger/manifest.bend as M
 import ../ez/args.bend as Args
 
 # which of the three commands is asking, with what it was told: where a
