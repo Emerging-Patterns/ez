@@ -17,7 +17,7 @@ import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
 import ../sha/nar.bend as Nar
-import ../ez/say.bend as Say
+import ../share/say.bend as Say
 
 # one `<sha>\t<name>` row of what `git ls-remote` printed
 type Row is Data:

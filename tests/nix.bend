@@ -5,7 +5,7 @@
 import Base
 import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
-import ../sha/sha.bend as Sha
+import ../share/sha.bend as Sha
 import ../ez/quiet.bend as Q
 import ../check/kit.bend as Check
 import ../check/world.bend as W

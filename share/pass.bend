@@ -1,4 +1,4 @@
-# ez/pass: a program run on ez's own stdin, stdout and stderr, as `cargo run`
+# share/pass: a program run on ez's own stdin, stdout and stderr, as `cargo run`
 # runs one. Every other program ez starts goes through snap's `exec`, which
 # hands the child /dev/null for stdin, holds what it prints until it exits,
 # and answers both at once; that is what a command that reads the answer

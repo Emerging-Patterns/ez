@@ -28,9 +28,9 @@ import ../git/git.bend as Git
 import ../fetch/run.bend as FetchRun
 import ../pkg/path.bend as P
 import ../run/bend.bend as Bend
-import ../ez/cap.bend as Cap
-import ../ez/say.bend as Say
-import ../ez/pass.bend as Pass
+import ../share/cap.bend as Cap
+import ../share/say.bend as Say
+import ../share/pass.bend as Pass
 import ./world.bend as TW
 import ./plan.bend as TP
 

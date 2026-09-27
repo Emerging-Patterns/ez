@@ -25,7 +25,7 @@ import ../pkg/path.bend as Path
 import ../git/git.bend as Git
 import ../ez/target.bend as Tgt
 import ../ez/named.bend as Named
-import ../sha/sha.bend as Sha
+import ../share/sha.bend as Sha
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
 import ../pkg/PROOF.bend as Pk
@@ -309,7 +309,7 @@ def wf(k: K.Walked) -> List<&2, K.Source>:
     case K.Refused{_why}:
       []
 
-def ws(k: K.Walked) -> List<&2, K.File>:
+def ws(k: K.Walked) -> List<&2, K.Item>:
   match k:
     case K.Walked{_h, _r, _fs, ss}:
       ss
@@ -438,7 +438,7 @@ law edits_of:
   for +h: String
   for +a: String
   for fs: List<&2, K.Source>
-  for ss: List<&2, K.File>
+  for ss: List<&2, K.Item>
   for +m: M.Manifest
   for +w: A.World
   {P.put.in(AP.effects.of(d, h, a, fs, ss, m, w), "ez.toml")
@@ -522,7 +522,7 @@ law syncs_of:
   for +h: String
   for +a: String
   for fs: List<&2, K.Source>
-  for ss: List<&2, K.File>
+  for ss: List<&2, K.Item>
   for +m: M.Manifest
   for +w: A.World
   {AP.after(P.put.in(AP.effects.of(d, h, a, fs, ss, m, w), ".gitignore"), A.ignore(w))
@@ -602,7 +602,7 @@ law says_of:
   for +h: String
   for +a: String
   for fs: List<&2, K.Source>
-  for ss: List<&2, K.File>
+  for ss: List<&2, K.Item>
   for +m: M.Manifest
   for +w: A.World
   {AP.last.go(P.said.in(AP.effects.of(d, h, a, fs, ss, m, w)), "") == Git.import.line(h, a)
@@ -894,7 +894,7 @@ law fixed_judge:
 def fixed_judge(ok, _bad, root, pre, out):
   match ok:
     case True{}:
-      %Equal.sym(List<&2, K.File>, K.placed(pre, K.hit.sums(out)),
+      %Equal.sym(List<&2, K.Item>, K.placed(pre, K.hit.sums(out)),
         K.laid.sums(K.laid(pre, out)), Pk.placed_is_laid(pre, out))
         : {K.Walked{K.hash_of(K.files_of(K.laid.sums(K.laid(pre, out)))), root, K.laid(pre, out),
           K.files_of(K.laid.sums(K.laid(pre, out)))}
@@ -1048,19 +1048,19 @@ def last_snoc(xs, at, text):
 # LAW: the found files as laid, weighed, are the walk's laid files weighed
 law weigh_srcs:
   for fs: List<&2, K.Source>
-  {W.weighs(AP.srcs(fs)) == K.laid.sums(fs) : List<&2, K.File>}
+  {W.weighs(AP.srcs(fs)) == K.laid.sums(fs) : List<&2, K.Item>}
 
 def weigh_srcs(fs):
   match fs:
     case []:
       {==}
     case K.Source{at, text} <> t:
-      Equal.cong(List<&2, K.File>, List<&2, K.File>, ys => K.File{at, Sha.hex(text)} <> ys,
+      Equal.cong(List<&2, K.Item>, List<&2, K.Item>, ys => K.Item{at, Sha.hex(text)} <> ys,
         W.weighs(AP.srcs(t)), K.laid.sums(t), weigh_srcs(t))
 
 # a package's file list, weighed from its texts, and the files a `Lay`
 # writes for it
-def lsum(fs: List<&2, K.Source>) -> List<&2, K.File>:
+def lsum(fs: List<&2, K.Source>) -> List<&2, K.Item>:
   K.files_of(K.laid.sums(fs))
 
 def lh(fs: List<&2, K.Source>) -> String:
@@ -1081,7 +1081,7 @@ def lay_canon(fs):
     : {Bool.and(String.eq(lh(fs), K.hash_of(K.files_of(W.weighs(_)))),
       String.eq(P.last(lay.files(fs)), K.manifest_of(K.files_of(W.weighs(_))))) == True{}
       : Bool}
-  %Equal.sym(List<&2, K.File>, W.weighs(AP.srcs(fs)), K.laid.sums(fs), weigh_srcs(fs))
+  %Equal.sym(List<&2, K.Item>, W.weighs(AP.srcs(fs)), K.laid.sums(fs), weigh_srcs(fs))
     : {Bool.and(String.eq(lh(fs), K.hash_of(K.files_of(_))),
       String.eq(P.last(lay.files(fs)), K.manifest_of(K.files_of(_)))) == True{} : Bool}
   %Equal.sym(String, P.last(lay.files(fs)), K.manifest_of(lsum(fs)),
@@ -1451,7 +1451,7 @@ law entry_fit:
   for +h: String
   for +r: String
   for fs: List<&2, K.Source>
-  for ss: List<&2, K.File>
+  for ss: List<&2, K.Item>
   for +w: A.World
   for s: {win(AP.outcome.entry(g, K.Walked{h, r, fs, ss}, w)) == True{} : Bool}
   {Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), AP.dep.of(h, r, w))) == True{} : Bool}
@@ -2282,7 +2282,7 @@ def lnv(+hash: String, v: W.Verdict) -> Bool:
 law lnv.laid:
   for ok: Bool
   for +hash: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Item>
   for +ss: List<&2, String>
   for e: {String.eq(hash, W.named(W.laid(fs, ss))) == ok : Bool}
   {lnv(hash, W.body.laid(ok, hash, fs, ss)) == True{} : Bool}
@@ -2297,7 +2297,7 @@ def lnv.laid(ok, _hash, _fs, _ss, e):
 law lnv.sums:
   for ok: Bool
   for +hash: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Item>
   for +ss: List<&2, String>
   {lnv(hash, W.body.sums(ok, hash, fs, ss)) == True{} : Bool}
 
@@ -2312,7 +2312,7 @@ law lnv.escape:
   for clean: Bool
   for +bad: String
   for +hash: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Item>
   for +ss: List<&2, String>
   {lnv(hash, W.body.escape.go(clean, bad, hash, fs, ss)) == True{} : Bool}
 

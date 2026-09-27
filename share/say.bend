@@ -1,4 +1,4 @@
-# ez/say: the words a long step says, and a spinner for the wait.
+# share/say: the words a long step says, and a spinner for the wait.
 #
 # A clone, a hub fetch or a native build can sit there for half a minute, and
 # a step that prints nothing looks stopped. The line is printed before the

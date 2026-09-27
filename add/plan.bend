@@ -564,7 +564,7 @@ def effects.of(
   +hash: String,
   +at: String,
   fs: List<&2, K.Source>,
-  ss: List<&2, K.File>,
+  ss: List<&2, K.Item>,
   +manifest: M.Manifest,
   +world: A.World
 ) -> List<&2, P.Effect>:
@@ -790,7 +790,7 @@ def refuses.command(+world: A.World) -> Bool:
 type Next is Data:
   AskGit{asks: List<&2, Up.Ask>}
   AskHub{asks: List<&2, W.Ask>}
-  Done{plan: P.Plan}
+  Ready{plan: P.Plan}
 
 # the git planner's step
 def next.git(st: Step) -> Next:
@@ -798,13 +798,13 @@ def next.git(st: Step) -> Next:
     case Asking{asks}:
       AskGit{asks}
     case Run{pl}:
-      Done{pl}
+      Ready{pl}
 
 # the hub planner's step: its questions, or its plan once there are none
 def next.hub(asks: List<&2, W.Ask>, +world: A.World) -> Next:
   match asks:
     case []:
-      Done{H.plan(world)}
+      Ready{H.plan(world)}
     case h <> t:
       AskHub{h <> t}
 
@@ -826,5 +826,5 @@ def next.asks(nx: Next) -> Bool:
       True{}
     case AskHub{_asks}:
       True{}
-    case Done{_pl}:
+    case Ready{_pl}:
       False{}

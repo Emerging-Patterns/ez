@@ -12,9 +12,9 @@ import Base
 import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
 import ../pkg/pkg.bend as K
-import ../sha/sha.bend as Sha
+import ../share/sha.bend as Sha
 
-# A directory child is a `K.File`: its name in `at` and the NAR serial of its
+# A directory child is a `K.Item`: its name in `at` and the NAR serial of its
 # node in `sum`. That is a package file's shape, a name and the text that
 # stands for it, so the walk sorts children with the same `K.file.sort` a
 # package sorts its files with, and what is proved of that sort is proved of
@@ -72,13 +72,13 @@ def symlink(+target: String) -> String:
     ++ str(Sha.utf8(target)) ++ str(")")
 
 # one directory entry: its name and its node
-def entry(+ent: K.File) -> String:
-  K.File{name, node} = ent
+def entry(+ent: K.Item) -> String:
+  K.Item{name, node} = ent
   str("entry") ++ str("(") ++ str("name") ++ str(Sha.utf8(name))
     ++ str("node") ++ node ++ str(")")
 
 # a directory's entries, in the order given
-def entries(es: List<&2, K.File>) -> String:
+def entries(es: List<&2, K.Item>) -> String:
   match es:
     case []:
       ""
@@ -86,7 +86,7 @@ def entries(es: List<&2, K.File>) -> String:
       entry(h) ++ entries(t)
 
 # a directory's node, its entries in the order given
-def directory(es: List<&2, K.File>) -> String:
+def directory(es: List<&2, K.Item>) -> String:
   str("(") ++ str("type") ++ str("directory") ++ entries(es) ++ str(")")
 
 # a directory's node as NAR writes it: its entries sorted by name, whatever
@@ -94,7 +94,7 @@ def directory(es: List<&2, K.File>) -> String:
 # byte order for the UTF-8 of valid names. Every directory the walk serializes
 # goes through here, so the order `find` printed its names in never reaches
 # the NAR.
-def dir(es: List<&2, K.File>) -> String:
+def dir(es: List<&2, K.Item>) -> String:
   directory(K.file.sort(es))
 
 # a whole NAR: the magic, then the root node
@@ -320,7 +320,7 @@ type Ent is Data:
 # a directory still open: its path from the top, its name, and the entries
 # found in it so far
 type Frame is Data:
-  Frame{at: String, name: String, kids: List<&2, K.File>}
+  Frame{at: String, name: String, kids: List<&2, K.Item>}
 
 # where the build stands: the paths still to place, the directory they are
 # being placed in, and the directories around it
@@ -330,7 +330,7 @@ type State is Data:
 # a step of the build: another state, or the finished node of the top
 type Move is Data:
   Next{st: State}
-  Done{node: String}
+  Built{node: String}
 
 def leaf.of(link: Bool, ex: Bool, +body: String) -> String:
   match link:
@@ -354,9 +354,9 @@ def close(top: Frame, up: List<&2, Frame>, es: List<&2, Ent>) -> Move:
   Frame{_at, +name, kids} = top
   match up:
     case []:
-      Done{dir(kids)}
+      Built{dir(kids)}
     case Frame{pat, pname, pkids} <> rest:
-      Next{State{es, Frame{pat, pname, K.File{name, dir(kids)} <> pkids}, rest}}
+      Next{State{es, Frame{pat, pname, K.Item{name, dir(kids)} <> pkids}, rest}}
 
 # an entry's type, name and path, and an open directory's path
 def ent.kind(entry: Ent) -> String:
@@ -394,7 +394,7 @@ def place(
       Next{State{more, Frame{at, name, []}, top <> up}}
     case False{}:
       Frame{a, n, ks} = top
-      Next{State{more, Frame{a, n, K.File{name, node} <> ks}, up}}
+      Next{State{more, Frame{a, n, K.Item{name, node} <> ks}, up}}
 
 # the next path: placed when it is inside the directory on top, which closes
 # otherwise
@@ -429,7 +429,7 @@ def build.go(fuel: Nat, mv: Move) -> Maybe<&2, String>:
       match mv:
         case Next{st}:
           build.go(f, step(st))
-        case Done{node}:
+        case Built{node}:
           Some{node}
 
 # the node of a directory, from its paths in the order `find` lists them. Each

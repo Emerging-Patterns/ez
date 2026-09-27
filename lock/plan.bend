@@ -37,7 +37,7 @@ import ./lock.bend as L
 import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
-import ../ez/pin.bend as Pin
+import ../share/pin.bend as Pin
 
 # ---------------------------------------------------------------------------
 # the walk
@@ -322,11 +322,11 @@ def src.values(source: L.Src) -> List<&2, String>:
       [url, rev, entry, root, nar, tag]
 
 # every path and sum a package's files write
-def file.values(fs: List<&2, K.File>) -> List<&2, String>:
+def file.values(fs: List<&2, K.Item>) -> List<&2, String>:
   match fs:
     case []:
       []
-    case K.File{at, sum} <> t:
+    case K.Item{at, sum} <> t:
       at <> (sum <> file.values(t))
 
 # every hash, key and value a package writes
@@ -348,11 +348,11 @@ def path.eqless(text: String) -> Bool:
       Bool.and(Bool.not(Char.is_eq(h, '=')), rest)
 
 # whether no file path of a package holds `=`
-def paths.ok(fs: List<&2, K.File>) -> Bool:
+def paths.ok(fs: List<&2, K.Item>) -> Bool:
   match fs:
     case []:
       True{}
-    case K.File{at, _sum} <> t:
+    case K.Item{at, _sum} <> t:
       +rest = paths.ok(t)
       Bool.and(path.eqless(at), rest)
 
@@ -401,11 +401,11 @@ def path.eq.pick(ok: Bool, at: String, rest: String) -> String:
     case False{}:
       at
 
-def path.eq.first(fs: List<&2, K.File>) -> String:
+def path.eq.first(fs: List<&2, K.Item>) -> String:
   match fs:
     case []:
       ""
-    case K.File{+at, _sum} <> t:
+    case K.Item{+at, _sum} <> t:
       path.eq.pick(path.eqless(at), at, path.eq.first(t))
 
 # why a package with such a path cannot be locked, naming it and the path

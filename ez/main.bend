@@ -9,14 +9,14 @@
 # would take the flags meant for ez.
 import Base
 import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
-import ../ez/args.bend as Args
+import ../share/args.bend as Args
 import ./cmd.bend as Cmd
 import ./test.bend as Test
 import ./prove.bend as Prove
 import ../doctor/run.bend as DoctorRun
 import ../tool/run.bend as ToolRun
 import ../tool/world.bend as TW
-import ../ez/say.bend as Say
+import ../share/say.bend as Say
 import ../io/file.bend as F
 import ../ez/line.bend as L
 

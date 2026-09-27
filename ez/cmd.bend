@@ -1,18 +1,18 @@
 # ez/cmd: what each subcommand does. Everything that touches the network or the
 # file system goes through a process effect, because bend links no TLS and
 # Base has neither mkdir nor readdir: snap's `exec` for a program whose answer
-# ez reads, and `ez/pass.bend` for the one `ez run` hands the terminal to.
+# ez reads, and `share/pass.bend` for the one `ez run` hands the terminal to.
 import Base
 import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../lock/plan.bend as P
-import ../ez/env.bend as Env
-import ../ez/cap.bend as Cap
-import ../ez/args.bend as Args
+import ../share/env.bend as Env
+import ../share/cap.bend as Cap
+import ../share/args.bend as Args
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
-import ../ez/pass.bend as Pass
+import ../share/pass.bend as Pass
 import ../init/run.bend as InitRun
 import ../remove/run.bend as RemoveRun
 import ../add/run.bend as AddRun
@@ -47,7 +47,7 @@ def report.capped(+why: String, +out: String) -> IO(Unit):
     Run.end(E.ran(out))
 
 # `ez check` and `ez run` are not capped, and `ez build` is. The wall
-# `ez/cap.bend` exists for is bend's C backend: emitting the C for a large
+# `share/cap.bend` exists for is bend's C backend: emitting the C for a large
 # program peaked at 18.8 GB here and an uncapped one reached 35 GB. `ez check`
 # emits JS and `ez run` interprets, so neither reaches that backend; and what
 # `ez run` spends after that is the user's own program spending it, which is

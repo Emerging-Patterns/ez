@@ -40,7 +40,7 @@ def loop.step(st: AP.Next, +lib: String, world: A.World, go: A.World -> IO(Unit)
       do IO<Unit>:
         rs : List<&2, W.Reply> <- Run.answer.all(lib, asks)
         go(more.hub(world, rs))
-    case AP.Done{pl}:
+    case AP.Ready{pl}:
       Run.exec.plan(lib, pl)
 
 # the loop, under fuel. Every round adds an answer, since the planner never

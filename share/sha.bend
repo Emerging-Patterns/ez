@@ -1,4 +1,4 @@
-# sha/sha: the sha256 a package hash is built from. The digest itself comes from
+# share/sha: the sha256 a package hash is built from. The digest itself comes from
 # noah-emp/bend-sha256, which proves its output equal to an executable FIPS
 # 180-4 specification; this file is only the string-in, hex-out shape ez uses.
 # The dependency hashes packed big-endian words and returns eight of them, or
@@ -86,44 +86,44 @@ def raw(+text: String) -> String:
 def utf8.byte(+code: U32) -> Char:
   Chr{(code .&. 255 : U32)}
 
-def utf8.1(+code: U32) -> String:
+def utf8.one(+code: U32) -> String:
   SCon{utf8.byte(code), SNil{}}
 
-def utf8.2(+code: U32) -> String:
+def utf8.two(+code: U32) -> String:
   SCon{utf8.byte((192 .|. U32.shrn(code, 6n) : U32)),
     SCon{utf8.byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}
 
-def utf8.3(+code: U32) -> String:
+def utf8.three(+code: U32) -> String:
   SCon{utf8.byte((224 .|. U32.shrn(code, 12n) : U32)),
     SCon{utf8.byte((128 .|. (U32.shrn(code, 6n) .&. 63 : U32) : U32)),
       SCon{utf8.byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}}
 
-def utf8.4(+code: U32) -> String:
+def utf8.four(+code: U32) -> String:
   SCon{utf8.byte((240 .|. U32.shrn(code, 18n) : U32)),
     SCon{utf8.byte((128 .|. (U32.shrn(code, 12n) .&. 63 : U32) : U32)),
       SCon{utf8.byte((128 .|. (U32.shrn(code, 6n) .&. 63 : U32) : U32)),
         SCon{utf8.byte((128 .|. (code .&. 63 : U32) : U32)), SNil{}}}}}
 
-def utf8.put.3(three: Bool, +code: U32) -> String:
+def utf8.put.three(three: Bool, +code: U32) -> String:
   match three:
     case True{}:
-      utf8.3(code)
+      utf8.three(code)
     case False{}:
-      utf8.4(code)
+      utf8.four(code)
 
-def utf8.put.2(two: Bool, +code: U32) -> String:
+def utf8.put.two(two: Bool, +code: U32) -> String:
   match two:
     case True{}:
-      utf8.2(code)
+      utf8.two(code)
     case False{}:
-      utf8.put.3(U32.is_lt(code, 65536), code)
+      utf8.put.three(U32.is_lt(code, 65536), code)
 
 def utf8.put.ascii(ascii: Bool, +code: U32) -> String:
   match ascii:
     case True{}:
-      utf8.1(code)
+      utf8.one(code)
     case False{}:
-      utf8.put.2(U32.is_lt(code, 2048), code)
+      utf8.put.two(U32.is_lt(code, 2048), code)
 
 def utf8.put(+code: U32) -> String:
   utf8.put.ascii(U32.is_lt(code, 128), code)

@@ -17,7 +17,7 @@ import Base
 import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../run/bend.bend as Bend
 import ../io/file.bend as F
-import ../ez/args.bend as Args
+import ../share/args.bend as Args
 import ../lock/run.bend as Run
 import ../lock/world.bend as W
 import ../lock/lock.bend as L

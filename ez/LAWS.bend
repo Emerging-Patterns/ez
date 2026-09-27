@@ -13,8 +13,8 @@ import ./clock.bend as Clock
 import ../ez/target.bend as Tgt
 import ./key.bend as K
 import ../ledger/manifest.bend as M
-import ../ez/pin.bend as Pin
-import ../ez/env.bend as Env
+import ../share/pin.bend as Pin
+import ../share/env.bend as Env
 import ../pkg/path.bend as P
 import ../ez/named.bend as Named
 import ../pkg/pkg.bend as Pkg
@@ -207,7 +207,7 @@ law key_rev_differs:
   for +f1: String
   for +b1: String
   for e: {False{} == String.eq(r0, r1) : Bool}
-  {K.reuse(K.Key{r0, f0, b0}, K.Key{r1, f1, b1}) == False{} : Bool}
+  {K.reuse(K.Stamp{r0, f0, b0}, K.Stamp{r1, f1, b1}) == False{} : Bool}
 
 # LAW: a binary built from another file is built again, so a pin's `bin` or
 # `entry` and a free run of the same commit do not share one
@@ -220,7 +220,7 @@ law key_file_differs:
   for +f1: String
   for +b1: String
   for e: {False{} == String.eq(f0, f1) : Bool}
-  {K.reuse(K.Key{r0, f0, b0}, K.Key{r1, f1, b1}) == False{} : Bool}
+  {K.reuse(K.Stamp{r0, f0, b0}, K.Stamp{r1, f1, b1}) == False{} : Bool}
 
 # LAW: a binary another bend built is built again
 # EZ-TOOL-2
@@ -232,15 +232,15 @@ law key_bend_differs:
   for +f1: String
   for +b1: String
   for e: {False{} == String.eq(b0, b1) : Bool}
-  {K.reuse(K.Key{r0, f0, b0}, K.Key{r1, f1, b1}) == False{} : Bool}
+  {K.reuse(K.Stamp{r0, f0, b0}, K.Stamp{r1, f1, b1}) == False{} : Bool}
 
 # LAW: with no commit, whatever was recorded, the binary is built again
 # EZ-TOOL-2
 law key_no_rev:
-  for was: K.Key
+  for was: K.Stamp
   for +f: String
   for +b: String
-  {K.reuse(was, K.Key{"", f, b}) == False{} : Bool}
+  {K.reuse(was, K.Stamp{"", f, b}) == False{} : Bool}
 
 # LAW: a record that did not read, such as one written before the file and
 # the bend were recorded, reuses nothing
@@ -249,7 +249,7 @@ law key_none_misses:
   for +f: String
   for +b: String
   for e: {False{} == String.is_empty(r) : Bool}
-  {K.reuse(K.none(), K.Key{r, f, b}) == False{} : Bool}
+  {K.reuse(K.none(), K.Stamp{r, f, b}) == False{} : Bool}
 
 # LAW: the same commit, file and bend reuse the binary
 # EZ-TOOL-2
@@ -258,7 +258,7 @@ law key_same_reuses:
   for +f: String
   for +b: String
   for e: {False{} == String.is_empty(r) : Bool}
-  {K.reuse(K.Key{r, f, b}, K.Key{r, f, b}) == True{} : Bool}
+  {K.reuse(K.Stamp{r, f, b}, K.Stamp{r, f, b}) == True{} : Bool}
 
 # LAW: a checkout of another commit is cloned again. The file and the bend
 # are not asked.

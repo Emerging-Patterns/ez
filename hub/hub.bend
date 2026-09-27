@@ -6,8 +6,8 @@ import 0x0a372da4a053652f70ded7d6e0d19330/main.bend as Http
 import 0x0a372da4a053652f70ded7d6e0d19330/client.bend as Client
 import 0x0a372da4a053652f70ded7d6e0d19330/url.bend as Url
 import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
-import ../io/file.bend as File
-import ../sha/sha.bend as Sha
+import ../io/file.bend as F
+import ../share/sha.bend as Sha
 
 # The GET is ezhttp's. What is kept here is the answer's shape: a status on
 # its own first line and then the text, the shape a run answers with and the
@@ -48,7 +48,7 @@ def get.file.got(got: Maybe<&2, String>, path: String) -> String:
 # a file url read off the disk
 def get.file(+path: String) -> IO(String):
   do IO<String>:
-    m : Maybe<&2, String> <- File.read(path)
+    m : Maybe<&2, String> <- F.read(path)
     return get.file.got(m, path)
 
 # a url whose scheme decides where the body comes from

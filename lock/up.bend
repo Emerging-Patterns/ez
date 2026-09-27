@@ -29,8 +29,8 @@ import ../git/git.bend as Git
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../hub/hub.bend as Web
-import ../sha/sha.bend as Sha
-import ../ez/say.bend as Say
+import ../share/sha.bend as Sha
+import ../share/say.bend as Say
 
 # ---------------------------------------------------------------------------
 # questions and answers

@@ -25,7 +25,7 @@ import ../lock/run.bend as Run
 import ../tool/run.bend as ToolRun
 import ../tool/world.bend as TW
 import ../hub/hub.bend as Web
-import ../ez/env.bend as Env
+import ../share/env.bend as Env
 import ./world.bend as PW
 import ./plan.bend as PP
 

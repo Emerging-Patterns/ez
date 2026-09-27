@@ -9,8 +9,8 @@
 import Base
 import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
 import ../io/file.bend as F
-import ../ez/env.bend as Env
-import ../ez/cap.bend as Cap
+import ../share/env.bend as Env
+import ../share/cap.bend as Cap
 import ./gate.bend as G
 import ./quiet.bend as Q
 import ./clock.bend as Clock

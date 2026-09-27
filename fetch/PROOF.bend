@@ -1,7 +1,7 @@
 # fetch: the proofs. `bend PROOF.bend` is the gate.
 #
 # The plan is `plan.led(ledger, lock, w)`: no ledger, then no lock, is a plan
-# with no effect, and otherwise the plan is `plan.parts` of every package of
+# with no effect, and otherwise the plan is `parts.plan` of every package of
 # the lock, which seals the effects of the verdicts with how they end. A
 # sealed plan that refuses has no effect, so the refusal law is case splits.
 # Every law about what a fetch lays is a law about `effects.of` over the
@@ -21,7 +21,7 @@ import ../lock/up.bend as Up
 import ../add/PROOF.bend as AddP
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
-import ../sha/sha.bend as Sha
+import ../share/sha.bend as Sha
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
 import ./LAWS.bend as Laws
@@ -280,14 +280,14 @@ def Laws.fetch_lays_the_lock(w):
 # LAW: the planner weighs a file the way the law vocabulary does
 law weighs_same:
   for ls: List<&2, W.Source>
-  {FP.weighs(ls) == W.weighs(ls) : List<&2, K.File>}
+  {FP.weighs(ls) == W.weighs(ls) : List<&2, K.Item>}
 
 def weighs_same(ls):
   match ls:
     case []:
       {==}
     case W.Source{at, text} <> t:
-      Equal.cong(List<&2, K.File>, List<&2, K.File>, ys => K.File{at, Sha.hex(text)} <> ys,
+      Equal.cong(List<&2, K.Item>, List<&2, K.Item>, ys => K.Item{at, Sha.hex(text)} <> ys,
         FP.weighs(t), W.weighs(t), weighs_same(t))
 
 law named_seal:
@@ -307,7 +307,7 @@ def named_seal(_es, o, e):
 # it
 law named_got:
   for b: Bool
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Item>
   for +h: String
   for +ls: List<&2, W.Source>
   for rest: List<&2, P.Effect>
@@ -350,7 +350,7 @@ def named_got(b, fs, h, ls, rest, g, e):
       e
 
 law named_one:
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Item>
   for +h: String
   for p: FP.Part
   for rest: List<&2, P.Effect>
@@ -744,7 +744,7 @@ law weighed_good:
   for +ss: List<&2, T.Sect>
   for +rs: List<&2, F.Reply>
   for +here: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Item>
   for +h: String
   for +ls: List<&2, W.Source>
   for rest: List<&2, P.Effect>
@@ -768,7 +768,7 @@ law weighed_got:
   for +ss: List<&2, T.Sect>
   for +rs: List<&2, F.Reply>
   for +here: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Item>
   for +h: String
   for +ls: List<&2, W.Source>
   for rest: List<&2, P.Effect>
@@ -790,7 +790,7 @@ law weighed_one:
   for +ss: List<&2, T.Sect>
   for +rs: List<&2, F.Reply>
   for +here: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Item>
   for +h: String
   for p: FP.Part
   for rest: List<&2, P.Effect>
@@ -944,7 +944,7 @@ def Laws.fetch_weighs_the_checkout(ss, rs, here, h, url, rev, entry, root, nar, 
 # LAW: a reason that is not empty stops the package with it
 law unweighed_stops:
   for k: Bool
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Item>
   for +h: String
   for +why: String
   for ls: List<&2, W.Source>

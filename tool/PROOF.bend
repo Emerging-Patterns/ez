@@ -20,7 +20,7 @@ import ../git/git.bend as Git
 import ../pkg/path.bend as Path
 import ../ez/target.bend as Tgt
 import ../ez/key.bend as Key
-import ../ez/args.bend as Args
+import ../share/args.bend as Args
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
@@ -228,14 +228,14 @@ def Laws.tool_builds_on_miss(w, ok, miss):
 
 # LAW: a record with no commit reuses nothing, whatever is on record
 law no_rev:
-  for was: Key.Key
+  for was: Key.Stamp
   for +f: String
   for +b: String
-  {Key.reuse(was, Key.Key{"", f, b}) == False{} : Bool}
+  {Key.reuse(was, Key.Stamp{"", f, b}) == False{} : Bool}
 
 def no_rev(was, _f, _b):
   match was:
-    case Key.Key{_r0, _f0, _b0}:
+    case Key.Stamp{_r0, _f0, _b0}:
       {==}
 
 # LAW: an `and` with a False right half is False
@@ -258,9 +258,9 @@ law unrevved_miss:
 
 def unrevved_miss(w, none):
   %Equal.sym(String, TP.rev(w), "", none)
-    : {Bool.and(TP.there(w), Key.reuse(TP.was(w), Key.Key{_, TP.file(w), TW.bend(w)}))
+    : {Bool.and(TP.there(w), Key.reuse(TP.was(w), Key.Stamp{_, TP.file(w), TW.bend(w)}))
       == False{} : Bool}
-  %Equal.sym(Bool, Key.reuse(TP.was(w), Key.Key{"", TP.file(w), TW.bend(w)}), False{},
+  %Equal.sym(Bool, Key.reuse(TP.was(w), Key.Stamp{"", TP.file(w), TW.bend(w)}), False{},
     no_rev(TP.was(w), TP.file(w), TW.bend(w)))
     : {Bool.and(TP.there(w), _) == False{} : Bool}
   and_false(TP.there(w))
