@@ -9,7 +9,7 @@
 # gate reading the status alone goes green on a claim that leans on code
 # nothing proved. Only the bare line means every term was proved outright.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../share/args.bend as Args
 import ../share/env.bend as Env
 import ../share/cap.bend as Cap

@@ -10,7 +10,7 @@
 # already has. A pipe is not a terminal: the line is printed once and left,
 # which is what a log wants.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../pkg/path.bend as P
 
 # a spinner that is running, or none. An empty pid means the line was already

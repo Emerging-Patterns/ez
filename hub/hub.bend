@@ -2,10 +2,10 @@
 # it. bend accepts any prefix of the sha256, and a package's `0x` name is the
 # first 32 characters of its manifest's digest, so the check is a prefix test.
 import Base
-import 0x0a372da4a053652f70ded7d6e0d19330/main.bend as Http
-import 0x0a372da4a053652f70ded7d6e0d19330/client.bend as Client
-import 0x0a372da4a053652f70ded7d6e0d19330/url.bend as Url
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0x5e4e2a9db839a0214ace6923b04b685b/main.bend as Http
+import 0x5e4e2a9db839a0214ace6923b04b685b/client.bend as Client
+import 0x5e4e2a9db839a0214ace6923b04b685b/url.bend as Url
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../io/file.bend as F
 import ../share/sha.bend as Sha
 

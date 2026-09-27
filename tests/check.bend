@@ -2,7 +2,7 @@
 # entry, so this is also the "no main to run" case: bend checks the file clean
 # and then exits 1 from the emit, and ez has to read that as a pass.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../ez/quiet.bend as Q
 import ../check/kit.bend as Check
 

@@ -4,7 +4,7 @@
 # are compared file by file, because the claim is that they are the same
 # package and not merely two packages that both work.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../io/file.bend as F
 import ../ez/quiet.bend as Q
 import ../check/kit.bend as Check

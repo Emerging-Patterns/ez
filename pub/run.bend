@@ -19,7 +19,7 @@
 # the text: whether the hub answered 200, and the body or why not.
 # It decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../tool/run.bend as ToolRun
