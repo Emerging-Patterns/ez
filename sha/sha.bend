@@ -1,10 +1,10 @@
 # sha/sha: the sha256 a package hash is built from. The digest itself comes from
-# Giulio2002/bend-sha256, which proves its output equal to an executable FIPS
+# noah-emp/bend-sha256, which proves its output equal to an executable FIPS
 # 180-4 specification; this file is only the string-in, hex-out shape ez uses.
 # The dependency hashes packed big-endian words and returns eight of them, or
 # nothing when the declared length does not fit the array.
 import Base
-import 0xda83506fb9f059ead7afcfa2f498df5f/sha256.bend as S
+import 0xa17f0215fb4dd22e26fd007661489402/sha256.bend as S
 
 # four big-endian bytes in one word, each kept to eight bits
 def pack(first: U32, second: U32, third: U32, fourth: U32) -> U32:

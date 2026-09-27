@@ -1,5 +1,5 @@
 # sha: the laws. The human states them; PROOF.bend must prove them. The digest
-# itself is Giulio2002/bend-sha256's, proved there against FIPS 180-4, so what
+# itself is noah-emp/bend-sha256's, proved there against FIPS 180-4, so what
 # is stated here is the encoding `Sha.hex` puts in front of it: a text is
 # hashed as its UTF-8 bytes, the way `bend --publish` and the hub hash it.
 import Base
