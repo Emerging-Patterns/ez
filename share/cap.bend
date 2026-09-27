@@ -1,4 +1,4 @@
-# ez/cap: every `bend` the runner starts, inside a memory cap.
+# share/cap: every `bend` the runner starts, inside a memory cap.
 #
 # bend's C backend, not clang, is what costs the memory: emitting the C for a
 # large program peaked at 18.8 GB here while clang on that same C peaked at
@@ -7,9 +7,9 @@
 # kills for memory looks exactly like one that succeeded and happened to write
 # no binary. The cap is what turns that into a legible exit 137.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
-import ../ez/env.bend as Env
-import ../ez/args.bend as Args
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import ./env.bend as Env
+import ./args.bend as Args
 
 # how many gigabytes one `bend` may have. 8 is what fits beside the rest of
 # this machine; a project whose closure costs more says so in EZ_CAP.

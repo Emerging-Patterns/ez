@@ -83,7 +83,7 @@ def heard(rs: List<&2, W.Reply>, +key: String) -> Maybe<&2, W.Answer>:
 # every answer is in, with the hash the hub named and the package it serves
 # checked against it; a question is still open; or the add refuses
 type Verdict is Data:
-  Go{hash: String, files: List<&2, K.File>, srcs: List<&2, String>}
+  Go{hash: String, files: List<&2, K.Item>, srcs: List<&2, String>}
   Wait{asks: List<&2, W.Ask>}
   Stop{why: String}
 
@@ -187,7 +187,7 @@ def decide(+world: A.World) -> Verdict:
 # the entry
 
 # whether a package holds a file at this path
-def holds(fs: List<&2, K.File>, +at: String) -> Bool:
+def holds(fs: List<&2, K.Item>, +at: String) -> Bool:
   match fs:
     case []:
       False{}
@@ -209,7 +209,7 @@ def top.at(hit: Bool, +at: String, rest: Unit -> String) -> String:
       rest(Unit{})
 
 # the first top-level `.bend` file, in manifest order, "" for none
-def top(fs: List<&2, K.File>) -> String:
+def top(fs: List<&2, K.Item>) -> String:
   match fs:
     case []:
       ""
@@ -217,7 +217,7 @@ def top(fs: List<&2, K.File>) -> String:
       top.at(top.one(K.file.at(h)), K.file.at(h), _u => top(t))
 
 # `main.bend` when the package holds one, else its first top-level file
-def entry.main(held: Bool, fs: List<&2, K.File>) -> String:
+def entry.main(held: Bool, fs: List<&2, K.Item>) -> String:
   match held:
     case True{}:
       "main.bend"
@@ -226,11 +226,11 @@ def entry.main(held: Bool, fs: List<&2, K.File>) -> String:
 
 # the entry a package is recorded with when none was asked for: its
 # `main.bend`, else its first top-level `.bend` file, else none
-def entry.of(+fs: List<&2, K.File>) -> String:
+def entry.of(+fs: List<&2, K.Item>) -> String:
   entry.main(holds(fs, "main.bend"), fs)
 
 # the entry asked for, or, when none was, the package's own
-def entry.pick(none: Bool, +fs: List<&2, K.File>, +asked: String) -> String:
+def entry.pick(none: Bool, +fs: List<&2, K.Item>, +asked: String) -> String:
   match none:
     case True{}:
       entry.of(fs)
@@ -238,14 +238,14 @@ def entry.pick(none: Bool, +fs: List<&2, K.File>, +asked: String) -> String:
       asked
 
 # the entry recorded: the one asked for, else the package's own
-def entry(+fs: List<&2, K.File>, +world: A.World) -> String:
+def entry(+fs: List<&2, K.Item>, +world: A.World) -> String:
   entry.pick(String.is_empty(asked(world)), fs, asked(world))
 
 # ---------------------------------------------------------------------------
 # the plan
 
 # the dependency recorded for a package the hub named by this hash
-def dep.of(+hash: String, +fs: List<&2, K.File>, +world: A.World) -> M.Dep:
+def dep.of(+hash: String, +fs: List<&2, K.Item>, +world: A.World) -> M.Dep:
   M.Dep{key(world), hash, entry(fs, world), M.Hub{nv(world)}}
 
 # the ledger with the package added, once it is known to read back. A
@@ -267,7 +267,7 @@ def outcome.entry(held: Bool, fit: Bool, +at: String, +world: A.World) -> P.Outc
       P.Refused{"ez: " ++ at ++ " is not in " ++ nv(world)}
 
 # how an add ends once the package is in hand
-def outcome.of(+hash: String, +fs: List<&2, K.File>, +world: A.World) -> P.Outcome:
+def outcome.of(+hash: String, +fs: List<&2, K.Item>, +world: A.World) -> P.Outcome:
   outcome.entry(Bool.or(String.is_empty(asked(world)), holds(fs, Path.norm(asked(world)))),
     Rend.renderable(Rend.add.keep(A.manifest.of(A.read(world)), dep.of(hash, fs, world))),
     asked(world), world)
@@ -325,7 +325,7 @@ def seal(es: List<&2, P.Effect>, outcome: P.Outcome) -> P.Plan:
       P.Plan{[], P.Refused{why}}
 
 # the plan once the package is in hand
-def made(+hash: String, +fs: List<&2, K.File>, +ss: List<&2, String>, +world: A.World) -> P.Plan:
+def made(+hash: String, +fs: List<&2, K.Item>, +ss: List<&2, String>, +world: A.World) -> P.Plan:
   seal(effects.of(dep.of(hash, fs, world), hash, W.laid(fs, ss),
       A.manifest.of(A.read(world)), world),
     outcome.of(hash, fs, world))
@@ -385,7 +385,7 @@ def verdict.hash(verdict: Verdict) -> String:
     case Stop{_why}:
       ""
 
-def verdict.files(verdict: Verdict) -> List<&2, K.File>:
+def verdict.files(verdict: Verdict) -> List<&2, K.Item>:
   match verdict:
     case Go{_hash, fs, _ss}:
       fs
@@ -399,7 +399,7 @@ def hash(+world: A.World) -> String:
   verdict.hash(decide(world))
 
 # the package's files, as the hub served them
-def files(+world: A.World) -> List<&2, K.File>:
+def files(+world: A.World) -> List<&2, K.Item>:
   verdict.files(decide(world))
 
 # the dependency `ez add <name>@<version>` records on a World

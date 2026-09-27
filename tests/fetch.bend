@@ -6,7 +6,7 @@
 # unit tests beside the code are about what can be said without one.
 import Base
 import ../hub/hub.bend as Hub
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../check/kit.bend as Check
 import ../check/world.bend as W
 

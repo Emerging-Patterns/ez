@@ -31,7 +31,7 @@ import ../git/git.bend as G
 import ./world.bend as PW
 import ./blurb.bend as B
 import ../lock/lock.bend as L
-import ../sha/sha.bend as Sha
+import ../share/sha.bend as Sha
 import ../io/file.bend as F
 
 # ---------------------------------------------------------------------------

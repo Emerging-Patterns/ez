@@ -1,4 +1,4 @@
-# ez/pin: a plain `ez lock` refuses a `[tools.*]` pin it would have to fill.
+# share/pin: a plain `ez lock` refuses a `[tools.*]` pin it would have to fill.
 # It copies every pin as the ledger has it and never asks a remote, so a pin
 # with no commit or no NAR hash stops it, naming the upgrade that fills the
 # pin. Filling and moving a pin is `ez lock --upgrade`'s, in lock/up.bend.

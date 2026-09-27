@@ -6,40 +6,40 @@
 import Base
 
 # the commit, the file handed to bend, and the bend that built it
-type Key is Data:
-  Key{rev: String, file: String, bend: String}
+type Stamp is Data:
+  Stamp{rev: String, file: String, bend: String}
 
 # the record that matches nothing: an empty commit is never reused
-def none() -> Key:
-  Key{"", "", ""}
+def none() -> Stamp:
+  Stamp{"", "", ""}
 
 # the record as it is written, one field to a line
-def show(key: Key) -> String:
+def show(key: Stamp) -> String:
   match key:
-    case Key{+r, +f, +b}:
+    case Stamp{+r, +f, +b}:
       r ++ "\n" ++ f ++ "\n" ++ b ++ "\n"
 
 # exactly three lines, or no record. A cache written before the file and the
 # bend were recorded holds the commit alone, and that reads as no record.
-def read.third(+rev: String, +file: String, ls: List<&2, String>) -> Key:
+def read.third(+rev: String, +file: String, ls: List<&2, String>) -> Stamp:
   match ls:
     case []:
       none()
     case +b <> t:
       match t:
         case []:
-          Key{rev, file, b}
+          Stamp{rev, file, b}
         case _h <> _t:
           none()
 
-def read.second(+rev: String, ls: List<&2, String>) -> Key:
+def read.second(+rev: String, ls: List<&2, String>) -> Stamp:
   match ls:
     case []:
       none()
     case +f <> t:
       read.third(rev, f, t)
 
-def read.lines(ls: List<&2, String>) -> Key:
+def read.lines(ls: List<&2, String>) -> Stamp:
   match ls:
     case []:
       none()
@@ -47,7 +47,7 @@ def read.lines(ls: List<&2, String>) -> Key:
       read.second(r, t)
 
 # a record's text, as `show` wrote it and a file read trimmed it
-def read(+text: String) -> Key:
+def read(+text: String) -> Stamp:
   read.lines(String.split(text, '\n'))
 
 # the checkout is this commit, and there is a commit at all. The checkout's
@@ -57,11 +57,11 @@ def checkout(+was: String, +now: String) -> Bool:
 
 # the three fields the same, and a commit at all. An empty commit is a dirty
 # tree or a directory that is not a checkout, and those are built every time.
-def reuse(was: Key, now: Key) -> Bool:
+def reuse(was: Stamp, now: Stamp) -> Bool:
   match was:
-    case Key{+r0, +f0, +b0}:
+    case Stamp{+r0, +f0, +b0}:
       match now:
-        case Key{+r1, +f1, +b1}:
+        case Stamp{+r1, +f1, +b1}:
           Bool.and(Bool.not(String.is_empty(r1)),
             Bool.and(String.eq(r0, r1),
               Bool.and(String.eq(f0, f1), String.eq(b0, b1))))

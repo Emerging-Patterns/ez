@@ -1,4 +1,4 @@
-# ez/args: the command line, as the binary itself receives it. `IO.args()` gives
+# share/args: the command line, as the binary itself receives it. `IO.args()` gives
 # a compiled Bend binary every argument it was started with: the first is the
 # subcommand and the rest are its own. The runtime keeps `--threads`, `--gpu`,
 # `--gpu-build` and `--help` for itself and strips them wherever they appear;

@@ -11,13 +11,13 @@
 # process effect the rest of ez uses: arguments execvp'd, no shell between.
 import Base
 import ../io/file.bend as F
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../toml/toml.bend as T
 import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
 import ../sha/nar.bend as Nar
-import ../ez/say.bend as Say
+import ../share/say.bend as Say
 
 # one `<sha>\t<name>` row of what `git ls-remote` printed
 type Row is Data:

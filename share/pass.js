@@ -13,3 +13,5 @@ function ezpass_run(cmd) {
   }
   return r.status;
 }
+
+io_eff(CID(ezpass.run), ezpass_run);

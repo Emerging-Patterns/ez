@@ -7,11 +7,11 @@
 # computation itself.
 import Base
 import ./gate.bend as G
-import ../ez/pin.bend as Pin
+import ../share/pin.bend as Pin
 import ../ez/target.bend as Tgt
 import ../ez/named.bend as Named
 import ../pkg/pkg.bend as Pkg
-import ../ez/env.bend as Env
+import ../share/env.bend as Env
 import ../pkg/path.bend as P
 import ../ledger/manifest.bend as M
 import ./key.bend as K
@@ -20,7 +20,7 @@ import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
@@ -1208,7 +1208,7 @@ def Laws.key_bend_differs(r0, f0, _b0, r1, f1, _b1, e):
 # the empty commit computes, and the `and` stops at it whatever was recorded
 def Laws.key_no_rev(was, _f, _b):
   match was:
-    case K.Key{_r0, _f0, _b0}:
+    case K.Stamp{_r0, _f0, _b0}:
       {==}
 
 # the resolved commit has a first char, so the empty one on record is not
@@ -1216,7 +1216,7 @@ def Laws.key_no_rev(was, _f, _b):
 def Laws.key_none_misses(r, f, b, e):
   match r:
     case SNil{}:
-      Eq.bit.absurd(&2, {K.reuse(K.none(), K.Key{"", f, b}) == False{} : Bool},
+      Eq.bit.absurd(&2, {K.reuse(K.none(), K.Stamp{"", f, b}) == False{} : Bool},
         e)
     case SCon{_h, _t}:
       {==}

@@ -56,7 +56,7 @@ import ../lock/plan.bend as P
 import ../lock/world.bend as W
 import ../lock/lock.bend as L
 import ../ledger/manifest.bend as M
-import ../ez/args.bend as Args
+import ../share/args.bend as Args
 
 # one thing doctor looked at: what to print, and whether it is a problem
 type Note is Data:

@@ -13,13 +13,13 @@
 # from its entry here, by `K.pkg_of`, which is interpreter code under
 # EZ-TRUST-2 until `ez add` is converted.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../io/file.bend as F
 import ../hub/hub.bend as Web
 import ../git/git.bend as Git
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
-import ../ez/say.bend as Say
+import ../share/say.bend as Say
 import ./lock.bend as L
 import ./world.bend as W
 import ./up.bend as Up
@@ -106,7 +106,7 @@ def gots(+how: W.How, +manifest: String, gs: List<&2, Web.Got>, acc: List<&2, St
           gots(how, manifest, t, body <> acc)
 
 # every file of a hub package, fetched and checked against its sum
-def hub.all(+hub: String, +hash: String, fs: List<&2, K.File>) -> IO(List<&2, Web.Got>):
+def hub.all(+hub: String, +hash: String, fs: List<&2, K.Item>) -> IO(List<&2, Web.Got>):
   match fs:
     case []:
       IO.pure(List<&2, Web.Got>, [])
@@ -137,7 +137,7 @@ def answer.hub(+hub: String, +hash: String) -> IO(W.Answer):
 
 # every file a tree's manifest names, read from beside it. A file that is not
 # there reads as "", which does not hash to its sum.
-def disk.all(+dir: String, fs: List<&2, K.File>) -> IO(List<&2, String>):
+def disk.all(+dir: String, fs: List<&2, K.Item>) -> IO(List<&2, String>):
   match fs:
     case []:
       IO.pure(List<&2, String>, [])
@@ -179,7 +179,7 @@ def clone.run(+work: String, what: String, args: List<&2, String>, go: Unit -> I
 def clone.walk(+work: String, +entry: String, +nar: String) -> IO(W.Answer):
   do IO<W.Answer>:
     +p : K.Pkg <- K.pkg_in(work, entry)
-    +fs : List<&2, K.File> <- IO.pure(List<&2, K.File>, K.pkg.files(p))
+    +fs : List<&2, K.Item> <- IO.pure(List<&2, K.Item>, K.pkg.files(p))
     ss : List<&2, String> <- disk.all(K.pkg.root(p), fs)
     _rm : String <- R.exec(["rm", "-rf", work])
     return W.Got{W.Clone{nar}, K.manifest_of(fs), ss}
@@ -332,7 +332,7 @@ def answer.above(+lib: String, +url: String, +pin: String, +tip: String) -> IO(U
 def tree.walk(+work: String, +at: String, +nar: String) -> IO(Up.Answer):
   do IO<Up.Answer>:
     +p : K.Pkg <- K.pkg_in(work, at)
-    +fs : List<&2, K.File> <- IO.pure(List<&2, K.File>, K.pkg.files(p))
+    +fs : List<&2, K.Item> <- IO.pure(List<&2, K.Item>, K.pkg.files(p))
     ss : List<&2, String> <- disk.all(K.pkg.root(p), fs)
     +rt : String <- IO.pure(String, Git.root.rel(P.join(work, at), K.pkg.root(p), at))
     _rm : String <- R.exec(["rm", "-rf", work])

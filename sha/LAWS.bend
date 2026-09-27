@@ -1,9 +1,9 @@
 # sha: the laws. The human states them; PROOF.bend must prove them. The digest
-# itself is Giulio2002/bend-sha256's, proved there against FIPS 180-4, so what
+# itself is noah-emp/bend-sha256's, proved there against FIPS 180-4, so what
 # is stated here is the encoding `Sha.hex` puts in front of it: a text is
 # hashed as its UTF-8 bytes, the way `bend --publish` and the hub hash it.
 import Base
-import ../sha/sha.bend as Sha
+import ../share/sha.bend as Sha
 import ../sha/nar.bend as Nar
 import ../pkg/pkg.bend as K
 import ../pkg/LAWS.bend as PL
@@ -21,14 +21,14 @@ law utf8_append:
 # listed in, so long as no name is listed twice, which a directory never does.
 # `find` lists a directory in whatever order the filesystem keeps it, and two
 # machines may keep it differently; this is why their narHash still agrees.
-# `perm` and `distinct` are pkg's: an entry is a `K.File` holding its name and
+# `perm` and `distinct` are pkg's: an entry is a `K.Item` holding its name and
 # its node's serial, so a rearranged directory is a rearranged file list.
 # Every directory the walk serializes goes through `Nar.dir`, children and
 # root alike, so the law at one level is the law for the whole tree.
 # EZ-HASH-2
 law nar_dir_order_free:
   for +ns: List<&2, Nat>
-  for +es: List<&2, K.File>
+  for +es: List<&2, K.Item>
   for +dis: {PL.distinct(es) == True{} : Bool}
   {Nar.dir(PL.perm(ns, es)) == Nar.dir(es) : String}
 

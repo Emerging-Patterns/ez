@@ -1,4 +1,4 @@
-# ez/pass: a program run on ez's own stdin, stdout and stderr, as `cargo run`
+# share/pass: a program run on ez's own stdin, stdout and stderr, as `cargo run`
 # runs one. Every other program ez starts goes through snap's `exec`, which
 # hands the child /dev/null for stdin, holds what it prints until it exits,
 # and answers both at once; that is what a command that reads the answer
@@ -6,7 +6,7 @@
 # the person, and ez only waits for it and exits with its status (`S.code`
 # and `TP.code`, EZ-OUT-1).
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 
 # the program and its arguments, newline separated, run with no shell between
 # and nothing captured. The answer is the status it exited with: 128 plus the

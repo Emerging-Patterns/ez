@@ -12,12 +12,12 @@
 # its own.
 import Base
 import ../io/file.bend as F
-import ../sha/sha.bend as Sha
+import ../share/sha.bend as Sha
 import ./path.bend as P
 
 # a file of a package: the path it takes inside the package, and its sha256
-type File is Data:
-  File{at: String, sum: String}
+type Item is Data:
+  Item{at: String, sum: String}
 
 # a package: the files it holds, the hash that names them, and the directory
 # their paths are written from. The root is the entry's own directory until a
@@ -25,7 +25,7 @@ type File is Data:
 # copying the files out joins them against this and never against the entry's
 # directory.
 type Pkg is Data:
-  Pkg{hash: String, root: String, files: List<&2, File>}
+  Pkg{hash: String, root: String, files: List<&2, Item>}
 
 # what a source file's header imports: modules by the path they were reached
 # through, and the foreign C and JS bodies bend uploads alongside the sources
@@ -503,12 +503,12 @@ def seen.has(xs: List<&2, String>, +want: String) -> Bool:
       seen.has.step(String.eq(h, want), _u => seen.has(t, want))
 
 # a found file, placed under whatever the package re-rooted at
-def file_of(+pre: String, hit: Found) -> File:
+def file_of(+pre: String, hit: Found) -> Item:
   Found{raw, sum} = hit
-  File{P.join(pre, raw), sum}
+  Item{P.join(pre, raw), sum}
 
 # every found file, placed
-def placed(+pre: String, fs: List<&2, Found>) -> List<&2, File>:
+def placed(+pre: String, fs: List<&2, Found>) -> List<&2, Item>:
   match fs:
     case []:
       []
@@ -516,17 +516,17 @@ def placed(+pre: String, fs: List<&2, Found>) -> List<&2, File>:
       file_of(pre, h) <> placed(pre, t)
 
 # where a file sits inside its package
-def file.at(item: File) -> String:
-  File{at, _sum} = item
+def file.at(item: Item) -> String:
+  Item{at, _sum} = item
   at
 
 # a package's files are written in path order, so the manifest of a package is
 # the same text whoever computes it
-def file.le(left: File, right: File) -> Bool:
+def file.le(left: Item, right: Item) -> Bool:
   String.is_le(file.at(left), file.at(right))
 
 # the same path twice is the same file twice, and a package holds it once
-def dedup.pick(same: Bool, head: File, rest: List<&2, File>) -> List<&2, File>:
+def dedup.pick(same: Bool, head: Item, rest: List<&2, Item>) -> List<&2, Item>:
   match same:
     case True{}:
       rest
@@ -534,7 +534,7 @@ def dedup.pick(same: Bool, head: File, rest: List<&2, File>) -> List<&2, File>:
       head <> rest
 
 # a file against the deduplicated files that follow it
-def dedup.head(+head: File, rest: List<&2, File>) -> List<&2, File>:
+def dedup.head(+head: Item, rest: List<&2, Item>) -> List<&2, Item>:
   match rest:
     case []:
       [head]
@@ -542,7 +542,7 @@ def dedup.head(+head: File, rest: List<&2, File>) -> List<&2, File>:
       dedup.pick(String.eq(file.at(head), file.at(b)), head, b <> t)
 
 # a sorted file list with the repeats dropped
-def dedup(fs: List<&2, File>) -> List<&2, File>:
+def dedup(fs: List<&2, Item>) -> List<&2, Item>:
   match fs:
     case []:
       []
@@ -552,7 +552,7 @@ def dedup(fs: List<&2, File>) -> List<&2, File>:
 # where a file goes among the files already in order: before the one it is not
 # after, otherwise behind it. The rest of the insertion is a parameter, because
 # two defs that call each other are not allowed.
-def file.ins.put(le: Bool, item: File, head: File, tail: List<&2, File>, rest: List<&2, File>) -> List<&2, File>:
+def file.ins.put(le: Bool, item: Item, head: Item, tail: List<&2, Item>, rest: List<&2, Item>) -> List<&2, Item>:
   match le:
     case True{}:
       item <> (head <> tail)
@@ -560,7 +560,7 @@ def file.ins.put(le: Bool, item: File, head: File, tail: List<&2, File>, rest: L
       head <> rest
 
 # a file inserted into a list already in path order
-def file.ins(fs: List<&2, File>, +item: File) -> List<&2, File>:
+def file.ins(fs: List<&2, Item>, +item: Item) -> List<&2, Item>:
   match fs:
     case []:
       [item]
@@ -572,7 +572,7 @@ def file.ins(fs: List<&2, File>, +item: File) -> List<&2, File>:
 # is reported as unsafe and every proof downstream of it inherits the report.
 # An insertion sort shrinks its list at every step, so Bend checks it, and a
 # package's file set is small enough that the cost is not felt.
-def file.sort(fs: List<&2, File>) -> List<&2, File>:
+def file.sort(fs: List<&2, Item>) -> List<&2, Item>:
   match fs:
     case []:
       []
@@ -580,7 +580,7 @@ def file.sort(fs: List<&2, File>) -> List<&2, File>:
       file.ins(file.sort(t), h)
 
 # the files of a package, in path order and each one once
-def files_of(fs: List<&2, File>) -> List<&2, File>:
+def files_of(fs: List<&2, Item>) -> List<&2, Item>:
   dedup(file.sort(fs))
 
 # a path that leaves the package behind, which no package may hold
@@ -599,7 +599,7 @@ def escaped.step(here: Bool, at: String, rest: Unit -> String) -> String:
       rest(Unit{})
 
 # the first file whose path leaves the package, or "" when none does
-def escaped(fs: List<&2, File>) -> String:
+def escaped(fs: List<&2, Item>) -> String:
   match fs:
     case []:
       ""
@@ -608,12 +608,12 @@ def escaped(fs: List<&2, File>) -> String:
       escaped.step(escapes(at), at, _u => escaped(t))
 
 # one `<sha256> <path>` line
-def manifest.line(item: File) -> String:
-  File{at, sum} = item
+def manifest.line(item: Item) -> String:
+  Item{at, sum} = item
   sum ++ " " ++ at ++ "\n"
 
 # every line of a manifest
-def manifest.lines(fs: List<&2, File>) -> String:
+def manifest.lines(fs: List<&2, Item>) -> String:
   match fs:
     case []:
       ""
@@ -622,21 +622,21 @@ def manifest.lines(fs: List<&2, File>) -> String:
 
 # the manifest text is the package's identity, and bend checks a fetched
 # manifest against the first 32 hex characters of its sha256
-def manifest_of(fs: List<&2, File>) -> String:
+def manifest_of(fs: List<&2, Item>) -> String:
   manifest.lines(files_of(fs))
 
 # the `0x` name a file set is published under
-def hash_of(fs: List<&2, File>) -> String:
+def hash_of(fs: List<&2, Item>) -> String:
   "0x" ++ String.take(Sha.hex(manifest_of(fs)), 32n)
 
 # whether a file of a package is a LICENSE bend took along. A module ends in
 # `.bend` and a foreign body in `.c` or `.js`, so a file named LICENSE is one
 # the walk took along beside them.
-def file.lic(item: File) -> Bool:
-  File{at, _sum} = item
+def file.lic(item: Item) -> Bool:
+  Item{at, _sum} = item
   String.eq(P.base(at), "LICENSE")
 
-def bare.pick(lic: Bool, head: File, rest: List<&2, File>) -> List<&2, File>:
+def bare.pick(lic: Bool, head: Item, rest: List<&2, Item>) -> List<&2, Item>:
   match lic:
     case True{}:
       rest
@@ -645,7 +645,7 @@ def bare.pick(lic: Bool, head: File, rest: List<&2, File>) -> List<&2, File>:
 
 # a package's files as bend named them before 2.0.27: without the LICENSE
 # files it now takes along, in the order they were given
-def bare(fs: List<&2, File>) -> List<&2, File>:
+def bare(fs: List<&2, Item>) -> List<&2, Item>:
   match fs:
     case []:
       []
@@ -661,7 +661,7 @@ def bare.srcs.pick(lic: Bool, text: String, rest: List<&2, String>) -> List<&2, 
 
 # the texts that go with those files: the texts of a file list, one per file
 # in the same order, with the LICENSE files' texts left out
-def bare.srcs(fs: List<&2, File>, ss: List<&2, String>) -> List<&2, String>:
+def bare.srcs(fs: List<&2, Item>, ss: List<&2, String>) -> List<&2, String>:
   match fs ss:
     case Nil{} _:
       ss
@@ -717,7 +717,7 @@ type State is Data:
 # written from, the files it lays with their texts, and those files weighed,
 # in path order, which is what its manifest lists.
 type Walked is Data:
-  Walked{hash: String, root: String, files: List<&2, Source>, sums: List<&2, File>}
+  Walked{hash: String, root: String, files: List<&2, Source>, sums: List<&2, Item>}
   Asks{at: String}
   Refused{why: String}
 
@@ -1101,12 +1101,12 @@ def laid(+pre: String, fs: List<&2, Hit>) -> List<&2, Source>:
 
 # a laid file weighed: its path and the sha256 of its text. This is what a
 # plan's reader would compute from the files a `Lay` writes.
-def laid.sum(src: Source) -> File:
+def laid.sum(src: Source) -> Item:
   Source{at, +text} = src
-  File{at, Sha.hex(text)}
+  Item{at, Sha.hex(text)}
 
 # every laid file weighed
-def laid.sums(fs: List<&2, Source>) -> List<&2, File>:
+def laid.sums(fs: List<&2, Source>) -> List<&2, Item>:
   match fs:
     case []:
       []
@@ -1132,7 +1132,7 @@ def made.judge(
   +bad: String,
   +root: String,
   +pre: String,
-  +fs: List<&2, File>,
+  +fs: List<&2, Item>,
   out: List<&2, Hit>
 ) -> Walked:
   match ok:
@@ -1303,7 +1303,7 @@ def state.stop(st: State) -> Stop:
 
 # a walk's verdict as a package, with its root taken back under the checkout
 # it was read from
-def pkg.made(+top: String, got: Walked) -> IO(Pkg):
+def made.io(+top: String, got: Walked) -> IO(Pkg):
   match got:
     case Walked{hash, root, _files, sums}:
       IO.pure(Pkg, Pkg{hash, P.join(top, root), files_of(sums)})
@@ -1327,15 +1327,15 @@ def pkg.next(
         m : Maybe<&2, String> <- F.read(P.join(top, at))
         go(tree.add(m, tree, at), resume(st))
     case Going{}:
-      pkg.made(top, made(entry, st))
+      made.io(top, made(entry, st))
     case Missing{_at}:
-      pkg.made(top, made(entry, st))
+      made.io(top, made(entry, st))
     case Climbs{_at}:
-      pkg.made(top, made(entry, st))
+      made.io(top, made(entry, st))
     case Spent{}:
-      pkg.made(top, made(entry, st))
+      made.io(top, made(entry, st))
     case Unnamed{_nv}:
-      pkg.made(top, made(entry, st))
+      made.io(top, made(entry, st))
 
 # the walk over what has been read so far, and each file it asks for read
 # and handed back, until it no longer asks
@@ -1351,22 +1351,22 @@ def pkg.ask(fuel: Nat, +top: String, +entry: String, +eb: String, +tree: Tree, s
 # the package an entry would be published as, walked over its checkout: the
 # entry and every file the walk reaches are paths from `top`, read from disk
 # as the walk asks for them. An import that climbs above `top` is refused.
-def pkg.walk(+top: String, +entry: String) -> IO(Pkg):
+def walk.io(+top: String, +entry: String) -> IO(Pkg):
   pkg.ask(U32.to_nat(100000), top, entry, P.base(entry), Tree{False{}, [], []},
     start(entry))
 
 # the package an entry of a checkout would be published as
 def pkg_in(+top: String, +entry: String) -> IO(Pkg):
-  pkg.walk(top, P.norm(entry))
+  walk.io(top, P.norm(entry))
 
 # an entry named from the working directory is walked over the working
 # directory, and one named from the root over the whole file system
 def pkg.from(abs: Bool, +entry: String) -> IO(Pkg):
   match abs:
     case True{}:
-      pkg.walk("/", String.drop(entry, 1n))
+      walk.io("/", String.drop(entry, 1n))
     case False{}:
-      pkg.walk("", entry)
+      walk.io("", entry)
 
 # the package an entry file would be published as: every module it reaches,
 # every foreign body beside them, and the hash over their manifest. A relative
@@ -1386,11 +1386,11 @@ def pkg.root(package: Pkg) -> String:
   root
 
 # the files a package holds
-def pkg.files(package: Pkg) -> List<&2, File>:
+def pkg.files(package: Pkg) -> List<&2, Item>:
   Pkg{_h, _root, fs} = package
   fs
 
 # the sha256 recorded for a file
-def file.sum(item: File) -> String:
-  File{_at, sum} = item
+def file.sum(item: Item) -> String:
+  Item{_at, sum} = item
   sum

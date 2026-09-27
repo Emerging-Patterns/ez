@@ -17,9 +17,9 @@
 # One connection is served at a time, each answer states its length and closes
 # the socket, and the oracle stops of its own accord after a million of them.
 import Base
-import ../sha/sha.bend as Sha
+import ../share/sha.bend as Sha
 import ../io/file.bend as F
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ./serve.bend as S
 
 # a list with its last element gone, the head held back one step so the walk can

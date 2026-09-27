@@ -14,10 +14,10 @@
 # is. None of these writes anything, and the plan writes nothing either. It
 # decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../run/bend.bend as Bend
 import ../io/file.bend as F
-import ../ez/args.bend as Args
+import ../share/args.bend as Args
 import ../lock/run.bend as Run
 import ../lock/world.bend as W
 import ../lock/lock.bend as L

@@ -129,7 +129,7 @@ Every requirement carries exactly one level.
 
 We considered intermediate levels for "checked on examples" and "agrees with an external oracle", and rejected both (see Abandoned Ideas). The short version is that Bend's gate is a proof checker, and anything it checks on a single example is a test wearing a law's syntax. Two levels keep the spec honest: if a claim is not proved for all inputs, we say we are trusting it, and a reader knows exactly how much weight to put on it.
 
-A guarantee proved in a dependency is Trusted from ez's side. The SHA-256 digest comes from Giulio2002/bend-sha256, whose own laws hold it to an executable FIPS 180-4 specification, and HTTP framing is proved in ezhttp, which replaced `net/` in #50. Those proofs are real, but ez's gate does not re-check them, so ez records them as trust with the dependency and pinned hash as the reason.
+A guarantee proved in a dependency is Trusted from ez's side. The SHA-256 digest comes from noah-emp/bend-sha256, whose own laws hold it to an executable FIPS 180-4 specification, and HTTP framing is proved in ezhttp, which replaced `net/` in #50. Those proofs are real, but ez's gate does not re-check them, so ez records them as trust with the dependency and pinned hash as the reason.
 
 A Proved requirement whose law has not landed yet is marked **pending** in `SPEC.md`. Pending is a status, not a third level: it means "intended to be Proved, not yet guaranteed", and the spec says so plainly. Because the gate fails on any undischarged law, a pending requirement's law stays out of LAWS.bend until its proof is written, and the statement lives in `SPEC.md` until then.
 
@@ -507,7 +507,7 @@ These assumptions sit outside the proofs. They are the complete list of Trusted 
 | EZ-RES-7 | git reports refs, tags, and ancestry accurately. | The World model takes git's answers as given. |
 | EZ-HASH-4 | ez's 0x hash matches `bend --publish`. | The publisher is a separate program. |
 | EZ-HASH-5 | ez's narHash matches nix. | nix is a separate program. What ez trusts of its own walk is GNU `find`'s listing of the tree, each path's type, `%M` mode, name and link target, and the file effect's read of each file's bytes. The walk takes the executable bit from the owner's exec bit of that mode, as nix's dumper does, and reads names and targets as listed (EZ-HASH-7). Submodules are not part of the tree: ez weighs a checkout without them, and its nix side asks `fetchgit` for the same. |
-| EZ-HASH-6 | `Sha.raw` computes the SHA-256 digest of its bytes, and `Sha.hex` of its text's UTF-8. | Proved in Giulio2002/bend-sha256 against an executable FIPS 180-4 specification, at the hash ez vendors; ez's gate does not re-check it. Collision resistance is also assumed. |
+| EZ-HASH-6 | `Sha.raw` computes the SHA-256 digest of its bytes, and `Sha.hex` of its text's UTF-8. | Proved in noah-emp/bend-sha256 against an executable FIPS 180-4 specification, at the hash ez vendors; ez's gate does not re-check it. Collision resistance is also assumed. |
 
 EZ-TRUST-3 is narrowed from the first draft: ez verifies hub content itself (EZ-FETCH-1), so what remains is that the hub serves the hash at all, which is what lets EZ-DOC-3 leave hub content out of `inputs`.
 

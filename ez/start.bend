@@ -7,7 +7,7 @@
 # that it does so faithfully is EZ-TRUST-2.
 import Base
 import ../ledger/manifest.bend as M
-import ../ez/args.bend as Args
+import ../share/args.bend as Args
 
 # which of the three commands is asking, with what it was told: where a
 # build goes, and every word of the line for a run

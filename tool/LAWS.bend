@@ -1,7 +1,7 @@
 # tool: the laws. The human states them; PROOF.bend must prove them. They are
 # stated over the plan `ez tool run`, `install` and `upgrade` run
 # (tool/plan.bend), over what it resolves a target to, and over the words
-# `ez tool run` and `ez run` hand on (ez/args.bend), so what they say of the
+# `ez tool run` and `ez run` hand on (share/args.bend), so what they say of the
 # plan is what the command does, the interpreter's faithfulness being
 # EZ-TRUST-2.
 import Base
@@ -13,7 +13,7 @@ import ../ledger/manifest.bend as M
 import ../git/git.bend as Git
 import ../pkg/path.bend as Path
 import ../ez/target.bend as Tgt
-import ../ez/args.bend as Args
+import ../share/args.bend as Args
 
 # ---------------------------------------------------------------------------
 # refusals

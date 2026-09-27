@@ -11,8 +11,8 @@
 # programs ez already runs the way it runs `find` and `mkdir`, with no shell
 # between.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
-import ../ez/env.bend as Env
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import ../share/env.bend as Env
 
 # how many seconds a whole run may take. Five minutes is what the gate is held
 # to; a tree that honestly needs longer says so in EZ_DEADLINE, and "0" turns

@@ -21,8 +21,8 @@ import ../ledger/upgrade.bend as U
 import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../hub/hub.bend as Web
-import ../sha/sha.bend as Sha
-import ../ez/say.bend as Say
+import ../share/sha.bend as Sha
+import ../share/say.bend as Say
 
 # the command as it was run: `--upgrade`, the name `--package` gave ("" for
 # none), and the directory it runs in, which is the project root. A relative
@@ -85,7 +85,7 @@ type World is Data:
 # check passed, or why it refused them; or, for a name or the lock, the names
 # it resolves, each to its hash
 type Verdict is Data:
-  Ok{files: List<&2, K.File>, srcs: List<&2, String>}
+  Ok{files: List<&2, K.Item>, srcs: List<&2, String>}
   No{why: String}
   Named{names: List<&2, L.Name>}
 
@@ -150,7 +150,7 @@ def ask.hash(ask: Ask) -> String:
 
 # whether every text hashes to the sum its file is recorded with. A list of
 # texts that is longer or shorter than the files is not the package.
-def sums.ok(fs: List<&2, K.File>, ss: List<&2, String>) -> Bool:
+def sums.ok(fs: List<&2, K.Item>, ss: List<&2, String>) -> Bool:
   match fs ss:
     case Nil{} Nil{}:
       True{}
@@ -163,7 +163,7 @@ def sums.ok(fs: List<&2, K.File>, ss: List<&2, String>) -> Bool:
       Bool.and(String.eq(Sha.hex(s), K.file.sum(f)), rest)
 
 # each file with its text, as it is laid
-def laid(fs: List<&2, K.File>, ss: List<&2, String>) -> List<&2, Source>:
+def laid(fs: List<&2, K.Item>, ss: List<&2, String>) -> List<&2, Source>:
   match fs ss:
     case Nil{} Nil{}:
       []
@@ -175,12 +175,12 @@ def laid(fs: List<&2, K.File>, ss: List<&2, String>) -> List<&2, Source>:
       Source{K.file.at(f), s} <> laid(g, t)
 
 # a laid file weighed by its own text
-def weigh(src: Source) -> K.File:
+def weigh(src: Source) -> K.Item:
   Source{at, +text} = src
-  K.File{at, Sha.hex(text)}
+  K.Item{at, Sha.hex(text)}
 
 # every laid file weighed by its own text
-def weighs(ls: List<&2, Source>) -> List<&2, K.File>:
+def weighs(ls: List<&2, Source>) -> List<&2, K.Item>:
   match ls:
     case []:
       []
@@ -202,7 +202,7 @@ def named(+ls: List<&2, Source>) -> String:
 # manifest is not written the way ez writes one (a line per file, in path
 # order, each file once) is refused here rather than laid under a name its
 # laid manifest does not hash to.
-def body.laid(ok: Bool, +hash: String, fs: List<&2, K.File>, ss: List<&2, String>) -> Verdict:
+def body.laid(ok: Bool, +hash: String, fs: List<&2, K.Item>, ss: List<&2, String>) -> Verdict:
   match ok:
     case True{}:
       Ok{fs, ss}
@@ -211,7 +211,7 @@ def body.laid(ok: Bool, +hash: String, fs: List<&2, K.File>, ss: List<&2, String
         " (one line per file, in path order, each file once)"}
 
 # the verdict once the texts were weighed against the manifest
-def body.sums(ok: Bool, +hash: String, +fs: List<&2, K.File>, +ss: List<&2, String>) -> Verdict:
+def body.sums(ok: Bool, +hash: String, +fs: List<&2, K.Item>, +ss: List<&2, String>) -> Verdict:
   match ok:
     case True{}:
       body.laid(String.eq(hash, named(laid(fs, ss))), hash, fs, ss)
@@ -219,7 +219,7 @@ def body.sums(ok: Bool, +hash: String, +fs: List<&2, K.File>, +ss: List<&2, Stri
       No{"ez: " ++ hash ++ ": a file does not match its manifest"}
 
 # the verdict once each path was asked whether it escapes the package
-def body.escape.go(clean: Bool, +bad: String, +hash: String, +fs: List<&2, K.File>, +ss: List<&2, String>) -> Verdict:
+def body.escape.go(clean: Bool, +bad: String, +hash: String, +fs: List<&2, K.Item>, +ss: List<&2, String>) -> Verdict:
   match clean:
     case True{}:
       body.sums(sums.ok(fs, ss), hash, fs, ss)
@@ -227,7 +227,7 @@ def body.escape.go(clean: Bool, +bad: String, +hash: String, +fs: List<&2, K.Fil
       No{"ez: " ++ hash ++ ": its manifest escapes the package (" ++ bad ++ ")"}
 
 # the verdict once no path was found to escape the package
-def body.escape(+bad: String, +hash: String, +fs: List<&2, K.File>, +ss: List<&2, String>) -> Verdict:
+def body.escape(+bad: String, +hash: String, +fs: List<&2, K.Item>, +ss: List<&2, String>) -> Verdict:
   body.escape.go(String.is_empty(bad), bad, hash, fs, ss)
 
 # the verdict once the manifest was known to be the one the hash names
@@ -266,12 +266,12 @@ def git.body(empty: Bool, +hash: String, +manifest: String, +ss: List<&2, String
 def git.rule(named: Bool, +hash: String, +manifest: String, +ss: List<&2, String>) -> Verdict:
   match named:
     case True{}:
-      git.body(List.is_empty(&2, K.File, L.manifest.files(String.lines(manifest))),
+      git.body(List.is_empty(&2, K.Item, L.manifest.files(String.lines(manifest))),
         hash, manifest, ss)
     case False{}:
       +fs = L.manifest.files(String.lines(manifest))
       +bs = K.bare(fs)
-      git.body(List.is_empty(&2, K.File, bs), hash, K.manifest.lines(bs),
+      git.body(List.is_empty(&2, K.Item, bs), hash, K.manifest.lines(bs),
         K.bare.srcs(fs, ss))
 
 # a git package's bytes once its checkout was weighed. A tree read from

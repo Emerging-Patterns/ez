@@ -46,8 +46,8 @@ import ../git/git.bend as Git
 import ../ez/target.bend as Tgt
 import ../ez/named.bend as Named
 import ../ez/key.bend as Key
-import ../ez/say.bend as Say
-import ../sha/sha.bend as Sha
+import ../share/say.bend as Say
+import ../share/sha.bend as Sha
 
 # ---------------------------------------------------------------------------
 # small pieces
@@ -705,11 +705,11 @@ def name(+world: TW.World) -> String:
   Tgt.out.name(name.raw(world))
 
 # what the binary is made from: the commit, the file and the bend (EZ-TOOL-2)
-def key(+world: TW.World) -> Key.Key:
-  Key.Key{rev(world), file(world), TW.bend(world)}
+def key(+world: TW.World) -> Key.Stamp:
+  Key.Stamp{rev(world), file(world), TW.bend(world)}
 
 # the directory a record's binary lives in, named by the record
-def stamp.of(key: Key.Key) -> String:
+def stamp.of(key: Key.Stamp) -> String:
   String.take(Sha.hex(Key.show(key)), 16n)
 
 # the directory of this record's binary
@@ -724,7 +724,7 @@ def key.at(+world: TW.World) -> String:
   bdir(world) ++ "/key"
 
 # the binary's record as it was written, none when there is none
-def was(+world: TW.World) -> Key.Key:
+def was(+world: TW.World) -> Key.Stamp:
   Key.read(String.trim(TW.text.or(read.got(world, key.at(world)))))
 
 # whether the binary is there

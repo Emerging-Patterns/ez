@@ -3,9 +3,9 @@
 # name. `tests/fresh.bend` records it beside a built `bin/ez.bin` and holds the
 # binary to it.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../run/bend.bend as Bend
-import ../ez/env.bend as Env
+import ../share/env.bend as Env
 
 # the toolchain: bend's version and the C compiler it would hand its C to
 def tool() -> IO(String):

@@ -1,12 +1,12 @@
-# ez/env: the environment ez hands to the programs it runs. Vendored packages
+# share/env: the environment ez hands to the programs it runs. Vendored packages
 # live with the project rather than in ~/.bend/lib, so every `bend` ez starts
 # has to be told where they are. Base has `get_env` and no `set_env`, and the
 # one foreign effect execvp's what it is given, so the variable rides in front
 # of the command as `env BEND_LIB=... bend ...`. `env` is coreutils and is
 # execvp'd like any other program, so no shell is involved.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
-import ../ez/args.bend as Args
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import ./args.bend as Args
 
 # a value, or the fallback when the variable was unset or empty
 def or_else(+value: String, +alt: String) -> String:
