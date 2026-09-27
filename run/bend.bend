@@ -9,7 +9,7 @@
 # report and the toolchain part of a cache key.
 # Asking both ways, current spelling first, is the whole of this module.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 
 # the older spelling, tried only when the current one was not understood
 def version.older(ok: Bool, out: String) -> IO(String):

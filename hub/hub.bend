@@ -2,11 +2,11 @@
 # it. bend accepts any prefix of the sha256, and a package's `0x` name is the
 # first 32 characters of its manifest's digest, so the check is a prefix test.
 import Base
-import 0x0a372da4a053652f70ded7d6e0d19330/main.bend as Http
-import 0x0a372da4a053652f70ded7d6e0d19330/client.bend as Client
-import 0x0a372da4a053652f70ded7d6e0d19330/url.bend as Url
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
-import ../io/file.bend as File
+import 0x5e4e2a9db839a0214ace6923b04b685b/main.bend as Http
+import 0x5e4e2a9db839a0214ace6923b04b685b/client.bend as Client
+import 0x5e4e2a9db839a0214ace6923b04b685b/url.bend as Url
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import ../io/file.bend as Disk
 import ../sha/sha.bend as Sha
 
 # The GET is ezhttp's. What is kept here is the answer's shape: a status on
@@ -48,7 +48,7 @@ def get.file.got(got: Maybe<&2, String>, path: String) -> String:
 # a file url read off the disk
 def get.file(+path: String) -> IO(String):
   do IO<String>:
-    m : Maybe<&2, String> <- File.read(path)
+    m : Maybe<&2, String> <- Disk.read(path)
     return get.file.got(m, path)
 
 # a url whose scheme decides where the body comes from

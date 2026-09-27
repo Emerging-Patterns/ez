@@ -19,7 +19,7 @@
 # `sync` asks the planner which pins to install (`TP.sync`) and installs
 # each in turn as `ez tool install <name>` would.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../lock/plan.bend as LP
@@ -178,7 +178,7 @@ def compile.said(ok: Bool, +why: String, +text: String) -> IO(Unit):
 # `bend <file> -o <out>` under the memory cap, with the checkout's library
 def compile(+lib: String, +file: String, +out: String) -> IO(Unit):
   do IO<Unit>:
-    +on : Bool <- Cap.ok()
+    +on : Bool <- Cap.ready()
     Cap.warn.err(on)
     +g : String <- Cap.gb()
     _mk : String <- R.exec(["mkdir", "-p", P.dir(out)])

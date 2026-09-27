@@ -5,7 +5,7 @@
 # prints and exits as they say and runs the command, which is trusted under
 # EZ-TRUST-2. `IO.args()` is copied so each word can be read more than once.
 # Build it
-# native (`bend ez/main.bend -o bin/ez.bin`); interpreted, bend's own CLI
+# native (`bend ez.bend -o bin/ez.bin`); interpreted, bend's own CLI
 # would take the flags meant for ez.
 import Base
 import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake

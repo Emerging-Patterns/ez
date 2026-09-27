@@ -10,7 +10,7 @@
 # exits 1 with the reason when the plan refuses. It decides nothing; that it
 # reads and executes faithfully is EZ-TRUST-2.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../lock/up.bend as Up
@@ -40,7 +40,7 @@ def loop.step(st: AP.Next, +lib: String, world: A.World, go: A.World -> IO(Unit)
       do IO<Unit>:
         rs : List<&2, W.Reply> <- Run.answer.all(lib, asks)
         go(more.hub(world, rs))
-    case AP.Done{pl}:
+    case AP.Ready{pl}:
       Run.exec.plan(lib, pl)
 
 # the loop, under fuel. Every round adds an answer, since the planner never

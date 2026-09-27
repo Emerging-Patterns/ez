@@ -1,7 +1,8 @@
-# ez/prove: the proof gate. Every PROOF.bend in the tree is run through `bend`,
-# all of them at once, and a proof passes only when the first line bend prints
-# is exactly `All terms check.` Nothing is cached: a gate CI leans on answers
-# for the tree in front of it, not for one it saw before.
+# ez/prove: the proof gate. Every PROOF.bend in the tree is imported by a file
+# above the tree and that file is run through `bend`, all of them at once, and
+# a proof passes only when the first line bend prints is exactly `All terms
+# check.` Nothing is cached: a gate CI leans on answers for the tree in front
+# of it, not for one it saw before.
 #
 # The line is the verdict, never the exit status. Both
 # `All terms check, with N unsafe annotations.` and 2.0.18's
@@ -9,7 +10,7 @@
 # gate reading the status alone goes green on a claim that leans on code
 # nothing proved. Only the bare line means every term was proved outright.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../ez/args.bend as Args
 import ../ez/env.bend as Env
 import ../ez/cap.bend as Cap
@@ -17,6 +18,7 @@ import ./quiet.bend as Q
 import ./sorted.bend as Sort
 import ../ez/ends.bend as E
 import ../lock/run.bend as Run
+import ../io/file.bend as F
 
 # every file of a kind in the tree, sorted, so a run's report is the same twice
 # over. Base has no readdir, so this is `find`. `.claude` is skipped along with
@@ -51,6 +53,60 @@ def fresh.dir(+at: String) -> IO(Unit):
 # where the jobs of this run write what they print
 def out.at() -> String:
   ".ez/run/prove"
+
+# where a proof is started from. Bend 2.0.28 names a file from the program
+# that starts it, and a start inside the tree gives one file two names. Each
+# proof is imported by a file here, above the tree, and that file is what
+# bend runs.
+def entry.dir() -> String:
+  ".ez/prove-entry"
+
+# `./sha/PROOF.bend` without the `./` find puts on the front
+def drop.dot(+path: String) -> String:
+  Bool.pick(String, String.starts_with(path, "./"), String.drop(path, 2n), path)
+
+# one character of a path, `/` written as `_`
+def us.ch(slash: Bool, ch: Char) -> Char:
+  match slash:
+    case True{}:
+      '_'
+    case False{}:
+      ch
+
+# `/` written as `_`, so a path is one file name
+def us.slash(text: String) -> String:
+  match text:
+    case SNil{}:
+      ""
+    case SCon{+h, t}:
+      SCon{us.ch(Char.is_eq(h, '/'), h), us.slash(t)}
+
+# the file bend starts for one proof
+def shim.at(+path: String) -> String:
+  entry.dir() ++ "/" ++ us.slash(drop.dot(path))
+
+# a program whose only import is the proof. It defines no main, so bend
+# prints the check line and stops, which is the line the gate reads.
+def shim.text(+path: String) -> String:
+  "import Base\nimport ../../" ++ drop.dot(path) ++ " as P\n"
+
+# that file written, and its path
+def lay.one(+path: String) -> IO(String):
+  do IO<String>:
+    +at : String <- IO.pure(String, shim.at(path))
+    _w : Bool <- F.write(at, shim.text(path))
+    return at
+
+# one start file for every proof, in the tree's order
+def lay(ps: List<&2, String>) -> IO(List<&2, String>):
+  match ps:
+    case Nil{}:
+      IO.pure(List<&2, String>, Nil{})
+    case Con{+h, t}:
+      do IO<List<&2, String>>:
+        at : String <- lay.one(h)
+        rest : List<&2, String> <- lay(t)
+        return at <> rest
 
 # the first line of a run's output
 def head.of(ls: List<&2, String>) -> String:
@@ -153,13 +209,15 @@ def done(+passed: Nat, +total: Nat) -> IO(Unit):
 # and one that never finishes is stopped by whatever runs the gate.
 def run() -> IO(Unit):
   do IO<Unit>:
-    +cap : Bool <- Cap.ok()
+    +cap : Bool <- Cap.ready()
     Cap.warn(cap)
     +g : String <- Cap.gb()
     +at : String <- Env.lib()
     +jobs : String <- width()
     +ps : List<&2, String> <- find.proofs()
     fresh.dir(out.at())
-    as : List<&2, String> <- R.par(cmds(ps, cap, g, at), jobs, g, out.at(), "0")
+    fresh.dir(entry.dir())
+    +shims : List<&2, String> <- lay(ps)
+    as : List<&2, String> <- R.par(cmds(shims, cap, g, at), jobs, g, out.at(), "0")
     +passed : Nat <- report(ps, as, g, 0n)
     done(passed, List.length(&2, String, ps))

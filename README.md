@@ -18,10 +18,10 @@ git clone https://github.com/Emerging-Patterns/ez
 cd ez
 sh bootstrap.sh
 mkdir -p bin
-BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
+BEND_LIB=$PWD/.ez/lib bend ez.bend -o bin/ez.bin
 ```
 
-ez runs on Bend 2.0.27, the version CI builds with. Its dependencies are
+ez runs on Bend 2.0.31, the version CI builds with. Its dependencies are
 pinned to git revs, and `ez fetch` is what fetches them, which ez cannot run
 before it is built. `bootstrap.sh` is that one step, and the one helper script
 in the repo: it reads `ez.lock.toml`, fetches each package at its pinned rev

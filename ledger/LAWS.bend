@@ -14,7 +14,7 @@ import ../check/str.bend as Str
 # written to: every ledger `R.renderable` accepts reads back, from the text
 # `R.show` writes, as itself. `R.show` is eztoml's `render` of the document ez
 # assembles (`R.text`), and `M.parse` reads through eztoml's `parse`, so this
-# rests on eztoml's round trip (TOML-RT-1, pending in eztoml v0.4.0) and is
+# rests on eztoml's round trip (TOML-RT-1, proved in eztoml v0.5.0) and is
 # trusted as EZ-TRUST-8, not proved here. A law that takes it holds of the
 # file's bytes wherever the round trip does.
 def ReadsBack() -> Type:

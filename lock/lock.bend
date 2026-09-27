@@ -25,7 +25,7 @@ type Src is Data:
 
 # a package the lock records
 type Pack is Data:
-  Pack{hash: String, src: Src, files: List<&2, K.File>}
+  Pack{hash: String, src: Src, files: List<&2, K.Member>}
 
 # a package's origin, as ez.toml records it
 type Origin is Data:
@@ -302,17 +302,17 @@ def origin.hash(known: Origin) -> String:
   n
 
 # one `<sha256> <path>` line of a manifest
-def line.put(+ws: List<&2, String>) -> List<&2, K.File>:
-  Bool.pick(List<&2, K.File>, Nat.is_eq(List.length(&2, String, ws), 2n),
-    [K.File{K.word(ws, 1n), K.word(ws, 0n)}], [])
+def line.put(+ws: List<&2, String>) -> List<&2, K.Member>:
+  Bool.pick(List<&2, K.Member>, Nat.is_eq(List.length(&2, String, ws), 2n),
+    [K.Member{K.word(ws, 1n), K.word(ws, 0n)}], [])
 
 # every file a manifest names
-def manifest.files(ls: List<&2, String>) -> List<&2, K.File>:
+def manifest.files(ls: List<&2, String>) -> List<&2, K.Member>:
   match ls:
     case []:
       []
     case h <> t:
-      List.append(&2, K.File, line.put(K.words(h)), manifest.files(t))
+      List.append(&2, K.Member, line.put(K.words(h)), manifest.files(t))
 
 # a url under the hub
 def url_of(+hub: String, +hash: String, at: String) -> String:
@@ -412,12 +412,12 @@ def src.pairs(source: Src) -> List<&2, T.Kv>:
          kv("root", root), kv("narHash", nar), kv("tag", tag)])
 
 # a file of a package as a `"<path>" = "<sha256>"` pair
-def file.pair(item: K.File) -> T.Kv:
-  K.File{at, sum} = item
+def file.pair(item: K.Member) -> T.Kv:
+  K.Member{at, sum} = item
   T.Kv{at, sum}
 
 # every file of a package, in path order
-def file.pairs(fs: List<&2, K.File>) -> List<&2, T.Kv>:
+def file.pairs(fs: List<&2, K.Member>) -> List<&2, T.Kv>:
   match fs:
     case []:
       []
@@ -426,7 +426,7 @@ def file.pairs(fs: List<&2, K.File>) -> List<&2, T.Kv>:
 
 # the two tables a package is written as, from its files already in path
 # order and each one once
-def pack.sects.of(hash: String, src: Src, fs: List<&2, K.File>) -> List<&2, T.Sect>:
+def pack.sects.of(hash: String, src: Src, fs: List<&2, K.Member>) -> List<&2, T.Sect>:
   +at = "packages." ++ T.quote(hash)
   [T.Sect{at ++ ".source", src.pairs(src)},
    T.Sect{at ++ ".files", file.pairs(fs)}]
@@ -498,12 +498,12 @@ def doc(hub: String, ps: List<&2, Pack>) -> List<&2, T.Sect>:
 # that proof again, and Bend's function values are linear, so one sort by a
 # key function applied at every comparison cannot be written. A block's path
 # is its package's hash, so distinct hashes are distinct paths.
-def pack.block(package: Pack) -> K.File:
+def pack.block(package: Pack) -> K.Member:
   Pack{+hash, src, files} = package
-  K.File{hash, T.render(pack.sects.of(hash, src, K.files_of(files)))}
+  K.Member{hash, T.render(pack.sects.of(hash, src, K.files_of(files)))}
 
 # every package, as its block
-def pack.blocks(ps: List<&2, Pack>) -> List<&2, K.File>:
+def pack.blocks(ps: List<&2, Pack>) -> List<&2, K.Member>:
   match ps:
     case []:
       []
@@ -511,18 +511,18 @@ def pack.blocks(ps: List<&2, Pack>) -> List<&2, K.File>:
       pack.block(h) <> pack.blocks(t)
 
 # the text of every block, in the order given
-def block.texts(bs: List<&2, K.File>) -> List<&2, String>:
+def block.texts(bs: List<&2, K.Member>) -> List<&2, String>:
   match bs:
     case []:
       []
-    case K.File{_hash, text} <> t:
+    case K.Member{_hash, text} <> t:
       text <> block.texts(t)
 
 # the lock's text: the `[lock]` table, each block in the order given, then the
 # rest, assembled as ez's document text (`T.render`) and written as eztoml
 # writes it (`T.normal`). Every part of it is fixed by the blocks' order, so
 # the order the walk found packages in does not reach the file (EZ-DOC-2).
-def text.of(hub: String, bs: List<&2, K.File>, rest: List<&2, String>) -> String:
+def text.of(hub: String, bs: List<&2, K.Member>, rest: List<&2, String>) -> String:
   T.normal(String.join(T.render.sect(lock.sect(hub)) <>
     List.append(&2, String, block.texts(bs), rest), "\n"))
 
@@ -562,12 +562,12 @@ def render.tools(ts: List<&2, M.Tool>, hub: String, ps: List<&2, Pack>) -> Strin
 # a name as the pair the `[names]` table writes it as, which is the shape a
 # file of a package is written in: its `<name>@<version>` as a quoted key and
 # its hash as the value
-def name.file(name: Name) -> K.File:
+def name.file(name: Name) -> K.Member:
   Name{nv, hash} = name
-  K.File{nv, hash}
+  K.Member{nv, hash}
 
 # every name, so
-def name.files(ns: List<&2, Name>) -> List<&2, K.File>:
+def name.files(ns: List<&2, Name>) -> List<&2, K.Member>:
   match ns:
     case []:
       []
@@ -658,12 +658,12 @@ def hashes(ss: List<&2, T.Sect>) -> List<&2, String>:
       hash.put(named3(segs(h), "packages", "files"), h, hashes(t))
 
 # a pair of a files table as a file
-def pair.file(kv: T.Kv) -> K.File:
+def pair.file(kv: T.Kv) -> K.Member:
   T.Kv{k, v} = kv
-  K.File{k, v}
+  K.Member{k, v}
 
 # every pair of a files table, as files
-def pair.files(ps: List<&2, T.Kv>) -> List<&2, K.File>:
+def pair.files(ps: List<&2, T.Kv>) -> List<&2, K.Member>:
   match ps:
     case []:
       []
@@ -693,7 +693,7 @@ def pack.src(package: Pack) -> Src:
   s
 
 # a package's files
-def pack.files(package: Pack) -> List<&2, K.File>:
+def pack.files(package: Pack) -> List<&2, K.Member>:
   Pack{_h, _s, f} = package
   f
 

@@ -139,7 +139,7 @@ law fetch_weighs_the_checkout:
 # (`fetch_refusal_writes_nothing`).
 # EZ-FETCH-1
 law fetch_refuses_unweighed:
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Member>
   for +h: String
   for +why: String
   for ls: List<&2, W.Source>

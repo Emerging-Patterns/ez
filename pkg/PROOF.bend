@@ -22,36 +22,36 @@ import ./LAWS.bend as Laws
 # a parameter and the equation that put it there given alongside, since a
 # match may not scrutinise a computed value
 law dedup_dup.arm:
-  for +f: P.File
-  for b: P.File
-  for t: List<&2, P.File>
+  for +f: P.Member
+  for b: P.Member
+  for t: List<&2, P.Member>
   for bb: Bool
   for eb: {String.eq(P.file.at(f), P.file.at(b)) == bb : Bool}
   {P.dedup.head(f, P.dedup.pick(bb, f, b <> t)) == P.dedup.pick(bb, f, b <> t)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def dedup_dup.arm(f, b, t, bb, eb):
   match bb:
     case True{}:
-      Equal.cong(Bool, List<&2, P.File>, x => P.dedup.pick(x, f, b <> t),
+      Equal.cong(Bool, List<&2, P.Member>, x => P.dedup.pick(x, f, b <> t),
         String.eq(P.file.at(f), P.file.at(b)), True{}, eb)
     case False{}:
-      Equal.cong(Bool, List<&2, P.File>,
+      Equal.cong(Bool, List<&2, P.Member>,
         x => P.dedup.pick(x, f, f <> (b <> t)),
         String.eq(P.file.at(f), P.file.at(f)), True{},
         Eq.string_eq_self(P.file.at(f)))
 
 # LAW: offering the same file to a deduplicated list twice changes nothing
 law dedup_dup.head:
-  for +f: P.File
-  for r: List<&2, P.File>
+  for +f: P.Member
+  for r: List<&2, P.Member>
   {P.dedup.head(f, P.dedup.head(f, r)) == P.dedup.head(f, r)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def dedup_dup.head(f, r):
   match r:
     case []:
-      Equal.cong(Bool, List<&2, P.File>, x => P.dedup.pick(x, f, [f]),
+      Equal.cong(Bool, List<&2, P.Member>, x => P.dedup.pick(x, f, [f]),
         String.eq(P.file.at(f), P.file.at(f)), True{},
         Eq.string_eq_self(P.file.at(f)))
     case +b <> t:
@@ -62,11 +62,11 @@ def Laws.dedup_dup(f, t):
 
 # LAW: whichever branch the pick takes, what comes back is a file and a rest
 law dedup_keeps.arm:
-  for -f: P.File
-  for -b: P.File
-  for -t: List<&2, P.File>
+  for -f: P.Member
+  for -b: P.Member
+  for -t: List<&2, P.Member>
   for bb: Bool
-  {List.is_empty(&2, P.File, P.dedup.pick(bb, f, b <> t)) == False{} : Bool}
+  {List.is_empty(&2, P.Member, P.dedup.pick(bb, f, b <> t)) == False{} : Bool}
 
 def dedup_keeps.arm(_f, _b, _t, bb):
   match bb:
@@ -77,9 +77,9 @@ def dedup_keeps.arm(_f, _b, _t, bb):
 
 # LAW: a file offered to any deduplicated list comes back with it
 law dedup_keeps.head:
-  for +h: P.File
-  for r: List<&2, P.File>
-  {List.is_empty(&2, P.File, P.dedup.head(h, r)) == False{} : Bool}
+  for +h: P.Member
+  for r: List<&2, P.Member>
+  {List.is_empty(&2, P.Member, P.dedup.head(h, r)) == False{} : Bool}
 
 def dedup_keeps.head(h, r):
   match r:
@@ -724,9 +724,9 @@ def le.trans.go(u, v, w, ok, eu, ev):
 
 # LAW: the order files are written in is transitive, as a total order is
 law le.trans:
-  for +x: P.File
-  for +y: P.File
-  for +z: P.File
+  for +x: P.Member
+  for +y: P.Member
+  for +z: P.Member
   for exy: {P.file.le(x, y) == True{} : Bool}
   for eyz: {P.file.le(y, z) == True{} : Bool}
   {P.file.le(x, z) == True{} : Bool}
@@ -776,8 +776,8 @@ def le.excl.go(u, eu):
 # both and never neither. This is what the order of a package's files rests
 # on: a package holds each path once, so no two of its files tie.
 law le.excl:
-  for +a: P.File
-  for +b: P.File
+  for +a: P.Member
+  for +b: P.Member
   for ne: {String.eq(P.file.at(a), P.file.at(b)) == False{} : Bool}
   {P.file.le(a, b) == Bool.not(P.file.le(b, a)) : Bool}
 
@@ -804,50 +804,50 @@ def le.excl(a, b, ne):
 
 # LAW: two files inserted into an empty list in either order land the same way
 law ins.swap.nil:
-  for +a: P.File
-  for +b: P.File
+  for +a: P.Member
+  for +b: P.Member
   for ba: Bool
   for eba: {P.file.le(b, a) == ba : Bool}
   for eab: {P.file.le(a, b) == Bool.not(ba) : Bool}
   {P.file.ins(P.file.ins([], a), b) == P.file.ins(P.file.ins([], b), a)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def ins.swap.nil(a, b, ba, eba, eab):
   match ba:
     case True{}:
-      Equal.trans(List<&2, P.File>,
+      Equal.trans(List<&2, P.Member>,
         P.file.ins(P.file.ins([], a), b),
         b <> (a <> []),
         P.file.ins(P.file.ins([], b), a),
-        Equal.cong(Bool, List<&2, P.File>,
+        Equal.cong(Bool, List<&2, P.Member>,
           y => P.file.ins.put(y, b, a, [], [b]),
           P.file.le(b, a), True{}, eba),
-        Equal.sym(List<&2, P.File>,
+        Equal.sym(List<&2, P.Member>,
           P.file.ins(P.file.ins([], b), a), b <> (a <> []),
-          Equal.cong(Bool, List<&2, P.File>,
+          Equal.cong(Bool, List<&2, P.Member>,
             y => P.file.ins.put(y, a, b, [], [a]),
             P.file.le(a, b), False{}, eab)))
     case False{}:
-      Equal.trans(List<&2, P.File>,
+      Equal.trans(List<&2, P.Member>,
         P.file.ins(P.file.ins([], a), b),
         a <> (b <> []),
         P.file.ins(P.file.ins([], b), a),
-        Equal.cong(Bool, List<&2, P.File>,
+        Equal.cong(Bool, List<&2, P.Member>,
           y => P.file.ins.put(y, b, a, [], [b]),
           P.file.le(b, a), False{}, eba),
-        Equal.sym(List<&2, P.File>,
+        Equal.sym(List<&2, P.Member>,
           P.file.ins(P.file.ins([], b), a), a <> (b <> []),
-          Equal.cong(Bool, List<&2, P.File>,
+          Equal.cong(Bool, List<&2, P.Member>,
             y => P.file.ins.put(y, a, b, [], [a]),
             P.file.le(a, b), True{}, eab)))
 
 # LAW: both files belong before the head, so both end up in front of it, in
 # the order their own comparison puts them
 law ins.swap.tt:
-  for +h: P.File
-  for +t: List<&2, P.File>
-  for +a: P.File
-  for +b: P.File
+  for +h: P.Member
+  for +t: List<&2, P.Member>
+  for +a: P.Member
+  for +b: P.Member
   for ba: Bool
   for eba: {P.file.le(b, a) == ba : Bool}
   for eab: {P.file.le(a, b) == Bool.not(ba) : Bool}
@@ -855,76 +855,76 @@ law ins.swap.tt:
   for eB: {P.file.le(b, h) == True{} : Bool}
   {P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b)
     == P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def ins.swap.tt(h, t, a, b, ba, eba, eab, eA, eB):
   match ba:
     case True{}:
-      Equal.trans(List<&2, P.File>,
+      Equal.trans(List<&2, P.Member>,
         P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b),
         b <> (a <> (h <> t)),
         P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a),
-        Equal.trans(List<&2, P.File>,
+        Equal.trans(List<&2, P.Member>,
           P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b),
           P.file.ins.put(P.file.le(b, a), b, a, h <> t, b <> (h <> t)),
           b <> (a <> (h <> t)),
-          Equal.cong(List<&2, P.File>, List<&2, P.File>,
+          Equal.cong(List<&2, P.Member>, List<&2, P.Member>,
             r => P.file.ins.put(P.file.le(b, a), b, a, h <> t, r),
             P.file.ins(h <> t, b), b <> (h <> t),
-            Equal.cong(Bool, List<&2, P.File>,
+            Equal.cong(Bool, List<&2, P.Member>,
               y => P.file.ins.put(y, b, h, t, P.file.ins(t, b)),
               P.file.le(b, h), True{}, eB)),
-          Equal.cong(Bool, List<&2, P.File>,
+          Equal.cong(Bool, List<&2, P.Member>,
             y => P.file.ins.put(y, b, a, h <> t, b <> (h <> t)),
             P.file.le(b, a), True{}, eba)),
-        Equal.sym(List<&2, P.File>,
+        Equal.sym(List<&2, P.Member>,
           P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a),
           b <> (a <> (h <> t)),
-          Equal.trans(List<&2, P.File>,
+          Equal.trans(List<&2, P.Member>,
             P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a),
             P.file.ins.put(P.file.le(a, b), a, b, h <> t, a <> (h <> t)),
             b <> (a <> (h <> t)),
-            Equal.cong(List<&2, P.File>, List<&2, P.File>,
+            Equal.cong(List<&2, P.Member>, List<&2, P.Member>,
               r => P.file.ins.put(P.file.le(a, b), a, b, h <> t, r),
               P.file.ins(h <> t, a), a <> (h <> t),
-              Equal.cong(Bool, List<&2, P.File>,
+              Equal.cong(Bool, List<&2, P.Member>,
                 y => P.file.ins.put(y, a, h, t, P.file.ins(t, a)),
                 P.file.le(a, h), True{}, eA)),
-            Equal.cong(Bool, List<&2, P.File>,
+            Equal.cong(Bool, List<&2, P.Member>,
               y => P.file.ins.put(y, a, b, h <> t, a <> (h <> t)),
               P.file.le(a, b), False{}, eab))))
     case False{}:
-      Equal.trans(List<&2, P.File>,
+      Equal.trans(List<&2, P.Member>,
         P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b),
         a <> (b <> (h <> t)),
         P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a),
-        Equal.trans(List<&2, P.File>,
+        Equal.trans(List<&2, P.Member>,
           P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b),
           P.file.ins.put(P.file.le(b, a), b, a, h <> t, b <> (h <> t)),
           a <> (b <> (h <> t)),
-          Equal.cong(List<&2, P.File>, List<&2, P.File>,
+          Equal.cong(List<&2, P.Member>, List<&2, P.Member>,
             r => P.file.ins.put(P.file.le(b, a), b, a, h <> t, r),
             P.file.ins(h <> t, b), b <> (h <> t),
-            Equal.cong(Bool, List<&2, P.File>,
+            Equal.cong(Bool, List<&2, P.Member>,
               y => P.file.ins.put(y, b, h, t, P.file.ins(t, b)),
               P.file.le(b, h), True{}, eB)),
-          Equal.cong(Bool, List<&2, P.File>,
+          Equal.cong(Bool, List<&2, P.Member>,
             y => P.file.ins.put(y, b, a, h <> t, b <> (h <> t)),
             P.file.le(b, a), False{}, eba)),
-        Equal.sym(List<&2, P.File>,
+        Equal.sym(List<&2, P.Member>,
           P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a),
           a <> (b <> (h <> t)),
-          Equal.trans(List<&2, P.File>,
+          Equal.trans(List<&2, P.Member>,
             P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a),
             P.file.ins.put(P.file.le(a, b), a, b, h <> t, a <> (h <> t)),
             a <> (b <> (h <> t)),
-            Equal.cong(List<&2, P.File>, List<&2, P.File>,
+            Equal.cong(List<&2, P.Member>, List<&2, P.Member>,
               r => P.file.ins.put(P.file.le(a, b), a, b, h <> t, r),
               P.file.ins(h <> t, a), a <> (h <> t),
-              Equal.cong(Bool, List<&2, P.File>,
+              Equal.cong(Bool, List<&2, P.Member>,
                 y => P.file.ins.put(y, a, h, t, P.file.ins(t, a)),
                 P.file.le(a, h), True{}, eA)),
-            Equal.cong(Bool, List<&2, P.File>,
+            Equal.cong(Bool, List<&2, P.Member>,
               y => P.file.ins.put(y, a, b, h <> t, a <> (h <> t)),
               P.file.le(a, b), True{}, eab))))
 
@@ -933,17 +933,17 @@ def ins.swap.tt(h, t, a, b, ba, eba, eab, eA, eB):
 # two were offered. A file that came before the first would come before the
 # head too, so the branch where one does is no branch at all.
 law ins.swap.tf:
-  for +h: P.File
-  for +t: List<&2, P.File>
-  for +a: P.File
-  for +b: P.File
+  for +h: P.Member
+  for +t: List<&2, P.Member>
+  for +a: P.Member
+  for +b: P.Member
   for ba: Bool
   for eba: {P.file.le(b, a) == ba : Bool}
   for eA: {P.file.le(a, h) == True{} : Bool}
   for eB: {P.file.le(b, h) == False{} : Bool}
   {P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b)
     == P.file.ins(P.file.ins.put(False{}, b, h, t, P.file.ins(t, b)), a)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def ins.swap.tf(h, t, a, b, ba, eba, eA, eB):
   match ba:
@@ -951,50 +951,50 @@ def ins.swap.tf(h, t, a, b, ba, eba, eA, eB):
       Eq.bit.absurd2(&2,
         {P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b)
           == P.file.ins(P.file.ins.put(False{}, b, h, t, P.file.ins(t, b)), a)
-          : List<&2, P.File>},
+          : List<&2, P.Member>},
         Equal.trans(Bool, True{}, P.file.le(b, h), False{},
           Equal.sym(Bool, P.file.le(b, h), True{},
             le.trans(b, a, h, eba, eA)),
           eB))
     case False{}:
-      Equal.trans(List<&2, P.File>,
+      Equal.trans(List<&2, P.Member>,
         P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b),
         a <> (h <> P.file.ins(t, b)),
         P.file.ins(P.file.ins.put(False{}, b, h, t, P.file.ins(t, b)), a),
-        Equal.trans(List<&2, P.File>,
+        Equal.trans(List<&2, P.Member>,
           P.file.ins(P.file.ins.put(True{}, a, h, t, P.file.ins(t, a)), b),
           P.file.ins.put(P.file.le(b, a), b, a, h <> t, h <> P.file.ins(t, b)),
           a <> (h <> P.file.ins(t, b)),
-          Equal.cong(List<&2, P.File>, List<&2, P.File>,
+          Equal.cong(List<&2, P.Member>, List<&2, P.Member>,
             r => P.file.ins.put(P.file.le(b, a), b, a, h <> t, r),
             P.file.ins(h <> t, b), h <> P.file.ins(t, b),
-            Equal.cong(Bool, List<&2, P.File>,
+            Equal.cong(Bool, List<&2, P.Member>,
               y => P.file.ins.put(y, b, h, t, P.file.ins(t, b)),
               P.file.le(b, h), False{}, eB)),
-          Equal.cong(Bool, List<&2, P.File>,
+          Equal.cong(Bool, List<&2, P.Member>,
             y => P.file.ins.put(y, b, a, h <> t, h <> P.file.ins(t, b)),
             P.file.le(b, a), False{}, eba)),
-        Equal.sym(List<&2, P.File>,
+        Equal.sym(List<&2, P.Member>,
           P.file.ins(P.file.ins.put(False{}, b, h, t, P.file.ins(t, b)), a),
           a <> (h <> P.file.ins(t, b)),
-          Equal.cong(Bool, List<&2, P.File>,
+          Equal.cong(Bool, List<&2, P.Member>,
             y => P.file.ins.put(y, a, h, P.file.ins(t, b),
               P.file.ins(P.file.ins(t, b), a)),
             P.file.le(a, h), True{}, eA)))
 
 # LAW: the mirror of the one above, with the two files the other way round
 law ins.swap.ft:
-  for +h: P.File
-  for +t: List<&2, P.File>
-  for +a: P.File
-  for +b: P.File
+  for +h: P.Member
+  for +t: List<&2, P.Member>
+  for +a: P.Member
+  for +b: P.Member
   for ab: Bool
   for eab: {P.file.le(a, b) == ab : Bool}
   for eA: {P.file.le(a, h) == False{} : Bool}
   for eB: {P.file.le(b, h) == True{} : Bool}
   {P.file.ins(P.file.ins.put(False{}, a, h, t, P.file.ins(t, a)), b)
     == P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def ins.swap.ft(h, t, a, b, ab, eab, eA, eB):
   match ab:
@@ -1002,72 +1002,72 @@ def ins.swap.ft(h, t, a, b, ab, eab, eA, eB):
       Eq.bit.absurd2(&2,
         {P.file.ins(P.file.ins.put(False{}, a, h, t, P.file.ins(t, a)), b)
           == P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a)
-          : List<&2, P.File>},
+          : List<&2, P.Member>},
         Equal.trans(Bool, True{}, P.file.le(a, h), False{},
           Equal.sym(Bool, P.file.le(a, h), True{},
             le.trans(a, b, h, eab, eB)),
           eA))
     case False{}:
-      Equal.trans(List<&2, P.File>,
+      Equal.trans(List<&2, P.Member>,
         P.file.ins(P.file.ins.put(False{}, a, h, t, P.file.ins(t, a)), b),
         b <> (h <> P.file.ins(t, a)),
         P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a),
-        Equal.cong(Bool, List<&2, P.File>,
+        Equal.cong(Bool, List<&2, P.Member>,
           y => P.file.ins.put(y, b, h, P.file.ins(t, a),
             P.file.ins(P.file.ins(t, a), b)),
           P.file.le(b, h), True{}, eB),
-        Equal.sym(List<&2, P.File>,
+        Equal.sym(List<&2, P.Member>,
           P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a),
           b <> (h <> P.file.ins(t, a)),
-          Equal.trans(List<&2, P.File>,
+          Equal.trans(List<&2, P.Member>,
             P.file.ins(P.file.ins.put(True{}, b, h, t, P.file.ins(t, b)), a),
             P.file.ins.put(P.file.le(a, b), a, b, h <> t,
               h <> P.file.ins(t, a)),
             b <> (h <> P.file.ins(t, a)),
-            Equal.cong(List<&2, P.File>, List<&2, P.File>,
+            Equal.cong(List<&2, P.Member>, List<&2, P.Member>,
               r => P.file.ins.put(P.file.le(a, b), a, b, h <> t, r),
               P.file.ins(h <> t, a), h <> P.file.ins(t, a),
-              Equal.cong(Bool, List<&2, P.File>,
+              Equal.cong(Bool, List<&2, P.Member>,
                 y => P.file.ins.put(y, a, h, t, P.file.ins(t, a)),
                 P.file.le(a, h), False{}, eA)),
-            Equal.cong(Bool, List<&2, P.File>,
+            Equal.cong(Bool, List<&2, P.Member>,
               y => P.file.ins.put(y, a, b, h <> t, h <> P.file.ins(t, a)),
               P.file.le(a, b), False{}, eab))))
 
 # LAW: neither file belongs before the head, so both go past it and the swap
 # is the one the shorter list already answered for
 law ins.swap.ff:
-  for +h: P.File
-  for +t: List<&2, P.File>
-  for +a: P.File
-  for +b: P.File
+  for +h: P.Member
+  for +t: List<&2, P.Member>
+  for +a: P.Member
+  for +b: P.Member
   for eA: {P.file.le(a, h) == False{} : Bool}
   for eB: {P.file.le(b, h) == False{} : Bool}
   for ih: {P.file.ins(P.file.ins(t, a), b) == P.file.ins(P.file.ins(t, b), a)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
   {P.file.ins(P.file.ins.put(False{}, a, h, t, P.file.ins(t, a)), b)
     == P.file.ins(P.file.ins.put(False{}, b, h, t, P.file.ins(t, b)), a)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def ins.swap.ff(h, t, a, b, eA, eB, ih):
-  Equal.trans(List<&2, P.File>,
+  Equal.trans(List<&2, P.Member>,
     P.file.ins(P.file.ins.put(False{}, a, h, t, P.file.ins(t, a)), b),
     h <> P.file.ins(P.file.ins(t, a), b),
     P.file.ins(P.file.ins.put(False{}, b, h, t, P.file.ins(t, b)), a),
-    Equal.cong(Bool, List<&2, P.File>,
+    Equal.cong(Bool, List<&2, P.Member>,
       y => P.file.ins.put(y, b, h, P.file.ins(t, a),
         P.file.ins(P.file.ins(t, a), b)),
       P.file.le(b, h), False{}, eB),
-    Equal.trans(List<&2, P.File>,
+    Equal.trans(List<&2, P.Member>,
       h <> P.file.ins(P.file.ins(t, a), b),
       h <> P.file.ins(P.file.ins(t, b), a),
       P.file.ins(P.file.ins.put(False{}, b, h, t, P.file.ins(t, b)), a),
-      Equal.cong(List<&2, P.File>, List<&2, P.File>, r => h <> r,
+      Equal.cong(List<&2, P.Member>, List<&2, P.Member>, r => h <> r,
         P.file.ins(P.file.ins(t, a), b), P.file.ins(P.file.ins(t, b), a), ih),
-      Equal.sym(List<&2, P.File>,
+      Equal.sym(List<&2, P.Member>,
         P.file.ins(P.file.ins.put(False{}, b, h, t, P.file.ins(t, b)), a),
         h <> P.file.ins(P.file.ins(t, b), a),
-        Equal.cong(Bool, List<&2, P.File>,
+        Equal.cong(Bool, List<&2, P.Member>,
           y => P.file.ins.put(y, a, h, P.file.ins(t, b),
             P.file.ins(P.file.ins(t, b), a)),
           P.file.le(a, h), False{}, eA))))
@@ -1075,20 +1075,20 @@ def ins.swap.ff(h, t, a, b, eA, eB, ih):
 # LAW: one step of the swap, with the two comparisons against the head given
 # as parameters and the equations that put them there given alongside
 law ins.swap.arm:
-  for +h: P.File
-  for +t: List<&2, P.File>
-  for +a: P.File
-  for +b: P.File
+  for +h: P.Member
+  for +t: List<&2, P.Member>
+  for +a: P.Member
+  for +b: P.Member
   for A: Bool
   for eA: {P.file.le(a, h) == A : Bool}
   for B: Bool
   for eB: {P.file.le(b, h) == B : Bool}
   for exc: {P.file.le(a, b) == Bool.not(P.file.le(b, a)) : Bool}
   for ih: {P.file.ins(P.file.ins(t, a), b) == P.file.ins(P.file.ins(t, b), a)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
   {P.file.ins(P.file.ins.put(A, a, h, t, P.file.ins(t, a)), b)
     == P.file.ins(P.file.ins.put(B, b, h, t, P.file.ins(t, b)), a)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def ins.swap.arm(h, t, a, b, A, eA, B, eB, exc, ih):
   match A B:
@@ -1105,12 +1105,12 @@ def ins.swap.arm(h, t, a, b, A, eA, B, eB, exc, ih):
 # give the same list. The list is any list: the sort's accumulator is in order
 # already, but the induction never needs to say so.
 law ins.swap:
-  for xs: List<&2, P.File>
-  for +a: P.File
-  for +b: P.File
+  for xs: List<&2, P.Member>
+  for +a: P.Member
+  for +b: P.Member
   for +ne: {String.eq(P.file.at(a), P.file.at(b)) == False{} : Bool}
   {P.file.ins(P.file.ins(xs, a), b) == P.file.ins(P.file.ins(xs, b), a)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def ins.swap(xs, a, b, ne):
   match xs:
@@ -1124,9 +1124,9 @@ def ins.swap(xs, a, b, ne):
 # list with one more file put in it, as long as it is not that file's either
 law fresh.ins_at:
   for +n: Nat
-  for +x: P.File
-  for +y: P.File
-  for +xs: List<&2, P.File>
+  for +x: P.Member
+  for +y: P.Member
+  for +xs: List<&2, P.Member>
   for nxy: {String.eq(P.file.at(x), P.file.at(y)) == False{} : Bool}
   for +fx: {Laws.fresh(x, xs) == True{} : Bool}
   {Laws.fresh(x, Laws.perm.ins_at(n, y, xs)) == True{} : Bool}
@@ -1163,9 +1163,9 @@ def fresh.ins_at(n, x, y, xs, nxy, fx):
 
 # LAW: rearranging a list does not put a path in it that was not there
 law fresh.perm:
-  for +x: P.File
+  for +x: P.Member
   for +ns: List<&2, Nat>
-  for +xs: List<&2, P.File>
+  for +xs: List<&2, P.Member>
   for +fx: {Laws.fresh(x, xs) == True{} : Bool}
   {Laws.fresh(x, Laws.perm(ns, xs)) == True{} : Bool}
 
@@ -1191,11 +1191,11 @@ def fresh.perm(x, ns, xs, fx):
 # which is the whole of the order-independence, said one file at a time.
 law sort.ins_at:
   for +n: Nat
-  for +x: P.File
-  for +xs: List<&2, P.File>
+  for +x: P.Member
+  for +xs: List<&2, P.Member>
   for +fr: {Laws.fresh(x, xs) == True{} : Bool}
   {P.file.sort(Laws.perm.ins_at(n, x, xs)) == P.file.ins(P.file.sort(xs), x)
-    : List<&2, P.File>}
+    : List<&2, P.Member>}
 
 def sort.ins_at(n, x, xs, fr):
   match n xs:
@@ -1204,11 +1204,11 @@ def sort.ins_at(n, x, xs, fr):
     case 1n+p Nil{}:
       {==}
     case 1n+p Con{+h, +t}:
-      Equal.trans(List<&2, P.File>,
+      Equal.trans(List<&2, P.Member>,
         P.file.sort(h <> Laws.perm.ins_at(p, x, t)),
         P.file.ins(P.file.ins(P.file.sort(t), x), h),
         P.file.ins(P.file.ins(P.file.sort(t), h), x),
-        Equal.cong(List<&2, P.File>, List<&2, P.File>,
+        Equal.cong(List<&2, P.Member>, List<&2, P.Member>,
           r => P.file.ins(r, h),
           P.file.sort(Laws.perm.ins_at(p, x, t)),
           P.file.ins(P.file.sort(t), x),
@@ -1229,21 +1229,21 @@ def Laws.sort_perm(ns, xs, dis):
     case Con{n, ms} Nil{}:
       {==}
     case Con{+n, +ms} Con{+h, +t}:
-      Equal.trans(List<&2, P.File>,
+      Equal.trans(List<&2, P.Member>,
         P.file.sort(Laws.perm.ins_at(n, h, Laws.perm(ms, t))),
         P.file.ins(P.file.sort(Laws.perm(ms, t)), h),
         P.file.ins(P.file.sort(t), h),
         sort.ins_at(n, h, Laws.perm(ms, t),
           fresh.perm(h, ms, t,
             Eq.and.left(Laws.fresh(h, t), Laws.distinct(t), dis))),
-        Equal.cong(List<&2, P.File>, List<&2, P.File>,
+        Equal.cong(List<&2, P.Member>, List<&2, P.Member>,
           r => P.file.ins(r, h),
           P.file.sort(Laws.perm(ms, t)), P.file.sort(t),
           Laws.sort_perm(ms, t,
             Eq.and.right(Laws.fresh(h, t), Laws.distinct(t), dis))))
 
 def Laws.manifest_perm(ns, xs, dis):
-  Equal.cong(List<&2, P.File>, String,
+  Equal.cong(List<&2, P.Member>, String,
     ys => P.manifest.lines(P.dedup(ys)),
     P.file.sort(Laws.perm(ns, xs)), P.file.sort(xs),
     Laws.sort_perm(ns, xs, dis))
@@ -2323,25 +2323,25 @@ def Laws.escaping_import_refused(f, entry, tree, eb, seen, out, file, ns, rest, 
 law placed_is_laid:
   for +pre: String
   for +out: List<&2, P.Hit>
-  {P.placed(pre, P.hit.sums(out)) == P.laid.sums(P.laid(pre, out)) : List<&2, P.File>}
+  {P.placed(pre, P.hit.sums(out)) == P.laid.sums(P.laid(pre, out)) : List<&2, P.Member>}
 
 def placed_is_laid(pre, out):
   match out:
     case []:
       {==}
     case P.Hit{+raw, +text} <> t:
-      Equal.cong(List<&2, P.File>, List<&2, P.File>,
-        xs => P.File{Path.join(pre, raw), Sha.hex(text)} <> xs,
+      Equal.cong(List<&2, P.Member>, List<&2, P.Member>,
+        xs => P.Member{Path.join(pre, raw), Sha.hex(text)} <> xs,
         P.placed(pre, P.hit.sums(t)), P.laid.sums(P.laid(pre, t)),
         placed_is_laid(pre, t))
 
 def Laws.walked_named_by_texts(pre, out):
-  Equal.cong(List<&2, P.File>, String, fs => P.hash_of(fs),
+  Equal.cong(List<&2, P.Member>, String, fs => P.hash_of(fs),
     P.placed(pre, P.hit.sums(out)), P.laid.sums(P.laid(pre, out)),
     placed_is_laid(pre, out))
 
 def Laws.walked_manifest_of_texts(pre, out):
-  Equal.cong(List<&2, P.File>, String, fs => P.manifest_of(fs),
+  Equal.cong(List<&2, P.Member>, String, fs => P.manifest_of(fs),
     P.placed(pre, P.hit.sums(out)), P.laid.sums(P.laid(pre, out)),
     placed_is_laid(pre, out))
 
@@ -2410,11 +2410,11 @@ def Laws.license_dir_passes(root, pre, out, none):
   {==}
 
 def Laws.bare_drops_license(h, t, lic):
-  %lic : {P.bare.pick(_, h, P.bare(t)) == P.bare(t) : List<&2, P.File>}
+  %lic : {P.bare.pick(_, h, P.bare(t)) == P.bare(t) : List<&2, P.Member>}
   {==}
 
 def Laws.bare_keeps_sources(h, t, src):
-  %src : {P.bare.pick(_, h, P.bare(t)) == h <> P.bare(t) : List<&2, P.File>}
+  %src : {P.bare.pick(_, h, P.bare(t)) == h <> P.bare(t) : List<&2, P.Member>}
   {==}
 
 # ---------------------------------------------------------------------------

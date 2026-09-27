@@ -5,7 +5,7 @@
 # of the command as `env BEND_LIB=... bend ...`. `env` is coreutils and is
 # execvp'd like any other program, so no shell is involved.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../ez/args.bend as Args
 
 # a value, or the fallback when the variable was unset or empty

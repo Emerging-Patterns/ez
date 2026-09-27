@@ -7,7 +7,7 @@
 # kills for memory looks exactly like one that succeeded and happened to write
 # no binary. The cap is what turns that into a legible exit 137.
 import Base
-import 0x103d0af04de36ab98b311e537366ec67/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../ez/env.bend as Env
 import ../ez/args.bend as Args
 
@@ -27,7 +27,7 @@ def gb() -> IO(String):
 # fails when the program is absent, and it fails when the program is present
 # and the user bus is not. Either failure is no cap. A probe that would
 # wait on a password fails closed instead.
-def ok() -> IO(Bool):
+def ready() -> IO(Bool):
   do IO<Bool>:
     +out : String <- R.exec(["systemd-run", "--user", "--scope", "-q",
       "--collect", "--no-ask-password", "true"])

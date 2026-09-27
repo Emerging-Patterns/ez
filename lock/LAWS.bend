@@ -13,7 +13,6 @@ import ../toml/toml.bend as T
 import ../pkg/pkg.bend as K
 import ../pkg/LAWS.bend as KL
 import ../hub/hub.bend as Web
-import ../ledger/upgrade.bend as U
 import ../ledger/ignore.bend as I
 import ../ledger/LAWS.bend as ML
 import ../check/str.bend as Str
@@ -173,10 +172,10 @@ law pack_order_free:
   for +ns: List<&2, Nat>
   for +hash: String
   for +src: L.Src
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Member>
   for dis: {KL.distinct(fs) == True{} : Bool}
   {L.pack.block(L.Pack{hash, src, KL.perm(ns, fs)})
-    == L.pack.block(L.Pack{hash, src, fs}) : K.File}
+    == L.pack.block(L.Pack{hash, src, fs}) : K.Member}
 
 # LAW: a lock with no tools is the lock `render` writes. Packages do not
 # move because a tool list was empty.
@@ -198,12 +197,12 @@ law path_eq_unlockable:
   for +src: L.Src
   for +at: String
   for +sum: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Member>
   for +rest: List<&2, L.Pack>
   for +ts: List<&2, M.Tool>
   for +hub: String
   for e: {False{} == P.path.eqless(at) : Bool}
-  {P.lockable(L.Pack{hash, src, K.File{at, sum} <> fs} <> rest, ts, hub) == False{}
+  {P.lockable(L.Pack{hash, src, K.Member{at, sum} <> fs} <> rest, ts, hub) == False{}
     : Bool}
 
 # LAW: and the refusal names the package and the path, so the author knows
@@ -213,10 +212,10 @@ law path_eq_named:
   for +src: L.Src
   for +at: String
   for +sum: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Member>
   for +rest: List<&2, L.Pack>
   for +e: {False{} == P.path.eqless(at) : Bool}
-  {P.lockable.why(L.Pack{hash, src, K.File{at, sum} <> fs} <> rest)
+  {P.lockable.why(L.Pack{hash, src, K.Member{at, sum} <> fs} <> rest)
     == P.path.eq.why(hash, at) : String}
 
 # The planner (plan.bend) over the World (world.bend). Every law below is
@@ -1045,12 +1044,12 @@ def lock.doc(nms: List<&2, L.Name>, ts: List<&2, M.Tool>, hub: String, ps: List<
   List.append(&2, T.Sect, L.doc(hub, ps), tail(nms, ts))
 
 # a name as a lock gives it back, from the pair it is written as
-def name.back(item: K.File) -> L.Name:
-  K.File{at, sum} = item
+def name.back(item: K.Member) -> L.Name:
+  K.Member{at, sum} = item
   L.Name{at, sum}
 
 # every name, so
-def names.back(fs: List<&2, K.File>) -> List<&2, L.Name>:
+def names.back(fs: List<&2, K.Member>) -> List<&2, L.Name>:
   match fs:
     case []:
       []
@@ -1059,12 +1058,12 @@ def names.back(fs: List<&2, K.File>) -> List<&2, L.Name>:
 
 # a name as a file of a package: its `<name>@<version>` as the path and its
 # hash as the sum. Law vocabulary.
-def name.as.file(nm: L.Name) -> K.File:
+def name.as.file(nm: L.Name) -> K.Member:
   L.Name{nv, hash} = nm
-  K.File{nv, hash}
+  K.Member{nv, hash}
 
 # every name, so. Law vocabulary.
-def names.as.files(nms: List<&2, L.Name>) -> List<&2, K.File>:
+def names.as.files(nms: List<&2, L.Name>) -> List<&2, K.Member>:
   match nms:
     case []:
       []
@@ -1660,7 +1659,7 @@ law git_named_without_license:
   for +ss: List<&2, String>
   for unnamed: {False{} == Web.matches(L.want(hash), manifest) : Bool}
   {W.git.weighed("", hash, manifest, ss)
-    == W.git.body(List.is_empty(&2, K.File, K.bare(L.manifest.files(String.lines(manifest)))),
+    == W.git.body(List.is_empty(&2, K.Member, K.bare(L.manifest.files(String.lines(manifest)))),
       hash, K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))),
       K.bare.srcs(L.manifest.files(String.lines(manifest)), ss)) : W.Verdict}
 

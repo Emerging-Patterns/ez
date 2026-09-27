@@ -76,7 +76,7 @@ law blocks_ins_at:
   for +x: L.Pack
   for +ps: List<&2, L.Pack>
   {L.pack.blocks(Laws.perm.ins_at(n, x, ps))
-    == KL.perm.ins_at(n, L.pack.block(x), L.pack.blocks(ps)) : List<&2, K.File>}
+    == KL.perm.ins_at(n, L.pack.block(x), L.pack.blocks(ps)) : List<&2, K.Member>}
 
 def blocks_ins_at(n, x, ps):
   match n ps:
@@ -85,7 +85,7 @@ def blocks_ins_at(n, x, ps):
     case 1n+p Nil{}:
       {==}
     case 1n+p Con{+h, +t}:
-      Equal.cong(List<&2, K.File>, List<&2, K.File>,
+      Equal.cong(List<&2, K.Member>, List<&2, K.Member>,
         bs => L.pack.block(h) <> bs,
         L.pack.blocks(Laws.perm.ins_at(p, x, t)),
         KL.perm.ins_at(p, L.pack.block(x), L.pack.blocks(t)),
@@ -96,7 +96,7 @@ law blocks_perm:
   for +ns: List<&2, Nat>
   for +ps: List<&2, L.Pack>
   {L.pack.blocks(Laws.perm(ns, ps)) == KL.perm(ns, L.pack.blocks(ps))
-    : List<&2, K.File>}
+    : List<&2, K.Member>}
 
 def blocks_perm(ns, ps):
   match ns ps:
@@ -107,12 +107,12 @@ def blocks_perm(ns, ps):
     case Con{n, ms} Nil{}:
       {==}
     case Con{+n, +ms} Con{+h, +t}:
-      Equal.trans(List<&2, K.File>,
+      Equal.trans(List<&2, K.Member>,
         L.pack.blocks(Laws.perm.ins_at(n, h, Laws.perm(ms, t))),
         KL.perm.ins_at(n, L.pack.block(h), L.pack.blocks(Laws.perm(ms, t))),
         KL.perm.ins_at(n, L.pack.block(h), KL.perm(ms, L.pack.blocks(t))),
         blocks_ins_at(n, h, Laws.perm(ms, t)),
-        Equal.cong(List<&2, K.File>, List<&2, K.File>,
+        Equal.cong(List<&2, K.Member>, List<&2, K.Member>,
           bs => KL.perm.ins_at(n, L.pack.block(h), bs),
           L.pack.blocks(Laws.perm(ms, t)), KL.perm(ms, L.pack.blocks(t)),
           blocks_perm(ms, t)))
@@ -123,7 +123,7 @@ law fresh_blocks:
   for +x: String
   for +s: String
   for +ps: List<&2, L.Pack>
-  {Laws.hash.fresh(x, ps) == KL.fresh(K.File{x, s}, L.pack.blocks(ps)) : Bool}
+  {Laws.hash.fresh(x, ps) == KL.fresh(K.Member{x, s}, L.pack.blocks(ps)) : Bool}
 
 def fresh_blocks(x, s, ps):
   match ps:
@@ -131,7 +131,7 @@ def fresh_blocks(x, s, ps):
       {==}
     case L.Pack{+h, _src, _fs} <> +t:
       Equal.cong(Bool, Bool, b => Bool.and(Bool.not(String.eq(x, h)), b),
-        Laws.hash.fresh(x, t), KL.fresh(K.File{x, s}, L.pack.blocks(t)),
+        Laws.hash.fresh(x, t), KL.fresh(K.Member{x, s}, L.pack.blocks(t)),
         fresh_blocks(x, s, t))
 
 # LAW: so distinct hashes are distinct block paths
@@ -166,14 +166,14 @@ law blocks_sort_perm:
   for +ps: List<&2, L.Pack>
   for dis: {Laws.distinct(ps) == True{} : Bool}
   {K.file.sort(L.pack.blocks(Laws.perm(ns, ps))) == K.file.sort(L.pack.blocks(ps))
-    : List<&2, K.File>}
+    : List<&2, K.Member>}
 
 def blocks_sort_perm(ns, ps, dis):
-  Equal.trans(List<&2, K.File>,
+  Equal.trans(List<&2, K.Member>,
     K.file.sort(L.pack.blocks(Laws.perm(ns, ps))),
     K.file.sort(KL.perm(ns, L.pack.blocks(ps))),
     K.file.sort(L.pack.blocks(ps)),
-    Equal.cong(List<&2, K.File>, List<&2, K.File>, bs => K.file.sort(bs),
+    Equal.cong(List<&2, K.Member>, List<&2, K.Member>, bs => K.file.sort(bs),
       L.pack.blocks(Laws.perm(ns, ps)), KL.perm(ns, L.pack.blocks(ps)),
       blocks_perm(ns, ps)),
     KL.sort_perm(ns, L.pack.blocks(ps),
@@ -185,15 +185,15 @@ def blocks_sort_perm(ns, ps, dis):
 # The text is the sorted blocks under the `[lock]` table and before the
 # tools, so it follows.
 def Laws.lock_order_free(ns, nms, ps, ts, hub, dis):
-  Equal.cong(List<&2, K.File>, String,
+  Equal.cong(List<&2, K.Member>, String,
     bs => L.text.of(hub, bs, T.render.all(Laws.tail(nms, ts))),
     K.file.sort(L.pack.blocks(Laws.perm(ns, ps))), K.file.sort(L.pack.blocks(ps)),
     blocks_sort_perm(ns, ps, dis))
 
 # A block renders its files sorted, so this is `sort_perm` under the block.
 def Laws.pack_order_free(ns, hash, src, fs, dis):
-  Equal.cong(List<&2, K.File>, K.File,
-    ys => K.File{hash, T.render(L.pack.sects.of(hash, src, K.dedup(ys)))},
+  Equal.cong(List<&2, K.Member>, K.Member,
+    ys => K.Member{hash, T.render(L.pack.sects.of(hash, src, K.dedup(ys)))},
     K.file.sort(KL.perm(ns, fs)), K.file.sort(fs), KL.sort_perm(ns, fs, dis))
 
 # LAW: one character before the slash, with the separator test given as
@@ -2289,7 +2289,7 @@ def and_false(a):
 def Laws.path_eq_unlockable(hash, src, at, sum, fs, rest, ts, hub, e):
   %e : {Bool.and(P.clean(hub), Bool.and(Bool.and(Bool.and(Bool.and(_,
     P.paths.ok(fs)), Bool.and(P.clean.all(P.pack.values(L.Pack{hash, src,
-    K.File{at, sum} <> fs})), Bool.not(L.has(rest, hash)))), P.packs.ok(rest)),
+    K.Member{at, sum} <> fs})), Bool.not(L.has(rest, hash)))), P.packs.ok(rest)),
     P.tools.ok(ts))) == False{} : Bool}
   and_false(P.clean(hub))
 
@@ -2348,25 +2348,25 @@ def eqless_clear(s, e):
 law blocks_ins.step:
   for +hp: String
   for +sp: L.Src
-  for +fp: List<&2, K.File>
+  for +fp: List<&2, K.Member>
   for +hh: String
   for +sh: L.Src
-  for +fh: List<&2, K.File>
+  for +fh: List<&2, K.Member>
   for +t: List<&2, L.Pack>
   for b: Bool
   for ih: {K.file.ins(L.pack.blocks(t), L.pack.block(L.Pack{hp, sp, fp}))
-    == L.pack.blocks(L.pack.ins(t, L.Pack{hp, sp, fp})) : List<&2, K.File>}
+    == L.pack.blocks(L.pack.ins(t, L.Pack{hp, sp, fp})) : List<&2, K.Member>}
   {K.file.ins.put(b, L.pack.block(L.Pack{hp, sp, fp}), L.pack.block(L.Pack{hh, sh, fh}),
     L.pack.blocks(t), K.file.ins(L.pack.blocks(t), L.pack.block(L.Pack{hp, sp, fp})))
     == L.pack.blocks(L.pack.ins.put(b, L.Pack{hp, sp, fp}, L.Pack{hh, sh, fh}, t,
-      L.pack.ins(t, L.Pack{hp, sp, fp}))) : List<&2, K.File>}
+      L.pack.ins(t, L.Pack{hp, sp, fp}))) : List<&2, K.Member>}
 
 def blocks_ins.step(hp, sp, fp, hh, sh, fh, t, b, ih):
   match b:
     case True{}:
       {==}
     case False{}:
-      Equal.cong(List<&2, K.File>, List<&2, K.File>, r => L.pack.block(L.Pack{hh, sh, fh}) <> r,
+      Equal.cong(List<&2, K.Member>, List<&2, K.Member>, r => L.pack.block(L.Pack{hh, sh, fh}) <> r,
         K.file.ins(L.pack.blocks(t), L.pack.block(L.Pack{hp, sp, fp})),
         L.pack.blocks(L.pack.ins(t, L.Pack{hp, sp, fp})), ih)
 
@@ -2376,9 +2376,9 @@ law blocks_ins.cons:
   for +t: List<&2, L.Pack>
   for +p: L.Pack
   for ih: {K.file.ins(L.pack.blocks(t), L.pack.block(p))
-    == L.pack.blocks(L.pack.ins(t, p)) : List<&2, K.File>}
+    == L.pack.blocks(L.pack.ins(t, p)) : List<&2, K.Member>}
   {K.file.ins(L.pack.blocks(h <> t), L.pack.block(p))
-    == L.pack.blocks(L.pack.ins(h <> t, p)) : List<&2, K.File>}
+    == L.pack.blocks(L.pack.ins(h <> t, p)) : List<&2, K.Member>}
 
 def blocks_ins.cons(h, t, p, ih):
   match h p:
@@ -2391,7 +2391,7 @@ law blocks_ins:
   for +qs: List<&2, L.Pack>
   for +p: L.Pack
   {K.file.ins(L.pack.blocks(qs), L.pack.block(p)) == L.pack.blocks(L.pack.ins(qs, p))
-    : List<&2, K.File>}
+    : List<&2, K.Member>}
 
 def blocks_ins(qs, p):
   match qs:
@@ -2403,17 +2403,17 @@ def blocks_ins(qs, p):
 # LAW: the blocks sorted are the blocks of the packages sorted
 law blocks_sort:
   for +ps: List<&2, L.Pack>
-  {K.file.sort(L.pack.blocks(ps)) == L.pack.blocks(L.pack.sort(ps)) : List<&2, K.File>}
+  {K.file.sort(L.pack.blocks(ps)) == L.pack.blocks(L.pack.sort(ps)) : List<&2, K.Member>}
 
 def blocks_sort(ps):
   match ps:
     case []:
       {==}
     case +h <> +t:
-      ih = Equal.sym(List<&2, K.File>, K.file.sort(L.pack.blocks(t)),
+      ih = Equal.sym(List<&2, K.Member>, K.file.sort(L.pack.blocks(t)),
         L.pack.blocks(L.pack.sort(t)), blocks_sort(t))
       %ih : {K.file.ins(_, L.pack.block(h)) == L.pack.blocks(L.pack.sort(h <> t))
-        : List<&2, K.File>}
+        : List<&2, K.Member>}
       blocks_ins(L.pack.sort(t), h)
 
 # LAW: each package's block, joined among what follows, is its two tables
@@ -2785,15 +2785,15 @@ def src_read(src):
 
 # LAW: a package's files read back from the pairs they are written as
 law pair_files:
-  for +fs: List<&2, K.File>
-  {L.pair.files(L.file.pairs(fs)) == fs : List<&2, K.File>}
+  for +fs: List<&2, K.Member>
+  {L.pair.files(L.file.pairs(fs)) == fs : List<&2, K.Member>}
 
 def pair_files(fs):
   match fs:
     case []:
       {==}
-    case K.File{+at, +sum} <> +t:
-      Equal.cong(List<&2, K.File>, List<&2, K.File>, r => K.File{at, sum} <> r,
+    case K.Member{+at, +sum} <> +t:
+      Equal.cong(List<&2, K.Member>, List<&2, K.Member>, r => K.Member{at, sum} <> r,
         L.pair.files(L.file.pairs(t)), t, pair_files(t))
 
 # LAW: a git tool reads back from the pairs it is written as, as the lock
@@ -3377,7 +3377,7 @@ def hash.all(qs: List<&2, L.Pack>) -> List<&2, String>:
 def pk.src(h: String, s: L.Src) -> T.Sect:
   T.Sect{pack.name(h, "source"), L.src.pairs(s)}
 
-def pk.files(h: String, f: List<&2, K.File>) -> T.Sect:
+def pk.files(h: String, f: List<&2, K.Member>) -> T.Sect:
   T.Sect{pack.name(h, "files"), L.file.pairs(K.files_of(f))}
 
 # the document from its packages' tables on. Proof vocabulary.
@@ -3402,28 +3402,28 @@ def hashes_skip_names(nms, _rest):
 
 # LAW: the pairs of a names table, read as names, are the names written
 law pair_names_back:
-  for fs: List<&2, K.File>
+  for fs: List<&2, K.Member>
   {L.pair.names(L.file.pairs(fs)) == Laws.names.back(fs) : List<&2, L.Name>}
 
 def pair_names_back(fs):
   match fs:
     case []:
       {==}
-    case K.File{at, sum} <> t:
+    case K.Member{at, sum} <> t:
       Equal.cong(List<&2, L.Name>, List<&2, L.Name>, r => L.Name{at, sum} <> r,
         L.pair.names(L.file.pairs(t)), Laws.names.back(t), pair_names_back(t))
 
 # LAW: the lock writes each name as the law's file of it
 law name_files_as:
   for nms: List<&2, L.Name>
-  {L.name.files(nms) == Laws.names.as.files(nms) : List<&2, K.File>}
+  {L.name.files(nms) == Laws.names.as.files(nms) : List<&2, K.Member>}
 
 def name_files_as(nms):
   match nms:
     case []:
       {==}
     case L.Name{nv, hash} <> t:
-      Equal.cong(List<&2, K.File>, List<&2, K.File>, x => K.File{nv, hash} <> x,
+      Equal.cong(List<&2, K.Member>, List<&2, K.Member>, x => K.Member{nv, hash} <> x,
         L.name.files(t), Laws.names.as.files(t), name_files_as(t))
 
 # The upgrade's decisions: what it keeps (EZ-RES-4, EZ-RES-6) and what it
@@ -14913,7 +14913,7 @@ def nv.all(js: List<&2, W.Judged>) -> Bool:
 law nv.laid:
   for ok: Bool
   for +hash: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Member>
   for +ss: List<&2, String>
   for e: {String.eq(hash, W.named(W.laid(fs, ss))) == ok : Bool}
   {nv(hash, W.body.laid(ok, hash, fs, ss)) == True{} : Bool}
@@ -14928,7 +14928,7 @@ def nv.laid(ok, _hash, _fs, _ss, e):
 law nv.sums:
   for ok: Bool
   for +hash: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Member>
   for +ss: List<&2, String>
   {nv(hash, W.body.sums(ok, hash, fs, ss)) == True{} : Bool}
 
@@ -14943,7 +14943,7 @@ law nv.escape:
   for clean: Bool
   for +bad: String
   for +hash: String
-  for +fs: List<&2, K.File>
+  for +fs: List<&2, K.Member>
   for +ss: List<&2, String>
   {nv(hash, W.body.escape.go(clean, bad, hash, fs, ss)) == True{} : Bool}
 
@@ -15003,10 +15003,10 @@ law nv.rule:
 def nv.rule(named, hash, manifest, ss):
   match named:
     case True{}:
-      nv.git.body(List.is_empty(&2, K.File, L.manifest.files(String.lines(manifest))),
+      nv.git.body(List.is_empty(&2, K.Member, L.manifest.files(String.lines(manifest))),
         hash, manifest, ss)
     case False{}:
-      nv.git.body(List.is_empty(&2, K.File, K.bare(L.manifest.files(String.lines(manifest)))),
+      nv.git.body(List.is_empty(&2, K.Member, K.bare(L.manifest.files(String.lines(manifest)))),
         hash, K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))),
         K.bare.srcs(L.manifest.files(String.lines(manifest)), ss))
 
@@ -17144,7 +17144,7 @@ def Laws.upgrade_origins_skip_tools(_nx, _n, _e, _b, _h, _hpa, _hpv, ds, _ts, g)
 
 def Laws.git_named_without_license(hash, manifest, ss, unnamed):
   %unnamed : {W.git.rule(_, hash, manifest, ss)
-    == W.git.body(List.is_empty(&2, K.File, K.bare(L.manifest.files(String.lines(manifest)))),
+    == W.git.body(List.is_empty(&2, K.Member, K.bare(L.manifest.files(String.lines(manifest)))),
       hash, K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))),
       K.bare.srcs(L.manifest.files(String.lines(manifest)), ss)) : W.Verdict}
   {==}

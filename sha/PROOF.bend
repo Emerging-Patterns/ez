@@ -35,7 +35,7 @@ def Laws.utf8_append(a, b):
 # `Nar.dir` sorts before it serializes, so this is pkg's `sort_perm` carried
 # under `Nar.directory`
 def Laws.nar_dir_order_free(ns, es, dis):
-  Equal.cong(List<&2, K.File>, String, ys => Nar.directory(ys),
+  Equal.cong(List<&2, K.Member>, String, ys => Nar.directory(ys),
     K.file.sort(PL.perm(ns, es)), K.file.sort(es),
     PL.sort_perm(ns, es, dis))
 

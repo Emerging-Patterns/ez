@@ -74,7 +74,7 @@ type Tree is Data:
   Gone{why: String}
 
 # the files a manifest names, each with the text read for it
-def zip(fs: List<&2, K.File>, ss: List<&2, String>) -> List<&2, K.Source>:
+def zip(fs: List<&2, K.Member>, ss: List<&2, String>) -> List<&2, K.Source>:
   match fs ss:
     case Nil{} Nil{}:
       []
@@ -132,23 +132,23 @@ def key(+root: String, +at: String) -> String:
 # every file the lock names, with the text the tree has at its path. A file
 # the tree does not have is taken as empty, which does not match the lock
 # unless the lock records an empty file.
-def cand(fs: List<&2, K.File>, +root: String, +tree: List<&2, K.Source>) -> List<&2, W.Source>:
+def cand(fs: List<&2, K.Member>, +root: String, +tree: List<&2, K.Source>) -> List<&2, W.Source>:
   match fs:
     case []:
       []
-    case K.File{+at, _sum} <> t:
+    case K.Member{+at, _sum} <> t:
       W.Source{at, text.or(K.look(tree, key(root, at)))} <> cand(t, root, tree)
 
 # ---------------------------------------------------------------------------
 # the checks
 
 # a file laid, weighed by its own text
-def weigh(src: W.Source) -> K.File:
+def weigh(src: W.Source) -> K.Member:
   W.Source{at, +text} = src
-  K.File{at, Sha.hex(text)}
+  K.Member{at, Sha.hex(text)}
 
 # every file laid, weighed by its own text
-def weighs(ls: List<&2, W.Source>) -> List<&2, K.File>:
+def weighs(ls: List<&2, W.Source>) -> List<&2, K.Member>:
   match ls:
     case []:
       []
@@ -157,14 +157,14 @@ def weighs(ls: List<&2, W.Source>) -> List<&2, K.File>:
 
 # whether one file is the one the lock names: the same path, and a text whose
 # digest is the sum the lock records
-def fit(want: K.File, got: W.Source) -> Bool:
-  K.File{+at, sum} = want
+def fit(want: K.Member, got: W.Source) -> Bool:
+  K.Member{+at, sum} = want
   W.Source{lat, +text} = got
   Bool.and(String.eq(lat, at), String.eq(Sha.hex(text), sum))
 
 # whether every file is the one the lock names, in the lock's order. A list
 # longer or shorter than the lock's is not the package.
-def fits(fs: List<&2, K.File>, ls: List<&2, W.Source>) -> Bool:
+def fits(fs: List<&2, K.Member>, ls: List<&2, W.Source>) -> Bool:
   match fs ls:
     case Nil{} Nil{}:
       True{}
@@ -203,7 +203,7 @@ def named(+ls: List<&2, W.Source>) -> String:
 # whether a package may be laid: every file is the one the lock names, no
 # path leaves the tree, and the files hash to the name the lock records them
 # under, so the tree laid under that name is that name's
-def good(fs: List<&2, K.File>, +hash: String, +ls: List<&2, W.Source>) -> Bool:
+def good(fs: List<&2, K.Member>, +hash: String, +ls: List<&2, W.Source>) -> Bool:
   +fit = fits(fs, ls)
   +safe = paths.safe(ls)
   Bool.and(fit, Bool.and(safe, String.eq(hash, named(ls))))
@@ -218,7 +218,7 @@ def unfit.pick(ok: Bool, +at: String, rest: String) -> String:
       at
 
 # the first path that does not fit, "" when every file does
-def unfit(fs: List<&2, K.File>, ls: List<&2, W.Source>) -> String:
+def unfit(fs: List<&2, K.Member>, ls: List<&2, W.Source>) -> String:
   match fs ls:
     case Nil{} Nil{}:
       ""
@@ -231,7 +231,7 @@ def unfit(fs: List<&2, K.File>, ls: List<&2, W.Source>) -> String:
       unfit.pick(fit(f, l), K.file.at(f), unfit(g, m))
 
 # why a package may not be laid, naming it
-def bad.why(fs: List<&2, K.File>, +hash: String, +ls: List<&2, W.Source>) -> String:
+def bad.why(fs: List<&2, K.Member>, +hash: String, +ls: List<&2, W.Source>) -> String:
   +at = unfit(fs, ls)
   Bool.pick(String, String.is_empty(at),
     Bool.pick(String, paths.safe(ls),
@@ -253,7 +253,7 @@ type Part is Data:
   No{why: String}
 
 # the files that arrived for a package, or why none did
-def part.tree(tree: Tree, fs: List<&2, K.File>) -> Part:
+def part.tree(tree: Tree, fs: List<&2, K.Member>) -> Part:
   match tree:
     case Tree{r, files}:
       Got{cand(fs, r, files)}
@@ -261,7 +261,7 @@ def part.tree(tree: Tree, fs: List<&2, K.File>) -> Part:
       No{why}
 
 # a package fetched, once it is answered
-def part.fetch.heard(got: F.Heard, fs: List<&2, K.File>, +root: String) -> Part:
+def part.fetch.heard(got: F.Heard, fs: List<&2, K.Member>, +root: String) -> Part:
   match got:
     case F.Open{}:
       AskFetch{}
@@ -272,7 +272,7 @@ def part.fetch.heard(got: F.Heard, fs: List<&2, K.File>, +root: String) -> Part:
 def part.fetch(
   +rs: List<&2, F.Reply>,
   +src: L.Src,
-  fs: List<&2, K.File>,
+  fs: List<&2, K.Member>,
   +here: String,
   +hub: String,
   +hash: String
@@ -284,7 +284,7 @@ def part.kept(
   ok: Bool,
   +rs: List<&2, F.Reply>,
   +src: L.Src,
-  fs: List<&2, K.File>,
+  fs: List<&2, K.Member>,
   +here: String,
   +hub: String,
   +hash: String
@@ -301,7 +301,7 @@ def part.found(
   tree: Tree,
   +rs: List<&2, F.Reply>,
   +src: L.Src,
-  +fs: List<&2, K.File>,
+  +fs: List<&2, K.Member>,
   +here: String,
   +hub: String,
   +hash: String
@@ -317,7 +317,7 @@ def part.laid(
   got: F.Heard,
   +rs: List<&2, F.Reply>,
   +src: L.Src,
-  +fs: List<&2, K.File>,
+  +fs: List<&2, K.Member>,
   +here: String,
   +hub: String,
   +hash: String
@@ -332,7 +332,7 @@ def part.laid(
 def part(
   +rs: List<&2, F.Reply>,
   +src: L.Src,
-  +fs: List<&2, K.File>,
+  +fs: List<&2, K.Member>,
   +here: String,
   +hub: String,
   +hash: String
@@ -434,7 +434,7 @@ def weigh.part(+why: String, part: Part) -> Part:
 
 # one package of the lock, and where it stands
 type Pt is Data:
-  Pt{hash: String, src: L.Src, files: List<&2, K.File>, part: Part}
+  Pt{hash: String, src: L.Src, files: List<&2, K.Member>, part: Part}
 
 # every package of the lock, and where each stands
 def parts(
@@ -599,7 +599,7 @@ type Verdict is Data:
   Stop{why: String}
 
 # the files that arrived, laid when they pass
-def judge.got(ok: Bool, fs: List<&2, K.File>, +hash: String, +ls: List<&2, W.Source>) -> Verdict:
+def judge.got(ok: Bool, fs: List<&2, K.Member>, +hash: String, +ls: List<&2, W.Source>) -> Verdict:
   match ok:
     case True{}:
       Put{hash, ls}
@@ -607,7 +607,7 @@ def judge.got(ok: Bool, fs: List<&2, K.File>, +hash: String, +ls: List<&2, W.Sou
       Stop{bad.why(fs, hash, ls)}
 
 # what one package comes to, where it stands
-def judge(+fs: List<&2, K.File>, +hash: String, part: Part) -> Verdict:
+def judge(+fs: List<&2, K.Member>, +hash: String, part: Part) -> Verdict:
   match part:
     case AskLaid{}:
       Stop{"ez: " ++ hash ++ " was never looked for under BEND_LIB"}
@@ -829,7 +829,7 @@ def front(fs: List<&2, W.Source>) -> List<&2, W.Source>:
           h <> front(h2 <> t2)
 
 # the files the lock records under a hash
-def locked(+ss: List<&2, T.Sect>, +hash: String) -> List<&2, K.File>:
+def locked(+ss: List<&2, T.Sect>, +hash: String) -> List<&2, K.Member>:
   L.pack.files(L.pack_of(ss, hash))
 
 # whether an effect that lays a tree lays the files the lock records under

@@ -6,7 +6,9 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.bend = {
-    url = "github:bendlang/bend";
+    # The v2.0.31 tag's flake still fetches the 2.0.30 archive. This commit
+    # is the flake that names 2.0.31.
+    url = "github:bendlang/bend/af569d4826913b2ce3557e9829ccad31fcf86f94";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
