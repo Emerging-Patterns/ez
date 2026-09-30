@@ -48,6 +48,38 @@ def slurp(fuel: Nat, file: File, acc: String) -> IO(String):
         got : File & Result<&1, &1, U32 & String, String> <- File.read(file, 65536)
         slurp.next(got, acc, fl => a => slurp(f, fl, a))
 
+# the reads a file with no size to go by may take: a pipe, a device or a
+# /proc file reports 0 bytes and a file past 4 GiB fails to report, so these
+# are read until they end, up to 100000 reads of 64 KiB, past any file ez reads
+def unsized() -> Nat:
+  U32.to_nat(100000)
+
+# a size of 0 is no size to go by; any other is read to
+def reads.given(none: Bool, bytes: U32) -> Nat:
+  match none:
+    case True{}:
+      unsized()
+    case False{}:
+      U32.to_nat(U32.add(U32.div(bytes, 65536), 2))
+
+# the reads a file of this many bytes takes: one for every 64 KiB, one for
+# the part past the last whole 64 KiB, and one to spare for a short read
+def reads(+bytes: U32) -> Nat:
+  reads.given(U32.is_zero(bytes), bytes)
+
+# the reads the size the host reported allows
+def reads.of(res: Result<&1, &1, U32 & String, U32>) -> Nat:
+  match res:
+    case Fail{_e}:
+      unsized()
+    case Done{bytes}:
+      reads(bytes)
+
+# a file read whole, with fuel enough for the size it reported
+def read.sized(got: File & Result<&1, &1, U32 & String, U32>) -> IO(String):
+  (file, r) = got
+  slurp(reads.of(r), file, "")
+
 # what an opened file holds, or nothing when it would not open
 def read.opened(res: Result<&1, &1, U32 & String, File>) -> IO(Maybe<&2, String>):
   match res:
@@ -55,7 +87,8 @@ def read.opened(res: Result<&1, &1, U32 & String, File>) -> IO(Maybe<&2, String>
       IO.pure(Maybe<&2, String>, None{})
     case Done{file}:
       do IO<Maybe<&2, String>>:
-        text : String <- slurp(U32.to_nat(100000), file, "")
+        got : File & Result<&1, &1, U32 & String, U32> <- File.size(file)
+        text : String <- read.sized(got)
         return Some{text}
 
 # a file's text, or None when it cannot be opened

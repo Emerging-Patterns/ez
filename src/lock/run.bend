@@ -676,6 +676,15 @@ def loop.step(st: Plan.Step, +lib: String, world: W.World, go: W.World -> IO(Uni
     case Plan.Run{pl}:
       exec.plan(lib, pl)
 
+# the rounds the loop may take. Each round's questions come from the last
+# round's answers (a package's imports are known once git has answered for
+# it), so how many there will be is not known up front. This is a guard
+# against a planner that keeps asking, not a limit on a lock: running out of
+# it dies loudly. The walk inside each round takes its fuel from its inputs
+# (`Plan.walk.fuel`).
+def rounds() -> Nat:
+  U32.to_nat(100000)
+
 # the loop, under fuel. Every round adds at least one answer, since the
 # planner never asks what the World answers already.
 def loop(fuel: Nat, +lib: String, +world: W.World) -> IO(Unit):
@@ -695,5 +704,5 @@ def run(up: Bool, +only: String) -> IO(Unit):
     +pwd : String <- R.exec(["pwd"])
     led : Maybe<&2, String> <- read.ledger()
     ls : W.Listing <- read.listing()
-    loop(U32.to_nat(100000), lib,
+    loop(rounds(), lib,
       W.World{W.Args{up, only, String.trim(R.text(pwd))}, led, ls, [], []})

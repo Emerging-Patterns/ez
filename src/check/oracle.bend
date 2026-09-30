@@ -677,6 +677,12 @@ def loop.on(state: Run, dir: String, rest: String -> Listener -> IO(Unit)) -> IO
     case RGo{l}:
       rest(dir, l)
 
+# a thousand: the runs the server takes, and the connections each run serves.
+# Bend has no unbounded loop, so "forever" is a count no test run will reach, a
+# thousand runs of a thousand connections; a server has no input to size it by.
+def thousand() -> Nat:
+  U32.to_nat(1000)
+
 # connections served for as long as the fuel lasts. Bend has no unbounded loop,
 # so "forever" is a count no test run will reach: a thousand runs of a thousand
 # connections. The count is nested rather than written out because a Nat is
@@ -688,7 +694,7 @@ def loop(fuel: Nat, +dir: String, listener: Listener) -> IO(Unit):
       Listener.close(listener)
     case 1n+f:
       do IO<Unit>:
-        r : Run <- turn(U32.to_nat(1000), dir, listener)
+        r : Run <- turn(thousand(), dir, listener)
         loop.on(r, dir, d => lis => loop(f, d, lis))
 
 # a port that would not open, reported rather than served on
@@ -706,7 +712,7 @@ def begin.at(bound: Result<&1, &1, U32 & String, Listener>, +dir: String, port: 
     case Done{l}:
       do IO<Unit>:
         IO.print("oracle: " ++ dir ++ " on port " ++ U32.show(port))
-        loop(U32.to_nat(1000), dir, l)
+        loop(thousand(), dir, l)
 
 # the oracle, on a directory and a port
 def begin(dir: String, +port: U32) -> IO(Unit):

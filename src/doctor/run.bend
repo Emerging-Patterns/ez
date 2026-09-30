@@ -104,6 +104,13 @@ def loop.step(st: DP.Step, +lib: String, world: DW.World, go: DW.World -> IO(Uni
     case DP.Run{pl}:
       Run.exec.plan("", pl)
 
+# the rounds the loop may take. The lock check's trees follow the sources
+# and each other, and the packages they reach are not known until BEND_LIB
+# has answered, so this is a guard against a planner that keeps asking, not
+# a limit on a project: running out of it dies loudly.
+def rounds() -> Nat:
+  U32.to_nat(100000)
+
 # the loop, under fuel. Every round adds at least one answer, since the
 # planner never asks what the World answers already, and the lock check asks
 # about each package at most once.
@@ -127,4 +134,4 @@ def run() -> IO(Unit):
     +lib : String <- var("BEND_LIB")
     led : Maybe<&2, String> <- F.read(DW.toml())
     lk : Maybe<&2, String> <- F.read(DW.lockfile())
-    loop(U32.to_nat(100000), DP.lib.at(lib), DW.World{cc, lib, led, lk, []})
+    loop(rounds(), DP.lib.at(lib), DW.World{cc, lib, led, lk, []})

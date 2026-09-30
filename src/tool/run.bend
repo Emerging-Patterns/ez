@@ -274,6 +274,12 @@ def loop.step(st: TP.Step, world: TW.World, go: TW.World -> IO(Unit)) -> IO(Unit
     case TP.Run{pl}:
       exec.plan(pl)
 
+# the rounds the loop may take. The planner asks at most five rounds, so this
+# is only a guard against a planner that keeps asking, and running out of it
+# dies loudly.
+def rounds() -> Nat:
+  U32.to_nat(100)
+
 # the loop, under fuel. Every round adds an answer, since the planner never
 # asks what the World answers already, and it asks at most five rounds, so
 # the fuel is only a guard.
@@ -319,7 +325,7 @@ def go(
   +led: Maybe<&2, String>,
   +lock: Maybe<&2, String>
 ) -> IO(Unit):
-  loop(U32.to_nat(100), TW.World{act, target, want, here, vars, bend, led, lock, [], []})
+  loop(rounds(), TW.World{act, target, want, here, vars, bend, led, lock, [], []})
 
 # `ez tool run [--entry <file>] <target> [-- args…]`, `install` and `upgrade`
 def run(act: TW.Act, +target: String, +want: String) -> IO(Unit):
