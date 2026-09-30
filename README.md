@@ -10,6 +10,30 @@ tools for a whole project.
 
 ## Install
 
+ez needs Bend 2.0.32 or later; the fleet is built and checked on Bend 2.0.34.
+
+### The ledger library, from the hub
+
+ez's ledger library, which reads `ez.toml`, is on the Bend hub as `ezx`. A
+plain Bend program imports it by name, at v1.3.0:
+
+```bend
+import ezx@1.3.0.0/main.bend as Ledger
+
+def main() -> String:
+  Ledger.show(Ledger.parse("[package]\nname = \"app\"\nentry = \"main.bend\"\n"))
+```
+
+`bend` fetches it from the hub on first run; there is no install step.
+`ezx@1.3.0.0` resolves to `0x046551eff0d59a82cf10d858b17b0c84`, and
+`import 0x046551eff0d59a82cf10d858b17b0c84/main.bend` pins it by content. In
+an ez project, `ez add Emerging-Patterns/ez` records it in the ledger.
+
+The hub package is the library only. The `ez` command is built from a clone,
+or installed with nix, as below.
+
+### The ez command
+
 Install Bend, then fetch the packages ez builds itself with, and build it:
 
 ```bash
@@ -21,9 +45,8 @@ mkdir -p bin
 BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
 ```
 
-ez runs on Bend 2.0.34, the version CI builds with, and needs 2.0.32 or later. Its dependencies are
-pinned to git revs, and `ez fetch` is what fetches them, which ez cannot run
-before it is built. `bootstrap.sh` is that one step, and the one helper script
+ez's own dependencies are pinned to git revs, and `ez fetch` is what fetches
+them, which ez cannot run before it is built. `bootstrap.sh` is that one step, and the one helper script
 in the repo: it reads `ez.lock.toml`, fetches each package at its pinned rev
 into `.ez/lib`, and checks every file's sha256 and the package's `0x` name
 against the lock. It needs `git` and `sha256sum` (or `shasum`), and nothing
@@ -47,22 +70,6 @@ nix profile install github:Emerging-Patterns/ez
 
 That install provides `ez` and `ezx`. `nix develop` gives a shell with bend,
 git, openssl and `BEND_LIB` already set.
-
-### The ledger library, from the hub
-
-ez's ledger library, which reads and writes `ez.toml`, is on the Bend hub.
-At v1.2.0 it is `0xb618c7a3b7cc335880c0ff4267b5bd98`, and any Bend program
-can import it with nothing but `bend`:
-
-```bend
-import 0xb618c7a3b7cc335880c0ff4267b5bd98/ledger/manifest.bend as Ledger
-
-def main() -> String:
-  Ledger.show(Ledger.parse("[package]\nname = \"app\"\nentry = \"main.bend\"\n"))
-```
-
-`bend` fetches it from the hub on first run. The `ez` command itself is
-built from a clone, as above.
 
 ## Quickstart
 
