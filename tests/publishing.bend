@@ -9,11 +9,11 @@
 # check/liar.bend, a `bend` that uploads nothing.
 import Base
 import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
-import ../io/file.bend as F
-import ../ez/quiet.bend as Q
-import ../pub/plan.bend as P
-import ../check/kit.bend as Check
-import ../check/world.bend as W
+import ../src/io/file.bend as F
+import ../src/ez/quiet.bend as Q
+import ../src/pub/plan.bend as P
+import ../src/check/kit.bend as Check
+import ../src/check/world.bend as W
 
 # a check whose answer is a yes or a no
 def yes(name: String, ok: Bool) -> IO(Unit):

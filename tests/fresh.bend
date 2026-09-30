@@ -53,12 +53,12 @@
 # gone.
 import Base
 import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
-import ../io/file.bend as F
-import ../ez/cache.bend as C
-import ../check/kit.bend as Check
+import ../src/io/file.bend as F
+import ../src/ez/cache.bend as C
+import ../src/check/kit.bend as Check
 
 # every source the binary is compiled from that is newer than the binary.
-# `check` and the `tests` directories are left out because `ez/main.bend` does
+# `check` and the `tests` directories are left out because `main.bend` does
 # not reach them: they are what grades ez, not what ez is made of. A missing
 # binary is caught by the same walk, since `find` has nothing to compare against
 # and says so.
@@ -67,7 +67,7 @@ def newer() -> IO(String):
     +out : String <- R.exec(["find", ".", "-name", "*.bend",
       "-newer", "bin/ez.bin",
       "-not", "-path", "./.ez/*", "-not", "-path", "./.git/*",
-      "-not", "-path", "./.claude/*", "-not", "-path", "./check/*",
+      "-not", "-path", "./.claude/*", "-not", "-path", "./src/check/*",
       "-not", "-path", "*/tests/*"])
     return String.trim(R.text(out))
 

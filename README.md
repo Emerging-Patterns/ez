@@ -10,29 +10,49 @@ tools for a whole project.
 
 ## Install
 
-ez needs Bend 2.0.32 or later; the fleet is built and checked on Bend 2.0.34.
+ez needs Bend 2.0.32 or later; it is built and checked on Bend 2.0.34, the
+version `flake.lock` pins. Building ez needs clang as well, since ez is one
+native binary. Every subcommand runs the `bend` and `git` on your PATH.
 
-### The ledger library, from the hub
+### From the hub
 
-ez's ledger library, which reads `ez.toml`, is on the Bend hub as `ezx`. A
-plain Bend program imports it by name, at v1.3.0:
+With an installed `bend` and nothing else, build ez v1.4.0 from the Bend hub,
+where the whole program is published as `ezx@1.4.0.0`. Put this in `t.bend`:
 
 ```bend
-import ezx@1.3.0.0/main.bend as Ledger
+import ezx@1.4.0.0/main.bend as Ez
+
+def main() -> IO(Unit):
+  Ez.main()
+```
+
+and build it:
+
+```bash
+curl -fsSL https://bend-lang.com/install.sh | sh
+bend t.bend -o ez                # fetches ez and its libraries from the hub
+./ez --help
+```
+
+There is no install step: `bend` fetches the package and the libraries it
+imports by hash (shake, snap, ezhttp, eztoml and sha256) on the first build,
+into `~/.bend/lib`. `import 0x<hash>/main.bend`, with the hash the hub names
+for `ezx@1.4.0.0`, pins it by content.
+
+ez's ledger library, which reads `ez.toml`, comes in the same package, at
+`src/ledger/manifest.bend`:
+
+```bend
+import ezx@1.4.0.0/src/ledger/manifest.bend as Ledger
 
 def main() -> String:
   Ledger.show(Ledger.parse("[package]\nname = \"app\"\nentry = \"main.bend\"\n"))
 ```
 
-`bend` fetches it from the hub on first run; there is no install step.
-`ezx@1.3.0.0` resolves to `0x046551eff0d59a82cf10d858b17b0c84`, and
-`import 0x046551eff0d59a82cf10d858b17b0c84/main.bend` pins it by content. In
-an ez project, `ez add Emerging-Patterns/ez` records it in the ledger.
+In an ez project, `ez add Emerging-Patterns/ez` records the package in the
+ledger.
 
-The hub package is the library only. The `ez` command is built from a clone,
-or installed with nix, as below.
-
-### The ez command
+### From a clone
 
 Install Bend, then fetch the packages ez builds itself with, and build it:
 
@@ -42,16 +62,18 @@ git clone https://github.com/Emerging-Patterns/ez
 cd ez
 sh bootstrap.sh
 mkdir -p bin
-BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
+BEND_LIB=$PWD/.ez/lib bend main.bend -o bin/ez.bin
 ```
 
-ez's own dependencies are pinned to git revs, and `ez fetch` is what fetches
-them, which ez cannot run before it is built. `bootstrap.sh` is that one step, and the one helper script
-in the repo: it reads `ez.lock.toml`, fetches each package at its pinned rev
-into `.ez/lib`, and checks every file's sha256 and the package's `0x` name
-against the lock. It needs `git` and `sha256sum` (or `shasum`), and nothing
-comes from the hub. `bend` then only needs telling where the packages are,
-since it looks in `~/.bend/lib` otherwise.
+The top-level `main.bend` is ez's program; the modules it imports are under
+`src/`. ez's own dependencies are pinned to git revs, and `ez fetch` is what
+fetches them, which ez cannot run before it is built. `bootstrap.sh` is that
+one step, and the one helper script in the repo: it reads `ez.lock.toml`,
+fetches each package at its pinned rev into `.ez/lib`, and checks every
+file's sha256 and the package's `0x` name against the lock. It needs `git`
+and `sha256sum` (or `shasum`), and nothing comes from the hub. `bend` then
+only needs telling where the packages are, since it looks in `~/.bend/lib`
+otherwise.
 
 Put `bin/ez.bin` on your PATH as `ez`. ez is Bend and nothing else, so the
 binary is all there is: no runtime, no helper scripts beside it, nothing to

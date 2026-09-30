@@ -4,11 +4,11 @@
 # hub import during the check, inside `book_load`, and a nix build cannot.
 import Base
 import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
-import ../io/file.bend as F
-import ../share/sha.bend as Sha
-import ../ez/quiet.bend as Q
-import ../check/kit.bend as Check
-import ../check/world.bend as W
+import ../src/io/file.bend as F
+import ../src/share/sha.bend as Sha
+import ../src/ez/quiet.bend as Q
+import ../src/check/kit.bend as Check
+import ../src/check/world.bend as W
 
 # a check whose answer is a yes or a no
 def yes(name: String, ok: Bool) -> IO(Unit):

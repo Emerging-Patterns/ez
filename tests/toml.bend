@@ -5,10 +5,10 @@
 # one layout. The step checked is `toml/toml.bend`'s, between eztoml's
 # document and ez's sections, which no law covers (EZ-TRUST-8).
 import Base
-import ../toml/toml.bend as T
-import ../ledger/manifest.bend as M
-import ../ledger/render.bend as Rend
-import ../check/kit.bend as Check
+import ../src/toml/toml.bend as T
+import ../src/ledger/manifest.bend as M
+import ../src/ledger/render.bend as Rend
+import ../src/check/kit.bend as Check
 
 # a ledger as ez wrote it before: quoted strings, a bare `vendor = true`, and
 # a blank line before each table

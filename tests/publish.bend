@@ -7,10 +7,10 @@
 # and uploading someone's tree to a public hub is not a thing a test does.
 import Base
 import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
-import ../io/file.bend as F
-import ../ez/quiet.bend as Q
-import ../check/kit.bend as Check
-import ../check/world.bend as W
+import ../src/io/file.bend as F
+import ../src/ez/quiet.bend as Q
+import ../src/check/kit.bend as Check
+import ../src/check/world.bend as W
 
 # the repo being published: a nested layout with an import across it, which is
 # the shape that makes the file walk worth checking. One comment is not ASCII,
@@ -39,11 +39,11 @@ def repo(+at: String) -> IO(Unit):
 # what ez says a file's package would be, without publishing it: the hash on
 # the first line, the directory its paths are written from on the second, then
 # the manifest. One run answers both questions, because a second `bend` over
-# `pkg/main.bend` would cost a whole check to learn nothing new. The check
+# `src/pkg/main.bend` would cost a whole check to learn nothing new. The check
 # report shares the stream with the answer, so the caller takes it back out.
 def ours(+here: String, +entry: String) -> IO(String):
   R.exec(["env", "BEND_LIB=" ++ here ++ "/.ez/lib", "EZ_ENTRY=" ++ entry,
-    "bend", here ++ "/pkg/main.bend"])
+    "bend", here ++ "/src/pkg/main.bend"])
 
 # the hash `bend --publish` mined, which is the line of its output that names a
 # package: the proof of work reports as it goes, on the same stream.

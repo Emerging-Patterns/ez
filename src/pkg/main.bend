@@ -3,7 +3,7 @@
 # written from on the second, then the manifest. The entry arrives in EZ_ENTRY,
 # since a native Bend binary takes no arguments of its own.
 #
-#   EZ_ENTRY=src/lib.bend bend pkg/main.bend
+#   EZ_ENTRY=src/lib.bend bend src/pkg/main.bend
 import Base
 import ./pkg.bend as K
 
@@ -28,7 +28,7 @@ def report(+at: String) -> IO(Unit):
 # nothing to weigh is an error, not an empty package
 def go(+at: String) -> IO(Unit):
   Bool.pick(IO(Unit), String.is_empty(at),
-    IO.die(Unit, 1, "usage: EZ_ENTRY=<entry.bend> bend pkg/main.bend"),
+    IO.die(Unit, 1, "usage: EZ_ENTRY=<entry.bend> bend src/pkg/main.bend"),
     report(at))
 
 def main() -> IO(Unit):
