@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/Emerging-Patterns/ez/compare/v1.4.0...v1.5.0) (2026-09-30)
+
+
+### Bug Fixes
+
+* fuels from their inputs; bolt v1.12.0 ([#134](https://github.com/Emerging-Patterns/ez/issues/134)) ([baf3a27](https://github.com/Emerging-Patterns/ez/commit/baf3a27cc8f53cd90a0d5ce3f318e2694b682260))
+
 ## [1.4.0](https://github.com/Emerging-Patterns/ez/compare/v1.3.0...v1.4.0) (2026-09-30)
 
 
