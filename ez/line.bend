@@ -5,7 +5,7 @@
 # is a law (EZ-OUT-1); ez/main.bend prints and exits as `line` and `status`
 # say, and runs the command a line names, whose own end decides the rest.
 import Base
-import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
+import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
 
 # a subcommand
 type Sub is Data:

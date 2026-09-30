@@ -691,8 +691,8 @@ def id.c(x: G.Id, y: G.Id) -> Cmp:
 # LAW: the order `ord.str` builds from a string comparison is its answer
 law str_ord.go:
   for r: (String & String) & Cmp
-  {String.order.fin(r)
-    == oc(G.ord.str(String.eq.fin(r), Cmp.is_le(String.order.fin(r)))) : Cmp}
+  {Pair.snd(String & String, Cmp, r)
+    == oc(G.ord.str(Cmp.is_eq(Pair.snd(String & String, Cmp, r)), Cmp.is_le(Pair.snd(String & String, Cmp, r)))) : Cmp}
 
 def str_ord.go(r):
   ((_a, _b), c) = r
@@ -774,7 +774,7 @@ def id.refl(x):
     case G.IdNum{+n}:
       nat.refl(n)
     case G.IdWord{+s}:
-      Equal.cong((String & String) & Cmp, Cmp, r => String.order.fin(r),
+      Equal.cong((String & String) & Cmp, Cmp, r => Pair.snd(String & String, Cmp, r),
         String.cmp(s, s), ((s, s), EQ{}), Eq.string_cmp_self(s))
 
 # A pre-release's identifiers, one at a time; a list that runs out first is

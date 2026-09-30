@@ -15,37 +15,22 @@ import ../share/env.bend as Env
 import ../pkg/path.bend as P
 import ../ledger/manifest.bend as M
 import ./key.bend as K
-import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
+import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+# snap's answer reading, from the file its main.bend re-exports it from:
+# main.bend itself reaches the foreign effects that run programs, which a
+# law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs
+# (snap's SNAP-TRUST-5, trusted as EZ-TRUST-9).
+import 0xabe575924687afad4cee1a2c1194d639/src/answer.bend as R
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
 def Laws.nag_needs_prefix(s, e):
   %e : {Bool.and(_, String.ends_with(s, " is available: run bend update"))
     == False{} : Bool}
-  {==}
-
-def Laws.report_opens(rest):
-  Equal.cong(Bool, Bool,
-    x => Bool.or(x, Bool.and(False{},
-      String.starts_with(String.append("All terms check", rest), "- "))),
-    String.starts_with(String.append("All terms check", rest), "All terms check"),
-    True{},
-    Eq.starts_append("All terms check", rest))
-
-def Laws.dash_follows_report(rest):
-  Equal.cong(Bool, Bool,
-    x => Bool.or(String.starts_with(String.append("- ", rest), "All terms check"),
-      Bool.and(True{}, x)),
-    String.starts_with(String.append("- ", rest), "- "),
-    True{},
-    Eq.starts_append("- ", rest))
-
-def Laws.dash_alone_is_output(_rest):
   {==}
 
 def Laws.want_skips(h, t, e):

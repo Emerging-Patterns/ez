@@ -2,59 +2,21 @@
 version = "2"
 hub = "https://hub.bend-lang.com"
 [packages]
-[packages.0x085b03c84ca37125e38dddede7b91e55]
-[packages.0x085b03c84ca37125e38dddede7b91e55.source]
-kind = "git"
-url = "https://github.com/Emerging-Patterns/shake"
-rev = "ddb93921dea168aed7a37d3e56e00c4732cf9082"
-entry = "main.bend"
-root = "."
-narHash = "sha256-o5NRUjz6OBNMecXY8CZzYQpqoGFxdolD/ST8rIgAnLo="
-tag = "v0.2.0"
-[packages.0x085b03c84ca37125e38dddede7b91e55.files]
-LICENSE = "309f5aae946e4db157750e002fb179a74ed0fe27fce09a7be68a6977b14f205f"
-"main.bend" = "fff16a9f901df7150ec13b5488820e8fe4ca288133c3cf2e4fcc04ec6a3671f9"
-"src/args.bend" = "cb408b31dc02aa0525dc07f7a3119798f6d1d96f244361dc941797bb90653b24"
-"src/check.bend" = "ad47c820def9bb1b77ea52b8097e4a62a7f1bbe6aac3c753ddf089c29f9c012a"
-"src/cli.bend" = "c8b1c75699e77ca233aac1125cff8565246ae230aee25752c52f05e608f41362"
-[packages.0x5e4e2a9db839a0214ace6923b04b685b]
-[packages.0x5e4e2a9db839a0214ace6923b04b685b.source]
-kind = "git"
-url = "https://github.com/Emerging-Patterns/ezhttp"
-rev = "a5279268547ee43b5c48b6c8ada235b4a4596f4c"
-entry = "ezhttp/main.bend"
-root = "ezhttp"
-narHash = "sha256-Xn6zaCwV8mdIorktU04few1qfhCRobo16yF9H4osPRk="
-tag = "v0.6.0"
-[packages.0x5e4e2a9db839a0214ace6923b04b685b.files]
-"b64.bend" = "7bf2cd0e2947db17a299e739fa8defa91b6275ef5b4fac70c87809bafb0a6420"
-"body.bend" = "3f45a3613417b1e6a430e6a85bffd9dc52eccec1274cb96d15bcd9e8650b3399"
-"cache.bend" = "f2f348b05c396c7e121425cc5b49d13ae828f6110d26cb8420c7356ac478c1ae"
-"client.bend" = "8ec4c45d3adb9cf889151def84d26cf513bad85d6b765b6579111ec6012b4d10"
-"cookie.bend" = "c8264b3f3d371872dd8d87c7f7f528a0379fa361817560a531f05e993a5a5e08"
-"cors.bend" = "cad2e8e7eedbd87cc37fbf65f720584ae035aada5ff5cb3c18daba54ff6a2a7d"
-"effs/wire.c" = "957c6561c6da3d204a0e34b806d063a9e77690572b1bc5759342cb123ca814b5"
-"effs/wire.js" = "5616d8369dda12f6513daacf8860795836bcc4011eb9214bf862c3ac30412e6a"
-"http.bend" = "7622e0cd3da5f669f8a15bfce44fa90b9af77b156c39228e8c637247887f7e7a"
-"main.bend" = "e0a0906566d4064045a49cf2c0a2b21d286c9091de619a48702ab698e84a9171"
-"server.bend" = "ebec77b7c2a73ec8e7d8230c336c139fdddb1152d759216deb0b42f4f4504108"
-"url.bend" = "a13c8acd86c5643c5f3b02e30550aeb2af9d043b5abbfe1fee2980b1c0aae254"
-"wire.bend" = "e6d672218e3fafeaf83a6178c32622a921bd41ae54d36864ab2eaaf438b9609c"
-[packages.0xa17f0215fb4dd22e26fd007661489402]
-[packages.0xa17f0215fb4dd22e26fd007661489402.source]
+[packages.0x3bdc0c9f5265bb49f7fc76b61f529f24]
+[packages.0x3bdc0c9f5265bb49f7fc76b61f529f24.source]
 kind = "git"
 url = "https://github.com/noah-emp/bend-sha256"
-rev = "1319f22df2d5072a861cc71740c93258c44ac4ff"
+rev = "f6c04a400b83cb927ea76b939d9351ef426e370d"
 entry = "package.bend"
 root = "."
-narHash = "sha256-XYNpKGNHcpV5vRjFMOSlVVBchSdrpJrxgbGzd4dXXAQ="
-[packages.0xa17f0215fb4dd22e26fd007661489402.files]
+narHash = "sha256-Tu8uurWltf6TQd0mNO10BTQq5WYPKrLhOAa+GZRp/zY="
+[packages.0x3bdc0c9f5265bb49f7fc76b61f529f24.files]
 "CORRECTNESS.bend" = "fbdac9b5ab17dca383263b6f8a8809c310573b5eb84f82be8c11bd6086a4099c"
 "LAWS.bend" = "5fff64c5b3d5c301a11fc1e9d12f2781b1ddb33caa07cf7794dcfd93b8dc6ce0"
 "PROOF.bend" = "7128c765e4f258105b452c87674206dc316ac0cf82749f3973c2b8fe85f6200f"
 "buffer.bend" = "c01ad104fa1906c1952398c08245dcd8a38977f379a87bccf7f2da9881223c7d"
 "buffer_proof.bend" = "4157894db68b98847a88e74bc8599f5f943936d0df4eea165cb32e6a2c78fa87"
-"conformance.bend" = "ef8708ff54859828421b56e2b753220f3649d55a77fb0c31c3eef0f8b1689dbe"
+"conformance.bend" = "fb094f3ce585af402a459bab5f5b8fdc45522c4f685db039b8d5908ea219fe63"
 "core.bend" = "bece2919b7a164b125bce89c0b893448067971ef3f754febd519c47408b94706"
 "core_model.bend" = "86a391b9721e3fcc3c4ede6f172f4bd2713bde298871a4f366a306834381b72a"
 "fips.bend" = "f11c04cc7e6c319ead48623f73ffb7353fedf3f8ce8751b9330be27aad541ba8"
@@ -68,6 +30,18 @@ narHash = "sha256-XYNpKGNHcpV5vRjFMOSlVVBchSdrpJrxgbGzd4dXXAQ="
 "padding_proof.bend" = "ed0f9b4069d3bb2f956adb2d3c53ebe0880cf564beffa37a53b0ea02ba622eff"
 "sha256.bend" = "995cca1d2f9c8b4863de92ade74ccf91aa4f1f73ef613fd918aec2483bb5de20"
 "state.bend" = "24b4bb267fe94bd1615a8cff6aa090fff766c9009b5f9aa1c08a865b87d06230"
+[packages.0x8fb95168b7719a8faec16af7ee47b246]
+[packages.0x8fb95168b7719a8faec16af7ee47b246.source]
+kind = "git"
+url = "https://github.com/Emerging-Patterns/eztoml"
+rev = "234239137b6761579954b9b1f5be9f6bea3007f8"
+entry = "main.bend"
+root = "."
+narHash = "sha256-/8hBA8pzeqSNsDNOmN/KyXHcvMUfGZj2tzD8mscRzQs="
+tag = "v0.8.0"
+[packages.0x8fb95168b7719a8faec16af7ee47b246.files]
+LICENSE = "309f5aae946e4db157750e002fb179a74ed0fe27fce09a7be68a6977b14f205f"
+"main.bend" = "01e0d4114673241e11880c86c3af49897d684a2d50fbe1275ceaa282e056d4a5"
 [packages.0xabe575924687afad4cee1a2c1194d639]
 [packages.0xabe575924687afad4cee1a2c1194d639.source]
 kind = "git"
@@ -91,18 +65,47 @@ LICENSE = "309f5aae946e4db157750e002fb179a74ed0fe27fce09a7be68a6977b14f205f"
 "src/par.js" = "33ff4eca5d524264d28da36a9caf0a8252036efd44b92358a4c07daeb3ba69c9"
 "src/start.c" = "1bec197312b644549c176463e9476986301b28f6e01e5c34ea508f396cda1aec"
 "src/start.js" = "8ea49fe5324a2608342b4629b29d841a81d72ee8006869ac06971a0fb1aed53a"
-[packages.0xd79254973edee82bcf56616220876efe]
-[packages.0xd79254973edee82bcf56616220876efe.source]
+[packages.0xcab8a7a189cec2b51e8db0484f69c593]
+[packages.0xcab8a7a189cec2b51e8db0484f69c593.source]
 kind = "git"
-url = "https://github.com/Emerging-Patterns/eztoml"
-rev = "10c3079194db0d6adc9dfb908e877f785a442669"
+url = "https://github.com/Emerging-Patterns/shake"
+rev = "a1f84ca8954ddcbfa052e0fabfcc203b0a16c5cc"
 entry = "main.bend"
 root = "."
-narHash = "sha256-oWGYok7TMYvBF1ctGYXZ6J10TRMcffDTrRNjgOH6qi0="
-tag = "v0.5.0"
-[packages.0xd79254973edee82bcf56616220876efe.files]
+narHash = "sha256-1puK7bbJBzBwK5USSjEyx+T9ocGL9eONYtX/9eFZjcE="
+tag = "v0.4.0"
+[packages.0xcab8a7a189cec2b51e8db0484f69c593.files]
 LICENSE = "309f5aae946e4db157750e002fb179a74ed0fe27fce09a7be68a6977b14f205f"
-"main.bend" = "7d4c33ce8e68895b3bc76cff3f374601e9a3dc4d460cd00bf3159c71c41c65db"
+"main.bend" = "b750dd093f8a04fd959df7ec076937cc9d4b5c65312399b8e9da5ff9863e9350"
+"src/args.bend" = "a8f66acba8d39f9d41da396f181090c266d6a9af2f62d858e38bbbc735d887e0"
+"src/check.bend" = "ad47c820def9bb1b77ea52b8097e4a62a7f1bbe6aac3c753ddf089c29f9c012a"
+"src/cli.bend" = "178ac20d27446645e697efb74d557e7938c2e9626847e04cbcc992517d7d9ef4"
+[packages.0xf1c957a470368870a6d1d62a8c0cbe32]
+[packages.0xf1c957a470368870a6d1d62a8c0cbe32.source]
+kind = "git"
+url = "https://github.com/Emerging-Patterns/ezhttp"
+rev = "fce089819a72d962aa91f79806eeac25c085f0e4"
+entry = "main.bend"
+root = "."
+narHash = "sha256-3ygjjJ228wjAzlFTSL92wJuDByBAoU5H552WBijrQqo="
+tag = "v0.8.0"
+[packages.0xf1c957a470368870a6d1d62a8c0cbe32.files]
+LICENSE = "309f5aae946e4db157750e002fb179a74ed0fe27fce09a7be68a6977b14f205f"
+"main.bend" = "1f597c7a02b04731effb1a505b014119636a6d9fc3f445abb73b8f06fa095d30"
+"src/auth.bend" = "53b36c29add9fa647134fea758fe43f3333ae8bbf2fd10df95fe28545dc00153"
+"src/b64.bend" = "4212a94d354d3919d630302d8d7f6436e000f09a308ad5ad27e37edd841d2a96"
+"src/body.bend" = "99b6475cad4df8ca4ea79015243831b5bcde96e809206eb6253bbcd27ca45a71"
+"src/cache.bend" = "5bad4c297b74b1b468bdc61aa48a17fc810c8e3a9cb31acd96bd83bf81e539aa"
+"src/client.bend" = "abf3764e6a02c51a883c5acc56e97c7af917257f5e99d7e2b294c4d6dd91fd11"
+"src/cookie.bend" = "c68e150822c2992146a57c1e75ef204897bce9f144838a4d79ae75b5ef8d0fe1"
+"src/cors.bend" = "cbb4cbea1253117f88c7191318313993c930315e0f80ff5b14e7846b4cb97178"
+"src/effs/wire.c" = "957c6561c6da3d204a0e34b806d063a9e77690572b1bc5759342cb123ca814b5"
+"src/effs/wire.js" = "5616d8369dda12f6513daacf8860795836bcc4011eb9214bf862c3ac30412e6a"
+"src/http.bend" = "fce8a062180882a343c043f8990f9e64a0baf50864d1066fe82867c49f513ad4"
+"src/server.bend" = "d0f90a12cb0275c0b0eb99f7e57136fb7f27ab86adcfbdf3156053d276838d35"
+"src/url.bend" = "758b93fdb6d0df4db7804baf522143730d30d65ffaa674831ffd470ed5b44c87"
+"src/wire.bend" = "6b26809ab3eeced7e84d0b1c53f9b62aa2daed863a21e8ff1fd5fd2bbd58440c"
+"src/wirespec.bend" = "d558f3e4fad3709d0634d4a8d1074aa77efe75b7b9ebc0380f39b769d6b33ef9"
 [tools]
 [tools.bolt]
 git = "https://github.com/Emerging-Patterns/bolt"

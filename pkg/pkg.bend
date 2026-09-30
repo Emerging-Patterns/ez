@@ -357,10 +357,11 @@ def name.first(text: String) -> Bool:
     case SCon{+h, _t}:
       Char.is_lower(h)
 
-# a hub name: a letter, then a-z, 0-9 and -, 12 to 64 characters in all
+# a hub name: a letter, then a-z, 0-9 and -, 1 to 64 characters in all, as
+# bend's NAMED rule reads it. Which names a Bender may take is the hub's.
 def name.part(+text: String) -> Bool:
   +n = String.length(text)
-  Bool.and(Bool.and(Nat.is_ge(n, 12n), Nat.is_le(n, 64n)),
+  Bool.and(Bool.and(Nat.is_ge(n, 1n), Nat.is_le(n, 64n)),
     Bool.and(name.first(text), name.chars(text)))
 
 # whether every character is a digit
@@ -424,7 +425,7 @@ def is_named(+spec: String) -> Bool:
 # words
 def unnamed.why(+nv: String) -> String:
   "ez: " ++ nv ++ " is not a package as <name>@<version>: a-z, 0-9 and -, " ++
-    "12 to 64 characters, at four numbers like 1.0.0.0"
+    "1 to 64 characters, at four numbers like 1.0.0.0"
 
 # the name when the hub rules it out, the rest's otherwise
 def unnamed.pick(bad: Bool, +nv: String, rest: Unit -> String) -> String:

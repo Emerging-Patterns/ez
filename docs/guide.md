@@ -5,9 +5,10 @@ install steps and a quickstart; [SPEC.md](../SPEC.md) lists what ez
 guarantees, each requirement with the laws that prove it. Requirement IDs
 such as (EZ-VEN-1) below point at its rows.
 
-Every subcommand needs `bend` and `git` on PATH. `ez help` prints the command
-list, and `ez help test` the flags of one command. The Bend runtime keeps
-`--help` for itself.
+Every subcommand needs `bend` and `git` on PATH. `ez help` or `ez --help`
+prints the command list, and `ez help test` or `ez test --help` the flags of
+one command. The Bend runtime keeps `--bend-help`, `--threads`, `--gpu` and
+`--gpu-build` for itself; put them after a `--` to hand them to ez.
 
 Every command exits 0 on success and 1 on any failure ez detects, except
 `ez run` and `ez tool run`, which exit with the program's status (EZ-OUT-1).
@@ -145,7 +146,7 @@ instead (see "Named imports" below).
   `src/main.bend` is a path.
 - Anything else is a path. The empty word is refused.
 - For `ez add` only, a path that bend reads as a hub package's
-  `<name>@<version>` (a-z, 0-9 and `-`, 12 to 64 characters, then `@` and four
+  `<name>@<version>` (a-z, 0-9 and `-`, 1 to 64 characters, then `@` and four
   numbers like `1.0.0.0`) is that package on the hub. A git URL,
   `git@host:path` or `owner/repo` never is.
 
@@ -663,7 +664,8 @@ you to `bend login` the first time, and the hub refuses a name that is
 someone else's or a version that does not go up.
 
 - `publish-as` is a hub name, as bend's rule reads one: a lowercase letter,
-  then a-z, 0-9 and `-`, 12 to 64 characters in all. It is not `name`, which
+  then a-z, 0-9 and `-`, 1 to 64 characters in all. Whether you may take a
+  name is the hub's to decide. It is not `name`, which
   is the ledger's own and may be anything, and not `hub`, which is the hub's
   URL.
 - `version` is `MAJOR.MINOR.PATCH`, three numbers with no leading zeros.
@@ -749,8 +751,12 @@ byte. CI also follows the README's install steps without nix and runs
 
 `ez prove` is the gate. It runs `bend` on every `PROOF.bend` in the tree, all
 at once, and passes a proof only when the first line bend prints is exactly
-`All terms check.`. bend exits 0 on a proof that leans on unsafe or foreign
-code, so the exit status is not enough.
+`ALL PROOFS CHECK`, the verdict bend 2.0.32 and later print for a file with no
+main. A proof that reaches an `@unsafe` def or foreign code, imports included,
+is `SOME PROOFS FAIL`, so a PROOF.bend imports only modules that run nothing.
+ez keeps the half of a module that runs programs or fetches over the network
+in a sibling module no law imports (`git/exec.bend` beside `git/git.bend`, for
+one). The gate reads the line rather than the exit status.
 
 It prints a line for each proof and then the count, and exits 1 when any
 proof failed. Nothing is cached, so every run checks every proof.

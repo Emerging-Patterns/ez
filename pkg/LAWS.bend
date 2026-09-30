@@ -378,7 +378,7 @@ law unnamed_refused:
   for +out: List<&2, P.Hit>
   {P.made.go(P.Unnamed{nv}, entry, out)
     == P.Refused{"ez: " ++ nv ++ " is not a package as <name>@<version>: a-z, 0-9 and -, " ++
-      "12 to 64 characters, at four numbers like 1.0.0.0"} : P.Walked}
+      "1 to 64 characters, at four numbers like 1.0.0.0"} : P.Walked}
 
 # LAW: a module named after the header has ended is dropped. The walk
 # does not follow it.

@@ -121,8 +121,8 @@ def cc.name(+var: String) -> String:
   Bool.pick(String, String.is_empty(var), "cc", var)
 
 # the programs doctor asks for their versions. bend's check report changed
-# wording between 2.0.16 and 2.0.18, and the native lane needs a C compiler,
-# so the version is the finding.
+# wording in 2.0.32, which the proof gate reads, and the native lane needs a C
+# compiler, so the version is the finding.
 def programs(+cc: String) -> List<&2, String>:
   ["bend", cc.name(cc), "git"]
 

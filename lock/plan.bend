@@ -232,6 +232,34 @@ def roots.named(fs: List<&2, W.Source>) -> List<&2, String>:
 def table(+led: M.Read, js: List<&2, W.Judged>) -> List<&2, L.Name>:
   List.append(&2, L.Name, L.ledger.names(led), W.names.of(js))
 
+# how many imports one verdict queues: a package's, or none
+def fuel.verdict(verdict: W.Verdict, ns: List<&2, L.Name>) -> Nat:
+  match verdict:
+    case W.Ok{_fs, ss}:
+      List.length(&2, String, L.kids.in(ns, ss))
+    case W.No{_why}:
+      0n
+    case W.Named{_names}:
+      0n
+
+# how many imports every verdict queues between them
+def fuel.judged(js: List<&2, W.Judged>, +ns: List<&2, L.Name>) -> Nat:
+  match js:
+    case []:
+      0n
+    case W.Judged{_h, v} <> t:
+      Nat.add(fuel.verdict(v, ns), fuel.judged(t, ns))
+
+# how many steps the walk may take: one for each hash the queue starts with,
+# one for each import a verdict can queue, since a hash is resolved at most
+# once, and one more to spare. That is a step for every hash the walk can
+# queue, and it is a function of the walk's inputs rather than a fixed
+# number, as the add walk's is: a proof about inputs it does not know leaves it unevaluated,
+# where bend 2.0.33 and 2.0.34 compare a fixed fuel's walk one stack frame a
+# step and overflow the checker past about 10000.
+def walk.fuel(queue: List<&2, String>, ns: List<&2, L.Name>, js: List<&2, W.Judged>) -> Nat:
+  Nat.add(1n, Nat.add(List.length(&2, String, queue), fuel.judged(js, ns)))
+
 # the walk from every committed source: every package they import by hash,
 # and every one they import by a name the table resolves. A listing git
 # could not give is a walk refused before its first step.
@@ -240,7 +268,8 @@ def walk.of(+led: M.Read, listing: W.Listing, +ns: List<&2, L.Name>, +js: List<&
     case W.Unlisted{why}:
       Walk{[], [], [], why}
     case W.Listed{+fs}:
-      walk(U32.to_nat(100000), L.ledger.read(led), ns, js,
+      walk(walk.fuel(List.append(&2, String, roots(fs), L.name.hashes(ns, roots.named(fs))), ns, js),
+        L.ledger.read(led), ns, js,
         Walk{List.append(&2, String, roots(fs), L.name.hashes(ns, roots.named(fs))), [], [], ""})
 
 # the committed sources a listing holds, none when git could not list them

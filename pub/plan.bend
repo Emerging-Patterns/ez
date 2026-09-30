@@ -201,7 +201,7 @@ def why.noname(+ver: String) -> String:
 # why a `publish-as` the hub would not take is refused
 def why.name(+name: String) -> String:
   "ez: publish-as = \"" ++ name ++ "\" is not a hub name: a lowercase letter, " ++
-    "then a-z, 0-9 and -, 12 to 64 characters in all"
+    "then a-z, 0-9 and -, 1 to 64 characters in all"
 
 # why a `version` that is not MAJOR.MINOR.PATCH is refused
 def why.ver(+ver: String) -> String:

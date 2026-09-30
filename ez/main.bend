@@ -8,7 +8,7 @@
 # native (`bend ez/main.bend -o bin/ez.bin`); interpreted, bend's own CLI
 # would take the flags meant for ez.
 import Base
-import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
+import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
 import ../share/args.bend as Args
 import ./cmd.bend as Cmd
 import ./test.bend as Test

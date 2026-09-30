@@ -36,8 +36,8 @@ def since(ls: List<&2, String>, +pre: String, on: Bool) -> List<&2, String>:
 def stanza(+text: String, +head: String) -> String:
   Q.chomp(String.join(since(String.lines(text), head, False{}), "\n"))
 
-# what a program answered, with bend's check report taken out of it, since a
-# run's output and the check that preceded it arrive on the same stream
+# what a program answered, with bend's update nag taken out of it, since a
+# run's output and bend's own lines arrive on the same stream
 def answer(+out: String) -> String:
   W.last(String.lines(Q.filter(R.text(out))))
 

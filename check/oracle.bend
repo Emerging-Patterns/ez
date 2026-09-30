@@ -711,7 +711,7 @@ def begin.at(bound: Result<&1, &1, U32 & String, Listener>, +dir: String, port: 
 # the oracle, on a directory and a port
 def begin(dir: String, +port: U32) -> IO(Unit):
   do IO<Unit>:
-    r : Result<&1, &1, U32 & String, Listener> <- TCP.listen(port)
+    r : Result<&1, &1, U32 & String, Listener> <- TCP.listen("127.0.0.1", port)
     begin.at(r, dir, port)
 
 # a &1 list copied into a &2 one. `IO.args()` answers a `&1` list, which can be
@@ -723,6 +723,15 @@ def copy(xs: List<&1, String>) -> List<&2, String>:
     case Con{h, t}:
       h <> copy(t)
 
+# the arguments after the program's own name. Since bend 2.0.32 `IO.args()`
+# starts with the program as it was invoked, as C's argv does.
+def args(xs: List<&1, String>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{_h, t}:
+      copy(t)
+
 # the command line: a directory to serve, and a port to serve it on
 def start(+as: List<&2, String>) -> IO(Unit):
   begin(S.at(as, 0n), Maybe.default(&2, U32, U32.read(S.at(as, 1n)), 0))
@@ -730,4 +739,4 @@ def start(+as: List<&2, String>) -> IO(Unit):
 def main() -> IO(Unit):
   do IO<Unit>:
     xs : List<&1, String> <- IO.args()
-    start(copy(xs))
+    start(args(xs))

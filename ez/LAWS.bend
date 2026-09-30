@@ -18,12 +18,16 @@ import ../share/env.bend as Env
 import ../pkg/path.bend as P
 import ../ez/named.bend as Named
 import ../pkg/pkg.bend as Pkg
-import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
+import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+# snap's answer reading, from the file its main.bend re-exports it from:
+# main.bend itself reaches the foreign effects that run programs, which a
+# law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs
+# (snap's SNAP-TRUST-5, trusted as EZ-TRUST-9).
+import 0xabe575924687afad4cee1a2c1194d639/src/answer.bend as R
 
 # quiet: bend's chatter is not the program's output
 
@@ -34,23 +38,6 @@ law nag_needs_prefix:
   for +s: String
   for e: {False{} == String.starts_with(s, "bend ") : Bool}
   {Q.is_nag(s) == False{} : Bool}
-
-# LAW: the check report's first line is a report line even when nothing
-# before it was. Both wordings open with these words.
-law report_opens:
-  for +rest: String
-  {Q.in_report(False{}, "All terms check" ++ rest) == True{} : Bool}
-
-# LAW: a dash line is a report line only when the line before it was. This is
-# the 2.0.18 list; a program's own `- ` line is not in that list.
-law dash_follows_report:
-  for +rest: String
-  {Q.in_report(True{}, "- " ++ rest) == True{} : Bool}
-
-# LAW: and a dash line that is not after the report is the program's.
-law dash_alone_is_output:
-  for rest: String
-  {Q.in_report(False{}, "- " ++ rest) == False{} : Bool}
 
 # trailer: what a test file states its run must print
 

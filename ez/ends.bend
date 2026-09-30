@@ -6,7 +6,11 @@
 # That the answer is what bend printed is EZ-TRUST-2. `ez run` reads no
 # answer: it exits with the program's own status (`code` in ez/start.bend).
 import Base
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+# snap's answer reading, from the file its main.bend re-exports it from:
+# main.bend itself reaches the foreign effects that run programs, which a
+# law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs
+# (snap's SNAP-TRUST-5, trusted as EZ-TRUST-9).
+import 0xabe575924687afad4cee1a2c1194d639/src/answer.bend as R
 import ../lock/plan.bend as P
 
 # a command that ends on whether it passed: success, or a refusal whose
