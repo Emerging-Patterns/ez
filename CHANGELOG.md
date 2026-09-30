@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.4.0](https://github.com/Emerging-Patterns/ez/compare/v1.3.0...v1.4.0) (2026-09-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* publish the whole ez program as the hub package ezx ([#130](https://github.com/Emerging-Patterns/ez/issues/130))
+
+### Features
+
+* publish the whole ez program as the hub package ezx ([#130](https://github.com/Emerging-Patterns/ez/issues/130)) ([5c530ef](https://github.com/Emerging-Patterns/ez/commit/5c530efbcce903c0fcb07e2a20692f072c6f9145))
+
 ## [1.3.0](https://github.com/Emerging-Patterns/ez/compare/v1.2.0...v1.3.0) (2026-09-30)
 
 
