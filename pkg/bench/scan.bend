@@ -135,6 +135,15 @@ def copy(xs: List<&1, String>) -> List<&2, String>:
     case Con{h, t}:
       h <> copy(t)
 
+# the arguments after the program's own name. Since bend 2.0.32 `IO.args()`
+# starts with the program as it was invoked, as C's argv does.
+def args(xs: List<&1, String>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{_h, t}:
+      copy(t)
+
 # the nth argument, "" past the end
 def at(xs: List<&2, String>, index: Nat) -> String:
   match xs index:
@@ -159,4 +168,4 @@ def start(as: List<&2, String>) -> IO(Unit):
 def main() -> IO(Unit):
   do IO<Unit>:
     xs : List<&1, String> <- IO.args()
-    start(copy(xs))
+    start(args(xs))

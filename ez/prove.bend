@@ -1,13 +1,14 @@
 # ez/prove: the proof gate. Every PROOF.bend in the tree is run through `bend`,
 # all of them at once, and a proof passes only when the first line bend prints
-# is exactly `All terms check.` Nothing is cached: a gate CI leans on answers
+# is exactly `ALL PROOFS CHECK`. Nothing is cached: a gate CI leans on answers
 # for the tree in front of it, not for one it saw before.
 #
-# The line is the verdict, never the exit status. Both
-# `All terms check, with N unsafe annotations.` and 2.0.18's
-# `All terms check, but N defs rely on unsafe or foreign code:` exit 0, so a
-# gate reading the status alone goes green on a claim that leans on code
-# nothing proved. Only the bare line means every term was proved outright.
+# The line is the verdict, never the exit status. Since bend 2.0.32 a file
+# with no main is answered `ALL PROOFS CHECK` or `SOME PROOFS FAIL`, and a
+# proof that reaches an `@unsafe` def or foreign code, imports included, fails
+# and exits 1 rather than passing with a note as 2.0.31 did. The gate reads
+# the line all the same: a status says nothing about what was checked, and
+# only that first line says every term was proved outright.
 import Base
 import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../share/args.bend as Args
@@ -66,7 +67,7 @@ def head(text: String) -> String:
 
 # the one line a proof passes on
 def verdict() -> String:
-  "All terms check."
+  "ALL PROOFS CHECK"
 
 # every line of a block, indented under the line that introduces it
 def indent.go(ls: List<&2, String>) -> List<&2, String>:

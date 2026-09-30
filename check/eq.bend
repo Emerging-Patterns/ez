@@ -92,7 +92,7 @@ law string_eq_self:
 
 # equality is the comparison read as a bit, so the comparison's law answers
 def string_eq_self(s):
-  Equal.cong((String & String) & Cmp, Bool, r => String.eq.fin(r),
+  Equal.cong((String & String) & Cmp, Bool, r => Cmp.is_eq(Pair.snd(String & String, Cmp, r)),
     String.cmp(s, s), ((s, s), EQ{}), string_cmp_self(s))
 
 # LAW: a char equals itself

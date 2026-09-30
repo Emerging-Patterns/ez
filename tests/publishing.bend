@@ -19,7 +19,7 @@ import ../check/world.bend as W
 def yes(name: String, ok: Bool) -> IO(Unit):
   Check.eq_str(name, Bool.pick(String, ok, "yes", "no"), "yes")
 
-# what a program printed, with bend's check report and the trailing blank gone
+# what a program printed, with bend's update nag and the trailing blank gone
 def said(+out: String) -> List<&2, String>:
   String.lines(Q.filter(R.text(out)))
 

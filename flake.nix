@@ -5,8 +5,9 @@
   description = "ez: dependency tracking, lockfile and vendoring tool for Bend 2, written in Bend";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  # the commit that packages bend 2.0.34 (the v2.0.34 tag packages 2.0.33)
   inputs.bend = {
-    url = "github:bendlang/bend";
+    url = "github:bendlang/bend/777ee0b55c485afdd7e68bd917b3d23a88d77371";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -46,7 +47,7 @@
       };
 
       # `ez prove`: every PROOF.bend, each passing only on a first line of
-      # exactly `All terms check.` That is the gate CI runs. The end-to-end
+      # exactly `ALL PROOFS CHECK`. That is the gate CI runs. The end-to-end
       # tests under `tests/` are not run here: they drive real git daemons, a
       # real `bend --publish` and `nix-build`, and the sandbox has no network,
       # no nix daemon and no ports to give them.

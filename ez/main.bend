@@ -114,7 +114,7 @@ def go.line(+how: L.Line, +as: List<&2, String>) -> IO(Unit):
 
 # the line taken apart
 def go(+app: Shake.Cli, +as: List<&2, String>) -> IO(Unit):
-  go.line(L.line(app, Shake.parse(app, Args.argv.of(as))), as)
+  go.line(L.line(app, Shake.parse(app, L.helped(Args.argv.of(as)))), as)
 
 def main() -> IO(Unit):
   do IO<Unit>:

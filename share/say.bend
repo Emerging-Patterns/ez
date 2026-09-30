@@ -9,8 +9,11 @@
 # so it opens the terminal by the path this process's own stderr or stdout
 # already has. A pipe is not a terminal: the line is printed once and left,
 # which is what a log wants.
+#
+# The words and the scripts the mark runs are here; what starts and stops the
+# mark is share/spin, which runs programs and so reaches foreign code a law
+# may not import.
 import Base
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../pkg/path.bend as P
 
 # a spinner that is running, or none. An empty pid means the line was already
@@ -179,70 +182,3 @@ def frames() -> String:
 # the mark wiped, and the line left in its place
 def settle() -> String:
   "printf '\\r\\033[K%s\\n' \"$2\" >\"$1\""
-
-# one fd of this process, as a path. A failure is not a terminal.
-def link(+fd: String) -> IO(String):
-  do IO<String>:
-    +out : String <- R.exec(["sh", "-c", probe(), "sh", fd])
-    return String.trim(R.text(out))
-
-# the terminal this process writes to, stderr's first, or empty for none
-def dev() -> IO(String):
-  do IO<String>:
-    +err : String <- link("2")
-    +out : String <- link("1")
-    return tty.pick(err, out)
-
-# the mark, when there is a terminal to draw it on
-def start(on: Bool, +dev: String, +msg: String) -> IO(Spin):
-  match on:
-    case False{}:
-      IO.pure(Spin, Spin{"", "", ""})
-    case True{}:
-      do IO<Spin>:
-        +pid : String <- R.start(["sh", "-c", frames(), "sh", dev, msg])
-        return Spin{dev, String.trim(pid), msg}
-
-def hold.at(plain: Bool, +dev: String, +msg: String) -> IO(Spin):
-  match plain:
-    case True{}:
-      do IO<Spin>:
-        IO.print_err(msg)
-        return Spin{"", "", ""}
-    case False{}:
-      start(True{}, dev, msg)
-
-# the line, then the mark when a terminal will show it moving. A pipe gets
-# the line and nothing else.
-def hold(+msg: String) -> IO(Spin):
-  do IO<Spin>:
-    +tty : String <- dev()
-    hold.at(String.is_empty(tty), tty, msg)
-
-# a spinner that never started still owes its line, unless the plain path
-# already printed it and left the message empty
-def owed(empty: Bool, +msg: String) -> IO(Unit):
-  match empty:
-    case True{}:
-      IO.pure(Unit, Unit{})
-    case False{}:
-      IO.print_err(msg)
-
-# the mark stopped, and the line written where it was
-def done.live(+dev: String, +pid: String, +msg: String) -> IO(Unit):
-  do IO<Unit>:
-    _k : String <- R.exec(["kill", pid])
-    _s : String <- R.exec(["sh", "-c", settle(), "sh", dev, msg])
-    return Unit{}
-
-def done.bad(bad: Bool, +dev: String, +pid: String, +msg: String) -> IO(Unit):
-  match bad:
-    case True{}:
-      owed(String.is_empty(msg), msg)
-    case False{}:
-      done.live(dev, pid, msg)
-
-# the step finished: the mark stopped and the line left, or the line owed
-def done(spin: Spin) -> IO(Unit):
-  Spin{+term, +pid, +msg} = spin
-  done.bad(Bool.or(String.is_empty(pid), String.eq(pid, "0")), term, pid, msg)

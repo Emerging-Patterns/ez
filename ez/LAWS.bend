@@ -23,7 +23,10 @@ import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+# snap's answer reading, from the file its main.bend re-exports it from:
+# main.bend itself reaches the foreign effects that run programs, which a
+# law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs.
+import 0xabe575924687afad4cee1a2c1194d639/src/answer.bend as R
 
 # quiet: bend's chatter is not the program's output
 
@@ -34,23 +37,6 @@ law nag_needs_prefix:
   for +s: String
   for e: {False{} == String.starts_with(s, "bend ") : Bool}
   {Q.is_nag(s) == False{} : Bool}
-
-# LAW: the check report's first line is a report line even when nothing
-# before it was. Both wordings open with these words.
-law report_opens:
-  for +rest: String
-  {Q.in_report(False{}, "All terms check" ++ rest) == True{} : Bool}
-
-# LAW: a dash line is a report line only when the line before it was. This is
-# the 2.0.18 list; a program's own `- ` line is not in that list.
-law dash_follows_report:
-  for +rest: String
-  {Q.in_report(True{}, "- " ++ rest) == True{} : Bool}
-
-# LAW: and a dash line that is not after the report is the program's.
-law dash_alone_is_output:
-  for rest: String
-  {Q.in_report(False{}, "- " ++ rest) == False{} : Bool}
 
 # trailer: what a test file states its run must print
 
@@ -662,6 +648,34 @@ law command_ends_its_own:
   for +m: Shake.Matched
   for named: {L.is.help(L.command(L.path(m))) == False{} : Bool}
   {L.status(L.line(app, Done{m})) == L.Ends{} : L.Status}
+
+# LAW: a line with no `--help` among its flags is parsed as it came
+# EZ-OUT-1
+law helped_keeps_line:
+  for +ws: List<&2, String>
+  for no: {L.has.help(ws) == False{} : Bool}
+  {L.helped(ws) == ws : List<&2, String>}
+
+# LAW: `--help` after a command asks for that command's help, as
+# `ez help add` does, whatever follows it on the line
+# EZ-OUT-1
+law help_flag_names_command:
+  for +rest: List<&2, String>
+  {L.helped("add" <> ("--help" <> rest)) == ["help", "add"] : List<&2, String>}
+
+# LAW: the words in front of `--help` are kept only while they name a command
+# path, so the arguments a command was given are not part of the request
+# EZ-OUT-1
+law help_flag_stops_at_argument:
+  for +rest: List<&2, String>
+  {L.helped("add" <> ("owner/repo" <> ("--help" <> rest)))
+    == ["help", "add"] : List<&2, String>}
+
+# LAW: `--help` first asks for ez's own help, as `ez help` does
+# EZ-OUT-1
+law help_flag_alone:
+  for +rest: List<&2, String>
+  {L.helped("--help" <> rest) == ["help"] : List<&2, String>}
 
 # ---------------------------------------------------------------------------
 # ends: the commands that are not planners (ez/ends.bend). Each ends with an

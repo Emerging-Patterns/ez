@@ -1,8 +1,13 @@
-# share/args: the command line, as the binary itself receives it. `IO.args()` gives
-# a compiled Bend binary every argument it was started with: the first is the
-# subcommand and the rest are its own. The runtime keeps `--threads`, `--gpu`,
-# `--gpu-build` and `--help` for itself and strips them wherever they appear;
-# everything after a `--` reaches the program untouched, those four included.
+# share/args: the command line, as the binary itself receives it. Since bend
+# 2.0.32 `IO.args()` starts with the program as it was invoked, as C's argv
+# does, so `all` drops it: the first word left is the subcommand and the rest
+# are its own. A compiled binary's runtime keeps `--threads N`, `--gpu V`,
+# `--gpu-build` and `--bend-help` for itself and strips them wherever they
+# appear, the first two with the value after them; the last two answer and
+# exit before the program starts. The first `--` is dropped and everything
+# after it reaches the program untouched, those four included. `--help` is
+# the program's since 2.0.29, and ez reads it as a request for help
+# (ez/line.bend).
 import Base
 
 # the non-empty strings
@@ -31,12 +36,6 @@ def copy(xs: List<&1, String>) -> List<&2, String>:
     case Con{h, t}:
       h <> copy(t)
 
-# every argument, each one readable twice
-def all() -> IO(List<&2, String>):
-  do IO<List<&2, String>>:
-    xs : List<&1, String> <- IO.args()
-    return copy(xs)
-
 # the first argument and the ones after it. The pair is returned rather than
 # asked about twice, since a match cannot scrutinise a local binder.
 def split(xs: List<&2, String>) -> String & List<&2, String>:
@@ -64,6 +63,12 @@ def rest(as: List<&2, String>) -> List<&2, String>:
       Nil{}
     case Con{_h, t}:
       t
+
+# every argument after the program's own name, each one readable twice
+def all() -> IO(List<&2, String>):
+  do IO<List<&2, String>>:
+    xs : List<&1, String> <- IO.args()
+    return rest(copy(xs))
 
 # the command `ez run` starts: bend on the entry, with every word after
 # `run` (EZ-TOOL-9)

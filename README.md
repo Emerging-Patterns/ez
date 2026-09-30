@@ -21,7 +21,7 @@ mkdir -p bin
 BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
 ```
 
-ez runs on Bend 2.0.31, the version CI builds with. Its dependencies are
+ez runs on Bend 2.0.34, the version CI builds with, and needs 2.0.32 or later. Its dependencies are
 pinned to git revs, and `ez fetch` is what fetches them, which ez cannot run
 before it is built. `bootstrap.sh` is that one step, and the one helper script
 in the repo: it reads `ez.lock.toml`, fetches each package at its pinned rev

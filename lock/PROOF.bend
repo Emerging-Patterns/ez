@@ -889,7 +889,7 @@ def Laws.plain_lock_pins_ledger_sources(w, e):
                 case W.Unlisted{why}:
                   {==}
                 case W.Listed{+fs}:
-                  Laws.walk_pins_ledger_sources(U32.to_nat(100000),
+                  Laws.walk_pins_ledger_sources(P.walk.fuel(),
                     L.ledger.read(W.parsed(ledger)),
                     P.table(W.parsed(ledger), W.judge(W.origins(ledger), W.ledger.hub(ledger), replies)),
                     W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
@@ -1157,7 +1157,7 @@ def walk_of_distinct(led, listing, ns, js):
     case W.Unlisted{why}:
       {==}
     case W.Listed{+fs}:
-      Laws.walk_keeps_hashes_distinct(U32.to_nat(100000), L.ledger.read(led), ns, js,
+      Laws.walk_keeps_hashes_distinct(P.walk.fuel(), L.ledger.read(led), ns, js,
         P.Walk{List.append(&2, String, P.roots(fs), L.name.hashes(ns, P.roots.named(fs))),
           [], [], ""}, {==})
 
@@ -15624,7 +15624,7 @@ def an.recs(led, listing, js):
     case W.Unlisted{_why}:
       {==}
     case W.Listed{+fs}:
-      Laws.walk_pins_ledger_sources(U32.to_nat(100000), L.ledger.read(led), P.table(led, js), js,
+      Laws.walk_pins_ledger_sources(P.walk.fuel(), L.ledger.read(led), P.table(led, js), js,
         P.Walk{List.append(&2, String, P.roots(fs), L.name.hashes(P.table(led, js), P.roots.named(fs))),
           [], [], ""}, {==})
 

@@ -6,6 +6,7 @@
 # unit tests beside the code are about what can be said without one.
 import Base
 import ../hub/hub.bend as Hub
+import ../hub/get.bend as Net
 import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../check/kit.bend as Check
 import ../check/world.bend as W
@@ -21,19 +22,19 @@ def show(+out: String) -> String:
 # every fetch, once the server is up
 def fetch(+port: String) -> IO(Unit):
   do IO<Unit>:
-    +plain : String <- Hub.get(at(port, "/plain"))
+    +plain : String <- Net.get(at(port, "/plain"))
     Check.eq_str("a Content-Length body comes back whole", show(plain),
       "0 a manifest line\n")
-    +chunked : String <- Hub.get(at(port, "/chunked"))
+    +chunked : String <- Net.get(at(port, "/chunked"))
     Check.eq_str("a chunked body is put back together", show(chunked),
       "0 one two three four\n")
-    +gone : String <- Hub.get(at(port, "/gone"))
+    +gone : String <- Net.get(at(port, "/gone"))
     Check.eq_str("a 404 is a status, never a body", show(gone),
       "22 the server answered 404")
-    +shut : String <- Hub.get("http://127.0.0.1:1/plain")
+    +shut : String <- Net.get("http://127.0.0.1:1/plain")
     Check.eq_str("a port with nothing on it names the host it could not reach",
       show(shut), "6 could not reach 127.0.0.1 port 1")
-    +bad : String <- Hub.get("nonsense")
+    +bad : String <- Net.get("nonsense")
     Check.eq_str("a url that is not one never reaches a socket", show(bad),
       "22 nonsense: has no //")
 

@@ -30,6 +30,7 @@ import ../pkg/path.bend as P
 import ../run/bend.bend as Bend
 import ../share/cap.bend as Cap
 import ../share/say.bend as Say
+import ../share/spin.bend as Spin
 import ../share/pass.bend as Pass
 import ./world.bend as TW
 import ./plan.bend as TP
@@ -208,9 +209,9 @@ def exec.make(making: TP.Make) -> IO(Unit):
     case TP.Make{+top, +lib, fetch, file, out, at, key, +name}:
       do IO<Unit>:
         exec.lib(fetch, top, lib)
-        +s : Say.Spin <- Say.hold(Say.building(name))
+        +s : Say.Spin <- Spin.hold(Say.building(name))
         compile(lib, file, out)
-        Say.done(s)
+        Spin.done(s)
         Run.write(at, key)
 
 # the lines a person is told, each on stderr

@@ -232,6 +232,15 @@ def roots.named(fs: List<&2, W.Source>) -> List<&2, String>:
 def table(+led: M.Read, js: List<&2, W.Judged>) -> List<&2, L.Name>:
   List.append(&2, L.Name, L.ledger.names(led), W.names.of(js))
 
+# how many steps the walk may take: one per hash the queue holds, and ez's own
+# lock takes about a hundred. It was 100000. bend 2.0.33 and 2.0.34 compare a
+# walk the laws unfold at this fuel one step per stack frame, and overflow the
+# checker's stack somewhere past 10000, where 2.0.31 did not, so the fuel is
+# 4096, well inside that. It is a def of its own so a proof names the same
+# fuel the planner walks with.
+def walk.fuel() -> Nat:
+  U32.to_nat(4096)
+
 # the walk from every committed source: every package they import by hash,
 # and every one they import by a name the table resolves. A listing git
 # could not give is a walk refused before its first step.
@@ -240,7 +249,7 @@ def walk.of(+led: M.Read, listing: W.Listing, +ns: List<&2, L.Name>, +js: List<&
     case W.Unlisted{why}:
       Walk{[], [], [], why}
     case W.Listed{+fs}:
-      walk(U32.to_nat(100000), L.ledger.read(led), ns, js,
+      walk(walk.fuel(), L.ledger.read(led), ns, js,
         Walk{List.append(&2, String, roots(fs), L.name.hashes(ns, roots.named(fs))), [], [], ""})
 
 # the committed sources a listing holds, none when git could not list them

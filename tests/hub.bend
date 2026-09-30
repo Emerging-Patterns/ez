@@ -15,7 +15,7 @@ import ../check/world.bend as W
 def yes(name: String, ok: Bool) -> IO(Unit):
   Check.eq_str(name, Bool.pick(String, ok, "yes", "no"), "yes")
 
-# what a program answered, with bend's check report taken out of it
+# what a program answered, with bend's update nag taken out of it
 def answer(+out: String) -> String:
   W.last(String.lines(Q.filter(R.text(out))))
 

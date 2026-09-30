@@ -1,14 +1,14 @@
 [package]
 name = "ez"
-entry = "ledger/manifest.bend"
+entry = "main.bend"
 bin = "ez/main.bend"
 [deps]
 [deps.sha256]
-hash = "0xa17f0215fb4dd22e26fd007661489402"
+hash = "0x3bdc0c9f5265bb49f7fc76b61f529f24"
 git = "https://github.com/noah-emp/bend-sha256"
-rev = "1319f22df2d5072a861cc71740c93258c44ac4ff"
+rev = "f6c04a400b83cb927ea76b939d9351ef426e370d"
 root = "."
-narHash = "sha256-XYNpKGNHcpV5vRjFMOSlVVBchSdrpJrxgbGzd4dXXAQ="
+narHash = "sha256-Tu8uurWltf6TQd0mNO10BTQq5WYPKrLhOAa+GZRp/zY="
 entry = "package.bend"
 [deps.shake]
 hash = "0x085b03c84ca37125e38dddede7b91e55"

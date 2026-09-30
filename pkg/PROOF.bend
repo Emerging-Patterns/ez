@@ -421,7 +421,7 @@ law rec.snd:
   for +h1: Char
   for +h2: Char
   for r: (String & String) & Cmp
-  {String.order.fin(String.cmp.rec(h1, h2, r)) == String.order.fin(r) : Cmp}
+  {Pair.snd(String & String, Cmp, String.cmp.rec(h1, h2, r)) == Pair.snd(String & String, Cmp, r) : Cmp}
 
 def rec.snd(_h1, _h2, r):
   ((a1, a2), c) = r
@@ -435,7 +435,7 @@ law order.cons.arm:
   for +h2: Char
   for t2: String
   for u: Cmp
-  {String.order.fin(String.cmp.fin(t1, t2, ((h1, h2), u)))
+  {Pair.snd(String & String, Cmp, String.cmp.fin(t1, t2, ((h1, h2), u)))
     == cmp.lex(u, String.order(t1, t2)) : Cmp}
 
 def order.cons.arm(h1, t1, h2, t2, u):
@@ -742,7 +742,7 @@ def le.trans(x, y, z, exy, eyz):
 # LAW: whether two strings are equal is what their comparison answered
 law eq.is.order.go:
   for r: (String & String) & Cmp
-  {String.eq.fin(r) == Cmp.is_eq(String.order.fin(r)) : Bool}
+  {Cmp.is_eq(Pair.snd(String & String, Cmp, r)) == Cmp.is_eq(Pair.snd(String & String, Cmp, r)) : Bool}
 
 def eq.is.order.go(r):
   ((a2, b2), c) = r

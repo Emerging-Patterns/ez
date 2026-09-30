@@ -8,6 +8,7 @@ import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../lock/plan.bend as P
 import ../share/env.bend as Env
+import ../share/exec.bend as Exec
 import ../share/cap.bend as Cap
 import ../share/args.bend as Args
 import ../ez/ends.bend as E
@@ -73,8 +74,8 @@ def check.go(start: S.Start) -> IO(Unit):
       refused(why)
     case S.Starts{+line}:
       do IO<Unit>:
-        Env.make(Env.dirs("check", ""))
-        +out : String <- Env.exec(line)
+        Exec.make(Env.dirs("check", ""))
+        +out : String <- Exec.exec(line)
         check.said(E.check.passed(out), Args.at(line, 1n), R.text(out))
         Run.end(E.checked(out))
 
@@ -93,7 +94,7 @@ def build.go(start: S.Start, +out: String) -> IO(Unit):
       refused(why)
     case S.Starts{line}:
       do IO<Unit>:
-        Env.make(Env.dirs("build", out))
+        Exec.make(Env.dirs("build", out))
         +cap : Bool <- Cap.ok()
         Cap.warn(cap)
         +g : String <- Cap.gb()
