@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.0](https://github.com/Emerging-Patterns/ez/compare/v1.2.0...v1.3.0) (2026-09-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* move ez to bend 2.0.34 ([#125](https://github.com/Emerging-Patterns/ez/issues/125))
+
+### Features
+
+* move ez to bend 2.0.34 ([#125](https://github.com/Emerging-Patterns/ez/issues/125)) ([8748a35](https://github.com/Emerging-Patterns/ez/commit/8748a3505c2b46c0320cf3345eb743443dd8f2f5))
+
 ## [1.2.0](https://github.com/Emerging-Patterns/ez/compare/v1.1.0...v1.2.0) (2026-09-25)
 
 
