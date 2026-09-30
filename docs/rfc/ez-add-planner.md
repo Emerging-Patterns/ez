@@ -2,6 +2,8 @@
 
 ## Draft Status
 
+Module paths here are the ones the code had when this was written, at the top of the repository. Since ez's WP34 every module lives under `src/`, so `lock/plan.bend` is now `src/lock/plan.bend`; see [ez-spec.md](ez-spec.md).
+
 State: Accepted. Nothing here changes `ez add` or `ez remove` yet; the work packages below do.
 
 This is the design for the phase after [ez-lock-planner.md](ez-lock-planner.md): converting `ez add` and `ez remove` to pure planners and thin interpreters, then proving the pending rows they touch. It follows the lock design's pattern (a World, a planner that asks or plans, an interpreter that answers and executes) and does not repeat it; read that design's "Summary", "Laziness without losing purity" and "The Plan and the outcome" first. It was written from the code at `0f8f179`, where WP1 of the lock design has landed, and it builds on the shapes WP1 built (see that design's "Update" note) rather than on its sketches. A spike in `pkg/tree/` makes the package walk pure; nothing imports it, so `ez add` behaves exactly as before. `SPEC.md` does not change until a requirement's law lands; how the work went is summarized in [ez-spec.md](ez-spec.md) under "How we got here".

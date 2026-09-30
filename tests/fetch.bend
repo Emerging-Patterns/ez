@@ -5,11 +5,11 @@
 # It is under tests/ rather than hub/tests/ because it drives a socket, and the
 # unit tests beside the code are about what can be said without one.
 import Base
-import ../hub/hub.bend as Hub
-import ../hub/get.bend as Net
+import ../src/hub/hub.bend as Hub
+import ../src/hub/get.bend as Net
 import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
-import ../check/kit.bend as Check
-import ../check/world.bend as W
+import ../src/check/kit.bend as Check
+import ../src/check/world.bend as W
 
 # a url on that server
 def at(+port: String, path: String) -> String:

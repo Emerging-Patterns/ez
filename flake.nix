@@ -24,11 +24,13 @@
       # network in the sandbox beyond the lock's own fixed-output fetches
       bendLib = ez.bendLib ./ez.lock.toml;
 
-      # the `ez` binary, with everything it shells out to on its PATH. curl is
-      # not among them: ezhttp speaks HTTP and HTTPS itself, and what it needs
-      # instead is libssl by name (it opens it at run time, and no search path
-      # reaches a Nix store path) and a CA bundle, which OpenSSL takes from
-      # SSL_CERT_FILE. git stays, because `ez add` vendors a repo.
+      # the `ez` binary, built from ez.toml's entry, the top-level main.bend
+      # (the program; its modules are under src/), with everything it shells
+      # out to on its PATH. curl is not among them: ezhttp speaks HTTP and
+      # HTTPS itself, and what it needs instead is libssl by name (it opens it
+      # at run time, and no search path reaches a Nix store path) and a CA
+      # bundle, which OpenSSL takes from SSL_CERT_FILE. git stays, because
+      # `ez add` vendors a repo.
       ezBin = ez.mkPackage {
         inherit bend;
         src = self;

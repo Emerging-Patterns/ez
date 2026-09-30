@@ -4,9 +4,9 @@
 # shown and the line exits 0, or the line is misused and exits 1. This file
 # prints and exits as they say and runs the command, which is trusted under
 # EZ-TRUST-2. `IO.args()` is copied so each word can be read more than once.
-# Build it
-# native (`bend ez/main.bend -o bin/ez.bin`); interpreted, bend's own CLI
-# would take the flags meant for ez.
+# The repo's top-level main.bend calls this `main`, and is the file that gets
+# built. Build it native (`bend main.bend -o bin/ez.bin`); interpreted, bend's
+# own CLI would take the flags meant for ez.
 import Base
 import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
 import ../share/args.bend as Args

@@ -2,6 +2,8 @@
 
 ## Draft Status
 
+Module paths here are the ones the code had when this was written, at the top of the repository. Since ez's WP34 every module lives under `src/`, so `lock/plan.bend` is now `src/lock/plan.bend`; see [ez-spec.md](ez-spec.md).
+
 State: Accepted. Nothing here changes `ez lock` yet; the work packages below do.
 
 **Update:** WP1 has landed. Plain `ez lock` runs the planner in `lock/world.bend`, `lock/plan.bend` and `lock/run.bend`, the spike in `lock/world/` is deleted, and its laws are restated over that planner in `lock/LAWS.bend`. Where the code differs from the sketches below: an `Ask` carries the hub a hub package is served from, so the interpreter never parses the ledger; the World's ledger is `Maybe<&2, String>`, so a missing ez.toml is refused by the planner (EZ-LED-6); `Outcome`'s success is `Success{}`, since Base owns `Done`; a refused plan has no effect at all and its reason is in `Refused{why}`; and a `Lay` is built from the planner's verdict, so only a checked tree is laid, and only by a lock that succeeds. What each work package proved is in [ez-spec.md](ez-spec.md) under "How we got here", and the laws behind each row are in the Law column of [SPEC.md](../../SPEC.md).

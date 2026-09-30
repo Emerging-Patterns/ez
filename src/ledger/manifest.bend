@@ -1,9 +1,8 @@
-# ezx: ez's ledger library for Bend 2: it parses an ez.toml into its package, dependencies and pinned tools.
-#
-# ledger/manifest: the dependency ledger. Bend's import lines carry a bare
-# `0x<hash>`, which says nothing about what the package is or where it came
-# from, and nothing in a repo lists them. ez.toml is that list: every package
-# the repo imports, by name, with its hash and its origin.
+# ledger/manifest: the dependency ledger, and ez's ledger library. Bend's
+# import lines carry a bare `0x<hash>`, which says nothing about what the
+# package is or where it came from, and nothing in a repo lists them.
+# ez.toml is that list: every package the repo imports, by name, with its
+# hash and its origin.
 import Base
 import ../toml/toml.bend as T
 

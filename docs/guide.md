@@ -755,7 +755,7 @@ at once, and passes a proof only when the first line bend prints is exactly
 main. A proof that reaches an `@unsafe` def or foreign code, imports included,
 is `SOME PROOFS FAIL`, so a PROOF.bend imports only modules that run nothing.
 ez keeps the half of a module that runs programs or fetches over the network
-in a sibling module no law imports (`git/exec.bend` beside `git/git.bend`, for
+in a sibling module no law imports (`src/git/exec.bend` beside `src/git/git.bend`, for
 one). The gate reads the line rather than the exit status.
 
 It prints a line for each proof and then the count, and exits 1 when any

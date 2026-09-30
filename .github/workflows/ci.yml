@@ -32,5 +32,5 @@ jobs:
           echo "$RUNNER_TEMP/bend/bin" >> "$GITHUB_PATH"
       - run: sh bootstrap.sh
       - run: mkdir -p bin
-      - run: BEND_LIB=$PWD/.ez/lib bend ez/main.bend -o bin/ez.bin
+      - run: BEND_LIB=$PWD/.ez/lib bend main.bend -o bin/ez.bin
       - run: bin/ez.bin prove
