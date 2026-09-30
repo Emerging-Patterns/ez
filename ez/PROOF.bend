@@ -15,14 +15,15 @@ import ../share/env.bend as Env
 import ../pkg/path.bend as P
 import ../ledger/manifest.bend as M
 import ./key.bend as K
-import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
+import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
 # snap's answer reading, from the file its main.bend re-exports it from:
 # main.bend itself reaches the foreign effects that run programs, which a
-# law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs.
+# law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs
+# (snap's SNAP-TRUST-5, trusted as EZ-TRUST-9).
 import 0xabe575924687afad4cee1a2c1194d639/src/answer.bend as R
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
@@ -1518,20 +1519,6 @@ def Laws.gap_of_narless_pin(n, _e, _b, _url, _rev, _tag, _root, _vend, fr):
 # ---------------------------------------------------------------------------
 # line: each law is the premise rewritten into the one match `L.line` turns
 # on, or, for a parse error, a case split on the error
-
-def Laws.helped_keeps_line(ws, no):
-  %Equal.sym(Bool, L.has.help(ws), False{}, no)
-    : {L.helped.at(_, ws) == ws : List<&2, String>}
-  {==}
-
-def Laws.help_flag_names_command(_rest):
-  {==}
-
-def Laws.help_flag_stops_at_argument(_rest):
-  {==}
-
-def Laws.help_flag_alone(_rest):
-  {==}
 
 def Laws.help_exits_zero(app, e, path, asks):
   %Equal.sym(Maybe<&2, List<&2, String>>, Shake.help_path(e), Some{path}, asks)

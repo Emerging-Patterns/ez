@@ -18,14 +18,15 @@ import ../share/env.bend as Env
 import ../pkg/path.bend as P
 import ../ez/named.bend as Named
 import ../pkg/pkg.bend as Pkg
-import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
+import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
 # snap's answer reading, from the file its main.bend re-exports it from:
 # main.bend itself reaches the foreign effects that run programs, which a
-# law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs.
+# law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs
+# (snap's SNAP-TRUST-5, trusted as EZ-TRUST-9).
 import 0xabe575924687afad4cee1a2c1194d639/src/answer.bend as R
 
 # quiet: bend's chatter is not the program's output
@@ -648,34 +649,6 @@ law command_ends_its_own:
   for +m: Shake.Matched
   for named: {L.is.help(L.command(L.path(m))) == False{} : Bool}
   {L.status(L.line(app, Done{m})) == L.Ends{} : L.Status}
-
-# LAW: a line with no `--help` among its flags is parsed as it came
-# EZ-OUT-1
-law helped_keeps_line:
-  for +ws: List<&2, String>
-  for no: {L.has.help(ws) == False{} : Bool}
-  {L.helped(ws) == ws : List<&2, String>}
-
-# LAW: `--help` after a command asks for that command's help, as
-# `ez help add` does, whatever follows it on the line
-# EZ-OUT-1
-law help_flag_names_command:
-  for +rest: List<&2, String>
-  {L.helped("add" <> ("--help" <> rest)) == ["help", "add"] : List<&2, String>}
-
-# LAW: the words in front of `--help` are kept only while they name a command
-# path, so the arguments a command was given are not part of the request
-# EZ-OUT-1
-law help_flag_stops_at_argument:
-  for +rest: List<&2, String>
-  {L.helped("add" <> ("owner/repo" <> ("--help" <> rest)))
-    == ["help", "add"] : List<&2, String>}
-
-# LAW: `--help` first asks for ez's own help, as `ez help` does
-# EZ-OUT-1
-law help_flag_alone:
-  for +rest: List<&2, String>
-  {L.helped("--help" <> rest) == ["help"] : List<&2, String>}
 
 # ---------------------------------------------------------------------------
 # ends: the commands that are not planners (ez/ends.bend). Each ends with an

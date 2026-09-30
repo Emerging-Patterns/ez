@@ -12,7 +12,7 @@
 # eztoml writes it (`render`). That form is the TOML ez wrote before eztoml
 # 0.4, so an old ledger or lock and a new one read to the same sections.
 import Base
-import 0xd79254973edee82bcf56616220876efe/main.bend as E
+import 0x8fb95168b7719a8faec16af7ee47b246/main.bend as E
 
 # a key and the string written for it
 type Kv is Data:

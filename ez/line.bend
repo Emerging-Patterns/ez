@@ -5,7 +5,7 @@
 # is a law (EZ-OUT-1); ez/main.bend prints and exits as `line` and `status`
 # say, and runs the command a line names, whose own end decides the rest.
 import Base
-import 0x085b03c84ca37125e38dddede7b91e55/main.bend as Shake
+import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
 
 # a subcommand
 type Sub is Data:
@@ -144,76 +144,6 @@ def leaf(+matched: Shake.Matched) -> Shake.Matched:
 # the value the command bound to `name`, or "" when it bound none
 def get(found: Shake.Matched, +name: String) -> String:
   Maybe.default(&2, String, Shake.get(found, name), "")
-
-# ---------------------------------------------------------------------------
-# `--help`
-
-# whether a path names a command or a group of them, which a bare `tool` does
-def names(+path: String) -> Bool:
-  Bool.or(Bool.not(is.help(command(path))), String.eq(path, "tool"))
-
-# a path one word longer
-def help.join(+at: String, +word: String) -> String:
-  Bool.pick(String, String.is_empty(at), word, at ++ "/" ++ word)
-
-# one word of the path kept, and the rest of the walk run only then
-def help.words.at(keep: Bool, +word: String, rest: Unit -> List<&2, String>) -> List<&2, String>:
-  match keep:
-    case True{}:
-      word <> rest(Unit{})
-    case False{}:
-      []
-
-# the leading words that name a command path, `at` being the path so far.
-# The walk stops at the first word that does not extend it.
-def help.words(ws: List<&2, String>, +at: String) -> List<&2, String>:
-  match ws:
-    case []:
-      []
-    case +h <> t:
-      +p = help.join(at, h)
-      help.words.at(names(p), h, _u => help.words(t, p))
-
-# the rest of the line asked, unless this word ended the flags
-def has.help.on(stop: Bool, rest: Unit -> Bool) -> Bool:
-  match stop:
-    case True{}:
-      False{}
-    case False{}:
-      rest(Unit{})
-
-# one word asked about `--help`: a hit, the end of the flags, or the rest
-def has.help.at(hit: Bool, stop: Bool, rest: Unit -> Bool) -> Bool:
-  match hit:
-    case True{}:
-      True{}
-    case False{}:
-      has.help.on(stop, rest)
-
-# whether a line holds `--help` among its flags, before any `--`
-def has.help(ws: List<&2, String>) -> Bool:
-  match ws:
-    case []:
-      False{}
-    case +h <> t:
-      has.help.at(String.eq(h, "--help"), String.eq(h, "--"), _u => has.help(t))
-
-# a line that asked for help, as `help` and the command path its words name;
-# any other line as it came
-def helped.at(asked: Bool, +ws: List<&2, String>) -> List<&2, String>:
-  match asked:
-    case True{}:
-      "help" <> help.words(ws, "")
-    case False{}:
-      ws
-
-# the words Shake parses. `--help` asks for the help of the command the words
-# in front of it name, as `help` in front of them does, and as `cargo add
-# --help` does: since bend 2.0.29 a compiled binary hands `--help` to the
-# program, and the runtime's own usage is `--bend-help`. A line without it is
-# parsed as it came.
-def helped(+ws: List<&2, String>) -> List<&2, String>:
-  helped.at(has.help(ws), ws)
 
 # ---------------------------------------------------------------------------
 # how a line ends
