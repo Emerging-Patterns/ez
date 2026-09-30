@@ -69,7 +69,7 @@ Under `--upgrade` it also reads what the remote says about refs, the default bra
 Three findings from this reading shape the design, beyond the decisions above:
 
 - A package under BEND_LIB is never checked against its own name, so a stale or edited tree there can reach the lock. The planner checks every package's manifest against its `0x` name, whatever it came from.
-- Both walks stop silently when their fuel runs out: `resolve` and `roots` return what they have (`lock/lock.bend:537, 637`). With fuel at 100000 this is unlikely, but a truncated lock written with exit 0 is the failure EZ-DOC-3 exists to prevent. The planner refuses when fuel runs out with work left.
+- Both walks stop silently when their fuel runs out: `resolve` and `roots` return what they have (`lock/lock.bend:537, 637`). With fuel at 8192 this is unlikely, but a truncated lock written with exit 0 is the failure EZ-DOC-3 exists to prevent. The planner refuses when fuel runs out with work left.
 - In the upgrade, `U.judge` is always called with its agreement bit set to true, so its `Drift` arm is dead and drift is decided later by `confirmed` (`ez/upgrade.bend:159`). The planner calls `U.judge` with the real bit, which is what makes EZ-RES-8 a statement about `U.judge`.
 
 ## The World

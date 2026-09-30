@@ -6,7 +6,7 @@
 # That the answer is what bend printed is EZ-TRUST-2. `ez run` reads no
 # answer: it exits with the program's own status (`code` in ez/start.bend).
 import Base
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/src/answer.bend as R
 import ../lock/plan.bend as P
 
 # a command that ends on whether it passed: success, or a refusal whose

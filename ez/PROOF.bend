@@ -20,7 +20,7 @@ import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/src/answer.bend as R
 import ../check/eq.bend as Eq
 import ./LAWS.bend as Laws
 
@@ -31,15 +31,29 @@ def Laws.nag_needs_prefix(s, e):
 
 def Laws.report_opens(rest):
   Equal.cong(Bool, Bool,
-    x => Bool.or(x, Bool.and(False{},
-      String.starts_with(String.append("All terms check", rest), "- "))),
-    String.starts_with(String.append("All terms check", rest), "All terms check"),
+    x => Bool.or(Bool.or(x,
+        String.starts_with(String.append("ALL PROOFS CHECK", rest), "SOME PROOFS FAIL")),
+      Bool.and(False{},
+        String.starts_with(String.append("ALL PROOFS CHECK", rest), "- "))),
+    String.starts_with(String.append("ALL PROOFS CHECK", rest), "ALL PROOFS CHECK"),
     True{},
-    Eq.starts_append("All terms check", rest))
+    Eq.starts_append("ALL PROOFS CHECK", rest))
+
+def Laws.report_fails(rest):
+  Equal.cong(Bool, Bool,
+    x => Bool.or(Bool.or(
+        String.starts_with(String.append("SOME PROOFS FAIL", rest), "ALL PROOFS CHECK"), x),
+      Bool.and(False{},
+        String.starts_with(String.append("SOME PROOFS FAIL", rest), "- "))),
+    String.starts_with(String.append("SOME PROOFS FAIL", rest), "SOME PROOFS FAIL"),
+    True{},
+    Eq.starts_append("SOME PROOFS FAIL", rest))
 
 def Laws.dash_follows_report(rest):
   Equal.cong(Bool, Bool,
-    x => Bool.or(String.starts_with(String.append("- ", rest), "All terms check"),
+    x => Bool.or(Bool.or(
+        String.starts_with(String.append("- ", rest), "ALL PROOFS CHECK"),
+        String.starts_with(String.append("- ", rest), "SOME PROOFS FAIL")),
       Bool.and(True{}, x)),
     String.starts_with(String.append("- ", rest), "- "),
     True{},

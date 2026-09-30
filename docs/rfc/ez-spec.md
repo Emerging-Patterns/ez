@@ -56,7 +56,7 @@ That was ez when we wrote the first revision. Since then every command has been 
 | Law | A claim in LAWS.bend, proved by a definition of the same name in PROOF.bend. |
 | Quantified law | A law with binders (`for x: T`). It holds for every input of that type. |
 | Closed law | A law with no binders. It holds for one specific input, which makes it a unit test checked at compile time. |
-| Proof gate | For every PROOF.bend, `bend PROOF.bend` prints exactly `All terms check.` as its first line. |
+| Proof gate | For every PROOF.bend, `bend PROOF.bend` prints exactly `ALL PROOFS CHECK` as its first line. |
 | Proved | A requirement backed by a quantified law tagged with its ID, passing the proof gate. |
 | Trusted | A requirement that is assumed, listed in the trust boundary, and checked by nothing in ez. |
 | Requirement ID | A stable name such as `EZ-DOC-3` for one entry in this specification. |
@@ -71,7 +71,7 @@ ez is a project manager for Bend 2. Bend already hashes a file and its local imp
 
 Bend's verification model splits claims from proofs. LAWS.bend holds the statements, PROOF.bend holds a definition that proves each one, and `bend PROOF.bend` fails until every law is discharged. Proofs are terms built from pattern matching, recursion as induction, and equality rewrites. There are no tactics and no proof search.
 
-A passing exit status is not enough. `bend` exits 0 and prints `All terms check, but N defs rely on unsafe or foreign code:` when a proof leans on an unchecked def, and a def that never returns proves anything. The gate ez runs reads the first line of output and accepts only the bare `All terms check.` That stricter reading is what we mean by the proof gate throughout.
+A file with no main prints `ALL PROOFS CHECK` when every term checked and none relies on unsafe or foreign code, and `SOME PROOFS FAIL` otherwise. The gate ez runs reads the first line of output and accepts only `ALL PROOFS CHECK`. That reading is what we mean by the proof gate throughout.
 
 When we started, the gate ran inside `ez test`, and it has since moved to its own command (see "The proof gate"). `ez test` found every PROOF.bend, ran `bend` on each alongside its test lanes, and reported a proof as passed only on that exact line. `flake.nix` ran `ez test --js-only --unit-only` through `mkProofs`, and that was the only place CI checked the laws. `ez test` cached a passed proof in `.ez/cache`, keyed on the bend version, `$CC`, and the hash of the proof's import closure; `mkProofs` builds from a clean copy of the source, so in CI the cache was always empty.
 
@@ -135,7 +135,7 @@ A Proved requirement whose law has not landed yet is marked **pending** in `SPEC
 
 ### The proof gate
 
-The specification depends on one mechanical check: for every PROOF.bend in the tree, `bend PROOF.bend` prints exactly `All terms check.` as its first line. That check is its own command, `ez prove`, which does only that and which `mkProofs` in `flake.nix` runs. It was once the proof lane of `ez test`; `ez test` no longer runs proofs, and is outside the specification. The runner's faithfulness is a trust assumption (EZ-TRUST-4), in the same way the interpreter's is.
+The specification depends on one mechanical check: for every PROOF.bend in the tree, `bend PROOF.bend` prints exactly `ALL PROOFS CHECK` as its first line. That check is its own command, `ez prove`, which does only that and which `mkProofs` in `flake.nix` runs. It was once the proof lane of `ez test`; `ez test` no longer runs proofs, and is outside the specification. The runner's faithfulness is a trust assumption (EZ-TRUST-4), in the same way the interpreter's is.
 
 ### The World model
 
@@ -501,7 +501,7 @@ These assumptions sit outside the proofs. They are the complete list of Trusted 
 | EZ-TRUST-1 | The Bend checker is sound. | We cannot check it from inside Bend. The BendTT paper and a Lean formalization exist, and the release notes report mismatches between the formalization and the implementation. |
 | EZ-TRUST-2 | The interpreter reads the World and executes plans faithfully. | It makes no decisions and is kept small enough to review line by line. |
 | EZ-TRUST-3 | The hub serves, for a hash, what was published under it. | ez checks every hub body against the hash it asked for (EZ-FETCH-1), so this reduces to availability and EZ-HASH-6. |
-| EZ-TRUST-4 | `ez prove` runs `bend` on every PROOF.bend in the tree and passes only on an exact `All terms check.` first line. | It is ez code run by `mkProofs`, not a law. CI builds from a clean tree, so nothing is cached. |
+| EZ-TRUST-4 | `ez prove` runs `bend` on every PROOF.bend in the tree and passes only on an exact `ALL PROOFS CHECK` first line. | It is ez code run by `mkProofs`, not a law. CI builds from a clean tree, so nothing is cached. |
 | EZ-TRUST-5 | HTTP framing and URL parsing are correct. | Proved in ezhttp v0.4.0, the rev ez.toml pins; ez's gate does not re-check it. |
 | EZ-TRUST-6 | A `<name>@<version>` the hub answered once names the same hash forever. | The hub never moves a name once it is taken, so a name is resolved once and pinned in the lock. The package it names is still checked against its hash (EZ-FETCH-1). |
 | EZ-RES-7 | git reports refs, tags, and ancestry accurately. | The World model takes git's answers as given. |
@@ -583,13 +583,15 @@ Moving to shake v0.2.0, snap v1.0.0 and the published sha256 package (WP31) adds
 
 Moving to eztoml v0.4.0 (WP32) changes the layout of ez.toml and ez.lock.toml, and the maintainer decided it. ez now writes both through eztoml's `render`: the table each dotted header implies is written (`[deps]`, `[tools]`, `[packages]`, `[packages.0x<hash>]`), a package's hash is a bare key rather than a quoted one, and no blank line separates tables. We weighed keeping ez's own renderer so the bytes would not change, and did not: EZ-DOC-1 and EZ-LED-4 can rest on eztoml's round trip only for text eztoml renders, and reasoning about how eztoml parses ez's own text would mean proving eztoml's internals, which ez does not do. So ez assembles the document as before, in the old layout, and writes eztoml's `render` of eztoml's `parse` of it (`T.normal`). Reading stays backward compatible: `toml/toml.bend` walks eztoml's document into ez's sections and passes over a table that holds only tables, which is the table a dotted header implies, so every ledger and lock in the old layout reads to the same model; we checked every one in the Emerging-Patterns repositories against the v0.1.0 reader, and `tests/toml.bend` keeps an old and a new ledger and lock. `bootstrap.sh` reads a package's tables headed either way. An ez before this change reads the new layout (`ez fetch` and `ez check` work), but its `ez doctor` calls the lock out of date and its `ez lock` writes the old layout back. The lock's refusal of a file path holding `=`, and of a `"`, `\` or newline, stays: eztoml reads them, but `bootstrap.sh`'s awk does not.
 
+On Bend 2.0.34, `bend` on a file with no main prints `ALL PROOFS CHECK` when the proof holds and `SOME PROOFS FAIL` when it does not, a def that relies on unsafe or foreign code included. `ez prove` accepts only the first line `ALL PROOFS CHECK`. `IO.args` starts with the program, and `Args.all` drops that word, so a command still reads the words it was given. `TCP.listen` takes the address to bind, and the oracle and the framing server bind `127.0.0.1`. The package walk refuses an import graph deeper than 8192 steps, where it refused at 100000: Bend 2.0.34 builds that count while it checks the walk laws, and 100000 does not fit the check. A ledger does not reach 8192 packages.
+
 Reading the code also turned up behavior that looked accidental and is not a requirement. Besides the ledger changes above, two such fixes were worth making, and both have landed. Every command, `ez help` included, created `.ez` and `bin` in the current directory, because `Env.make()` ran before the line was parsed; `Env.dirs` now names only the directories a command writes into, and nothing for most commands (`dirs_other`, `dirs_check`, `dirs_build`, `dirs_build_out`). And `ez doctor` failed a project with no dependencies, because it counted a lock that names no package as a problem even when the ledger needed none. The rest of what looked accidental was either covered by a decided change above or left alone as incidental, and what remains open is under "Known gaps".
 
 ### Known gaps
 
 These are the things we know ez does not yet do, or does in a way we have not decided to guarantee. None of them is a requirement, and none weakens a proved row; each is here so that a reader does not have to rediscover it.
 
-The Bend native runtime takes `--help`, `--threads` and `--gpu` anywhere on the command line before ez sees them, so `ez add --help` prints the runtime's usage and exits 0. `ez -h` is an unknown flag, since Shake binds no short help. Neither is ez's to fix from inside ez.
+The Bend native runtime keeps `--threads`, `--gpu`, `--gpu-build` and `--bend-help` before ez sees the line, and `--bend-help` prints the runtime's usage. `--help` reaches ez. Shake binds no `--help` and no `-h`, so `ez --help` and `ez -h` are unknown flags and exit 1. `ez help` prints ez's usage.
 
 EZ-HASH-5 can still diverge from nix for bytes that are not UTF-8. The file effect reads a file as text, so a file whose bytes are not valid UTF-8 is serialized with its invalid bytes replaced and hashes differently from nix, the same bytes for every ez, so `ez lock` and `ez fetch` agree with each other and not with the nix build. A name that is not valid UTF-8 cannot be read back from the listing and stops the walk. Neither can be fixed from ez until Base can read a file's bytes.
 
@@ -695,6 +697,7 @@ The rollout above ran as planned, with the command conversions split into work p
 | WP30 | `ez publish` asks the ledger's hub about every hub package the package imports, by hash and by name, and refuses, sending nothing, when one is not there or the hub cannot be asked. | EZ-PUB-5, EZ-OUT-2 |
 | WP31 | shake v0.2.0 through its interface alone, snap v1.0.0, sha256 by its published walk, and ezhttp v0.5.0; the line laws restated over shake's `help_path`, `path_of` and `at`, resting on shake's proofs (EZ-TRUST-7). | EZ-OUT-1 |
 | WP32 | eztoml v0.4.0 through its interface alone: ez.toml and ez.lock.toml written by eztoml's `render`, in its layout, and read by its `parse`, old layouts included. EZ-DOC-1 becomes Trusted, and the EZ-LED-4 and upgrade laws take the ledger's read-back as a premise (EZ-TRUST-8). | EZ-LED-4, EZ-DOC-4 |
+| Bend 2.0.34 | The flake pins bendlang/bend at 777ee0b, whose package is 2.0.34. `Args.all` drops the program name `IO.args` now leads with. The oracle and framing servers bind `127.0.0.1`. `ez prove` accepts `ALL PROOFS CHECK`. The package walk's fuel is 8192. | |
 
 Proving also found bugs that reading the code had missed, and each was fixed where it was found: WP6 found that WP2's upgrade read an empty refusal reason as no refusal (a case the interpreter never built, so the binary did not change), WP5b found that a tool pin with a rev and no narHash moved on the next upgrade, WP7 found the allowlist written twice for a shared tree, and WP10 found a lock that accepted a manifest `ez fetch` would then refuse. The proofs are long, as the risks below expected: `lock/PROOF.bend` grew by about 4,800 lines in WP5b alone, most of them one lemma per step of the upgrade.
 

@@ -4,6 +4,14 @@
 # proofs need that answer to be yes rather than to assume it.
 import Base
 
+# Bend 2.0.33 folds the comparison's pair into `String.order` and `String.eq`.
+# These two are that fold named on the pair, so a proof can still read it.
+def order.fin(r: (String & String) & Cmp) -> Cmp:
+  Pair.snd(String & String, Cmp, r)
+
+def eq.fin(r: (String & String) & Cmp) -> Bool:
+  Cmp.is_eq(order.fin(r))
+
 # LAW: a bit compares equal to itself
 law bool_cmp_self:
   for +b: Bool
@@ -92,7 +100,7 @@ law string_eq_self:
 
 # equality is the comparison read as a bit, so the comparison's law answers
 def string_eq_self(s):
-  Equal.cong((String & String) & Cmp, Bool, r => String.eq.fin(r),
+  Equal.cong((String & String) & Cmp, Bool, r => eq.fin(r),
     String.cmp(s, s), ((s, s), EQ{}), string_cmp_self(s))
 
 # LAW: a char equals itself

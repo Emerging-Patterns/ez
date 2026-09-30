@@ -7,7 +7,7 @@ such as (EZ-VEN-1) below point at its rows.
 
 Every subcommand needs `bend` and `git` on PATH. `ez help` prints the command
 list, and `ez help test` the flags of one command. The Bend runtime keeps
-`--help` for itself.
+`--threads`, `--gpu`, `--gpu-build` and `--bend-help`. `--help` reaches ez.
 
 Every command exits 0 on success and 1 on any failure ez detects, except
 `ez run` and `ez tool run`, which exit with the program's status (EZ-OUT-1).
@@ -749,8 +749,8 @@ byte. CI also follows the README's install steps without nix and runs
 
 `ez prove` is the gate. It runs `bend` on every `PROOF.bend` in the tree, all
 at once, and passes a proof only when the first line bend prints is exactly
-`All terms check.`. bend exits 0 on a proof that leans on unsafe or foreign
-code, so the exit status is not enough.
+`ALL PROOFS CHECK`. A proof that does not hold, a def that relies on unsafe
+or foreign code included, prints `SOME PROOFS FAIL`.
 
 It prints a line for each proof and then the count, and exits 1 when any
 proof failed. Nothing is cached, so every run checks every proof.

@@ -15,7 +15,7 @@
 # runs, the line the question carries, the hub description, goes to stderr,
 # where bend's own notices go, so stdout stays the hash and the import line.
 # Before that, the lock is read as a file, and a url under the hub is asked
-# for with the lock's own GET (`Web.get`), whose answer is a status line and
+# for with the lock's own GET (`Get.get`), whose answer is a status line and
 # the text: whether the hub answered 200, and the body or why not.
 # It decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
 import Base
@@ -24,7 +24,7 @@ import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../tool/run.bend as ToolRun
 import ../tool/world.bend as TW
-import ../hub/hub.bend as Web
+import ../hub/get.bend as Get
 import ../share/env.bend as Env
 import ./world.bend as PW
 import ./plan.bend as PP
@@ -55,7 +55,7 @@ def answer(+lib: String, ask: PW.Ask) -> IO(PW.Answer):
         return PW.Told{TW.Text{m}}
     case PW.Hub{+url}:
       do IO<PW.Answer>:
-        +out : String <- Web.get(url)
+        +out : String <- Get.get(url)
         return ran(out)
 
 # every question, answered

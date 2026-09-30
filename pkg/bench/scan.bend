@@ -147,6 +147,14 @@ def at(xs: List<&2, String>, index: Nat) -> String:
     case Con{h, t} 1n+p:
       at(t, p)
 
+# the program, dropped. `IO.args` starts with it, and the mode is the next word.
+def user(xs: List<&2, String>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{_h, t}:
+      t
+
 # the command line: a mode, and how many blocks of source to classify
 def start(as: List<&2, String>) -> IO(Unit):
   match as:
@@ -159,4 +167,4 @@ def start(as: List<&2, String>) -> IO(Unit):
 def main() -> IO(Unit):
   do IO<Unit>:
     xs : List<&1, String> <- IO.args()
-    start(copy(xs))
+    start(user(copy(xs)))

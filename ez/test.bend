@@ -14,6 +14,7 @@ import ../share/cap.bend as Cap
 import ./gate.bend as G
 import ./quiet.bend as Q
 import ./clock.bend as Clock
+import ./when.bend as When
 import ./prove.bend as P
 import ../ez/ends.bend as E
 import ../lock/run.bend as Run
@@ -125,7 +126,7 @@ def run() -> IO(Unit):
     +cap : Bool <- Cap.ok()
     Cap.warn(cap)
     +secs : String <- Clock.seconds()
-    +deadline : String <- Clock.start(secs)
+    +deadline : String <- When.start(secs)
     +g : String <- Cap.gb()
     +at : String <- Env.lib()
     +jobs : String <- P.width()
@@ -134,6 +135,6 @@ def run() -> IO(Unit):
     +by : String <- IO.pure(String, Clock.by.effect(deadline))
     as : List<&2, String> <- R.par(P.cmds(ts, cap, g, at), jobs, g, out.at(), by)
     every : Tally <- report(ts, as, Tally{0n, 0n})
-    +late : Bool <- Clock.over(deadline)
+    +late : Bool <- When.over(deadline)
     kept : Tally <- budget(late, secs, every)
     done(kept)

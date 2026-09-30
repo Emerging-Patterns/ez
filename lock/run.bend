@@ -16,10 +16,13 @@ import Base
 import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ../io/file.bend as F
 import ../hub/hub.bend as Web
+import ../hub/get.bend as Get
 import ../git/git.bend as Git
+import ../git/fetch.bend as Fetch
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
 import ../share/say.bend as Say
+import ../share/spin.bend as Spin
 import ./lock.bend as L
 import ./world.bend as W
 import ./up.bend as Up
@@ -112,7 +115,7 @@ def hub.all(+hub: String, +hash: String, fs: List<&2, K.Item>) -> IO(List<&2, We
       IO.pure(List<&2, Web.Got>, [])
     case +h <> t:
       do IO<List<&2, Web.Got>>:
-        g : Web.Got <- Web.fetch(L.url_of(hub, hash, K.file.at(h)), K.file.sum(h))
+        g : Web.Got <- Get.fetch(L.url_of(hub, hash, K.file.at(h)), K.file.sum(h))
         rest : List<&2, Web.Got> <- hub.all(hub, hash, t)
         return g <> rest
 
@@ -129,10 +132,10 @@ def hub.got(got: Web.Got, +hub: String, +hash: String) -> IO(W.Answer):
 # a hub package: its manifest, then every file it names
 def answer.hub(+hub: String, +hash: String) -> IO(W.Answer):
   do IO<W.Answer>:
-    +s : Say.Spin <- Say.hold(Say.dep.hub(hash))
-    g : Web.Got <- Web.fetch(L.url_of(hub, hash, "manifest"), L.want(hash))
+    +s : Say.Spin <- Spin.hold(Say.dep.hub(hash))
+    g : Web.Got <- Get.fetch(L.url_of(hub, hash, "manifest"), L.want(hash))
     a : W.Answer <- hub.got(g, hub, hash)
-    Say.done(s)
+    Spin.done(s)
     return a
 
 # every file a tree's manifest names, read from beside it. A file that is not
@@ -196,9 +199,9 @@ def clone.entry(ok: Bool, +work: String, +entry: String, +url: String, +rev: Str
 def clone.weigh(+work: String, +url: String, +rev: String, +entry: String) -> IO(W.Answer):
   do IO<W.Answer>:
     _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
-    +s : Say.Spin <- Say.hold(Say.hashing(rev))
-    +nar : String <- Git.nar(work)
-    Say.done(s)
+    +s : Say.Spin <- Spin.hold(Say.hashing(rev))
+    +nar : String <- Fetch.nar(work)
+    Spin.done(s)
     +ck : String <- R.exec(["test", "-f", P.join(work, entry)])
     clone.entry(R.ok(ck), work, entry, url, rev, nar)
 
@@ -211,12 +214,12 @@ def answer.clone(+lib: String, +hash: String, +url: String, +rev: String, +entry
   do IO<W.Answer>:
     _rm : String <- R.exec(["rm", "-rf", work])
     _mk : String <- R.exec(["mkdir", "-p", work])
-    +s : Say.Spin <- Say.hold(Say.dep.git(Say.label(hash, entry), url))
+    +s : Say.Spin <- Spin.hold(Say.dep.git(Say.label(hash, entry), url))
     a : W.Answer <- clone.run(work, "init", ["git", "init", "-q", work], _u =>
       clone.run(work, "fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", url, rev], _v =>
         clone.run(work, "checkout", ["git", "-C", work, "checkout", "-q", rev], _w =>
           clone.weigh(work, url, rev, entry))))
-    Say.done(s)
+    Spin.done(s)
     return a
 
 # a tree already under BEND_LIB is read; a missing one is cloned
@@ -260,9 +263,9 @@ def said(got: Web.Got) -> W.Answer:
 # a name, asked of the hub once: `GET <hub>/name/<nv>`
 def answer.name(+hub: String, +nv: String) -> IO(W.Answer):
   do IO<W.Answer>:
-    +s : Say.Spin <- Say.hold(Say.dep.hub(nv))
-    g : Web.Got <- Web.fetch(hub ++ "/name/" ++ nv, "")
-    Say.done(s)
+    +s : Say.Spin <- Spin.hold(Say.dep.hub(nv))
+    g : Web.Got <- Get.fetch(hub ++ "/name/" ++ nv, "")
+    Spin.done(s)
     return said(g)
 
 # the lock being rewritten, "" when there is none
@@ -298,9 +301,9 @@ def answer.all(+lib: String, asks: List<&2, W.Ask>) -> IO(List<&2, W.Reply>):
 # what git printed, and whether it succeeded, kept as it was
 def git.said(+what: String, args: List<&2, String>) -> IO(Up.Answer):
   do IO<Up.Answer>:
-    +s : Say.Spin <- Say.hold(what)
+    +s : Say.Spin <- Spin.hold(what)
     +out : String <- R.exec(args)
-    Say.done(s)
+    Spin.done(s)
     return Up.Printed{R.ok(out), R.text(out)}
 
 # The upgrade's questions, and `ez add`'s and `ez fetch`'s, name the source
@@ -324,7 +327,7 @@ def answer.tags(+url: String) -> IO(Up.Answer):
 # whether `tip` descends from `pin`, asked of a blobless bare clone
 def answer.above(+lib: String, +url: String, +pin: String, +tip: String) -> IO(Up.Answer):
   do IO<Up.Answer>:
-    yes : Bool <- Git.descendant.at(lib ++ "/.work-above", url, pin, tip)
+    yes : Bool <- Fetch.descendant.at(lib ++ "/.work-above", url, pin, tip)
     return Up.Onward{yes}
 
 # the checkout's package, walked from its entry the way `ez add` walks it, with
@@ -357,25 +360,25 @@ def answer.tree(+lib: String, +url: String, +rev: String, +entry: String) -> IO(
   do IO<Up.Answer>:
     _rm : String <- R.exec(["rm", "-rf", work])
     _mk : String <- R.exec(["mkdir", "-p", work])
-    Git.clone(work, url, rev)
+    Fetch.clone(work, url, rev)
     +at : String <- Git.entry.for(Bool.not(String.is_empty(entry)), entry, work)
     _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
-    +s : Say.Spin <- Say.hold(Say.hashing(rev))
-    +nar : String <- Git.nar(work)
-    Say.done(s)
+    +s : Say.Spin <- Spin.hold(Say.hashing(rev))
+    +nar : String <- Fetch.nar(work)
+    Spin.done(s)
     +ck : String <- R.exec(["test", "-f", P.join(work, at)])
     tree.entry(R.ok(ck), work, at, url, rev, nar)
 
 # a commit's NAR hash, for a tool
 def answer.weigh(+url: String, +rev: String) -> IO(Up.Answer):
   do IO<Up.Answer>:
-    +nar : String <- Git.weigh(url, rev)
+    +nar : String <- Fetch.weigh(url, rev)
     return Up.Weighed{nar}
 
 # the hub's manifest for a hash a dependency moved to
 def answer.hubhas(+hub: String, +hash: String) -> IO(Up.Answer):
   do IO<Up.Answer>:
-    g : Web.Got <- Web.fetch(L.url_of(hub, hash, "manifest"), L.want(hash))
+    g : Web.Got <- Get.fetch(L.url_of(hub, hash, "manifest"), L.want(hash))
     return Up.HubSaid{g}
 
 # the ignore file, "" when it is missing
@@ -486,9 +489,9 @@ def whole.listed(ok: Bool, +work: String, +nar: String, +text: String) -> IO(Up.
 def whole.weigh(+work: String, +rev: String) -> IO(Up.Answer):
   do IO<Up.Answer>:
     _dg : String <- R.exec(["rm", "-rf", work ++ "/.git"])
-    +s : Say.Spin <- Say.hold(Say.hashing(rev))
-    +nar : String <- Git.nar(work)
-    Say.done(s)
+    +s : Say.Spin <- Spin.hold(Say.hashing(rev))
+    +nar : String <- Fetch.nar(work)
+    Spin.done(s)
     +out : String <- R.exec(["find", work, "(", "-type", "f", "-o", "-type", "l", ")"])
     whole.listed(R.ok(out), work, nar, R.text(out))
 
@@ -499,12 +502,12 @@ def whole.dir(ok: Bool, +work: String, +url: String, +rev: String) -> IO(Up.Answ
       IO.pure(Up.Answer, Up.Miss{"ez: no scratch directory to clone into: " ++ work})
     case True{}:
       do IO<Up.Answer>:
-        +s : Say.Spin <- Say.hold(Say.git.fetch(url))
+        +s : Say.Spin <- Spin.hold(Say.git.fetch(url))
         a : Up.Answer <- whole.run(work, "init", ["git", "init", "-q", work], _u =>
           whole.run(work, "fetch", ["git", "-C", work, "fetch", "-q", "--depth", "1", url, rev], _v =>
             whole.run(work, "checkout", ["git", "-C", work, "checkout", "-q", rev], _w =>
               whole.weigh(work, rev))))
-        Say.done(s)
+        Spin.done(s)
         return a
 
 # a checkout at a rev for `ez add`: a shallow clone into a scratch directory

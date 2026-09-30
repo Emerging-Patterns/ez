@@ -46,7 +46,7 @@
       };
 
       # `ez prove`: every PROOF.bend, each passing only on a first line of
-      # exactly `All terms check.` That is the gate CI runs. The end-to-end
+      # exactly `ALL PROOFS CHECK`. That is the gate CI runs. The end-to-end
       # tests under `tests/` are not run here: they drive real git daemons, a
       # real `bend --publish` and `nix-build`, and the sandbox has no network,
       # no nix daemon and no ports to give them.

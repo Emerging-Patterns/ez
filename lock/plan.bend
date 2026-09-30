@@ -38,6 +38,7 @@ import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as Path
 import ../share/pin.bend as Pin
+import ./fuel.bend as Fuel
 
 # ---------------------------------------------------------------------------
 # the walk
@@ -240,7 +241,7 @@ def walk.of(+led: M.Read, listing: W.Listing, +ns: List<&2, L.Name>, +js: List<&
     case W.Unlisted{why}:
       Walk{[], [], [], why}
     case W.Listed{+fs}:
-      walk(U32.to_nat(100000), L.ledger.read(led), ns, js,
+      walk(Fuel.cap(), L.ledger.read(led), ns, js,
         Walk{List.append(&2, String, roots(fs), L.name.hashes(ns, roots.named(fs))), [], [], ""})
 
 # the committed sources a listing holds, none when git could not list them

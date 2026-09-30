@@ -5,7 +5,6 @@
 # of the command as `env BEND_LIB=... bend ...`. `env` is coreutils and is
 # execvp'd like any other program, so no shell is involved.
 import Base
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
 import ./args.bend as Args
 
 # a value, or the fallback when the variable was unset or empty
@@ -26,12 +25,6 @@ def lib() -> IO(String):
 def line(at: String, args: List<&2, String>) -> List<&2, String>:
   List.append(&2, String, ["env", "BEND_LIB=" ++ at], args)
 
-# a program run with this project's BEND_LIB set for it
-def exec(args: List<&2, String>) -> IO(String):
-  do IO<String>:
-    at : String <- lib()
-    R.exec(line(at, args))
-
 # the directory `ez build` writes into: `bin` when it was not told where
 def dirs.build(build: Bool, bare: Bool) -> List<&2, String>:
   match build:
@@ -49,14 +42,3 @@ def dirs.build(build: Bool, bare: Bool) -> List<&2, String>:
 def dirs(+cmd: String, +out: String) -> List<&2, String>:
   Bool.pick(List<&2, String>, String.eq(cmd, "check"), [".ez"],
     dirs.build(String.eq(cmd, "build"), String.is_empty(out)))
-
-# those directories made. Base has no mkdir, so this is coreutils, and no
-# directory means no run at all.
-def make(ds: List<&2, String>) -> IO(Unit):
-  match ds:
-    case []:
-      IO.pure(Unit, Unit{})
-    case h <> t:
-      do IO<Unit>:
-        _mk : String <- R.exec(List.append(&2, String, ["mkdir", "-p"], h <> t))
-        return Unit{}

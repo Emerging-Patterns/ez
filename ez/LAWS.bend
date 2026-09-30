@@ -23,7 +23,7 @@ import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
 import ../lock/plan.bend as LP
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import 0xabe575924687afad4cee1a2c1194d639/src/answer.bend as R
 
 # quiet: bend's chatter is not the program's output
 
@@ -35,11 +35,15 @@ law nag_needs_prefix:
   for e: {False{} == String.starts_with(s, "bend ") : Bool}
   {Q.is_nag(s) == False{} : Bool}
 
-# LAW: the check report's first line is a report line even when nothing
-# before it was. Both wordings open with these words.
+# LAW: the passing verdict is a report line even when nothing before it was.
 law report_opens:
   for +rest: String
-  {Q.in_report(False{}, "All terms check" ++ rest) == True{} : Bool}
+  {Q.in_report(False{}, "ALL PROOFS CHECK" ++ rest) == True{} : Bool}
+
+# LAW: the failing verdict is a report line even when nothing before it was.
+law report_fails:
+  for +rest: String
+  {Q.in_report(False{}, "SOME PROOFS FAIL" ++ rest) == True{} : Bool}
 
 # LAW: a dash line is a report line only when the line before it was. This is
 # the 2.0.18 list; a program's own `- ` line is not in that list.

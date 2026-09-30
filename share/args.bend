@@ -1,8 +1,10 @@
-# share/args: the command line, as the binary itself receives it. `IO.args()` gives
-# a compiled Bend binary every argument it was started with: the first is the
-# subcommand and the rest are its own. The runtime keeps `--threads`, `--gpu`,
-# `--gpu-build` and `--help` for itself and strips them wherever they appear;
-# everything after a `--` reaches the program untouched, those four included.
+# share/args: the command line, as the binary itself receives it. `IO.args()`
+# is C's argv: the program as invoked, then every argument it was started
+# with. `all` drops the program, so the first word a command reads is the
+# subcommand. The runtime keeps `--threads`, `--gpu`, `--gpu-build` and
+# `--bend-help` and strips them wherever they appear; everything after a
+# `--` reaches the program untouched, those four included. `--help` is an
+# argument.
 import Base
 
 # the non-empty strings
@@ -31,11 +33,21 @@ def copy(xs: List<&1, String>) -> List<&2, String>:
     case Con{h, t}:
       h <> copy(t)
 
-# every argument, each one readable twice
+# every word after the first. `all` uses it to drop the program `IO.args`
+# puts at the front, and `run` uses it to forward what follows `run`.
+def rest(as: List<&2, String>) -> List<&2, String>:
+  match as:
+    case Nil{}:
+      Nil{}
+    case Con{_h, t}:
+      t
+
+# every argument, the program dropped, each one readable twice. The first
+# word `IO.args` answers is the program, as C's argv does.
 def all() -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     xs : List<&1, String> <- IO.args()
-    return copy(xs)
+    return rest(copy(xs))
 
 # the first argument and the ones after it. The pair is returned rather than
 # asked about twice, since a match cannot scrutinise a local binder.
@@ -56,14 +68,6 @@ def at(xs: List<&2, String>, index: Nat) -> String:
       h
     case Con{_h, t} 1n+p:
       at(t, p)
-
-# every word after the first, which is what `run` forwards to the entry
-def rest(as: List<&2, String>) -> List<&2, String>:
-  match as:
-    case Nil{}:
-      Nil{}
-    case Con{_h, t}:
-      t
 
 # the command `ez run` starts: bend on the entry, with every word after
 # `run` (EZ-TOOL-9)

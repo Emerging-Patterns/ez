@@ -1,8 +1,7 @@
 # ez/quiet: bend's own chatter dropped from a run's output, so a test sees only
-# what its program printed. The wording changed between releases: 2.0.16 says
-# `All terms check, with N unsafe annotations.` on one line, 2.0.18 says
-# `All terms check, but N defs rely on unsafe or foreign code:` and then a
-# `- <name>` line each. Both go. A test asserting its own output never starts a
+# what its program printed. A file with no main prints `ALL PROOFS CHECK` or
+# `SOME PROOFS FAIL`, and a failure then lists each unchecked def on a
+# `- <name>` line. Those go. A test asserting its own output never starts a
 # line with `- `.
 #
 # bend also nags about its own updates: `bend 2.0.21 is available: run bend
@@ -27,10 +26,15 @@ def is_nag(+line: String) -> Bool:
 type Tail is Data:
   Tail{live: Bool, out: List<&2, String>}
 
+# whether this line opens bend's verdict
+def opens(+line: String) -> Bool:
+  Bool.or(String.starts_with(line, "ALL PROOFS CHECK"),
+    String.starts_with(line, "SOME PROOFS FAIL"))
+
 # whether this line is part of the check report rather than the program's
 # output. `report` says the line before it was.
 def in_report(report: Bool, +line: String) -> Bool:
-  Bool.or(String.starts_with(line, "All terms check"),
+  Bool.or(opens(line),
     Bool.and(report, String.starts_with(line, "- ")))
 
 

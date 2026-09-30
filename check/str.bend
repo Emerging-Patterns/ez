@@ -252,7 +252,7 @@ law eq_fin_rec:
   for h1: Char
   for h2: Char
   for r: (String & String) & Cmp
-  {String.eq.fin(String.cmp.rec(h1, h2, r)) == String.eq.fin(r) : Bool}
+  {Eq.eq.fin(String.cmp.rec(h1, h2, r)) == Eq.eq.fin(r) : Bool}
 
 # the comparison, taken apart and put back together
 def eq_fin_rec(_h1, _h2, r):
@@ -272,7 +272,7 @@ law eq_head.cmp:
   for t2: String
   for c: Cmp
   for ec: {U32.cmp(x, y) == c : Cmp}
-  for e: {String.eq.fin(String.cmp.fin(t1, t2, ((Chr{x}, Chr{y}), c)))
+  for e: {Eq.eq.fin(String.cmp.fin(t1, t2, ((Chr{x}, Chr{y}), c)))
     == True{} : Bool}
   {Chr{x} == Chr{y} : Char}
 
@@ -294,7 +294,7 @@ law eq_tail.cmp:
   for +t2: String
   for c: Cmp
   for ec: {U32.cmp(x, y) == c : Cmp}
-  for e: {String.eq.fin(String.cmp.fin(t1, t2, ((Chr{x}, Chr{y}), c)))
+  for e: {Eq.eq.fin(String.cmp.fin(t1, t2, ((Chr{x}, Chr{y}), c)))
     == True{} : Bool}
   {String.eq(t1, t2) == True{} : Bool}
 
@@ -305,10 +305,10 @@ def eq_tail.cmp(x, y, t1, t2, c, _ec, e):
     case EQ{}:
       Equal.trans(Bool,
         String.eq(t1, t2),
-        String.eq.fin(String.cmp.rec(Chr{x}, Chr{y}, String.cmp(t1, t2))),
+        Eq.eq.fin(String.cmp.rec(Chr{x}, Chr{y}, String.cmp(t1, t2))),
         True{},
         Equal.sym(Bool,
-          String.eq.fin(String.cmp.rec(Chr{x}, Chr{y}, String.cmp(t1, t2))),
+          Eq.eq.fin(String.cmp.rec(Chr{x}, Chr{y}, String.cmp(t1, t2))),
           String.eq(t1, t2),
           eq_fin_rec(Chr{x}, Chr{y}, String.cmp(t1, t2))),
         e)

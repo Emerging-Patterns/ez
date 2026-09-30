@@ -3,6 +3,7 @@ import Base
 import ./lock.bend as L
 import ./world.bend as W
 import ./plan.bend as P
+import ./fuel.bend as Fuel
 import ./up.bend as Up
 import ../ledger/manifest.bend as M
 import ../ledger/upgrade.bend as U
@@ -848,7 +849,7 @@ law more_pins:
   for +wk: P.Walk
   for e: {Laws.pinned.all(orgs, P.walk.packs(wk)) == P.walk.packs(wk)
     : List<&2, L.Pack>}
-  for ih: {Laws.pinned.all(orgs, P.walk.packs(P.walk(f, orgs, ns, js,
+  for ih: Unit -> {Laws.pinned.all(orgs, P.walk.packs(P.walk(f, orgs, ns, js,
     P.walk.step(orgs, ns, js, wk))))
     == P.walk.packs(P.walk(f, orgs, ns, js, P.walk.step(orgs, ns, js, wk)))
     : List<&2, L.Pack>}
@@ -862,7 +863,7 @@ def more_pins(_ns, done, _orgs, _js, _f, _wk, e, ih):
     case True{}:
       e
     case False{}:
-      ih
+      ih(Unit{})
 
 def Laws.walk_pins_ledger_sources(fuel, orgs, ns, js, wk, e):
   match fuel:
@@ -870,7 +871,7 @@ def Laws.walk_pins_ledger_sources(fuel, orgs, ns, js, wk, e):
       out_pins(P.walk.done(wk), orgs, wk, e)
     case 1n+f:
       more_pins(ns, P.walk.done(wk), orgs, js, f, wk, e,
-        Laws.walk_pins_ledger_sources(f, orgs, ns, js, P.walk.step(orgs, ns, js, wk),
+        _u => Laws.walk_pins_ledger_sources(f, orgs, ns, js, P.walk.step(orgs, ns, js, wk),
           step_pins(ns, orgs, js, wk, e)))
 
 def Laws.plain_lock_pins_ledger_sources(w, e):
@@ -889,7 +890,7 @@ def Laws.plain_lock_pins_ledger_sources(w, e):
                 case W.Unlisted{why}:
                   {==}
                 case W.Listed{+fs}:
-                  Laws.walk_pins_ledger_sources(U32.to_nat(100000),
+                  Laws.walk_pins_ledger_sources(Fuel.cap(),
                     L.ledger.read(W.parsed(ledger)),
                     P.table(W.parsed(ledger), W.judge(W.origins(ledger), W.ledger.hub(ledger), replies)),
                     W.judge(W.origins(ledger), W.ledger.hub(ledger), replies),
@@ -1122,7 +1123,7 @@ law more_distinct:
   for f: Nat
   for +wk: P.Walk
   for e: {Laws.distinct(P.walk.packs(wk)) == True{} : Bool}
-  for ih: {Laws.distinct(P.walk.packs(P.walk(f, orgs, ns, js,
+  for ih: Unit -> {Laws.distinct(P.walk.packs(P.walk(f, orgs, ns, js,
     P.walk.step(orgs, ns, js, wk)))) == True{} : Bool}
   {Laws.distinct(P.walk.packs(P.walk.more(done, wk,
     now => P.walk(f, orgs, ns, js, P.walk.step(orgs, ns, js, now))))) == True{} : Bool}
@@ -1132,7 +1133,7 @@ def more_distinct(_ns, done, _orgs, _js, _f, _wk, e, ih):
     case True{}:
       e
     case False{}:
-      ih
+      ih(Unit{})
 
 def Laws.walk_keeps_hashes_distinct(fuel, orgs, ns, js, wk, e):
   match fuel:
@@ -1140,7 +1141,7 @@ def Laws.walk_keeps_hashes_distinct(fuel, orgs, ns, js, wk, e):
       out_distinct(P.walk.done(wk), wk, e)
     case 1n+f:
       more_distinct(ns, P.walk.done(wk), orgs, js, f, wk, e,
-        Laws.walk_keeps_hashes_distinct(f, orgs, ns, js, P.walk.step(orgs, ns, js, wk),
+        _u => Laws.walk_keeps_hashes_distinct(f, orgs, ns, js, P.walk.step(orgs, ns, js, wk),
           step_distinct(ns, orgs, js, wk, e)))
 
 # LAW: the walk from any listing, over any ledger and verdicts, resolves each
@@ -1157,7 +1158,7 @@ def walk_of_distinct(led, listing, ns, js):
     case W.Unlisted{why}:
       {==}
     case W.Listed{+fs}:
-      Laws.walk_keeps_hashes_distinct(U32.to_nat(100000), L.ledger.read(led), ns, js,
+      Laws.walk_keeps_hashes_distinct(Fuel.cap(), L.ledger.read(led), ns, js,
         P.Walk{List.append(&2, String, P.roots(fs), L.name.hashes(ns, P.roots.named(fs))),
           [], [], ""}, {==})
 
@@ -15624,7 +15625,7 @@ def an.recs(led, listing, js):
     case W.Unlisted{_why}:
       {==}
     case W.Listed{+fs}:
-      Laws.walk_pins_ledger_sources(U32.to_nat(100000), L.ledger.read(led), P.table(led, js), js,
+      Laws.walk_pins_ledger_sources(Fuel.cap(), L.ledger.read(led), P.table(led, js), js,
         P.Walk{List.append(&2, String, P.roots(fs), L.name.hashes(P.table(led, js), P.roots.named(fs))),
           [], [], ""}, {==})
 

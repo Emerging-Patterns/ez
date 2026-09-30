@@ -169,7 +169,7 @@ rec {
     });
 
   # `ez prove` in a writable copy of src: `bend` on every PROOF.bend, passing
-  # only when each one's first line is `All terms check.` It takes no flags.
+  # only when each one's first line is `ALL PROOFS CHECK`. It takes no flags.
   # `lock` is an explicit lock path, as in mkPackage. `bendLib`, when non-null,
   # is the store path used as BEND_LIB. Precedence: `bendLib`, else
   # `bendLibOf src lock`, else no BEND_LIB.
