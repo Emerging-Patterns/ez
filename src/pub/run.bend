@@ -86,6 +86,13 @@ def loop.step(st: PP.Step, +lib: String, world: PW.World, go: PW.World -> IO(Uni
     case PP.Run{pl}:
       Run.exec.plan(lib, pl)
 
+# the rounds the loop may take. The walk asks for one file a round and cannot
+# know how many the package holds until it has read them, so this is a guard
+# against a planner that keeps asking, not a limit on a package: running out
+# of it dies loudly.
+def rounds() -> Nat:
+  U32.to_nat(100000)
+
 # the loop, under fuel. The walk asks for one file a round, so the fuel is a
 # guard against a planner that keeps asking, not a limit on a package.
 def loop(fuel: Nat, +lib: String, +world: PW.World) -> IO(Unit):
@@ -102,4 +109,4 @@ def run() -> IO(Unit):
     lib : String <- Env.lib()
     +pwd : String <- R.exec(["pwd"])
     led : Maybe<&2, String> <- F.read(PW.toml())
-    loop(U32.to_nat(100000), lib, PW.World{String.trim(R.text(pwd)), led, []})
+    loop(rounds(), lib, PW.World{String.trim(R.text(pwd)), led, []})

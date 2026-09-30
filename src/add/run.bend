@@ -43,6 +43,12 @@ def loop.step(st: AP.Next, +lib: String, world: A.World, go: A.World -> IO(Unit)
     case AP.Ready{pl}:
       Run.exec.plan(lib, pl)
 
+# the rounds the loop may take. The planner asks at most three rounds for a
+# git target and two for a name, so this is only a guard against a planner
+# that keeps asking, and running out of it dies loudly.
+def rounds() -> Nat:
+  U32.to_nat(100)
+
 # the loop, under fuel. Every round adds an answer, since the planner never
 # asks what the World answers already, and it asks at most three rounds for
 # a git target and two for a name, so the fuel is only a guard.
@@ -61,5 +67,5 @@ def run(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Un
     h : Result<&1, &1, U32 & String, String> <- IO.get_env("HOME")
     led : Maybe<&2, String> <- F.read(A.toml())
     ig : Maybe<&2, String> <- F.read(A.ignore.file())
-    loop(U32.to_nat(100), lib, A.World{A.Args{target, ref, entry, rename}, String.trim(R.text(pwd)),
+    loop(rounds(), lib, A.World{A.Args{target, ref, entry, rename}, String.trim(R.text(pwd)),
       Run.env.text(h), led, F.text_of(ig), [], []})

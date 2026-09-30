@@ -1267,9 +1267,20 @@ def of.tree(fuel: Nat, +entry: String, +tree: Tree) -> Walked:
 def of.fuel(fuel: Nat, +entry: String, +fs: List<&2, Source>) -> Walked:
   of.tree(fuel, entry, Tree{True{}, fs, []})
 
-# the same, with the fuel `pkg_of` walks with
+# fuel enough for a walk over these files: one step for the entry and one for
+# every import it can queue, and every import is a line of some file. A
+# function of the files rather than a number, so no checkout is too big for
+# it and a proof about files it does not know leaves it unevaluated.
+def walk.fuel(fs: List<&2, Source>) -> Nat:
+  match fs:
+    case []:
+      1n
+    case Source{_at, text} <> t:
+      (List.length(&2, String, String.lines(text)) + walk.fuel(t) : Nat)
+
+# the same, with fuel enough for every file of the checkout
 def of(+entry: String, +fs: List<&2, Source>) -> Walked:
-  of.fuel(U32.to_nat(100000), entry, fs)
+  of.fuel(walk.fuel(fs), entry, fs)
 
 # ---------------------------------------------------------------------------
 # the walk answered from disk
@@ -1338,14 +1349,29 @@ def pkg.next(
     case Unnamed{_nv}:
       made.io(top, made(entry, st))
 
+# fuel enough for a walk taken up again over the files read so far: a step
+# for every file still queued, and `walk.fuel`'s step for every import those files
+# can queue
+def resumed.fuel(+tree: Tree, +st: State) -> Nat:
+  Tree{_whole, fs, _gone} = tree
+  State{_seen, _out, _stop, queue} = st
+  (List.length(&2, Task, queue) + walk.fuel(fs) : Nat)
+
+# how many files the walk from disk may ask for. It asks for one file a round
+# and cannot know how many the checkout holds until it has read them, so this
+# is a guard against a walk that keeps asking, not a limit on a package: a
+# package of more files than this is refused, never hashed short.
+def asks() -> Nat:
+  U32.to_nat(100000)
+
 # the walk over what has been read so far, and each file it asks for read
 # and handed back, until it no longer asks
-def pkg.ask(fuel: Nat, +top: String, +entry: String, +eb: String, +tree: Tree, st: State) -> IO(Pkg):
+def pkg.ask(fuel: Nat, +top: String, +entry: String, +eb: String, +tree: Tree, +st: State) -> IO(Pkg):
   match fuel:
     case 0n:
       IO.die(Pkg, 1, "ez: the walk from " ++ entry ++ " asked too many questions")
     case 1n+f:
-      +now = walk(U32.to_nat(100000), tree, eb, st)
+      +now = walk(resumed.fuel(tree, st), tree, eb, st)
       pkg.next(state.stop(now), top, entry, tree, now,
         t => s => pkg.ask(f, top, entry, eb, t, s))
 
@@ -1353,7 +1379,7 @@ def pkg.ask(fuel: Nat, +top: String, +entry: String, +eb: String, +tree: Tree, s
 # entry and every file the walk reaches are paths from `top`, read from disk
 # as the walk asks for them. An import that climbs above `top` is refused.
 def walk.io(+top: String, +entry: String) -> IO(Pkg):
-  pkg.ask(U32.to_nat(100000), top, entry, P.base(entry), Tree{False{}, [], []},
+  pkg.ask(asks(), top, entry, P.base(entry), Tree{False{}, [], []},
     start(entry))
 
 # the package an entry of a checkout would be published as

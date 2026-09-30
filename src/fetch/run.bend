@@ -86,6 +86,13 @@ def loop.step(st: FP.Step, +lib: String, world: FW.World, go: FW.World -> IO(Uni
     case FP.Run{pl}:
       Run.exec.plan(lib, pl)
 
+# the rounds the loop may take. A package asks at most twice, for its tree
+# under BEND_LIB and for its fetch, and a round asks for every package at
+# once, so this is only a guard against a planner that keeps asking, and
+# running out of it dies loudly.
+def rounds() -> Nat:
+  U32.to_nat(10)
+
 # the loop, under fuel. A package asks at most twice, for its tree under
 # BEND_LIB and for its fetch, and every round answers what it asked, so the
 # fuel is only a guard.
@@ -107,7 +114,7 @@ def fill(+here: String, +lib: String) -> IO(Unit):
   do IO<Unit>:
     led : Maybe<&2, String> <- F.read(at(here, FW.toml()))
     lk : Maybe<&2, String> <- F.read(at(here, FW.lockfile()))
-    loop(U32.to_nat(10), lib, FW.World{here, Maybe.is_some(&2, String, led), lk, []})
+    loop(rounds(), lib, FW.World{here, Maybe.is_some(&2, String, led), lk, []})
 
 # `ez fetch`: BEND_LIB filled from the lock of the project ez runs in
 def run() -> IO(Unit):

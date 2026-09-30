@@ -246,6 +246,12 @@ def recv.go(fuel: Nat, sock: Socket, +acc: String) -> IO(Socket & String):
     case 1n+f:
       recv.more(complete(acc), sock, acc, s => a => recv.go(f, s, a))
 
+# the reads a request may take, 64 KiB at most each: 256 MiB, past any request
+# a test sends. How long a request is is not known until its head has arrived,
+# so the reads cannot be counted up front.
+def reads() -> Nat:
+  U32.to_nat(4096)
+
 # a whole request read off a socket, and the socket it came on
 def request(sock: Socket) -> IO(Socket & String):
-  recv.go(U32.to_nat(4096), sock, "")
+  recv.go(reads(), sock, "")
