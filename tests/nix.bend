@@ -3,7 +3,7 @@
 # fixed-output fetches. This is the gap ez exists to close — bend resolves a
 # hub import during the check, inside `book_load`, and a nix build cannot.
 import Base
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
 import ../src/io/file.bend as F
 import ../src/share/sha.bend as Sha
 import ../src/ez/quiet.bend as Q

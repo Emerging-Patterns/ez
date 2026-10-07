@@ -7,7 +7,7 @@
 # tree away and asks again: the lock fetches it at the ledger's rev and
 # checks it.
 import Base
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
 import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check

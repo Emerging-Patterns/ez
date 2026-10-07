@@ -1,7 +1,7 @@
 # ez, run against the repo it is built from. The ledger here names ez's own
 # program as its entry, and `ez check` checks it without running it.
 import Base
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check
 
