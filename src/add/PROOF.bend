@@ -61,7 +61,7 @@ def plan_quiet(v, w, r):
   match v:
     case AP.Go{}:
       seal_quiet(AP.effects.k(AP.walked(w), w), AP.outcome.k(AP.walked(w), w), r)
-    case AP.Wait{_qs}:
+    case AP.Pending{_qs}:
       {==}
     case AP.Stop{_why}:
       {==}
@@ -80,8 +80,8 @@ def plan_made(v, w, ok):
   match v:
     case AP.Go{}:
       {==}
-    case AP.Wait{qs}:
-      Eq.bit.absurd2(&2, {AP.plan.v(AP.Wait{qs}, w) == AP.made(AP.walked(w), w) : P.Plan}, ok)
+    case AP.Pending{qs}:
+      Eq.bit.absurd2(&2, {AP.plan.v(AP.Pending{qs}, w) == AP.made(AP.walked(w), w) : P.Plan}, ok)
     case AP.Stop{why}:
       Eq.bit.absurd2(&2, {AP.plan.v(AP.Stop{why}, w) == AP.made(AP.walked(w), w) : P.Plan}, ok)
 
@@ -686,7 +686,7 @@ def lose_v(v, w, e):
   match v:
     case AP.Go{}:
       seal_refused(AP.effects.k(AP.walked(w), w), AP.outcome.k(AP.walked(w), w), e)
-    case AP.Wait{_qs}:
+    case AP.Pending{_qs}:
       {==}
     case AP.Stop{_why}:
       {==}
@@ -1212,7 +1212,7 @@ def lays_v(v, w):
   match v:
     case AP.Go{}:
       lays_seal(AP.effects.k(AP.walked(w), w), AP.outcome.k(AP.walked(w), w), lays_walked(w))
-    case AP.Wait{_qs}:
+    case AP.Pending{_qs}:
       {==}
     case AP.Stop{_why}:
       {==}
@@ -1573,7 +1573,7 @@ def hplan_quiet(v, w, r):
     case H.Go{+h, +fs, +ss}:
       hseal_quiet(H.effects.of(H.dep.of(h, fs, w), h, W.laid(fs, ss),
         A.manifest.of(A.read(w)), w), H.outcome.of(h, fs, w), r)
-    case H.Wait{_asks}:
+    case H.Pending{_asks}:
       {==}
     case H.Stop{_why}:
       {==}
@@ -1586,7 +1586,7 @@ def hstops(v: H.Verdict) -> Bool:
   match v:
     case H.Go{_h, _fs, _ss}:
       False{}
-    case H.Wait{_asks}:
+    case H.Pending{_asks}:
       True{}
     case H.Stop{_why}:
       True{}
@@ -1602,7 +1602,7 @@ def hstops_refuses(v, w, e):
   match v:
     case H.Go{h, fs, ss}:
       Eq.bit.absurd(&2, {H.refuses.plan(H.plan.v(H.Go{h, fs, ss}, w)) == True{} : Bool}, e)
-    case H.Wait{_asks}:
+    case H.Pending{_asks}:
       {==}
     case H.Stop{_why}:
       {==}
@@ -1784,7 +1784,7 @@ def hvs(v: H.Verdict) -> List<&2, String>:
   match v:
     case H.Go{_h, _fs, ss}:
       ss
-    case H.Wait{_asks}:
+    case H.Pending{_asks}:
       []
     case H.Stop{_why}:
       []
@@ -1854,7 +1854,7 @@ def hv_unfit(v, w, bad):
         Rend.renderable(Rend.add.keep(A.manifest.of(A.read(w)), H.dep.of(h, fs, w))),
         H.asked(w), w,
         H.effects.of(H.dep.of(h, fs, w), h, W.laid(fs, ss), A.manifest.of(A.read(w)), w), bad)
-    case H.Wait{_asks}:
+    case H.Pending{_asks}:
       {==}
     case H.Stop{_why}:
       {==}
@@ -1890,7 +1890,7 @@ def hv_absent(v, w, given, miss):
         H.asked(w), w,
         H.effects.of(H.dep.of(h, fs, w), h, W.laid(fs, ss), A.manifest.of(A.read(w)), w),
         or_false(String.is_empty(H.asked(w)), H.holds(fs, Path.norm(H.asked(w))), given, miss))
-    case H.Wait{_asks}:
+    case H.Pending{_asks}:
       {==}
     case H.Stop{_why}:
       {==}
@@ -1910,8 +1910,8 @@ def hplan_made(v, w, ok):
   match v:
     case H.Go{_h, _fs, _ss}:
       {==}
-    case H.Wait{asks}:
-      Eq.bit.absurd2(&2, {H.plan.v(H.Wait{asks}, w) == H.made("", [], [], w) : P.Plan}, ok)
+    case H.Pending{asks}:
+      Eq.bit.absurd2(&2, {H.plan.v(H.Pending{asks}, w) == H.made("", [], [], w) : P.Plan}, ok)
     case H.Stop{why}:
       Eq.bit.absurd2(&2, {H.plan.v(H.Stop{why}, w) == H.made("", [], [], w) : P.Plan}, ok)
 
@@ -2137,7 +2137,7 @@ def hnb(v: H.Verdict, +t: String) -> Bool:
   match v:
     case H.Go{h, _fs, _ss}:
       String.eq(h, t)
-    case H.Wait{_asks}:
+    case H.Pending{_asks}:
       True{}
     case H.Stop{_why}:
       True{}
@@ -2244,8 +2244,8 @@ def hnb_hash_is(v, t, _w, e, ok):
   match v:
     case H.Go{h, _fs, _ss}:
       Str.string_eq_true(h, t, e)
-    case H.Wait{asks}:
-      Eq.bit.absurd2(&2, {H.verdict.hash(H.Wait{asks}) == t : String}, ok)
+    case H.Pending{asks}:
+      Eq.bit.absurd2(&2, {H.verdict.hash(H.Pending{asks}) == t : String}, ok)
     case H.Stop{why}:
       Eq.bit.absurd2(&2, {H.verdict.hash(H.Stop{why}) == t : String}, ok)
 
@@ -2263,7 +2263,7 @@ def hgv(v: H.Verdict) -> Bool:
   match v:
     case H.Go{h, fs, ss}:
       String.eq(h, W.named(W.laid(fs, ss)))
-    case H.Wait{_asks}:
+    case H.Pending{_asks}:
       True{}
     case H.Stop{_why}:
       True{}
@@ -2563,7 +2563,7 @@ def hv_lays(v, w, g):
               H.dep.of(h, fs, w))), A.ignore(w)), A.ignore(w)),
             I.sync(A.deps.of(Rend.add.keep(A.manifest.of(A.read(w)), H.dep.of(h, fs, w))),
               A.ignore(w)), h, H.entry(fs, w), w)))
-    case H.Wait{_asks}:
+    case H.Pending{_asks}:
       {==}
     case H.Stop{_why}:
       {==}

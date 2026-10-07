@@ -84,7 +84,7 @@ def heard(rs: List<&2, W.Reply>, +key: String) -> Maybe<&2, W.Answer>:
 # checked against it; a question is still open; or the add refuses
 type Verdict is Data:
   Go{hash: String, files: List<&2, K.Item>, srcs: List<&2, String>}
-  Wait{asks: List<&2, W.Ask>}
+  Pending{asks: List<&2, W.Ask>}
   Stop{why: String}
 
 # the package, judged as the lock judges a hub package
@@ -111,7 +111,7 @@ def decide.got(answer: W.Answer, +hash: String, +world: A.World) -> Verdict:
 def decide.pkg(got: Maybe<&2, W.Answer>, +hash: String, +world: A.World) -> Verdict:
   match got:
     case None{}:
-      Wait{[W.Pkg{hash, L.Hub{}, A.hub(world)}]}
+      Pending{[W.Pkg{hash, L.Hub{}, A.hub(world)}]}
     case Some{answer}:
       decide.got(answer, hash, world)
 
@@ -148,7 +148,7 @@ def decide.said(answer: W.Answer, +world: A.World) -> Verdict:
 def decide.name(got: Maybe<&2, W.Answer>, +world: A.World) -> Verdict:
   match got:
     case None{}:
-      Wait{[W.Name{nv(world), A.hub(world)}]}
+      Pending{[W.Name{nv(world), A.hub(world)}]}
     case Some{answer}:
       decide.said(answer, world)
 
@@ -336,7 +336,7 @@ def plan.v(verdict: Verdict, +world: A.World) -> P.Plan:
   match verdict:
     case Go{hash, fs, ss}:
       made(hash, fs, ss, world)
-    case Wait{_asks}:
+    case Pending{_asks}:
       P.Plan{[], P.Refused{"ez: the hub was never asked what " ++ nv(world) ++ " names"}}
     case Stop{why}:
       P.Plan{[], P.Refused{why}}
@@ -350,7 +350,7 @@ def asks.v(verdict: Verdict) -> List<&2, W.Ask>:
   match verdict:
     case Go{_hash, _fs, _ss}:
       []
-    case Wait{asks}:
+    case Pending{asks}:
       asks
     case Stop{_why}:
       []
@@ -380,7 +380,7 @@ def verdict.hash(verdict: Verdict) -> String:
   match verdict:
     case Go{hash, _fs, _ss}:
       hash
-    case Wait{_asks}:
+    case Pending{_asks}:
       ""
     case Stop{_why}:
       ""
@@ -389,7 +389,7 @@ def verdict.files(verdict: Verdict) -> List<&2, K.Item>:
   match verdict:
     case Go{_hash, fs, _ss}:
       fs
-    case Wait{_asks}:
+    case Pending{_asks}:
       []
     case Stop{_why}:
       []

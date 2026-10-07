@@ -4,7 +4,7 @@
 # foreign effect, and lives apart because bend 2.0.32 fails a proof whose
 # imports reach foreign code, so a law may import share/env but never this.
 import Base
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
 import ./env.bend as Env
 
 # a program run with this project's BEND_LIB set for it

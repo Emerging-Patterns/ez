@@ -13,7 +13,7 @@
 # from its entry here, by `K.pkg_of`, which is interpreter code under
 # EZ-TRUST-2 until `ez add` is converted.
 import Base
-import 0xabe575924687afad4cee1a2c1194d639/main.bend as R
+import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
 import ../io/file.bend as F
 import ../hub/hub.bend as Web
 import ../hub/get.bend as Net

@@ -132,20 +132,20 @@ def response(status: String, +body: String) -> String:
     "\r\nConnection: close\r\n\r\n" ++ body
 
 # the socket shut once the answer has gone out
-def send.done(sr: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Unit):
+def send.done(sr: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(Unit):
   (sock, _r) = sr
   Socket.close(sock)
 
 # one answer written in one go and the connection closed
 def answer(sock: Socket, text: String) -> IO(Unit):
   do IO<Unit>:
-    sr : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(sock, text)
+    sr : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(sock, text)
     send.done(sr)
 
 # the socket handed back once a piece has gone out, so the next one can follow
 # it down the same connection
 def piece.sent(
-  sr: Socket & Result<&1, &1, U32 & String, Unit>,
+  sr: Socket & Result<&1, &1, (U32 & String) & String, Unit>,
   left: String,
   rest: Socket -> String -> IO(Socket)
 ) -> IO(Socket):
@@ -165,7 +165,7 @@ def piece.more(
       IO.pure(Socket, sock)
     case False{}:
       do IO<Socket>:
-        sr : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(sock, head)
+        sr : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(sock, head)
         piece.sent(sr, tail, rest)
 
 # an answer written out a few characters at a time, one write per piece, so a
@@ -200,9 +200,23 @@ def recv.chunk(
     case SCon{c, t}:
       rest(sock, acc ++ SCon{c, t})
 
-# a failed read ends the request as surely as an empty one
+# None is the peer done sending. Some is the bytes, and an empty chunk is
+# the same end.
+def recv.taken(
+  chunk: Maybe<&1, String>,
+  sock: Socket,
+  acc: String,
+  rest: Socket -> String -> IO(Socket & String)
+) -> IO(Socket & String):
+  match chunk:
+    case None{}:
+      recv.chunk("", sock, acc, rest)
+    case Some{text}:
+      recv.chunk(text, sock, acc, rest)
+
+# a failed read ends the request as surely as a closed peer
 def recv.got(
-  received: Result<&1, &1, U32 & String, String>,
+  received: Result<&1, &1, U32 & String, Maybe<&1, String>>,
   sock: Socket,
   acc: String,
   rest: Socket -> String -> IO(Socket & String)
@@ -211,11 +225,11 @@ def recv.got(
     case Fail{_e}:
       IO.pure(Socket & String, (sock, acc))
     case Done{chunk}:
-      recv.chunk(chunk, sock, acc, rest)
+      recv.taken(chunk, sock, acc, rest)
 
 # the socket comes back paired with what it read
 def recv.next(
-  got: Socket & Result<&1, &1, U32 & String, String>,
+  got: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>,
   acc: String,
   rest: Socket -> String -> IO(Socket & String)
 ) -> IO(Socket & String):
@@ -234,7 +248,7 @@ def recv.more(
       IO.pure(Socket & String, (sock, acc))
     case False{}:
       do IO<Socket & String>:
-        got : Socket & Result<&1, &1, U32 & String, String> <- TCP.recv(sock, 65536)
+        got : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(sock, 65536)
         recv.next(got, acc, rest)
 
 # a whole request read off a socket, one chunk at a time until the head has

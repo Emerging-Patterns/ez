@@ -56,5 +56,5 @@ Term ezpass_run_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) ezpass_run_use(void) {
-  io_eff(CID(ezpass.run), ezpass_run_run, 0);
+  io_eff(CID(ezpass.run), ezpass_run_run);
 }

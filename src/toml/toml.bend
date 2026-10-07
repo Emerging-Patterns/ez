@@ -68,9 +68,17 @@ def seg.sym(+ch: Char) -> Sym:
 type Split is Data:
   Split{quoted: Bool, cur: List<&2, Char>, out: List<&2, String>}
 
+# the chars gathered so far, last read first, spelled in the order they arrived
+def seg.chars(buf: List<&2, Char>, acc: String) -> String:
+  match buf:
+    case []:
+      acc
+    case hd <> tl:
+      seg.chars(tl, SCon{hd, acc})
+
 # the segment gathered so far, in order
 def seg.done(cur: List<&2, Char>) -> String:
-  String.from_list(List.reverse(&2, Char, cur))
+  seg.chars(cur, "")
 
 # a dot inside quotes is part of the segment; outside, it ends one
 def seg.dot(quoted: Bool, cur: List<&2, Char>, out: List<&2, String>) -> Split:

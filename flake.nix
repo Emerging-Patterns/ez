@@ -5,9 +5,9 @@
   description = "ez: dependency tracking, lockfile and vendoring tool for Bend 2, written in Bend";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  # the commit that packages bend 2.0.35 (the v2.0.35 tag packages 2.0.34)
+  # the commit that packages bend 2.0.36 (the v2.0.36 tag packages 2.0.35)
   inputs.bend = {
-    url = "github:bendlang/bend/5a0b523f7759335164f1dead0e0815234a5fd9dc";
+    url = "github:bendlang/bend/eebc18cd04daeade06c3f68c3c96c1faefd3462f";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 

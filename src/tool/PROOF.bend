@@ -38,7 +38,7 @@ def quiet(v, w, r):
   match v:
     case TP.Go{}:
       Eq.bit.absurd(&2, {TP.writes(TP.plan.v(TP.Go{}, w)) == False{} : Bool}, r)
-    case TP.Wait{_as, _us}:
+    case TP.Pending{_as, _us}:
       {==}
     case TP.Stop{_why}:
       {==}
@@ -57,7 +57,7 @@ def quiet_exit(v, w, r):
   match v:
     case TP.Go{}:
       Eq.bit.absurd(&2, {TP.exit(TP.plan.v(TP.Go{}, w)) == TP.Refusal{} : TP.Exit}, r)
-    case TP.Wait{_as, _us}:
+    case TP.Pending{_as, _us}:
       {==}
     case TP.Stop{_why}:
       {==}
@@ -95,8 +95,8 @@ def plan_made(v, w, ok):
   match v:
     case TP.Go{}:
       {==}
-    case TP.Wait{as, us}:
-      Eq.bit.absurd2(&2, {TP.plan.v(TP.Wait{as, us}, w) == TP.made(w) : TP.Plan}, ok)
+    case TP.Pending{as, us}:
+      Eq.bit.absurd2(&2, {TP.plan.v(TP.Pending{as, us}, w) == TP.made(w) : TP.Plan}, ok)
     case TP.Stop{why}:
       Eq.bit.absurd2(&2, {TP.plan.v(TP.Stop{why}, w) == TP.made(w) : TP.Plan}, ok)
 
@@ -478,7 +478,7 @@ def never(v, w, a, act, l):
         : {TP.launches(TP.Plan{TP.lay(w), TP.make(w), TP.finish.of(_, w), P.Success{}})
           == False{} : Bool}
       never_a(a, w, l)
-    case TP.Wait{_as, _us}:
+    case TP.Pending{_as, _us}:
       {==}
     case TP.Stop{_why}:
       {==}
