@@ -40,7 +40,7 @@ def loop.step(st: AP.Next, +lib: String, world: A.World, go: A.World -> IO(Unit)
       do IO<Unit>:
         rs : List<&2, W.Reply> <- Run.answer.all(lib, asks)
         go(more.hub(world, rs))
-    case AP.Ready{pl}:
+    case AP.Planned{pl}:
       Run.exec.plan(lib, pl)
 
 # the rounds the loop may take. The planner asks at most three rounds for a

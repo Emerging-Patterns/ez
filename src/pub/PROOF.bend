@@ -393,8 +393,8 @@ def stop_unsent(v, r):
   match v:
     case PP.Go{}:
       Eq.bit.absurd(&2, {PP.sends.v(PP.Go{}) == False{} : Bool}, r)
-    case PP.Wait{asks}:
-      Eq.bit.absurd(&2, {PP.sends.v(PP.Wait{asks}) == False{} : Bool}, r)
+    case PP.Pending{asks}:
+      Eq.bit.absurd(&2, {PP.sends.v(PP.Pending{asks}) == False{} : Bool}, r)
     case PP.Stop{_why}:
       {==}
 
@@ -411,7 +411,7 @@ def unsent_fails(v, w, r):
   match v:
     case PP.Go{}:
       Eq.bit.absurd2(&2, {PP.succeeds.plan(PP.plan.v(PP.Go{}, w)) == False{} : Bool}, r)
-    case PP.Wait{_asks}:
+    case PP.Pending{_asks}:
       {==}
     case PP.Stop{_why}:
       {==}
@@ -570,8 +570,8 @@ def said_made(v, w, ok):
   match v:
     case PP.Go{}:
       {==}
-    case PP.Wait{asks}:
-      Eq.bit.absurd(&2, {P.said(PP.plan.v(PP.Wait{asks}, w))
+    case PP.Pending{asks}:
+      Eq.bit.absurd(&2, {P.said(PP.plan.v(PP.Pending{asks}, w))
         == [PP.hash(w), G.import.line(PP.called(w), PP.at(w))] : List<&2, String>}, ok)
     case PP.Stop{why}:
       Eq.bit.absurd(&2, {P.said(PP.plan.v(PP.Stop{why}, w))
@@ -589,7 +589,7 @@ def quiet(v, _w):
   match v:
     case PP.Go{}:
       {==}
-    case PP.Wait{_asks}:
+    case PP.Pending{_asks}:
       {==}
     case PP.Stop{_why}:
       {==}
@@ -1113,7 +1113,7 @@ def unsent_quiet(v, w, r):
   match v:
     case PP.Go{}:
       Eq.bit.absurd2(&2, {P.effects(PP.plan.v(PP.Go{}, w)) == [] : List<&2, P.Effect>}, r)
-    case PP.Wait{_asks}:
+    case PP.Pending{_asks}:
       {==}
     case PP.Stop{_why}:
       {==}

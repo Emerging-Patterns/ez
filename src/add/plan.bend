@@ -341,7 +341,7 @@ def early(+world: A.World) -> String:
 # question is still open, or the add refuses
 type Verdict is Data:
   Go{}
-  Wait{qs: List<&2, Q>}
+  Pending{qs: List<&2, Q>}
   Stop{why: String}
 
 # the checkout answered, still to ask, or not to be had
@@ -350,7 +350,7 @@ def decide.co(checkout: Co, +rev: String) -> Verdict:
     case Co{_nar, _fs}:
       Go{}
     case CoWait{}:
-      Wait{[QClone{rev}]}
+      Pending{[QClone{rev}]}
     case CoNo{why}:
       Stop{why}
 
@@ -360,7 +360,7 @@ def decide.tip(tip: Tip, +world: A.World) -> Verdict:
     case At{+rev}:
       decide.co(co.at(world, rev), rev)
     case TipAsk{q}:
-      Wait{[q]}
+      Pending{[q]}
     case TipNo{why}:
       Stop{why}
 
@@ -610,7 +610,7 @@ def plan.v(verdict: Verdict, +world: A.World) -> P.Plan:
   match verdict:
     case Go{}:
       made(walked(world), world)
-    case Wait{_qs}:
+    case Pending{_qs}:
       P.Plan{[], P.Refused{"ez: the remote was never asked what " ++ A.url(world) ++
         " holds"}}
     case Stop{why}:
@@ -638,7 +638,7 @@ def qs.v(verdict: Verdict) -> List<&2, Q>:
   match verdict:
     case Go{}:
       []
-    case Wait{qs}:
+    case Pending{qs}:
       qs
     case Stop{_why}:
       []
@@ -660,7 +660,7 @@ def step.v(verdict: Verdict, +world: A.World) -> Step:
   match verdict:
     case Go{}:
       Run{plan.v(Go{}, world)}
-    case Wait{qs}:
+    case Pending{qs}:
       Asking{asks.of(qs, A.from(world))}
     case Stop{why}:
       Run{plan.v(Stop{why}, world)}
@@ -790,7 +790,7 @@ def refuses.command(+world: A.World) -> Bool:
 type Next is Data:
   AskGit{asks: List<&2, Up.Ask>}
   AskHub{asks: List<&2, W.Ask>}
-  Ready{plan: P.Plan}
+  Planned{plan: P.Plan}
 
 # the git planner's step
 def next.git(st: Step) -> Next:
@@ -798,13 +798,13 @@ def next.git(st: Step) -> Next:
     case Asking{asks}:
       AskGit{asks}
     case Run{pl}:
-      Ready{pl}
+      Planned{pl}
 
 # the hub planner's step: its questions, or its plan once there are none
 def next.hub(asks: List<&2, W.Ask>, +world: A.World) -> Next:
   match asks:
     case []:
-      Ready{H.plan(world)}
+      Planned{H.plan(world)}
     case h <> t:
       AskHub{h <> t}
 
@@ -826,5 +826,5 @@ def next.asks(nx: Next) -> Bool:
       True{}
     case AskHub{_asks}:
       True{}
-    case Ready{_pl}:
+    case Planned{_pl}:
       False{}

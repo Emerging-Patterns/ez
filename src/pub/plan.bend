@@ -1077,7 +1077,7 @@ def on.hub(+world: PW.World) -> Bool:
 # every check passed, questions still open, or why the command refuses
 type Verdict is Data:
   Go{}
-  Wait{asks: List<&2, PW.Ask>}
+  Pending{asks: List<&2, PW.Ask>}
   Stop{why: String}
 
 # what a refusal for a dirty tree says. The lines git printed come with it,
@@ -1104,7 +1104,7 @@ def decide.agreed(ok: Bool, +world: PW.World) -> Verdict:
 def decide.upload(got: PW.Heard, +world: PW.World) -> Verdict:
   match got:
     case PW.Open{}:
-      Wait{[upload(world)]}
+      Pending{[upload(world)]}
     case PW.Heard{_a}:
       decide.agreed(agreed(world), world)
 
@@ -1115,7 +1115,7 @@ def decide.hub(on: Hubbed, +world: PW.World) -> Verdict:
     case OnHub{}:
       decide.upload(uploaded(world), world)
     case HubWait{open}:
-      Wait{probe.asks(hub(world), open)}
+      Pending{probe.asks(hub(world), open)}
     case OffHub{why}:
       Stop{why}
 
@@ -1128,7 +1128,7 @@ def decide.lock(need: Bool, got: PW.Heard, +world: PW.World) -> Verdict:
     case True{}:
       match got:
         case PW.Open{}:
-          Wait{[PW.Lock{}]}
+          Pending{[PW.Lock{}]}
         case PW.Heard{_a}:
           decide.hub(hubbed(world), world)
 
@@ -1140,7 +1140,7 @@ def decide.kept(kept: Kept, +world: PW.World) -> Verdict:
     case Stray{path}:
       Stop{why.stray(path)}
     case KeptWait{}:
-      Wait{[PW.Tracked{}]}
+      Pending{[PW.Tracked{}]}
     case KeptNo{why}:
       Stop{why}
 
@@ -1150,7 +1150,7 @@ def decide.walk(got: K.Walked, +world: PW.World) -> Verdict:
     case K.Walked{_h, _root, _fs, _sums}:
       decide.kept(stray(world), world)
     case K.Asks{at}:
-      Wait{[PW.Tool{TW.Read{at}}]}
+      Pending{[PW.Tool{TW.Read{at}}]}
     case K.Refused{why}:
       Stop{why}
 
@@ -1168,7 +1168,7 @@ def decide.status(said: Status, +world: PW.World) -> Verdict:
     case Said{+text}:
       decide.clean(dirty(text), text, world)
     case StatusWait{}:
-      Wait{[locate(world)]}
+      Pending{[locate(world)]}
     case StatusNo{why}:
       Stop{why}
 
@@ -1216,7 +1216,7 @@ def plan.v(verdict: Verdict, +world: PW.World) -> P.Plan:
   match verdict:
     case Go{}:
       made(world)
-    case Wait{_asks}:
+    case Pending{_asks}:
       P.Plan{[], P.Refused{"ez: the publish of " ++ entry(world) ++
         " was never resolved"}}
     case Stop{why}:
@@ -1236,7 +1236,7 @@ def step.v(verdict: Verdict, +world: PW.World) -> Step:
   match verdict:
     case Go{}:
       Run{made(world)}
-    case Wait{asks}:
+    case Pending{asks}:
       Asking{asks}
     case Stop{why}:
       Run{plan.v(Stop{why}, world)}
@@ -1270,7 +1270,7 @@ def stops.v(verdict: Verdict) -> Bool:
   match verdict:
     case Go{}:
       False{}
-    case Wait{_asks}:
+    case Pending{_asks}:
       False{}
     case Stop{_why}:
       True{}
@@ -1308,7 +1308,7 @@ def sends.v(verdict: Verdict) -> Bool:
   match verdict:
     case Go{}:
       True{}
-    case Wait{asks}:
+    case Pending{asks}:
       any.upload(asks)
     case Stop{_why}:
       False{}

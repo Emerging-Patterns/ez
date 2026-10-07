@@ -864,7 +864,7 @@ def made(+world: TW.World) -> Plan:
 # every answer is in, a question is still open, or the command refuses
 type Verdict is Data:
   Go{}
-  Wait{asks: List<&2, TW.Ask>, ups: List<&2, Up.Ask>}
+  Pending{asks: List<&2, TW.Ask>, ups: List<&2, Up.Ask>}
   Stop{why: String}
 
 # a lock is needed only for a binary that is built, and only by an ez
@@ -892,7 +892,7 @@ def decide.cache(open: List<&2, TW.Ask>, +world: TW.World) -> Verdict:
     case []:
       decide.lock(unlocked(world), world)
     case h <> t:
-      Wait{h <> t, []}
+      Pending{h <> t, []}
 
 # why a missing file is refused: a file a pin names is the project's to fix,
 # and any other can be named with `--entry`
@@ -915,7 +915,7 @@ def decide.file(open: List<&2, TW.Ask>, +world: TW.World) -> Verdict:
     case []:
       decide.present(present(world), world)
     case h <> t:
-      Wait{h <> t, []}
+      Pending{h <> t, []}
 
 # what a name that could not name a file is: a package's, or the one a
 # plain repository would be linked as
@@ -947,7 +947,7 @@ def decide.co(checkout: Co, +world: TW.World) -> Verdict:
     case Laid{_fs}:
       decide.led(led(world), world)
     case CoWait{as, us}:
-      Wait{as, us}
+      Pending{as, us}
     case CoNo{why}:
       Stop{why}
 
@@ -957,7 +957,7 @@ def decide.loc(spot: Loc, +world: TW.World) -> Verdict:
     case Loc{_a, _t, _h, _ok, _s}:
       decide.co(co(world), world)
     case LocWait{ask}:
-      Wait{[ask], []}
+      Pending{[ask], []}
     case LocNo{why}:
       Stop{why}
 
@@ -976,7 +976,7 @@ def decide.said(said: Up.Said, +url: String, +world: TW.World) -> Verdict:
     case Up.Unsaid{why}:
       Stop{why}
     case Up.Unasked{ask}:
-      Wait{[], [ask]}
+      Pending{[], [ask]}
 
 # a pin's commit is the lock's; a free remote's is asked of its HEAD
 def decide.head(found: Src, +url: String, +world: TW.World) -> Verdict:
@@ -1051,7 +1051,7 @@ def plan.v(verdict: Verdict, +world: TW.World) -> Plan:
   match verdict:
     case Go{}:
       made(world)
-    case Wait{_as, _us}:
+    case Pending{_as, _us}:
       Plan{Still{}, Skip{}, Idle{}, P.Refused{"ez: " ++ TW.target(world) ++ " was never resolved"}}
     case Stop{why}:
       Plan{Still{}, Skip{}, Idle{}, P.Refused{why}}
@@ -1083,7 +1083,7 @@ def step.v(verdict: Verdict, +world: TW.World) -> Step:
   match verdict:
     case Go{}:
       Run{made(world)}
-    case Wait{as, us}:
+    case Pending{as, us}:
       Asking{as, us}
     case Stop{why}:
       Run{plan.v(Stop{why}, world)}
