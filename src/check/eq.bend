@@ -85,15 +85,34 @@ def string_cmp_self(s):
           r => String.cmp.rec(h, h, r), String.cmp(t, t), ((t, t), EQ{}),
           string_cmp_self(t)))
 
+# LAW: a string's walk in order against itself, from an equal start, ends
+# equal. Base's String.eq is this walk read as a bit.
+law string_order_self:
+  for +s: String
+  {String.order.go(s, s, EQ{}) == EQ{} : Cmp}
+
+# by induction on the string: each code point compares equal to itself, so
+# the walk goes on to the tail still equal
+def string_order_self(s):
+  match s:
+    case SNil{}:
+      {==}
+    case SCon{Chr{+x}, +t}:
+          Equal.trans(Cmp, String.order.go(t, t, U32.cmp(x, x)),
+            String.order.go(t, t, EQ{}), EQ{},
+            Equal.cong(Cmp, Cmp, c => String.order.go(t, t, c),
+              U32.cmp(x, x), EQ{}, u32_cmp_self(x)),
+            string_order_self(t))
+
 # LAW: a string equals itself. Every lookup in this project turns on it.
 law string_eq_self:
   for +s: String
   {String.eq(s, s) == True{} : Bool}
 
-# equality is the comparison read as a bit, so the comparison's law answers
+# equality is the walk's answer read as a bit, so the walk's law answers
 def string_eq_self(s):
-  Equal.cong((String & String) & Cmp, Bool, r => Cmp.is_eq(Pair.snd(String & String, Cmp, r)),
-    String.cmp(s, s), ((s, s), EQ{}), string_cmp_self(s))
+  Equal.cong(Cmp, Bool, r => Cmp.is_eq(r),
+    String.order.go(s, s, EQ{}), EQ{}, string_order_self(s))
 
 # LAW: a char equals itself
 law char_eq_self:
@@ -213,11 +232,11 @@ def starts_append(a, b):
       starts_nil(b)
     case SCon{+h, +t}:
       Equal.trans(Bool,
-        String.starts_with.if(String.append(t, b), t, Char.is_eq(h, h)),
-        String.starts_with.if(String.append(t, b), t, True{}),
+        String.starts_with.go.if(t, String.append(t, b), Char.is_eq(h, h)),
+        String.starts_with.go.if(t, String.append(t, b), True{}),
         True{},
         Equal.cong(Bool, Bool,
-          x => String.starts_with.if(String.append(t, b), t, x),
+          x => String.starts_with.go.if(t, String.append(t, b), x),
           Char.is_eq(h, h), True{}, char_eq_self(h)),
         starts_append(t, b))
 

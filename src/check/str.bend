@@ -287,6 +287,60 @@ def eq_head.cmp(x, y, _t1, _t2, c, ec, e):
     case GT{}:
       Eq.bit.absurd(&2, {Chr{x} == Chr{y} : Char}, e)
 
+# LAW: two strings that compare equal by String.cmp are one string
+law cmp_true:
+  for a: String
+  for b: String
+  for +e: {Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp(a, b))) == True{} : Bool}
+  {a == b : String}
+
+# LAW: the tails of two strings with a first char each that compare equal
+# compare equal: the chars rebuilt in front do not change the answer
+law cmp_tail.cmp:
+  for x: U32
+  for y: U32
+  for +t1: String
+  for +t2: String
+  for c: Cmp
+  for ec: {U32.cmp(x, y) == c : Cmp}
+  for e: {Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp.fin(t1, t2, ((Chr{x}, Chr{y}), c))))
+    == True{} : Bool}
+  {Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp(t1, t2))) == True{} : Bool}
+
+# the old eq_tail.cmp's argument, stopped at the comparison
+def cmp_tail.cmp(x, y, t1, t2, c, _ec, e):
+  match c:
+    case LT{}:
+      Eq.bit.absurd(&2, {Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp(t1, t2))) == True{} : Bool}, e)
+    case EQ{}:
+      Equal.trans(Bool,
+        Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp(t1, t2))),
+        Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp.rec(Chr{x}, Chr{y}, String.cmp(t1, t2)))),
+        True{},
+        Equal.sym(Bool,
+          Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp.rec(Chr{x}, Chr{y}, String.cmp(t1, t2)))),
+          Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp(t1, t2))),
+          eq_fin_rec(Chr{x}, Chr{y}, String.cmp(t1, t2))),
+        e)
+    case GT{}:
+      Eq.bit.absurd(&2, {Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp(t1, t2))) == True{} : Bool}, e)
+
+# by induction on both strings, as string_eq_true goes over String.eq
+def cmp_true(a, b, e):
+  match a b:
+    case SNil{} SNil{}:
+      {==}
+    case SNil{} SCon{h, t}:
+      Eq.bit.absurd(&2, {SNil{} == SCon{h, t} : String}, e)
+    case SCon{h, t} SNil{}:
+      Eq.bit.absurd(&2, {SCon{h, t} == SNil{} : String}, e)
+    case SCon{Chr{+x}, +t1} SCon{Chr{+y}, +t2}:
+          Equal.trans(String, SCon{Chr{x}, t1}, SCon{Chr{y}, t1}, SCon{Chr{y}, t2},
+            Equal.cong(Char, String, h => SCon{h, t1}, Chr{x}, Chr{y},
+              eq_head.cmp(x, y, t1, t2, U32.cmp(x, y), {==}, e)),
+            Equal.cong(String, String, t => SCon{Chr{y}, t}, t1, t2,
+              cmp_true(t1, t2, cmp_tail.cmp(x, y, t1, t2, U32.cmp(x, y), {==}, e))))
+
 # LAW: and tails that read as equal
 law eq_tail.cmp:
   for x: U32
@@ -299,22 +353,51 @@ law eq_tail.cmp:
     == True{} : Bool}
   {String.eq(t1, t2) == True{} : Bool}
 
-def eq_tail.cmp(x, y, t1, t2, c, _ec, e):
-  match c:
-    case LT{}:
-      Eq.bit.absurd(&2, {String.eq(t1, t2) == True{} : Bool}, e)
-    case EQ{}:
-      Equal.trans(Bool,
-        String.eq(t1, t2),
-        Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp.rec(Chr{x}, Chr{y}, String.cmp(t1, t2)))),
-        True{},
-        Equal.sym(Bool,
-          Cmp.is_eq(Pair.snd(String & String, Cmp, String.cmp.rec(Chr{x}, Chr{y}, String.cmp(t1, t2)))),
-          String.eq(t1, t2),
-          eq_fin_rec(Chr{x}, Chr{y}, String.cmp(t1, t2))),
-        e)
-    case GT{}:
-      Eq.bit.absurd(&2, {String.eq(t1, t2) == True{} : Bool}, e)
+# the tails compare equal, so they are one string, which equals itself
+def eq_tail.cmp(x, y, t1, t2, c, ec, e):
+  Equal.trans(Bool, String.eq(t1, t2), String.eq(t1, t1), True{},
+    Equal.cong(String, Bool, t => String.eq(t1, t), t2, t1,
+      Equal.sym(String, t1, t2, cmp_true(t1, t2, cmp_tail.cmp(x, y, t1, t2, c, ec, e)))),
+    Eq.string_eq_self(t1))
+
+# LAW: a walk in order that ends equal began equal: from LT or GT it never
+# moves
+law order_start:
+  for a: String
+  for b: String
+  for c: Cmp
+  for e: {Cmp.is_eq(String.order.go(a, b, c)) == True{} : Bool}
+  {c == EQ{} : Cmp}
+
+# every arm the walk takes on a start other than EQ answers that start
+def order_start(a, b, c, e):
+  match a b:
+    case SNil{} SNil{}:
+      cmp_is_eq(c, e)
+    case SNil{} SCon{h, t}:
+      match c:
+        case LT{}:
+          Eq.bit.absurd(&2, {LT{} == EQ{} : Cmp}, e)
+        case EQ{}:
+          {==}
+        case GT{}:
+          Eq.bit.absurd(&2, {GT{} == EQ{} : Cmp}, e)
+    case SCon{Chr{x}, t} SNil{}:
+      match c:
+        case LT{}:
+          Eq.bit.absurd(&2, {LT{} == EQ{} : Cmp}, e)
+        case EQ{}:
+          {==}
+        case GT{}:
+          Eq.bit.absurd(&2, {GT{} == EQ{} : Cmp}, e)
+    case SCon{Chr{x}, t1} SCon{Chr{y}, t2}:
+          match c:
+            case LT{}:
+              Eq.bit.absurd(&2, {LT{} == EQ{} : Cmp}, e)
+            case EQ{}:
+              {==}
+            case GT{}:
+              Eq.bit.absurd(&2, {GT{} == EQ{} : Cmp}, e)
 
 # LAW: two strings with a first char each, which read as equal, have one
 # first char
@@ -326,11 +409,13 @@ law eq_head:
   for e: {String.eq(SCon{h1, t1}, SCon{h2, t2}) == True{} : Bool}
   {h1 == h2 : Char}
 
-# the heads' comparison is the answer the first arm is given
+# the walk goes on to the tails from the heads' comparison, which must have
+# been EQ for the walk to end equal
 def eq_head(h1, h2, t1, t2, e):
   match h1 h2:
     case Chr{+x} Chr{+y}:
-      eq_head.cmp(x, y, t1, t2, U32.cmp(x, y), {==}, e)
+      u32_eq(x, y, Equal.cong(Cmp, Bool, k => Cmp.is_eq(k), U32.cmp(x, y), EQ{},
+        order_start(t1, t2, U32.cmp(x, y), e)))
 
 # LAW: and the rest of each reads as equal
 law eq_tail:
@@ -338,14 +423,18 @@ law eq_tail:
   for h2: Char
   for +t1: String
   for +t2: String
-  for e: {String.eq(SCon{h1, t1}, SCon{h2, t2}) == True{} : Bool}
+  for +e: {String.eq(SCon{h1, t1}, SCon{h2, t2}) == True{} : Bool}
   {String.eq(t1, t2) == True{} : Bool}
 
-# and the answer the second arm is given
+# and the walk over the tails started from that EQ
 def eq_tail(h1, h2, t1, t2, e):
   match h1 h2:
     case Chr{+x} Chr{+y}:
-      eq_tail.cmp(x, y, t1, t2, U32.cmp(x, y), {==}, e)
+      Equal.trans(Bool, String.eq(t1, t2),
+        Cmp.is_eq(String.order.go(t1, t2, U32.cmp(x, y))), True{},
+        Equal.cong(Cmp, Bool, k => Cmp.is_eq(String.order.go(t1, t2, k)), EQ{}, U32.cmp(x, y),
+          Equal.sym(Cmp, U32.cmp(x, y), EQ{}, order_start(t1, t2, U32.cmp(x, y), e))),
+        e)
 
 # LAW: two strings that compare equal are one string
 law string_eq_true:
@@ -362,8 +451,8 @@ def string_eq_true(a, b, e):
       {==}
     case SNil{} SCon{h, t}:
       Eq.bit.absurd(&2, {SNil{} == SCon{h, t} : String}, e)
-    case SCon{h, t} SNil{}:
-      Eq.bit.absurd(&2, {SCon{h, t} == SNil{} : String}, e)
+    case SCon{Chr{x}, t} SNil{}:
+      Eq.bit.absurd(&2, {SCon{Chr{x}, t} == SNil{} : String}, e)
     case SCon{+h1, +t1} SCon{+h2, +t2}:
       Equal.trans(String, SCon{h1, t1}, SCon{h2, t1}, SCon{h2, t2},
         Equal.cong(Char, String, h => SCon{h, t1}, h1, h2,

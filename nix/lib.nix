@@ -69,6 +69,15 @@ let
 
   defaultBend = bend;
 
+  # The words that hand a compiled program's runtime its options. bend 2.0.38
+  # reads them only between `+RTS` and `-RTS`, and hands any other word to the
+  # program; earlier bends took `--threads` and `--gpu` anywhere on the line.
+  # A bend with no version is taken as the older kind.
+  rtsFlags = b: flags:
+    if b != null && lib.versionAtLeast (b.version or "0") "2.0.38"
+    then [ "+RTS" ] ++ flags ++ [ "-RTS" ]
+    else flags;
+
   lockDoc = src: lock:
     let file = lockOf src lock; in
     if file == null then { } else builtins.fromTOML (builtins.readFile file);
@@ -124,7 +133,7 @@ let
     );
 in
 rec {
-  inherit bend-cc bendLib;
+  inherit bend-cc bendLib rtsFlags;
 
   # Build the program the ledger names and wrap it onto $out/bin/<pname>.
   # PATH starts with bend. wrapFlags are appended. wrapEnv is `--set`;
@@ -237,7 +246,9 @@ rec {
       (builtins.attrNames ((lockDoc src null).tools or { }));
 
   # `bolt` in a writable copy of src. Pass `bolt` to use that derivation.
-  # Otherwise bolt is built from `[tools.bolt]` in the lock.
+  # Otherwise bolt is built from `[tools.bolt]` in the lock with `bend`, and
+  # wrapped to run with the GPU off: `+RTS --gpu off -RTS` on bend 2.0.38 and
+  # later, `--gpu off` on an older bend.
   # `lock` and `bendLib` match mkProofs: an explicit `bendLib` is BEND_LIB,
   # else the lock's tree, else no BEND_LIB.
   mkLint = {
@@ -254,7 +265,7 @@ rec {
         else toolPackage {
           name = "bolt";
           inherit src bend lock;
-          wrapFlags = [ "--gpu" "off" ];
+          wrapFlags = rtsFlags bend [ "--gpu" "off" ];
         };
     in
     pkgs.runCommand name

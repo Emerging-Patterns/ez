@@ -385,7 +385,7 @@ def answer.hubhas(+hub: String, +hash: String) -> IO(Up.Answer):
 def answer.ignore() -> IO(Up.Answer):
   do IO<Up.Answer>:
     m : Maybe<&2, String> <- F.read(".gitignore")
-    return Up.Text{F.text_of(m)}
+    return Up.Plain{F.text_of(m)}
 
 # one source in front of the rest, or the first that could not be read
 def found.put(got: Maybe<&2, String>, +at: String, rest: Up.Answer) -> Up.Answer:

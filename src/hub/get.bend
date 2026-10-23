@@ -4,9 +4,9 @@
 # 2.0.32 fails a proof whose imports reach foreign code, so a law may import
 # hub/hub but never this.
 import Base
-import 0x49ec536f1d3da4f76d78aaece3ccda7a/main.bend as Http
-import 0x49ec536f1d3da4f76d78aaece3ccda7a/src/client.bend as Client
-import 0x49ec536f1d3da4f76d78aaece3ccda7a/src/url.bend as Url
+import 0xa22bee008c725452ca25c990ed2e8867/main.bend as Http
+import 0xa22bee008c725452ca25c990ed2e8867/src/client.bend as Client
+import 0xa22bee008c725452ca25c990ed2e8867/src/url.bend as Url
 import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
 import ../io/file.bend as F
 import ./hub.bend as Hub

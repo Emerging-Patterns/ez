@@ -3808,7 +3808,7 @@ law sw_if_head:
   for t: String
   for p: String
   for s: Bool
-  for e: {String.starts_with.if(t, p, s) == True{} : Bool}
+  for e: {String.starts_with.go.if(p, t, s) == True{} : Bool}
   {s == True{} : Bool}
 
 def sw_if_head(_t, _p, s, e):
@@ -3823,7 +3823,7 @@ law sw_if_tail:
   for t: String
   for p: String
   for s: Bool
-  for e: {String.starts_with.if(t, p, s) == True{} : Bool}
+  for e: {String.starts_with.go.if(p, t, s) == True{} : Bool}
   {String.starts_with(t, p) == True{} : Bool}
 
 def sw_if_tail(t, p, s, e):

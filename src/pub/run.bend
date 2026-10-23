@@ -53,7 +53,7 @@ def answer(+lib: String, ask: PW.Ask) -> IO(PW.Answer):
     case PW.Lock{}:
       do IO<PW.Answer>:
         m : Maybe<&2, String> <- F.read(PW.lockfile())
-        return PW.Told{TW.Text{m}}
+        return PW.Told{TW.Plain{m}}
     case PW.Hub{+url}:
       do IO<PW.Answer>:
         +out : String <- Net.get(url)

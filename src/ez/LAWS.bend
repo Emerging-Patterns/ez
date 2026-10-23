@@ -18,7 +18,7 @@ import ../share/env.bend as Env
 import ../pkg/path.bend as P
 import ../ez/named.bend as Named
 import ../pkg/pkg.bend as Pkg
-import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
+import 0xa383b26a5a0ef35663b3615d7aedf9e3/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S

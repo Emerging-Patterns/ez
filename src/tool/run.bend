@@ -126,7 +126,7 @@ def answer(ask: TW.Ask) -> IO(TW.Answer):
     case TW.Read{path}:
       do IO<TW.Answer>:
         m : Maybe<&2, String> <- F.read(path)
-        return TW.Text{m}
+        return TW.Plain{m}
     case TW.Exec{path}:
       do IO<TW.Answer>:
         +out : String <- R.exec(["test", "-x", path])

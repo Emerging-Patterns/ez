@@ -1,13 +1,13 @@
 # share/args: the command line, as the binary itself receives it. Since bend
 # 2.0.32 `IO.args()` starts with the program as it was invoked, as C's argv
 # does, so `all` drops it: the first word left is the subcommand and the rest
-# are its own. A compiled binary's runtime keeps `--threads N`, `--gpu V`,
-# `--gpu-build` and `--bend-help` for itself and strips them wherever they
-# appear, the first two with the value after them; the last two answer and
-# exit before the program starts. The first `--` is dropped and everything
-# after it reaches the program untouched, those four included. `--help` is
-# the program's since 2.0.29, and ez reads it as a request for help
-# (ez/line.bend).
+# are its own. Since 2.0.38 a compiled binary's runtime keeps only its own
+# bracket: `+RTS`, `-RTS` and the words between them (`+RTS --threads 4
+# -RTS`), and the first `--RTS`, after which every word reaches the program
+# untouched. Every other word is the program's, `--`, `--threads`, `--gpu`,
+# `--gpu-build` and `--bend-help` included (EZ-TRUST-2, shake's
+# SHAKE-TRUST-2). `--help` is the program's since 2.0.29, and ez reads it as
+# a request for help (ez/line.bend).
 import Base
 
 # the non-empty strings

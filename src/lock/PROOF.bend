@@ -9661,7 +9661,7 @@ def Laws.upgrade_tag_resolves(w, n, tip, tag, branch, up, named, sel, refs, ok):
 # the answers the next upgrade reads: `.gitignore` as the last one left it,
 # then the same answers
 def re(g: String, rs: List<&2, Up.Reply>) -> List<&2, Up.Reply>:
-  Up.Reply{Up.Ignore{}, Up.Text{g}} <> rs
+  Up.Reply{Up.Ignore{}, Up.Plain{g}} <> rs
 
 # LAW: a question that is not `.gitignore` is answered past it
 law re.heard:
@@ -9673,7 +9673,7 @@ law re.heard:
 
 def re.heard(q, g, rs, ne):
   nes = Equal.sym(Bool, String.eq("ignore", Up.key(q)), False{}, ne)
-  %nes : {Up.look.step(_, Up.Text{g}, _u => Up.look(rs, Up.key(q))) == Up.heard(rs, q) : Up.Heard}
+  %nes : {Up.look.step(_, Up.Plain{g}, _u => Up.look(rs, Up.key(q))) == Up.heard(rs, q) : Up.Heard}
   {==}
 
 # LAW: what git printed for refs, past `.gitignore`

@@ -381,7 +381,7 @@ def status(+world: PW.World) -> Status:
 # when there is none
 def tree.told(got: TW.Answer, +path: String, rest: K.Tree) -> K.Tree:
   match got:
-    case TW.Text{m}:
+    case TW.Plain{m}:
       K.tree.add(m, rest, path)
     case _:
       K.tree.gone(rest, path)
@@ -766,7 +766,7 @@ def deps(world: PW.World) -> List<&2, M.Dep>:
 # the lock's text, "" when there is none or it was not read
 def lock.told(got: TW.Answer) -> String:
   match got:
-    case TW.Text{m}:
+    case TW.Plain{m}:
       F.text_of(m)
     case _:
       ""

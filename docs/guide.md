@@ -7,8 +7,11 @@ such as (EZ-VEN-1) below point at its rows.
 
 Every subcommand needs `bend` and `git` on PATH. `ez help` or `ez --help`
 prints the command list, and `ez help test` or `ez test --help` the flags of
-one command. The Bend runtime keeps `--bend-help`, `--threads`, `--gpu` and
-`--gpu-build` for itself; put them after a `--` to hand them to ez.
+one command. The Bend runtime takes its own options only between `+RTS` and
+`-RTS` (`ez +RTS --threads 4 -RTS lock`), or from the `BENDRTS` variable;
+every other word is ez's, so `ez --threads 4` is an unknown flag (EZ-OUT-1).
+Everything after a `--RTS` reaches ez untouched, `+RTS` included, which is how
+`ez tool run` hands runtime options to the program it starts.
 
 Every command exits 0 on success and 1 on any failure ez detects, except
 `ez run` and `ez tool run`, which exit with the program's status (EZ-OUT-1).
@@ -394,7 +397,9 @@ the three.
   binary. The program reads ez's stdin and prints straight to the terminal as
   it goes, gets every word after `run`, and its status is the status of the
   command. The entry is the one `ez.toml` names, or `main.bend` when it names
-  none (EZ-TOOL-9).
+  none (EZ-TOOL-9). The words go to `bend <entry>`, which takes the first `--`
+  and refuses a word that starts with `-` before it, so a program's flags go
+  after one: `ez run -- --verbose`.
 
 ## Tools
 
@@ -414,10 +419,13 @@ ez tool upgrade <target> [--entry F]
 A target is read as in [Targets](#targets). `ez tool run <target>` passes
 every word after the target to the program, dropping one leading `--`, so
 `--entry` goes before the target there, as uvx takes its own options before
-the command.
+the command. ez's own runtime takes a `+RTS … -RTS` bracket before ez sees
+it, so options for the program's runtime go after a `--RTS`:
+`ez tool run <target> --RTS +RTS --gpu off -RTS` starts the program with
+`+RTS --gpu off -RTS`.
 
 ```bash
-ezx Emerging-Patterns/bolt -- --gpu off   # an ez project, built from its lock
+ezx Emerging-Patterns/bolt --RTS +RTS --gpu off -RTS   # an ez project, built from its lock
 ezx ./hello                               # a plain Bend repo: builds main.bend
 ezx --entry src/cli.bend ./hello          # another file of the same checkout
 ```

@@ -729,7 +729,7 @@ def after.up.laid(world: W.World) -> W.World:
   +nx = W.next(args, ledger, ups)
   W.World{args, ledger.left(Up.next.edits(nx), ledger), W.listing.of(nx, listing),
     after.all(W.next.origins(nx), W.next.hub(nx), W.replies.of(nx, replies)),
-    Up.Reply{Up.Ignore{}, Up.Text{ig.left(Up.next.edits(nx), ig.read(ups))}} <> ups}
+    Up.Reply{Up.Ignore{}, Up.Plain{ig.left(Up.next.edits(nx), ig.read(ups))}} <> ups}
 
 # a refused upgrade writes and lays nothing, so it leaves the World it read
 def after.up.pick(refused: Bool, world: W.World) -> W.World:

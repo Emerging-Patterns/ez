@@ -15,7 +15,7 @@ import ../share/env.bend as Env
 import ../pkg/path.bend as P
 import ../ledger/manifest.bend as M
 import ./key.bend as K
-import 0xcab8a7a189cec2b51e8db0484f69c593/main.bend as Shake
+import 0xa383b26a5a0ef35663b3615d7aedf9e3/main.bend as Shake
 import ../ez/line.bend as L
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
@@ -215,14 +215,14 @@ law no_url.arm:
     == True{} : Bool}
   for ih: {Tgt.name.all(r) == True{} : Bool}
     -> {String.contains(r ++ t, "://") == String.contains(t, "://") : Bool}
-  {String.contains.if(r ++ t, "://", String.starts_with.if(r ++ t, "//", c))
+  {String.contains.if(r ++ t, "://", String.starts_with.go.if("//", r ++ t, c))
     == String.contains(t, "://") : Bool}
 
 def no_url.arm(r, t, c, s, d, ti, w, e, ih):
   match c:
     case True{}:
       Eq.bit.absurd(&2,
-        {String.contains.if(r ++ t, "://", String.starts_with.if(r ++ t, "//", True{}))
+        {String.contains.if(r ++ t, "://", String.starts_with.go.if("//", r ++ t, True{}))
           == String.contains(t, "://") : Bool}, e)
     case False{}:
       ih(keep_true(Tgt.kind.slash(s, d, ti, w), r, e))
@@ -864,12 +864,12 @@ law slash_starts.arm:
   for w: Bool
   for +t: String
   for e: {Tgt.looks.slash.at(Tgt.kind.colon(c, s, d, ti, w)) == True{} : Bool}
-  {String.starts_with.if(t, "", s) == True{} : Bool}
+  {String.starts_with.go.if("", t, s) == True{} : Bool}
 
 def slash_starts.arm(c, s, d, ti, w, t, e):
   match c:
     case True{}:
-      Eq.bit.absurd(&2, {String.starts_with.if(t, "", s) == True{} : Bool}, e)
+      Eq.bit.absurd(&2, {String.starts_with.go.if("", t, s) == True{} : Bool}, e)
     case False{}:
       match s:
         case True{}:
@@ -914,19 +914,19 @@ law dot_starts.arm:
   for +t: String
   for z: Bool
   for e: {Tgt.looks.dot.at(Tgt.kind.colon(c, s, d, ti, w), t) == True{} : Bool}
-  {Bool.or(String.starts_with.if(t, "", s),
-    Bool.or(String.starts_with.if(t, "/", d), z)) == True{} : Bool}
+  {Bool.or(String.starts_with.go.if("", t, s),
+    Bool.or(String.starts_with.go.if("/", t, d), z)) == True{} : Bool}
 
 def dot_starts.arm(c, s, d, ti, w, t, z, e):
   match c:
     case True{}:
-      Eq.bit.absurd(&2, {Bool.or(String.starts_with.if(t, "", s),
-        Bool.or(String.starts_with.if(t, "/", d), z)) == True{} : Bool}, e)
+      Eq.bit.absurd(&2, {Bool.or(String.starts_with.go.if("", t, s),
+        Bool.or(String.starts_with.go.if("/", t, d), z)) == True{} : Bool}, e)
     case False{}:
       match s:
         case True{}:
           %Equal.sym(Bool, String.starts_with(t, ""), True{}, Eq.starts_nil(t)) :
-            {Bool.or(_, Bool.or(String.starts_with.if(t, "/", d), z)) == True{}
+            {Bool.or(_, Bool.or(String.starts_with.go.if("/", t, d), z)) == True{}
               : Bool}
           {==}
         case False{}:
@@ -973,30 +973,30 @@ law path_starts.arm:
   for w: Bool
   for +t: String
   for e: {Tgt.looks.first(Tgt.kind.colon(c, s, d, ti, w), t) == True{} : Bool}
-  {Bool.or(String.starts_with.if(t, "", s),
-    Bool.or(String.starts_with.if(t, "/", d),
-      Bool.or(String.starts_with.if(t, "./", d),
-        String.starts_with.if(t, "/", ti)))) == True{} : Bool}
+  {Bool.or(String.starts_with.go.if("", t, s),
+    Bool.or(String.starts_with.go.if("/", t, d),
+      Bool.or(String.starts_with.go.if("./", t, d),
+        String.starts_with.go.if("/", t, ti)))) == True{} : Bool}
 
 def path_starts.arm(c, s, d, ti, w, t, e):
   match c:
     case True{}:
-      Eq.bit.absurd(&2, {Bool.or(String.starts_with.if(t, "", s),
-        Bool.or(String.starts_with.if(t, "/", d),
-          Bool.or(String.starts_with.if(t, "./", d),
-            String.starts_with.if(t, "/", ti)))) == True{} : Bool}, e)
+      Eq.bit.absurd(&2, {Bool.or(String.starts_with.go.if("", t, s),
+        Bool.or(String.starts_with.go.if("/", t, d),
+          Bool.or(String.starts_with.go.if("./", t, d),
+            String.starts_with.go.if("/", t, ti)))) == True{} : Bool}, e)
     case False{}:
       match s:
         case True{}:
           %Equal.sym(Bool, String.starts_with(t, ""), True{}, Eq.starts_nil(t)) :
-            {Bool.or(_, Bool.or(String.starts_with.if(t, "/", d),
-              Bool.or(String.starts_with.if(t, "./", d),
-                String.starts_with.if(t, "/", ti)))) == True{} : Bool}
+            {Bool.or(_, Bool.or(String.starts_with.go.if("/", t, d),
+              Bool.or(String.starts_with.go.if("./", t, d),
+                String.starts_with.go.if("/", t, ti)))) == True{} : Bool}
           {==}
         case False{}:
           match d:
             case True{}:
-              dot_starts(t, String.starts_with.if(t, "/", ti), e)
+              dot_starts(t, String.starts_with.go.if("/", t, ti), e)
             case False{}:
               match ti:
                 case True{}:

@@ -427,25 +427,62 @@ def rec.snd(_h1, _h2, r):
   ((a1, a2), c) = r
   {==}
 
+# LAW: Base's walk in order, started from a comparison that is not a tie,
+# answers that comparison: it reads no more of either string
+law order.stays:
+  for a: String
+  for b: String
+  for u: Cmp
+  for ne: {Cmp.is_eq(u) == False{} : Bool}
+  {String.order.go(a, b, u) == u : Cmp}
+
+# every shape of the two strings, each with a start other than EQ
+def order.stays(a, b, u, ne):
+  match a b:
+    case SNil{} SNil{}:
+      {==}
+    case SNil{} SCon{Chr{y}, t2}:
+      match u:
+        case LT{}:
+          {==}
+        case EQ{}:
+          Eq.bit.absurd2(&2, {LT{} == EQ{} : Cmp}, ne)
+        case GT{}:
+          {==}
+    case SCon{Chr{x}, t1} SNil{}:
+      match u:
+        case LT{}:
+          {==}
+        case EQ{}:
+          Eq.bit.absurd2(&2, {GT{} == EQ{} : Cmp}, ne)
+        case GT{}:
+          {==}
+    case SCon{Chr{x}, t1} SCon{Chr{y}, t2}:
+      match u:
+        case LT{}:
+          {==}
+        case EQ{}:
+          Eq.bit.absurd2(&2, {String.order.go(t1, t2, U32.cmp(x, y)) == EQ{} : Cmp}, ne)
+        case GT{}:
+          {==}
+
 # LAW: one step of a string comparison, with the char comparison it turns on
-# given as a parameter, since a match may not scrutinise a computed value
+# given as a parameter, since a match may not scrutinise a computed value.
+# Base walks both strings once, carrying the comparison so far.
 law order.cons.arm:
-  for +h1: Char
   for t1: String
-  for +h2: Char
   for t2: String
   for u: Cmp
-  {Pair.snd(String & String, Cmp, String.cmp.fin(t1, t2, ((h1, h2), u)))
-    == cmp.lex(u, String.order(t1, t2)) : Cmp}
+  {String.order.go(t1, t2, u) == cmp.lex(u, String.order(t1, t2)) : Cmp}
 
-def order.cons.arm(h1, t1, h2, t2, u):
+def order.cons.arm(t1, t2, u):
   match u:
     case LT{}:
-      {==}
+      order.stays(t1, t2, LT{}, {==})
     case EQ{}:
-      rec.snd(h1, h2, String.cmp(t1, t2))
-    case GT{}:
       {==}
+    case GT{}:
+      order.stays(t1, t2, GT{}, {==})
 
 # LAW: two strings are compared by their first chars, and by the rest of them
 # only when those tie
@@ -460,7 +497,7 @@ law order.cons:
 def order.cons(h1, t1, h2, t2):
   match h1 h2:
     case Chr{+x1} Chr{+x2}:
-      order.cons.arm(Chr{x1}, t1, Chr{x2}, t2, U32.cmp(x1, x2))
+      order.cons.arm(t1, t2, U32.cmp(x1, x2))
 
 # LAW: a lexicographic step taken the other way round flips the answer
 law lex.flip:
@@ -540,9 +577,9 @@ def str.flip(a, b):
   match a b:
     case SNil{} SNil{}:
       {==}
-    case SNil{} SCon{h2, t2}:
+    case SNil{} SCon{Chr{x2}, t2}:
       {==}
-    case SCon{h1, t1} SNil{}:
+    case SCon{Chr{x1}, t1} SNil{}:
       {==}
     case SCon{+h1, +t1} SCon{+h2, +t2}:
       Equal.trans(Cmp,
@@ -656,18 +693,18 @@ def str.tri(a, b, c):
   match a b c:
     case SNil{} SNil{} SNil{}:
       {==}
-    case SNil{} SNil{} SCon{h3, t3}:
+    case SNil{} SNil{} SCon{Chr{x3}, t3}:
       {==}
-    case SNil{} SCon{h2, t2} SNil{}:
+    case SNil{} SCon{Chr{x2}, t2} SNil{}:
       {==}
-    case SNil{} SCon{h2, t2} SCon{h3, t3}:
-      tri.lt.free(String.order(SCon{h2, t2}, SCon{h3, t3}))
-    case SCon{h1, t1} SNil{} SNil{}:
+    case SNil{} SCon{Chr{x2}, t2} SCon{Chr{x3}, t3}:
+      tri.lt.free(String.order(SCon{Chr{x2}, t2}, SCon{Chr{x3}, t3}))
+    case SCon{Chr{x1}, t1} SNil{} SNil{}:
       {==}
-    case SCon{h1, t1} SNil{} SCon{h3, t3}:
+    case SCon{Chr{x1}, t1} SNil{} SCon{Chr{x3}, t3}:
       {==}
-    case SCon{h1, t1} SCon{h2, t2} SNil{}:
-      tri.mid.gt(String.order(SCon{h1, t1}, SCon{h2, t2}), GT{})
+    case SCon{Chr{x1}, t1} SCon{Chr{x2}, t2} SNil{}:
+      tri.mid.gt(String.order(SCon{Chr{x1}, t1}, SCon{Chr{x2}, t2}), GT{})
     case SCon{+h1, +t1} SCon{+h2, +t2} SCon{+h3, +t3}:
       str.tri.go(h1, t1, h2, t2, h3, t3, str.tri(t1, t2, t3))
 
@@ -753,8 +790,9 @@ law eq.is.order:
   for +b: String
   {String.eq(a, b) == Cmp.is_eq(String.order(a, b)) : Bool}
 
-def eq.is.order(a, b):
-  eq.is.order.go(String.cmp(a, b))
+# Base's String.eq is that comparison read as a bit
+def eq.is.order(_a, _b):
+  {==}
 
 # LAW: of two comparisons that are not a tie, exactly one is at most EQ
 law le.excl.go:
@@ -1416,13 +1454,13 @@ law abs_append.arm:
   for +x: String
   for b: Bool
   for eb: {b == Char.is_eq(h, '/') : Bool}
-  for e: {True{} == String.starts_with.if(t, "", b) : Bool}
+  for e: {True{} == String.starts_with.go.if("", t, b) : Bool}
   {String.starts_with(String.append(SCon{h, t}, x), "/") == True{} : Bool}
 
 def abs_append.arm(h, t, x, b, eb, e):
   match b:
     case True{}:
-      %eb : {String.starts_with.if(String.append(t, x), "", _) == True{} : Bool}
+      %eb : {String.starts_with.go.if("", String.append(t, x), _) == True{} : Bool}
       Eq.starts_nil(String.append(t, x))
     case False{}:
       Eq.bit.absurd2(&2,
@@ -1549,11 +1587,11 @@ def contains_slash(s, rest):
           x => String.contains.if(rest, "/", x),
           String.starts_with(SCon{'/', rest}, "/"), True{},
           Equal.trans(Bool,
-            String.starts_with.if(rest, "", Char.is_eq('/', '/')),
-            String.starts_with.if(rest, "", True{}),
+            String.starts_with.go.if("", rest, Char.is_eq('/', '/')),
+            String.starts_with.go.if("", rest, True{}),
             True{},
             Equal.cong(Bool, Bool,
-              x => String.starts_with.if(rest, "", x),
+              x => String.starts_with.go.if("", rest, x),
               Char.is_eq('/', '/'), True{}, Eq.char_eq_self('/')),
             Eq.starts_nil(rest))),
         {==})
@@ -1740,14 +1778,14 @@ def slashless_rel(p, x, e, e0):
         e0)
     case SCon{+h, +t}:
       Equal.sym(Bool,
-        String.starts_with.if(String.append(t, x), "", Char.is_eq(h, '/')),
+        String.starts_with.go.if("", String.append(t, x), Char.is_eq(h, '/')),
         False{},
         Equal.trans(Bool,
-          String.starts_with.if(String.append(t, x), "", Char.is_eq(h, '/')),
-          String.starts_with.if(String.append(t, x), "", False{}),
+          String.starts_with.go.if("", String.append(t, x), Char.is_eq(h, '/')),
+          String.starts_with.go.if("", String.append(t, x), False{}),
           False{},
           Equal.cong(Bool, Bool,
-            b => String.starts_with.if(String.append(t, x), "", b),
+            b => String.starts_with.go.if("", String.append(t, x), b),
             Char.is_eq(h, '/'), False{},
             Eq.not.true(Char.is_eq(h, '/'),
               Eq.and.left(Bool.not(Char.is_eq(h, '/')), Laws.slashless(t), e))),
