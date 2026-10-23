@@ -16,11 +16,11 @@ native binary. Every subcommand runs the `bend` and `git` on your PATH.
 
 ### From the hub
 
-With an installed `bend` and nothing else, build ez v1.4.0 from the Bend hub,
-where the whole program is published as `ezx@1.4.0.0`. Put this in `t.bend`:
+With an installed `bend` and nothing else, build ez v1.7.0 from the Bend hub,
+where the whole program is published as `ezx@1.7.0.0`. Put this in `t.bend`:
 
 ```bend
-import ezx@1.4.0.0/main.bend as Ez
+import ezx@1.7.0.0/main.bend as Ez
 
 def main() -> IO(Unit):
   Ez.main()
@@ -37,13 +37,13 @@ bend t.bend -o ez                # fetches ez and its libraries from the hub
 There is no install step: `bend` fetches the package and the libraries it
 imports by hash (shake, snap, ezhttp, eztoml and sha256) on the first build,
 into `~/.bend/lib`. `import 0x<hash>/main.bend`, with the hash the hub names
-for `ezx@1.4.0.0`, pins it by content.
+for `ezx@1.7.0.0` (`0xd9eedaedd82ad7ac346aadcc1f92c7fb`), pins it by content.
 
 ez's ledger library, which reads `ez.toml`, comes in the same package, at
 `src/ledger/manifest.bend`:
 
 ```bend
-import ezx@1.4.0.0/src/ledger/manifest.bend as Ledger
+import ezx@1.7.0.0/src/ledger/manifest.bend as Ledger
 
 def main() -> String:
   Ledger.show(Ledger.parse("[package]\nname = \"app\"\nentry = \"main.bend\"\n"))
