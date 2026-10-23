@@ -17,6 +17,8 @@ import Base
 import ./world.bend as A
 import ./plan.bend as AP
 import ./hub.bend as H
+import ./relock.bend as AR
+import ../relock/relock.bend as R
 import ../lock/plan.bend as P
 import ../lock/up.bend as Up
 import ../lock/world.bend as W
@@ -463,3 +465,70 @@ law add_named_says_import:
 law add_named_asks_hub:
   for +w: A.World
   {H.asks.hub(H.wants(w), A.hub(w)) == True{} : Bool}
+
+# ---------------------------------------------------------------------------
+# the add and the lock as one plan (`AR.plan`, add/relock.bend), which is
+# the plan the interpreter runs. The laws above are about the add's own plan
+# (`AP.command`); `add_runs_add_then_lock` says the command runs exactly
+# those effects first, so they hold of the command too.
+
+# LAW: `ez add` that succeeds runs the add's effects, then the note, then
+# exactly the effects of the plan a plain `ez lock` makes on the World the
+# add leaves, which writes the lock last
+# EZ-DOC-6
+law add_runs_add_then_lock:
+  for +w: AR.World
+  for ok: {AR.refuses(w) == False{} : Bool}
+  {P.effects(AR.plan(w)) == List.append(&2, P.Effect, P.effects(AP.command(AR.add(w))),
+    List.append(&2, P.Effect, AR.notes(w), P.effects(P.plan(AR.lock.world(w)))))
+    : List<&2, P.Effect>}
+
+# LAW: the World that lock reads holds the ledger the add writes to ez.toml
+# EZ-DOC-6
+law add_locks_what_it_writes:
+  for +w: AR.World
+  for +text: String
+  for put: {P.put.plan(AP.command(AR.add(w)), "ez.toml") == P.Put{text} : P.Wrote}
+  {W.ledger.of(AR.lock.world(w)) == Some{text} : Maybe<&2, String>}
+
+# LAW: and is a plain lock's, which moves no pin (EZ-DOC-5)
+# EZ-DOC-6
+law add_relock_is_plain:
+  for +w: AR.World
+  {W.args.upgrade(AR.lock.world(w)) == False{} : Bool}
+
+# LAW: when that lock refuses, `ez add` refuses
+# EZ-DOC-6
+law add_refuses_with_lock:
+  for +w: AR.World
+  for r: {R.refuses(P.plan(AR.lock.world(w))) == True{} : Bool}
+  {AR.refuses(w) == True{} : Bool}
+
+# LAW: `ez add` that refuses, the add or the lock after it, writes, lays and
+# removes nothing
+# EZ-OUT-2
+law add_whole_refusal_writes_nothing:
+  for +w: AR.World
+  for r: {AR.refuses(w) == True{} : Bool}
+  {P.writes(AR.plan(w)) == False{} : Bool}
+
+# LAW: and ends with the status of whether it refuses
+# EZ-OUT-1
+law add_whole_exits_as_it_refuses:
+  for +w: AR.World
+  {P.code(AR.plan(w)) == P.status.of(AR.refuses(w)) : U32}
+
+# LAW: when the lock holds no package under the hash the add records, the
+# note is the line that says so, naming the hash
+# EZ-DOC-7
+law add_notes_unlocked:
+  for +w: AR.World
+  for no: {AR.held(P.packs(AR.lock.world(w)), AR.added(AR.add(w))) == False{} : Bool}
+  {AR.notes(w) == [P.Say{AR.unlocked(AR.added(AR.add(w)))}] : List<&2, P.Effect>}
+
+# LAW: and when it holds one, there is no note
+# EZ-DOC-7
+law add_notes_nothing_when_locked:
+  for +w: AR.World
+  for yes: {AR.held(P.packs(AR.lock.world(w)), AR.added(AR.add(w))) == True{} : Bool}
+  {AR.notes(w) == [] : List<&2, P.Effect>}

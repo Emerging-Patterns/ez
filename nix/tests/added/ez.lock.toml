@@ -1,0 +1,15 @@
+[lock]
+version = "2"
+hub = "http://127.0.0.1:1"
+[packages]
+[packages.0xfe8120688511cf87c1f48ab713570f6c]
+[packages.0xfe8120688511cf87c1f48ab713570f6c.source]
+kind = "git"
+url = "../dep"
+rev = "b5fdff449353076ed94012f6f4a8f01534b7fe26"
+entry = "lib.bend"
+root = "."
+narHash = "sha256-6jbvqrSz16LYpPH/zjdWUoI1jHSuUaKiwxYl9aaBXr8="
+tag = "main"
+[packages.0xfe8120688511cf87c1f48ab713570f6c.files]
+"lib.bend" = "23d14d44b21db97b6e20b77aed52d8ad9d7dc632142afda53fbac25d8ea7db7a"
