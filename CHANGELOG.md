@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/Emerging-Patterns/ez/compare/v1.8.0...v1.9.0) (2026-10-23)
+
+
+### Features
+
+* **add:** ez add and ez remove write the lock with the ledger ([#146](https://github.com/Emerging-Patterns/ez/issues/146)) ([3ed2cca](https://github.com/Emerging-Patterns/ez/commit/3ed2ccacd70af0044c8e74b65a878f2f711127da))
+
 ## [1.8.0](https://github.com/Emerging-Patterns/ez/compare/v1.7.0...v1.8.0) (2026-10-23)
 
 
