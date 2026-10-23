@@ -82,7 +82,8 @@ def ledger(+repo: String, +app: String, +url: String, +rev: String) -> IO(String
     e : Maybe<&2, String> <- F.read(app ++ "/main.bend")
     Check.eq_str("and an entry that checks and runs",
       Q.chomp(F.text_of(e)),
-      "import Base\n\ndef main() -> IO(Unit):\n  IO.print(\"hello\")")
+      "# myapp: TODO describe myapp\nimport Base\nimport ./src/lib.bend as Lib\n\n" ++
+        "def main() -> IO(Unit):\n  IO.print(Lib.greeting())")
     _a : String <- R.exec(W.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
     +t2 : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
     +hash : String <- IO.pure(String, W.value(F.text_of(t2), "hash"))

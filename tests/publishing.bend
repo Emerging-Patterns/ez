@@ -165,7 +165,7 @@ def refuses.untracked(+repo: String, +app: String, +hub: String) -> IO(Unit):
 def liar(+repo: String, +root: String) -> IO(String):
   do IO<String>:
     W.mkdir(root ++ "/bin")
-    +out : String <- R.exec(["bend", repo ++ "/check/liar.bend", "-o",
+    +out : String <- R.exec(["bend", repo ++ "/src/check/liar.bend", "-o",
       root ++ "/bin/bend"])
     yes("a bend that answers wrongly builds", R.ok(out))
     +p : String <- path()
@@ -207,7 +207,7 @@ def go(+repo: String, +root: String, +port: String) -> IO(Unit):
     ignored(app)
     W.mkdir(root ++ "/hub")
     +pid : String <- W.spawn(["env", "BEND_LIB=" ++ repo ++ "/.ez/lib",
-      "bend", repo ++ "/check/oracle.bend", root ++ "/hub", port])
+      "bend", repo ++ "/src/check/oracle.bend", root ++ "/hub", port])
     up : Bool <- W.ready(["curl", "-fsS", "--max-time", "5", hub ++ "/"])
     yes("the oracle answers", up)
     +hash : String <- publishes(repo, app, root, hub)

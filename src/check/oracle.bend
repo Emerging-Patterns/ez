@@ -13,7 +13,8 @@
 # shared with check/framing.bend. Plaintext HTTP only; bend speaks TLS to the
 # real hub, and check/serve.bend says why a Bend binary cannot.
 #
-# `GET /` answers `ok`, so a script can wait for the oracle before it publishes.
+# `GET /` answers `ok`, so a script can wait for the oracle before it publishes,
+# and `GET /pow.json` the least proof-of-work difficulty bend accepts.
 # One connection is served at a time, each answer states its length and closes
 # the socket, and the oracle stops of its own accord after a million of them.
 import Base
@@ -535,6 +536,16 @@ def get.go(root: Bool, sock: Socket, dir: String, path: String) -> IO(Unit):
     case False{}:
       serve.get(sock, dir, path)
 
+# `/pow.json` is the difficulty bend mines a proof of work against before it
+# uploads (`{"files": .., "nonce": N}`). The oracle asks for the least, 1, so
+# the first nonce bend tries passes, and it takes the nonce it is sent unchecked.
+def get.pow(pow: Bool, sock: Socket, dir: String, +path: String) -> IO(Unit):
+  match pow:
+    case True{}:
+      answer(sock, "200 OK", "{\"pow\": 1}")
+    case False{}:
+      get.go(String.eq(path, "/"), sock, dir, path)
+
 # a file written once its directory exists
 def write.after(out: String, at: String, text: String) -> IO(Bool):
   do IO<Bool>:
@@ -601,7 +612,7 @@ def serve.pick(post: Bool, sock: Socket, dir: String, +path: String, body: Strin
     case True{}:
       post.go(sock, dir, parse(body))
     case False{}:
-      get.go(String.eq(path, "/"), sock, dir, path)
+      get.pow(String.eq(path, "/pow.json"), sock, dir, path)
 
 # a request's first line taken apart into its method and its path
 def serve.req(sock: Socket, dir: String, first: String, body: String) -> IO(Unit):

@@ -42,7 +42,7 @@ def fetch(+port: String) -> IO(Unit):
 def go(+here: String, +port: String) -> IO(Unit):
   do IO<Unit>:
     +pid : String <- W.spawn(["env", "BEND_LIB=" ++ here ++ "/.ez/lib",
-      "bend", here ++ "/check/framing.bend", port])
+      "bend", here ++ "/src/check/framing.bend", port])
     up : Bool <- W.ready(["curl", "-fsS", "--max-time", "5",
       "http://127.0.0.1:" ++ port ++ "/"])
     Check.eq_str("the server answers",

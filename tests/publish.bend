@@ -77,7 +77,7 @@ def go(+here: String, +root: String, +port: String) -> IO(Unit):
     repo(root ++ "/repo")
     W.mkdir(root ++ "/hub")
     +pid : String <- W.spawn(["env", "BEND_LIB=" ++ here ++ "/.ez/lib",
-      "bend", here ++ "/check/oracle.bend", root ++ "/hub", port])
+      "bend", here ++ "/src/check/oracle.bend", root ++ "/hub", port])
     up : Bool <- W.ready(["curl", "-fsS", "--max-time", "5",
       "http://127.0.0.1:" ++ port ++ "/"])
     Check.eq_str("the oracle answers",
