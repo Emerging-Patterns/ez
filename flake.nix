@@ -34,7 +34,7 @@
       ezBin = ez.mkPackage {
         inherit bend;
         src = self;
-        version = "1.5.0"; # x-release-please-version
+        version = "1.6.0"; # x-release-please-version
         nativeBuildInputs = [ llvm.clang ];
         extraPath = [ pkgs.git pkgs.findutils pkgs.coreutils ];
         wrapEnv = {
@@ -97,7 +97,9 @@
       apps.${system}.default = { type = "app"; program = "${ezBin}/bin/ez"; };
       # `lint` is bolt at the lock's `[tools.bolt]` pin, run with
       # `+RTS --gpu off -RTS` over a copy of the tree, graded by ./bolt.bend.
-      # `fresh` is EZ-DOC-3 checked directly: a clone's `ez lock` gives back the committed lock.
+      # `fresh` is EZ-DOC-3 checked directly: a clone's `ez lock` gives back
+      # the committed lock. `named` builds ./nix/tests/named with mkPackage
+      # and no network.
       # `fresh` waits for `ez`: each compile of ez peaks near 3.3 GB, and the
       # two side by side ran a CI runner out of memory.
       checks.${system} = {
@@ -105,6 +107,12 @@
         lint = ez.mkLint { src = self; };
         fresh = ez.mkFresh { src = self; after = [ ezBin ]; };
         ez = ezBin;
+        # bend-lib.nix lays the lock's `[names]`, so a dependency that imports
+        # another package by its hub name builds in the sandbox
+        named = import ./nix/tests/named.nix {
+          inherit pkgs bend;
+          nativeBuildInputs = [ llvm.clang ];
+        };
       };
       devShells.${system}.default = ez.mkShell {
         src = self;

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/Emerging-Patterns/ez/compare/v1.5.0...v1.6.0) (2026-10-23)
+
+
+### Bug Fixes
+
+* **nix:** lay the lock's [names] in bend-lib.nix ([#140](https://github.com/Emerging-Patterns/ez/issues/140)) ([bf65816](https://github.com/Emerging-Patterns/ez/commit/bf65816aea44aecc29412468e7fa329b12756746))
+
 ## [1.5.0](https://github.com/Emerging-Patterns/ez/compare/v1.4.0...v1.5.0) (2026-09-30)
 
 
