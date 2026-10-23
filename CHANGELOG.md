@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.0](https://github.com/Emerging-Patterns/ez/compare/v1.6.0...v1.7.0) (2026-10-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* ez needs bend 2.0.38. ez's runtime options go between +RTS and -RTS (`ez +RTS --threads 4 -RTS lock`); `--threads`, `--gpu`, `--gpu-build` and `--bend-help` now reach ez and are refused as unknown flags, and a `--` reaches ez instead of being dropped. Runtime options for a program `ez tool run` starts go after a `--RTS` (`ezx Emerging-Patterns/bolt --RTS +RTS --gpu off -RTS`).
+
+### Features
+
+* build and check ez on bend 2.0.38 ([#141](https://github.com/Emerging-Patterns/ez/issues/141)) ([7b893ab](https://github.com/Emerging-Patterns/ez/commit/7b893ab1ad0477491339ca59f193ca82d3130bcb))
+
 ## [1.6.0](https://github.com/Emerging-Patterns/ez/compare/v1.5.0...v1.6.0) (2026-10-23)
 
 
