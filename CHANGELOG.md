@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/Emerging-Patterns/ez/compare/v1.7.0...v1.8.0) (2026-10-23)
+
+
+### Bug Fixes
+
+* **deps:** ezhttp v0.14.0 ([#148](https://github.com/Emerging-Patterns/ez/issues/148)) ([ad12d9e](https://github.com/Emerging-Patterns/ez/commit/ad12d9e00754a326c8f50b84504681a609431fa0))
+
 ## [1.7.0](https://github.com/Emerging-Patterns/ez/compare/v1.6.0...v1.7.0) (2026-10-23)
 
 
