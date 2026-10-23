@@ -1,0 +1,16 @@
+[lock]
+version = "2"
+hub = "http://127.0.0.1:1"
+[packages]
+[packages.0x5c91a927dfd42412df799159c017e177]
+[packages.0x5c91a927dfd42412df799159c017e177.source]
+kind = "hub"
+[packages.0x5c91a927dfd42412df799159c017e177.files]
+"lib.bend" = "fa401f7e9393b7f18b26228e34b0857f4a59677a5c908d02ed83885cc7290903"
+[packages.0x6488ec0538085e3b469f5210e33890dd]
+[packages.0x6488ec0538085e3b469f5210e33890dd.source]
+kind = "hub"
+[packages.0x6488ec0538085e3b469f5210e33890dd.files]
+"doc.bend" = "1f331770a5522926968a137fdd50f2602e5a6a8d008024a85d525db182fba0ea"
+[names]
+"named-library@0.1.0.0" = "0x5c91a927dfd42412df799159c017e177"

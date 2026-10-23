@@ -730,6 +730,9 @@ lint = ez.mkLint { src = self; };
 - `ez.bendLib ./ez.lock.toml` is that tree on its own. Every file comes from a
   fixed-output derivation keyed by the sha256 the lock already records, so
   the build needs no network and `bend` never reaches the hub.
+  Every name in the lock's `[names]` table is laid as `ez fetch` lays it,
+  `names/<name>@<version>` holding the hash and a newline, so a dependency
+  that imports another package by its hub name builds too.
 - `mkProofs` runs `ez prove` over a copy of `src`. This repo's own `proofs`
   check is that.
 - `mkLint` builds `bolt` from `[tools.bolt]` in the lock.
