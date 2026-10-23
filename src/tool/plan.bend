@@ -365,7 +365,7 @@ def text.of(got: TW.Heard) -> Maybe<&2, String>:
       None{}
     case TW.Heard{answer}:
       match answer:
-        case TW.Text{m}:
+        case TW.Plain{m}:
           m
         case _:
           None{}

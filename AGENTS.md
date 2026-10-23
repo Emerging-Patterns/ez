@@ -15,7 +15,7 @@ sh bootstrap.sh
 mkdir -p bin
 BEND_LIB=$PWD/.ez/lib bend main.bend -o bin/ez.bin
 bin/ez.bin prove                     # the proof gate: every PROOF.bend must pass
-bin/ez.bin tool run bolt -- --gpu off   # lint: 0 errors
+bin/ez.bin tool run bolt --RTS +RTS --gpu off -RTS   # lint: 0 errors
 bin/ez.bin lock                      # must leave ez.lock.toml unchanged unless you meant to change it
 ```
 

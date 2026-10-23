@@ -118,7 +118,7 @@ type Answer is Data:
   Checkout{nar: String, root: String, manifest: String, srcs: List<&2, String>}  # Tree
   Weighed{nar: String}                                                         # Weigh
   HubSaid{got: Web.Got}                                                        # HubHas
-  Text{text: String}                                                           # Ignore
+  Plain{text: String}                                                          # Ignore
   Files{files: List<&2, Found>}                                                # Sources
   Cloned{nar: String, files: List<&2, K.Source>}                               # Clone
   Miss{why: String}                                                            # any question IO could not answer
@@ -307,7 +307,7 @@ def printed(rs: List<&2, Reply>, +ask: Ask, +what: String) -> Said:
 # a file's text, "" when it is missing
 def text.of(answer: Answer) -> Said:
   match answer:
-    case Text{text}:
+    case Plain{text}:
       Said{text}
     case Miss{why}:
       Unsaid{why}

@@ -41,7 +41,7 @@ type Ask is Data:
 # commit HEAD names, and whether `git status` answered and what it printed.
 # A path that has no real path, or a question IO could not answer, is a miss.
 type Answer is Data:
-  Text{got: Maybe<&2, String>}
+  Plain{got: Maybe<&2, String>}
   Is{yes: Bool}
   Located{abs: String, top: String, head: String, ok: Bool, status: String}
   Miss{why: String}

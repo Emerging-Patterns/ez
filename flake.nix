@@ -5,9 +5,9 @@
   description = "ez: dependency tracking, lockfile and vendoring tool for Bend 2, written in Bend";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  # the commit that packages bend 2.0.36 (the v2.0.36 tag packages 2.0.35)
+  # the commit that packages bend 2.0.38 (the v2.0.38 tag packages 2.0.37)
   inputs.bend = {
-    url = "github:bendlang/bend/eebc18cd04daeade06c3f68c3c96c1faefd3462f";
+    url = "github:bendlang/bend/042e797ebd1cfc060603e2682879909fe86fa8c2";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -67,6 +67,9 @@
       # lib.${system}:
       #   bend-cc
       #   bendLib ./ez.lock.toml          lock path -> BEND_LIB
+      #   rtsFlags bend [ "--gpu" "off" ]  runtime options as that bend's
+      #                                   binaries read them (+RTS … -RTS
+      #                                   from 2.0.38)
       #   mkPackage { bend, src, wrapFlags?, pname?, version?, entry?, lock?,
       #               wrapEnv?, defaultWrapEnv?, extraPath?, extraInstall? }
       #   mkProofs { ez, src, name?, lock?, bendLib? }
@@ -92,10 +95,11 @@
       # packages.
       lib.${system} = ez;
       apps.${system}.default = { type = "app"; program = "${ezBin}/bin/ez"; };
-      # `lint` is bolt at the lock's `[tools.bolt]` pin, run with `--gpu off`
-      # over a copy of the tree, graded by ./bolt.bend. `fresh` is EZ-DOC-3
-      # checked directly: a clone's `ez lock` gives back the committed lock.
-      # `named` builds ./nix/tests/named with mkPackage and no network.
+      # `lint` is bolt at the lock's `[tools.bolt]` pin, run with
+      # `+RTS --gpu off -RTS` over a copy of the tree, graded by ./bolt.bend.
+      # `fresh` is EZ-DOC-3 checked directly: a clone's `ez lock` gives back
+      # the committed lock. `named` builds ./nix/tests/named with mkPackage
+      # and no network.
       # `fresh` waits for `ez`: each compile of ez peaks near 3.3 GB, and the
       # two side by side ran a CI runner out of memory.
       checks.${system} = {

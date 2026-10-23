@@ -704,6 +704,21 @@ def str_ord.go(r):
     case GT{}:
       {==}
 
+# LAW: and the same for a comparison alone, which is what Base's String.order
+# answers
+law str_ord.cmp:
+  for c: Cmp
+  {c == oc(G.ord.str(Cmp.is_eq(c), Cmp.is_le(c))) : Cmp}
+
+def str_ord.cmp(c):
+  match c:
+    case LT{}:
+      {==}
+    case EQ{}:
+      {==}
+    case GT{}:
+      {==}
+
 # LAW: the twin is `ord.id`
 law id.is:
   for +x: G.Id
@@ -719,7 +734,7 @@ def id.is(x, y):
     case G.IdWord{_s} G.IdNum{_n}:
       {==}
     case G.IdWord{+s} G.IdWord{+t}:
-      str_ord.go(String.cmp(s, t))
+      str_ord.cmp(String.order(s, t))
 
 # LAW: two identifiers compared the other way round
 law id.flip:
@@ -774,8 +789,7 @@ def id.refl(x):
     case G.IdNum{+n}:
       nat.refl(n)
     case G.IdWord{+s}:
-      Equal.cong((String & String) & Cmp, Cmp, r => Pair.snd(String & String, Cmp, r),
-        String.cmp(s, s), ((s, s), EQ{}), Eq.string_cmp_self(s))
+      Eq.string_order_self(s)
 
 # A pre-release's identifiers, one at a time; a list that runs out first is
 # the lesser.

@@ -10,7 +10,7 @@ tools for a whole project.
 
 ## Install
 
-ez needs Bend 2.0.32 or later; it is built and checked on Bend 2.0.36, the
+ez needs Bend 2.0.38 or later; it is built and checked on Bend 2.0.38, the
 version `flake.lock` pins. Building ez needs clang as well, since ez is one
 native binary. Every subcommand runs the `bend` and `git` on your PATH.
 
@@ -111,7 +111,7 @@ Run any Bend repository's program, as `uvx` runs a package. One with no
 `ez.toml` builds its `main.bend`, or the file `--entry` names:
 
 ```bash
-ezx Emerging-Patterns/bolt -- --gpu off   # an ez project, at its HEAD
+ezx Emerging-Patterns/bolt --RTS +RTS --gpu off -RTS   # an ez project, at its HEAD
 ezx ./hello                               # a plain Bend repo; the second run reuses the binary
 ezx --entry src/cli.bend ./hello          # another file of it
 ez tool install ./hello                   # link it on PATH as `hello`

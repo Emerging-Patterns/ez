@@ -120,7 +120,7 @@ type Answer is Data:
   Checkout{nar: String, root: String, manifest: String, srcs: List<&2, String>}  # Tree
   Weighed{nar: String}                                             # Weigh
   HubSaid{got: Web.Got}                                            # HubHas
-  Text{text: String}                                               # Ignore
+  Plain{text: String}                                              # Ignore
   Files{files: List<&2, Source>}                                   # Sources
   Miss{why: String}                                                # any question IO could not answer
 
