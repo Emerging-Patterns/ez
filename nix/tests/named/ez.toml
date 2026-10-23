@@ -1,0 +1,8 @@
+[package]
+name = "named-app"
+hub = "http://127.0.0.1:1"
+[deps]
+[deps.named-dependency]
+hash = "0x6488ec0538085e3b469f5210e33890dd"
+hub = "named-dependency@0.1.0.0"
+entry = "doc.bend"

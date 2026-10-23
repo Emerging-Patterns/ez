@@ -9,6 +9,12 @@
 # its files are taken from the checkout at the paths the manifest names, which
 # are relative to the package's own root: the entry file's directory, unless a
 # module of it was reached through `..` and re-rooted the package above that.
+#
+# Every name the lock's `[names]` table records is laid as `ez fetch` lays it:
+# `names/<name>@<version>` holding the `0x` hash and a newline, the file bend
+# reads a named import's hash from, so a package that imports another by its
+# hub name resolves here too (EZ-HUB-4). A name or hash bend would not read
+# back fails the evaluation, as `ez fetch` refuses it.
 { lib, fetchurl, fetchgit, runCommand, python3 }:
 
 lockFile:
@@ -60,7 +66,24 @@ let
         cp ${hubFile hash at sha256} "$out/${hash}/${at}"
       '') files)}
     '';
-  # `[tools.*]` is a CLI pin. This tree is `[packages.*]` only.
+  # bend's NAMED rule and a `0x` name, the pair `ez fetch` lays (src/pkg/pkg.bend
+  # `name.ok`, src/lock/lock.bend `hash.ok`)
+  num = "(0|[1-9][0-9]*)";
+  nameOk = nv: builtins.match "[a-z][a-z0-9-]{0,63}@${num}\\.${num}\\.${num}\\.${num}" nv != null;
+  hashOk = hash: builtins.match "0x[0-9a-f]{32}" hash != null;
+
+  name = nv: hash:
+    if !(nameOk nv) then
+      throw "bend-lib.nix: the lock names ${nv}, which bend would not read as <name>@<version>"
+    else if !(builtins.isString hash && hashOk hash) then
+      throw "bend-lib.nix: the lock names ${nv} as ${builtins.toJSON hash}, which is not a 0x name"
+    else ''
+      printf '%s\n' ${lib.escapeShellArg hash} > "$out/names/"${lib.escapeShellArg nv}
+    '';
+
+  names = doc.names or { };
+
+  # `[tools.*]` is a CLI pin. This tree is `[packages.*]` and `[names]` only.
 in
 runCommand "bend-lib" {
   passthru = { lock = doc; };
@@ -71,4 +94,7 @@ runCommand "bend-lib" {
   folded() {
     python3 -c 'import hashlib,sys; t=open(sys.argv[1],encoding="utf-8",newline="").read(); print(hashlib.sha256(bytes(ord(c)&255 for c in t)).hexdigest(), end="")' "$1"
   }
-'' + lib.concatStrings (lib.mapAttrsToList pkg (doc.packages or { })))
+'' + lib.concatStrings (lib.mapAttrsToList pkg (doc.packages or { }))
+  + lib.optionalString (names != { }) ''
+    mkdir -p "$out/names"
+  '' + lib.concatStrings (lib.mapAttrsToList name names))
