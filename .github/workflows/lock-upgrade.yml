@@ -15,6 +15,6 @@ permissions:
 
 jobs:
   upgrade:
-    uses: Emerging-Patterns/actions/.github/workflows/lock-upgrade.yml@4963a78a6800f81dea5da54de675a6c3059cb065
+    uses: Emerging-Patterns/actions/.github/workflows/lock-upgrade.yml@73b2fbc64cefd6e22bd786437adb5f35190ee837
     with:
       package: ${{ inputs.package }}

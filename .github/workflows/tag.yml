@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   tag:
-    uses: Emerging-Patterns/actions/.github/workflows/tag.yml@9523e8b294ae014fade5861c32d5ab911866acb2
+    uses: Emerging-Patterns/actions/.github/workflows/tag.yml@73b2fbc64cefd6e22bd786437adb5f35190ee837
     with:
       version: ${{ inputs.version }}
       bump: ${{ inputs.bump }}
