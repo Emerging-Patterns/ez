@@ -220,6 +220,34 @@ A name the ledger gives to another source stops `ez add` with exit 1 and
 leaves the ledger as it was, `--rename` included. Remove that entry, or add
 this one with `--rename` under another name.
 
+### The lock
+
+`ez add` writes `ez.lock.toml` too, as `uv add` does (EZ-DOC-6). Once the
+dependency is recorded it runs a plain `ez lock` over the ledger it writes, and
+writes the lock last, in the same command. A plain lock moves no pin, so every
+other dependency and tool keeps the pin it had, and only what the add changed
+is new. Trees already under `BEND_LIB` are read from there, and the package the
+add fetched is not fetched again. So a nix build from the lock (`mkPackage`,
+`bendLib`) needs no `ez lock` after `ez add`.
+
+`ez lock` reads only the `.bend` files `git ls-files` lists, so the lock holds
+the new package only when a listed file imports it. When none does, because
+the file that imports it is untracked or not written yet, `ez add` says so
+(EZ-DOC-7):
+
+```text
+ez: no .bend file git lists imports 0x… yet, so ez.lock.toml does not hold it. Import it, `git add` the file, and run `ez lock`.
+```
+
+When the lock refuses, the add refuses too and writes nothing, so ez.toml and
+ez.lock.toml always agree. It refuses where `ez lock` would: outside a git
+repository, for a `[tools.*]` pin with no `rev` or `narHash`, and when a listed
+file imports a hash the new ledger does not name. That last is the case of
+adding a new rev of a dependency whose old hash is still imported: `ez add`
+does not rewrite import lines, so it names the new hash, and you point the
+imports at it and add again, or move the dependency with
+`ez lock --upgrade --package NAME`, which rewrites them.
+
 ### What a refused add leaves
 
 Whatever stops it, `ez add` writes nothing: not the ledger, not
@@ -234,6 +262,11 @@ ledger alone, it stops before asking the remote anything.
 `.ez/lib/<hash>`, is removed too, unless another dependency still names that
 hash. A name the ledger does not have stops `ez remove` with exit 1, and it
 writes nothing, as `cargo remove` does.
+
+Like `ez add`, `ez remove` then writes the lock a plain `ez lock` writes over
+the ledger it leaves, in the same command (EZ-DOC-6). A listed `.bend` file
+that still imports the dependency makes that lock refuse, and the remove with
+it, writing nothing: drop the import first.
 
 ## Lock
 
