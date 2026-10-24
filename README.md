@@ -50,7 +50,7 @@ def main() -> String:
 ```
 
 In an ez project, `ez add Emerging-Patterns/ez` records the package in the
-ledger.
+ledger and writes the lock.
 
 ### From a clone
 
@@ -100,8 +100,9 @@ git init myapp && cd myapp
 ez init myapp --description "my first app"
                                  # ez.toml, .gitignore, main.bend, src/lib.bend
 git add -A
-ez add Emerging-Patterns/snap    # pin a git package; prints its import line
-ez lock                          # write ez.lock.toml
+ez add Emerging-Patterns/snap    # pin a git package and lock; prints its import line
+                                 # import it in main.bend, then `git add main.bend`
+ez lock                          # lock what the listed files import
 ez run                           # check and run main.bend
 ```
 

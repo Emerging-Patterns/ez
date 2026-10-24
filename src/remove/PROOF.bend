@@ -1,6 +1,10 @@
 # remove: the proofs. `bend PROOF.bend` is the gate.
 import Base
 import ./plan.bend as RP
+import ./relock.bend as RR
+import ../relock/relock.bend as R
+import ../relock/PROOF.bend as Rp
+import ../lock/world.bend as W
 import ../lock/plan.bend as P
 import ../ledger/manifest.bend as M
 import ../ledger/render.bend as Rend
@@ -284,3 +288,37 @@ def Laws.remove_ledger_reads_back(name, s, ignore, m, text, good, ok, put, rb):
     P.Put{text}, p)
   %t : {M.parse(_) == M.Good{Rend.remove(m, name)} : M.Read}
   rb(Rend.remove(m, name), er)
+
+# ---------------------------------------------------------------------------
+# EZ-DOC-6: the remove and the lock as one plan
+
+def Laws.remove_runs_remove_then_lock(w, ok):
+  match w:
+    case RR.World{+r, +here, +listing, +locks}:
+      Rp.join_effects(RP.plan(r), RR.lock(RR.World{r, here, listing, locks}), [], RR.tail(), ok)
+
+def Laws.remove_locks_what_it_writes(w, text, put):
+  match w:
+    case RR.World{+r, +here, _listing, _locks}:
+      %Equal.sym(P.Wrote, P.put.plan(RP.plan(r), "ez.toml"), P.Put{text}, put)
+        : {R.ledger.of(_, RR.ledger.was(r)) == Some{text} : Maybe<&2, String>}
+      {==}
+
+def Laws.remove_relock_is_plain(w):
+  match w:
+    case RR.World{_r, _here, _listing, _locks}:
+      {==}
+
+def Laws.remove_refuses_with_lock(w, r):
+  match w:
+    case RR.World{+rm, +here, +listing, +locks}:
+      Rp.join_refuses_lock(RP.plan(rm), RR.lock(RR.World{rm, here, listing, locks}), [],
+        RR.tail(), r)
+
+def Laws.remove_whole_refusal_writes_nothing(w, r):
+  match w:
+    case RR.World{+rm, +here, +listing, +locks}:
+      Rp.join_quiet(RP.plan(rm), RR.lock(RR.World{rm, here, listing, locks}), [], RR.tail(), r)
+
+def Laws.remove_whole_exits_as_it_refuses(w):
+  Rp.join_code(RR.plan(w))

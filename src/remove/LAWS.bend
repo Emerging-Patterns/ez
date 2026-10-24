@@ -4,6 +4,9 @@
 # being EZ-TRUST-2.
 import Base
 import ./plan.bend as RP
+import ./relock.bend as RR
+import ../relock/relock.bend as R
+import ../lock/world.bend as W
 import ../lock/plan.bend as P
 import ../ledger/manifest.bend as M
 import ../ledger/LAWS.bend as ML
@@ -141,3 +144,54 @@ law remove_ledger_reads_back:
     : P.Wrote}
   for rb: ML.ReadsBack()
   {M.parse(text) == M.Good{Rend.remove(m, name)} : M.Read}
+
+# ---------------------------------------------------------------------------
+# the remove and the lock as one plan (`RR.plan`, remove/relock.bend), which
+# is the plan the interpreter runs. The laws above are about the remove's own
+# plan (`RP.plan`); `remove_runs_remove_then_lock` says the command runs
+# exactly those effects first, so they hold of the command too.
+
+# LAW: `ez remove` that succeeds runs the remove's effects, then exactly the
+# effects of the plan a plain `ez lock` makes on the World the remove leaves,
+# which writes the lock last
+# EZ-DOC-6
+law remove_runs_remove_then_lock:
+  for +w: RR.World
+  for ok: {RR.refuses(w) == False{} : Bool}
+  {P.effects(RR.plan(w)) == List.append(&2, P.Effect, P.effects(RP.plan(RR.remove(w))),
+    P.effects(P.plan(RR.lock.world(w)))) : List<&2, P.Effect>}
+
+# LAW: the World that lock reads holds the ledger the remove writes to ez.toml
+# EZ-DOC-6
+law remove_locks_what_it_writes:
+  for +w: RR.World
+  for +text: String
+  for put: {P.put.plan(RP.plan(RR.remove(w)), "ez.toml") == P.Put{text} : P.Wrote}
+  {W.ledger.of(RR.lock.world(w)) == Some{text} : Maybe<&2, String>}
+
+# LAW: and is a plain lock's, which moves no pin (EZ-DOC-5)
+# EZ-DOC-6
+law remove_relock_is_plain:
+  for +w: RR.World
+  {W.args.upgrade(RR.lock.world(w)) == False{} : Bool}
+
+# LAW: when that lock refuses, `ez remove` refuses
+# EZ-DOC-6
+law remove_refuses_with_lock:
+  for +w: RR.World
+  for r: {R.refuses(P.plan(RR.lock.world(w))) == True{} : Bool}
+  {RR.refuses(w) == True{} : Bool}
+
+# LAW: `ez remove` that refuses, the remove or the lock after it, writes,
+# lays and removes nothing
+# EZ-OUT-2
+law remove_whole_refusal_writes_nothing:
+  for +w: RR.World
+  for r: {RR.refuses(w) == True{} : Bool}
+  {P.writes(RR.plan(w)) == False{} : Bool}
+
+# LAW: and ends with the status of whether it refuses
+# EZ-OUT-1
+law remove_whole_exits_as_it_refuses:
+  for +w: RR.World
+  {P.code(RR.plan(w)) == P.status.of(RR.refuses(w)) : U32}

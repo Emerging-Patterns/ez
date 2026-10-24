@@ -12,6 +12,9 @@ import Base
 import ./world.bend as A
 import ./plan.bend as AP
 import ./hub.bend as H
+import ./relock.bend as AR
+import ../relock/relock.bend as R
+import ../relock/PROOF.bend as Rp
 import ../lock/plan.bend as P
 import ../lock/world.bend as W
 import ../lock/up.bend as Up
@@ -2866,4 +2869,51 @@ def Laws.add_runs_plan(w, g):
 
 def Laws.add_runs_hub(w, n):
   %Equal.sym(Bool, A.named(w), True{}, n) : {AP.command.of(_, w) == H.plan(w) : P.Plan}
+  {==}
+
+# ---------------------------------------------------------------------------
+# EZ-DOC-6 and EZ-DOC-7: the add and the lock as one plan
+
+def Laws.add_runs_add_then_lock(w, ok):
+  match w:
+    case AR.World{+a, +listing, +locks}:
+      Rp.join_effects(AP.command(a), AR.lock(AR.World{a, listing, locks}),
+        AR.notes(AR.World{a, listing, locks}), AR.tail(a), ok)
+
+def Laws.add_locks_what_it_writes(w, text, put):
+  match w:
+    case AR.World{+a, _listing, _locks}:
+      %Equal.sym(P.Wrote, P.put.plan(AP.command(a), "ez.toml"), P.Put{text}, put)
+        : {R.ledger.of(_, A.ledger(a)) == Some{text} : Maybe<&2, String>}
+      {==}
+
+def Laws.add_relock_is_plain(w):
+  match w:
+    case AR.World{_a, _listing, _locks}:
+      {==}
+
+def Laws.add_refuses_with_lock(w, r):
+  match w:
+    case AR.World{+a, +listing, +locks}:
+      Rp.join_refuses_lock(AP.command(a), AR.lock(AR.World{a, listing, locks}),
+        AR.notes(AR.World{a, listing, locks}), AR.tail(a), r)
+
+def Laws.add_whole_refusal_writes_nothing(w, r):
+  match w:
+    case AR.World{+a, +listing, +locks}:
+      Rp.join_quiet(AP.command(a), AR.lock(AR.World{a, listing, locks}),
+        AR.notes(AR.World{a, listing, locks}), AR.tail(a), r)
+
+def Laws.add_whole_exits_as_it_refuses(w):
+  Rp.join_code(AR.plan(w))
+
+def Laws.add_notes_unlocked(w, no):
+  %Equal.sym(Bool, AR.held(P.packs(AR.lock.world(w)), AR.added(AR.add(w))), False{}, no)
+    : {AR.notes.of(_, AR.added(AR.add(w))) == [P.Say{AR.unlocked(AR.added(AR.add(w)))}]
+    : List<&2, P.Effect>}
+  {==}
+
+def Laws.add_notes_nothing_when_locked(w, yes):
+  %Equal.sym(Bool, AR.held(P.packs(AR.lock.world(w)), AR.added(AR.add(w))), True{}, yes)
+    : {AR.notes.of(_, AR.added(AR.add(w))) == [] : List<&2, P.Effect>}
   {==}
