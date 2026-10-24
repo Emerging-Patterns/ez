@@ -28,6 +28,7 @@ A command that refuses writes nothing (EZ-OUT-2).
 - [The hub](#the-hub)
 - [Publish](#publish)
 - [Doctor](#doctor)
+- [Workspaces](#workspaces)
 - [Nix](#nix)
 - [Prove and test](#prove-and-test)
 
@@ -705,6 +706,98 @@ your source (EZ-VEN-4). It reports:
   source to fix it.
 
 It exits 1 when it reports any problem, after reporting everything it found.
+
+## Workspaces
+
+A repository that holds several packages can share one lock across them, as
+a uv or cargo workspace does. Give the root ledger a `[workspace]` table:
+
+```toml
+[package]
+name = "app"
+entry = "main.bend"
+[workspace]
+members = ["cli", "libs/*"]
+exclude = ["libs/scratch"]
+```
+
+- Each member is a directory with its own committed ez.toml. An entry in
+  `members` is a path from the root, or `<dir>/*`, which names every
+  directory directly under `<dir>` that holds a committed ez.toml. `exclude`
+  takes plain paths. No other glob is read.
+- The root is a member too when its ledger has a `[package]` table. A root
+  with none only holds the workspace and the lock.
+- An entry with an empty, `.`, `..` or misplaced `*` segment, a plain path
+  with no committed ez.toml, a member with its own `[workspace]` table, and
+  two members with one `[package] name` are refused (EZ-WS-1).
+
+Run in a directory, ez takes as its root the nearest directory at or above
+it, up to the top of the git checkout, whose `[workspace]` names it as a
+member. With none, the directory is a project of its own, as before
+(EZ-WS-2). From any member:
+
+| Command | Acts on |
+| :-- | :-- |
+| `ez lock`, `ez lock --upgrade` | every member's ledger; writes one `ez.lock.toml` at the root |
+| `ez fetch` | the root's lock, into the root's `.ez/lib` |
+| `ez doctor` | every member, and the root's lock |
+| `ez add`, `ez remove` | the member's own ledger |
+| `ez check`, `ez build`, `ez run` | the member's own entry, with `BEND_LIB` at the root's `.ez/lib` |
+| `ez publish` | the member's own package, judged against the root's lock |
+
+The lock is planned from every member's ledger joined: the root's
+`[package]`, then every dependency and tool of the root and each member. Two
+declarations of one name that differ, a member naming another hub than the
+root's, and one git source pinned at two commits or tags are refused, naming
+both (EZ-WS-3, EZ-WS-4). `ez add` in a member, of a source the workspace
+already pins, takes that pin when you give no ref, and refuses any other ref,
+naming `ez lock --upgrade --package <name>`, which moves the source in every
+member's ledger at once.
+
+### Depending on a member
+
+A member depends on another with a section that names it by its
+`[package] name` and says nothing else:
+
+```toml
+[deps.parse]
+workspace = true
+```
+
+It records no hash and no source: the member's hash is the walk of its
+committed files from its entry, which `ez lock` works out each time and
+records in the lock as `kind = "member"`, laying the walked tree under
+`BEND_LIB/<hash>` (EZ-WS-5). A section that names no member, names its own
+member, or gives a hash, an entry or a source is refused.
+
+How you import a member depends on whether it has a published name, as for a
+package from outside:
+
+- A member whose ledger gives `publish-as` and `version` is imported by the
+  name `ez publish` would give it, `import parse@1.2.0.0/lib.bend as Parse`,
+  with or without a section. `ez lock` resolves the name to the member's
+  hash, records it under `[names]`, and never asks the hub or the old lock
+  about it. Edit the member and run `ez lock`, and the name moves to the new
+  hash with no source rewritten (EZ-WS-6). The import is the same once the
+  member is published.
+- A member with neither is imported by its `0x` hash. Editing it moves its
+  hash and leaves the import lines naming the old one, so a plain `ez lock`
+  refuses, naming the file, the member and `ez lock --upgrade --package
+  <name>`, and writes nothing. That upgrade rewrites the lines, and carries
+  on to every member imported by hash whose files it rewrote, until no line
+  names an old hash (EZ-WS-7).
+
+`ez fetch` lays a member from the committed tree, and only when its walk
+hashes to what the lock records; a member edited since the lock was written
+is refused by name and nothing is laid (EZ-WS-8). `ez doctor` gives each
+member its own drift report, its import lines against its own ledger, judges
+the root lock over every member's ledger, and reports a member whose files
+walk to another hash than the lock records (EZ-WS-9). In nix,
+`ez.bendLib ./ez.lock.toml` lays a member's files from the workspace the
+lock sits in, each checked against its sum.
+
+`ez init` under a workspace root makes a project of its own and does not add
+it to `members`, and a member cannot be a `[tools.*]` pin.
 
 ## Nix
 
