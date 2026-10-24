@@ -69,6 +69,8 @@ The lock is written at the root and nowhere else. A member's own `ez.lock.toml`,
 
 The lock already takes the hub imports of every committed `.bend` file under the root, so the files it reads do not change. What changes is that the ledger it resolves against is the union of the members' ledgers, checked by EZ-WS-4.
 
+**Update (W3):** we did not give the lock planner a second kind of World. The lock planner's World holds a ledger's text, and every lock law (EZ-DOC-3 to EZ-DOC-5, EZ-OUT-1, EZ-OUT-2) quantifies over every World, so a workspace is locked by the same planner from one ledger that joins the members' (`src/ws/joint.bend`): the root's `[package]` table, then every dependency and tool of the root and of each member in the order git lists them, a member's relative path source anchored at the member's directory as EZ-LED-8 anchors one at the root, and each name at its first declaration (`firsts_find`). Members are joined only when every declaration of a name agrees with the first and every member names the root's hub, or none (`combine_needs_deps`, `combine_needs_tools`, `combine_needs_hub`). Two new lock laws say a plain lock writes no path but the lock's, so no member's ledger (`plain_lock_writes_only_lock`, `plain_lock_keeps_members`), and `lock_reproducible`, `lock_idempotent` and `plain_lock_keeps_ledger` carry EZ-WS-3 too, since a workspace's lock is one of the Worlds they are about. Base has no way to change directory, and every interpreter reads its paths from where it runs, so `ez lock`, `ez fetch` and `ez doctor` run in a member run again at the root with the same words (`src/ws/hop.bend`), and end as that run ends. On the binary, `ez lock` in `libs/a` of a workspace whose two members pin one path dependency wrote one lock at the root, recording the member's `../../../dep` as the root reads it, `../dep`; a rerun wrote the same bytes, two members pinning it at different revs were refused naming it, and ez's own lock was unchanged. `ez lock --upgrade` at a workspace root is refused until W4, since an upgrade writes back the ledger it planned from.
+
 ## One pin per source (EZ-WS-4)
 
 In uv the whole workspace has one resolution, so two members cannot hold two versions of one package. ez pins exactly, so the same rule is that one git URL has one `rev` and one `tag` across the workspace. `ez lock` refuses a workspace whose members disagree, names both members and both pins, and writes nothing.
@@ -118,7 +120,7 @@ On a fresh clone, every import already names the hash the committed tree walks t
 | :-- | :-- | :-- |
 | W1 (landed) | `[workspace]` read beside the ledger model, in `src/ws/workspace.bend`; the member set as a pure function of the root ledger and the committed listing | EZ-WS-1 |
 | W2 (landed) | Root finding as a pure function of the directories above and their ledgers; every command's interpreter reads the ancestors and calls it | EZ-WS-2 |
-| W3 | The lock World holds every member's ledger; one lock at the root; EZ-DOC-3 to EZ-DOC-5 restated over it | EZ-WS-3 |
+| W3 (landed) | The lock planned from the members' joint ledger; one lock at the root; EZ-DOC-3 to EZ-DOC-5 hold of it as of any World | EZ-WS-3 |
 | W4 | The one-pin check in the lock; `ez add` reusing a member's pin; `ez lock --upgrade` moving a source in every member | EZ-WS-4 |
 | W5 | `workspace = true` sources (a `Member` constructor of `M.Source`); the lock walks each member and lays it | EZ-WS-5 |
 | W6 | Named members resolved before the ledger, the lock and the hub; EZ-HUB-1 and EZ-HUB-2 reworded | EZ-WS-6 |

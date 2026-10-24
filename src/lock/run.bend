@@ -27,6 +27,7 @@ import ./lock.bend as L
 import ./world.bend as W
 import ./up.bend as Up
 import ./plan.bend as Plan
+import ../ws/run.bend as WsRun
 
 # ---------------------------------------------------------------------------
 # the World's first fields
@@ -697,12 +698,13 @@ def loop(fuel: Nat, +lib: String, +world: W.World) -> IO(Unit):
 # `ez lock` and `ez lock --upgrade [--package only]`: the directory it runs
 # in, the ledger and the listing read, every question answered, and the plan
 # run
-def run(up: Bool, +only: String) -> IO(Unit):
+def run(+up: Bool, +only: String) -> IO(Unit):
   do IO<Unit>:
     IO.print_err(Say.resolving())
     lib : String <- bend.lib()
     +pwd : String <- R.exec(["pwd"])
-    led : Maybe<&2, String> <- read.ledger()
+    own : Maybe<&2, String> <- read.ledger()
+    led : Maybe<&2, String> <- WsRun.ledger(own, up)
     ls : W.Listing <- read.listing()
     loop(rounds(), lib,
       W.World{W.Args{up, only, String.trim(R.text(pwd))}, led, ls, [], []})

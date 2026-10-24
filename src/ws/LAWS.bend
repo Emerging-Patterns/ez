@@ -11,6 +11,10 @@
 import Base
 import ./workspace.bend as W
 import ./root.bend as R
+import ./joint.bend as J
+import ./hop.bend as H
+import ../pkg/path.bend as P
+import ../ledger/manifest.bend as M
 
 # a path every path that starts with it extends. Law vocabulary: ez never
 # calls it.
@@ -366,3 +370,154 @@ law claims_member:
   for +hd: String
   for +tl: List<&2, String>
   {R.claims(spec, hd <> tl) == W.chosen(spec, hd <> tl) : Bool}
+
+# ---------------------------------------------------------------------------
+# one lock (EZ-WS-3)
+
+# LAW: a ledger with no `[workspace]` table is no workspace root, and is
+# locked as it always was
+# EZ-WS-3
+law joint_lone:
+  for +text: String
+  for +fs: List<&2, J.Found>
+  for ev: {W.spec.of(text) == W.Lone{} : W.Read}
+  {J.joint(text, fs) == J.Lone{} : J.Joint}
+
+# LAW: and the lock planner reads that ledger's own text
+# EZ-WS-3
+law lone_locks_own:
+  for own: Maybe<&2, String>
+  {J.joint.text(J.Lone{}, own) == own : Maybe<&2, String>}
+
+# LAW: a `[workspace]` table that cannot be read leaves nothing to lock from
+# EZ-WS-3
+law joint_bad_table:
+  for +text: String
+  for +fs: List<&2, J.Found>
+  for +why: String
+  for ev: {W.spec.of(text) == W.Bad{why} : W.Read}
+  {J.joint(text, fs) == J.Clash{why} : J.Joint}
+
+# LAW: and so does a workspace with no member set (EZ-WS-1)
+# EZ-WS-3
+law joint_refused_members:
+  for +text: String
+  for +fs: List<&2, J.Found>
+  for +spec: W.Spec
+  for +why: String
+  for ev: {W.spec.of(text) == W.Root{spec} : W.Read}
+  for em: {W.members(spec, W.root.of(text), J.ledgers(fs)) == W.Refused{why} : W.Members}
+  {J.joint(text, fs) == J.Clash{why} : J.Joint}
+
+# LAW: members that can be joined are: the root's package, with every
+# dependency and tool of the root and the members at its first declaration
+# EZ-WS-3
+law combine_when_ok:
+  for +root: M.Manifest
+  for +ms: List<&2, J.Member>
+  for ev: {J.ok(root, ms) == True{} : Bool}
+  {J.combine(root, ms) == J.Joint{J.joined(root, ms)} : J.Joint}
+
+# LAW: and members that cannot be are refused, with the reason why
+# EZ-WS-3
+law combine_refused:
+  for +root: M.Manifest
+  for +ms: List<&2, J.Member>
+  for ev: {J.ok(root, ms) == False{} : Bool}
+  {J.combine(root, ms) == J.Clash{J.why(root, ms)} : J.Joint}
+
+# LAW: the joint ledger's dependency of a name is the first declaration of it,
+# among the root's and then every member's, and a name no one declares is
+# none in it either
+# EZ-WS-3
+law firsts_find:
+  for ds: List<&2, M.Dep>
+  for +name: String
+  {M.find(J.firsts(ds), name) == M.find(ds, name) : M.Dep}
+
+# LAW: and so is its tool of a name
+# EZ-WS-3
+law tools_firsts_find:
+  for ts: List<&2, M.Tool>
+  for +name: String
+  {M.tool.find(J.tools.firsts(ts), name) == M.tool.find(ts, name) : M.Tool}
+
+# LAW: joined members name the root's hub
+# EZ-WS-3
+law combine_needs_hub:
+  for +root: M.Manifest
+  for +ms: List<&2, J.Member>
+  for +ev: {J.ok(root, ms) == True{} : Bool}
+  {J.hubs(J.root.hub(root), ms) == True{} : Bool}
+
+# LAW: and every declaration of a dependency agrees with the first, so no
+# member's is dropped for another's
+# EZ-WS-3
+law combine_needs_deps:
+  for +root: M.Manifest
+  for +ms: List<&2, J.Member>
+  for +ev: {J.ok(root, ms) == True{} : Bool}
+  {J.agree(J.all.deps(root, ms)) == True{} : Bool}
+
+# LAW: and every declaration of a tool
+# EZ-WS-3
+law combine_needs_tools:
+  for +root: M.Manifest
+  for +ms: List<&2, J.Member>
+  for +ev: {J.ok(root, ms) == True{} : Bool}
+  {J.tools.agree(J.all.tools(root, ms)) == True{} : Bool}
+
+# ---------------------------------------------------------------------------
+# where a whole-workspace command runs (EZ-WS-2)
+
+# a list with its first `count` words dropped, the count looked at first.
+# Law vocabulary: ez never calls it.
+def past(count: Nat, xs: List<&2, String>) -> List<&2, String>:
+  match count:
+    case 0n:
+      xs
+    case 1n+kk:
+      match xs:
+        case []:
+          []
+        case _hd <> tl:
+          past(kk, tl)
+
+# LAW: a command run in a project of its own runs where it is
+# EZ-WS-2
+law hop_alone:
+  for top: String
+  {H.hop(top, R.Alone{}) == H.Here{} : H.Hop}
+
+# LAW: and so does one run at its workspace's root
+# EZ-WS-2
+law hop_at_root:
+  for top: String
+  for root: List<&2, String>
+  {H.hop(top, R.Within{root, []}) == H.Here{} : H.Hop}
+
+# LAW: one run in a member runs again at the root's directory
+# EZ-WS-2
+law hop_member:
+  for +top: String
+  for +root: List<&2, String>
+  for hd: String
+  for tl: List<&2, String>
+  {H.hop(top, R.Within{root, hd <> tl}) == H.Hop{P.join(top, W.segs.text(root))} : H.Hop}
+
+# LAW: and one whose search was refused runs nowhere, saying why
+# EZ-WS-2
+law hop_broken:
+  for top: String
+  for +why: String
+  {H.hop(top, R.Broken{why}) == H.Stop{why} : H.Hop}
+
+# LAW: the run at the root is handed every word the command was run with,
+# unchanged and in order
+# EZ-WS-2
+law hop_keeps_words:
+  for +dir: String
+  for +pwd: String
+  for +prog: String
+  for +words: List<&2, String>
+  {past(6n, H.line(dir, pwd, prog, words)) == words : List<&2, String>}

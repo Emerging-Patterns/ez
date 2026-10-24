@@ -19,6 +19,7 @@ import ../tool/world.bend as TW
 import ../share/say.bend as Say
 import ../io/file.bend as F
 import ../ez/line.bend as L
+import ../ws/run.bend as WsRun
 
 # what a subcommand runs. `L.line` never runs `CHelp`, which names no
 # command; it is here so the match is whole, and it writes the help a bare
@@ -36,9 +37,11 @@ def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(U
     case L.CRemove{}:
       Cmd.remove(L.get(matched, "name"))
     case L.CLock{}:
-      Cmd.lock(Shake.on(matched, "upgrade"), L.get(matched, "package"))
+      +up = Shake.on(matched, "upgrade")
+      +only = L.get(matched, "package")
+      WsRun.at.root(_u => Cmd.lock(up, only))
     case L.CFetch{}:
-      Cmd.fetch()
+      WsRun.at.root(_u => Cmd.fetch())
     case L.CCheck{}:
       Cmd.check()
     case L.CBuild{}:
@@ -61,7 +64,7 @@ def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(U
     case L.CProve{}:
       Prove.run()
     case L.CDoctor{}:
-      DoctorRun.run()
+      WsRun.at.root(_u => DoctorRun.run())
     case L.CHelp{}:
       IO.write(Shake.help(L.spec(), []))
 

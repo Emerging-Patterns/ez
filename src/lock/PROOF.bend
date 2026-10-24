@@ -17719,3 +17719,78 @@ def Laws.lock_lays_its_names(w, t, d):
           W.judged.of(W.next(args, ledger, ups), replies), _))) == L.names.read(t) : List<&2, L.Name>}
       nm.made(W.next(args, ledger, ups), P.cloned(W.replies.of(W.next(args, ledger, ups), replies)),
         W.judged.of(W.next(args, ledger, ups), replies), t)
+
+# ---------------------------------------------------------------------------
+# a plain lock writes only the lock (EZ-WS-3)
+
+# and a plain lock leaves every path but the lock's as it was, whatever was
+# decided: the one file it writes is the lock
+def made_keeps_other(
+  _led: M.Read,
+  +cs: List<&2, String>,
+  +js: List<&2, W.Judged>,
+  d: P.Doc,
+  +path: String,
+  ep: {String.eq(P.lockfile(), path) == False{} : Bool}
+) -> {P.put.plan(P.made(Up.plain(_led), cs, js, d), path) == P.Kept{} : P.Wrote}:
+  match d:
+    case P.Doc{+text}:
+      Equal.trans(P.Wrote,
+        P.put.in(P.lays(cs, [], js, P.names.lay(L.names.read(text), [P.Write{P.lockfile(), text}])), path),
+        P.put.in([P.Write{P.lockfile(), text}], path),
+        P.Kept{},
+        lays_names_put(cs, [], js, L.names.read(text), [P.Write{P.lockfile(), text}], path),
+        Equal.cong(Bool, P.Wrote, bb => Bool.pick(P.Wrote, bb, P.Put{text}, P.Kept{}),
+          String.eq(P.lockfile(), path), False{}, ep))
+    case P.Stop{_why}:
+      {==}
+
+def Laws.plain_lock_writes_only_lock(w, e, path, ep):
+  match w:
+    case W.World{args, +ledger, listing, +replies, ups}:
+      match args:
+        case W.Args{up, only, here}:
+          match up:
+            case True{}:
+              Eq.bit.absurd2(&2, {P.put(W.World{W.Args{True{}, only, here}, ledger, listing,
+                replies, ups}, path) == P.Kept{} : P.Wrote}, e)
+            case False{}:
+              made_keeps_other(W.parsed(ledger),
+                P.cloned(W.replies.of(Up.plain(W.parsed(ledger)), replies)),
+                W.judged.of(Up.plain(W.parsed(ledger)), replies),
+                P.decide(W.Inputs{W.parsed(ledger), "", listing,
+                  W.judged.of(Up.plain(W.parsed(ledger)), replies)}), path, ep)
+
+# a path that ends in a directory's ez.toml holds a `/`
+def slash_member(pre: String) -> {Str.clear(pre ++ "/ez.toml", '/') == False{} : Bool}:
+  match pre:
+    case SNil{}:
+      {==}
+    case SCon{+hd, +tl}:
+      Equal.trans(Bool,
+        Bool.and(Bool.not(Char.is_eq(hd, '/')), Str.clear(tl ++ "/ez.toml", '/')),
+        Bool.and(Bool.not(Char.is_eq(hd, '/')), False{}),
+        False{},
+        Equal.cong(Bool, Bool, bb => Bool.and(Bool.not(Char.is_eq(hd, '/')), bb),
+          Str.clear(tl ++ "/ez.toml", '/'), False{}, slash_member(tl)),
+        Str.and_false(Bool.not(Char.is_eq(hd, '/'))))
+
+# so it is not the lock's path, which holds none
+def lock_not_member(
+  bb: Bool,
+  +pre: String,
+  eb: {String.eq(P.lockfile(), pre ++ "/ez.toml") == bb : Bool}
+) -> {String.eq(P.lockfile(), pre ++ "/ez.toml") == False{} : Bool}:
+  match bb:
+    case False{}:
+      eb
+    case True{}:
+      Eq.bit.absurd2(&2, {String.eq(P.lockfile(), pre ++ "/ez.toml") == False{} : Bool},
+        Equal.trans(Bool, True{}, Str.clear(pre ++ "/ez.toml", '/'), False{},
+          Equal.cong(String, Bool, ss => Str.clear(ss, '/'), P.lockfile(), pre ++ "/ez.toml",
+            Str.string_eq_true(P.lockfile(), pre ++ "/ez.toml", eb)),
+          slash_member(pre)))
+
+def Laws.plain_lock_keeps_members(w, e, pre):
+  Laws.plain_lock_writes_only_lock(w, e, pre ++ "/ez.toml",
+    lock_not_member(String.eq(P.lockfile(), pre ++ "/ez.toml"), pre, {==}))
