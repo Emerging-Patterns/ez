@@ -61,6 +61,8 @@ What a command acts on follows uv:
 | `ez check`, `ez build`, `ez run` | the member's own entry, with the root's `BEND_LIB` |
 | `ez publish` | the member's own package, judged against the root's lock (EZ-PUB-5) |
 
+**Update (W2):** the search is `src/ws/root.bend`. `R.asks` names the directories whose ez.toml the interpreter reads, where ez runs first and the top of the checkout last, each with the path from it down to where ez runs, and `R.root.go` decides from what they hold in that order. A directory with no ez.toml, and one whose ledger has no `[workspace]` table, are passed by; the first workspace root that claims the directory is its root, a workspace root claiming itself and a directory below it exactly when EZ-WS-1 makes it a member; and a `[workspace]` table that cannot be read stops the search with its reason, since taking the directory for a project of its own would silently ignore the workspace above it. We read the path from `git rev-parse --show-prefix` (`R.here.of`), so the search stops at the top of the checkout without ez walking the filesystem. No command calls the search yet; each does as it is converted, from W3 on, so EZ-WS-2 stays pending until then.
+
 ## One lock (EZ-WS-3)
 
 The lock is written at the root and nowhere else. A member's own `ez.lock.toml`, if one is left over from before it joined, is neither read nor written, and `ez doctor` says so. EZ-DOC-3 to EZ-DOC-5 are restated over the workspace's World, which holds every member's ledger text in place of one: the lock is a function of those ledgers and the committed tree, a rerun writes the same bytes, and a plain lock writes no ledger.
@@ -115,7 +117,7 @@ On a fresh clone, every import already names the hash the committed tree walks t
 | WP | Lands | Rows |
 | :-- | :-- | :-- |
 | W1 (landed) | `[workspace]` read beside the ledger model, in `src/ws/workspace.bend`; the member set as a pure function of the root ledger and the committed listing | EZ-WS-1 |
-| W2 | Root finding as a pure function of the directories above and their ledgers; every command's interpreter reads the ancestors and calls it | EZ-WS-2 |
+| W2 (landed) | Root finding as a pure function of the directories above and their ledgers; every command's interpreter reads the ancestors and calls it | EZ-WS-2 |
 | W3 | The lock World holds every member's ledger; one lock at the root; EZ-DOC-3 to EZ-DOC-5 restated over it | EZ-WS-3 |
 | W4 | The one-pin check in the lock; `ez add` reusing a member's pin; `ez lock --upgrade` moving a source in every member | EZ-WS-4 |
 | W5 | `workspace = true` sources (a `Member` constructor of `M.Source`); the lock walks each member and lays it | EZ-WS-5 |

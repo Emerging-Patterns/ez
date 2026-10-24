@@ -9,6 +9,7 @@ import Base
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
 import ./workspace.bend as W
+import ./root.bend as R
 import ./LAWS.bend as Laws
 
 # a cut at the last segment, by induction on the segments before it: the
@@ -323,3 +324,187 @@ def Laws.ok_needs_names(spec, root, ls, ev):
     case W.Spec{+es, +ex}:
       Eq.and.right(W.unnested(W.picks(W.Spec{es, ex}, ls)),
         W.distinct(W.names(root, W.picks(W.Spec{es, ex}, ls))), ok.last(es, ex, root, ls, ev))
+
+# ---------------------------------------------------------------------------
+# finding the root
+
+# by induction on where ez runs: the directories above the parent, one
+# segment further down, start with the parent
+def Laws.asks_nearest(here):
+  match here:
+    case []:
+      {==}
+    case +hd <> +tl:
+      Equal.cong(List<&2, R.Ask>, List<&2, R.Ask>,
+        xs => List.append(&2, R.Ask, R.asks.under(hd, xs), [R.Ask{[], hd <> tl}]),
+        R.asks(tl), R.Ask{tl, []} <> Laws.asks.rest(tl), Laws.asks_nearest(tl))
+
+# the top is put last, at the top and with a segment in front alike
+def Laws.asks_top(here):
+  match here:
+    case []:
+      {==}
+    case _hd <> _tl:
+      {==}
+
+# a path compares equal to itself, segment by segment
+def segs_eq_self(ds: List<&2, String>) -> {W.segs.eq(ds, ds) == True{} : Bool}:
+  match ds:
+    case []:
+      {==}
+    case +hd <> +tl:
+      Str.and_true(String.eq(hd, hd), W.segs.eq(tl, tl), Eq.string_eq_self(hd), segs_eq_self(tl))
+
+# where the brackets of two `and`s fall does not matter
+def and_assoc(
+  aa: Bool,
+  bb: Bool,
+  cc: Bool
+) -> {Bool.and(aa, Bool.and(bb, cc)) == Bool.and(Bool.and(aa, bb), cc) : Bool}:
+  match aa:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# the directories of two lists split where ez runs when those of each do
+def splits_app(
+  xs: List<&2, R.Ask>,
+  +ys: List<&2, R.Ask>,
+  +here: List<&2, String>
+) -> {Laws.splits(List.append(&2, R.Ask, xs, ys), here)
+    == Bool.and(Laws.splits(xs, here), Laws.splits(ys, here)) : Bool}:
+  match xs:
+    case []:
+      {==}
+    case R.Ask{+ds, +rs} <> +xt:
+      Equal.trans(Bool,
+        Bool.and(W.segs.eq(List.append(&2, String, ds, rs), here),
+          Laws.splits(List.append(&2, R.Ask, xt, ys), here)),
+        Bool.and(W.segs.eq(List.append(&2, String, ds, rs), here),
+          Bool.and(Laws.splits(xt, here), Laws.splits(ys, here))),
+        Bool.and(Bool.and(W.segs.eq(List.append(&2, String, ds, rs), here), Laws.splits(xt, here)),
+          Laws.splits(ys, here)),
+        Equal.cong(Bool, Bool, bb => Bool.and(W.segs.eq(List.append(&2, String, ds, rs), here), bb),
+          Laws.splits(List.append(&2, R.Ask, xt, ys), here),
+          Bool.and(Laws.splits(xt, here), Laws.splits(ys, here)),
+          splits_app(xt, ys, here)),
+        and_assoc(W.segs.eq(List.append(&2, String, ds, rs), here), Laws.splits(xt, here),
+          Laws.splits(ys, here)))
+
+# directories asked about from one segment further down split where ez runs
+# when they split one segment further down
+def splits_under(
+  +hd: String,
+  xs: List<&2, R.Ask>,
+  +tl: List<&2, String>
+) -> {Laws.splits(R.asks.under(hd, xs), hd <> tl) == Laws.splits(xs, tl) : Bool}:
+  match xs:
+    case []:
+      {==}
+    case R.Ask{+ds, +rs} <> +xt:
+      Equal.trans(Bool,
+        Bool.and(Bool.and(String.eq(hd, hd), W.segs.eq(List.append(&2, String, ds, rs), tl)),
+          Laws.splits(R.asks.under(hd, xt), hd <> tl)),
+        Bool.and(W.segs.eq(List.append(&2, String, ds, rs), tl),
+          Laws.splits(R.asks.under(hd, xt), hd <> tl)),
+        Bool.and(W.segs.eq(List.append(&2, String, ds, rs), tl), Laws.splits(xt, tl)),
+        Equal.cong(Bool, Bool,
+          bb => Bool.and(Bool.and(bb, W.segs.eq(List.append(&2, String, ds, rs), tl)),
+            Laws.splits(R.asks.under(hd, xt), hd <> tl)),
+          String.eq(hd, hd), True{}, Eq.string_eq_self(hd)),
+        Equal.cong(Bool, Bool, bb => Bool.and(W.segs.eq(List.append(&2, String, ds, rs), tl), bb),
+          Laws.splits(R.asks.under(hd, xt), hd <> tl), Laws.splits(xt, tl),
+          splits_under(hd, xt, tl)))
+
+# by induction on where ez runs: the directories above the parent split
+# there, one segment further down, and the top is the whole path above it
+def Laws.asks_split(here):
+  match here:
+    case []:
+      {==}
+    case +hd <> +tl:
+      Equal.trans(Bool,
+        Laws.splits(List.append(&2, R.Ask, R.asks.under(hd, R.asks(tl)), [R.Ask{[], hd <> tl}]), hd <> tl),
+        Bool.and(Laws.splits(R.asks.under(hd, R.asks(tl)), hd <> tl),
+          Laws.splits([R.Ask{[], hd <> tl}], hd <> tl)),
+        True{},
+        splits_app(R.asks.under(hd, R.asks(tl)), [R.Ask{[], hd <> tl}], hd <> tl),
+        Str.and_true(Laws.splits(R.asks.under(hd, R.asks(tl)), hd <> tl),
+          Laws.splits([R.Ask{[], hd <> tl}], hd <> tl),
+          Equal.trans(Bool, Laws.splits(R.asks.under(hd, R.asks(tl)), hd <> tl),
+            Laws.splits(R.asks(tl), tl), True{},
+            splits_under(hd, R.asks(tl), tl), Laws.asks_split(tl)),
+          Str.and_true(W.segs.eq(hd <> tl, hd <> tl), True{}, segs_eq_self(hd <> tl), {==})))
+
+def Laws.root_skips_none(_ds, _rs, _ups):
+  {==}
+
+def Laws.root_skips_lone(ds, rs, tt, ups, ev):
+  Equal.cong(W.Read, R.Found, rd => R.root.read(rd, ds, rs, R.root.go(ups)), W.spec.of(tt), W.Lone{}, ev)
+
+def Laws.root_bad_refuses(ds, rs, tt, ups, why, ev):
+  Equal.cong(W.Read, R.Found, rd => R.root.read(rd, ds, rs, R.root.go(ups)), W.spec.of(tt), W.Bad{why}, ev)
+
+def Laws.root_claims_it(ds, rs, tt, ups, spec, ev, ec):
+  Equal.trans(R.Found,
+    R.root.read(W.spec.of(tt), ds, rs, R.root.go(ups)),
+    R.root.claim(R.claims(spec, rs), ds, rs, R.root.go(ups)),
+    R.Within{ds, rs},
+    Equal.cong(W.Read, R.Found, rd => R.root.read(rd, ds, rs, R.root.go(ups)), W.spec.of(tt), W.Root{spec}, ev),
+    Equal.cong(Bool, R.Found, bb => R.root.claim(bb, ds, rs, R.root.go(ups)), R.claims(spec, rs), True{}, ec))
+
+def Laws.root_passes_by(ds, rs, tt, ups, spec, ev, ec):
+  Equal.trans(R.Found,
+    R.root.read(W.spec.of(tt), ds, rs, R.root.go(ups)),
+    R.root.claim(R.claims(spec, rs), ds, rs, R.root.go(ups)),
+    R.root.go(ups),
+    Equal.cong(W.Read, R.Found, rd => R.root.read(rd, ds, rs, R.root.go(ups)), W.spec.of(tt), W.Root{spec}, ev),
+    Equal.cong(Bool, R.Found, bb => R.root.claim(bb, ds, rs, R.root.go(ups)), R.claims(spec, rs), False{}, ec))
+
+# a ledger that says nothing of a workspace leaves the search to the
+# directories above
+def quiet_read(
+  rd: W.Read,
+  +ds: List<&2, String>,
+  +rs: List<&2, String>,
+  rest: R.Found,
+  ev: {Laws.quiet.read(rd) == True{} : Bool}
+) -> {R.root.read(rd, ds, rs, rest) == rest : R.Found}:
+  match rd:
+    case W.Lone{}:
+      {==}
+    case W.Bad{why}:
+      Eq.bit.absurd(&2, {R.root.read(W.Bad{why}, ds, rs, rest) == rest : R.Found}, ev)
+    case W.Root{spec}:
+      Eq.bit.absurd(&2, {R.root.read(W.Root{spec}, ds, rs, rest) == rest : R.Found}, ev)
+
+# and so does a directory with no ledger
+def quiet_at(
+  text: Maybe<&2, String>,
+  +ds: List<&2, String>,
+  +rs: List<&2, String>,
+  rest: R.Found,
+  ev: {Laws.quiet.one(text) == True{} : Bool}
+) -> {R.root.at(text, ds, rs, rest) == rest : R.Found}:
+  match text:
+    case None{}:
+      {==}
+    case Some{tt}:
+      quiet_read(W.spec.of(tt), ds, rs, rest, ev)
+
+# by induction on the directories read: each leaves the search to the rest
+def Laws.root_none(ups, ev):
+  match ups:
+    case []:
+      {==}
+    case R.Up{+ds, +rs, +tx} <> +tl:
+      Equal.trans(R.Found, R.root.at(tx, ds, rs, R.root.go(tl)), R.root.go(tl), R.Alone{},
+        quiet_at(tx, ds, rs, R.root.go(tl), Eq.and.left(Laws.quiet.one(tx), Laws.quiet(tl), ev)),
+        Laws.root_none(tl, Eq.and.right(Laws.quiet.one(tx), Laws.quiet(tl), ev)))
+
+def Laws.claims_self(_spec):
+  {==}
+
+def Laws.claims_member(_spec, _hd, _tl):
+  {==}

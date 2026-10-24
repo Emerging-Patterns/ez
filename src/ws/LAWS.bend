@@ -4,9 +4,13 @@
 # that decision: an entry names a directory or every directory directly under
 # one, a path that climbs or names itself by `.` is never one, and the
 # members are exactly the listed directories no exclusion takes back, once
-# nothing is refused.
+# nothing is refused. A command run in a directory finds its root by reading
+# the ledger of each directory from there up to the top of the checkout,
+# nearest first, and the first workspace root that claims the directory is
+# its root.
 import Base
 import ./workspace.bend as W
+import ./root.bend as R
 
 # a path every path that starts with it extends. Law vocabulary: ez never
 # calls it.
@@ -207,3 +211,158 @@ law ok_needs_names:
   for +ls: List<&2, W.Ledger>
   for +ev: {W.ok(spec, root, ls) == True{} : Bool}
   {W.distinct(W.names(root, W.picks(spec, ls))) == True{} : Bool}
+
+# ---------------------------------------------------------------------------
+# finding the root (EZ-WS-2)
+
+# every directory asked about after the first, nearest first. Law
+# vocabulary: ez never calls it.
+def asks.rest(here: List<&2, String>) -> List<&2, R.Ask>:
+  match here:
+    case []:
+      []
+    case +hd <> +tl:
+      List.append(&2, R.Ask, R.asks.under(hd, asks.rest(tl)), [R.Ask{[], hd <> tl}])
+
+# every directory asked about before the top of the checkout
+def asks.init(here: List<&2, String>) -> List<&2, R.Ask>:
+  match here:
+    case []:
+      []
+    case +hd <> +tl:
+      R.asks.under(hd, R.asks(tl))
+
+# whether every directory asked about, followed down by its path to where ez
+# runs, is where ez runs
+def splits(xs: List<&2, R.Ask>, +here: List<&2, String>) -> Bool:
+  match xs:
+    case []:
+      True{}
+    case R.Ask{ds, rs} <> tl:
+      Bool.and(W.segs.eq(List.append(&2, String, ds, rs), here), splits(tl, here))
+
+# whether a directory's ledger says nothing of a workspace: it has none, or it
+# has no `[workspace]` table
+def quiet.read(rd: W.Read) -> Bool:
+  match rd:
+    case W.Lone{}:
+      True{}
+    case W.Bad{_why}:
+      False{}
+    case W.Root{_spec}:
+      False{}
+
+# whether a directory read says nothing of a workspace
+def quiet.one(text: Maybe<&2, String>) -> Bool:
+  match text:
+    case None{}:
+      True{}
+    case Some{tt}:
+      quiet.read(W.spec.of(tt))
+
+# whether no directory read says anything of a workspace
+def quiet(ups: List<&2, R.Up>) -> Bool:
+  match ups:
+    case []:
+      True{}
+    case R.Up{_ds, _rs, tx} <> tl:
+      Bool.and(quiet.one(tx), quiet(tl))
+
+# LAW: the first directory asked about is where ez runs, as its own root
+# would be
+# EZ-WS-2
+law asks_nearest:
+  for +here: List<&2, String>
+  {R.asks(here) == R.Ask{here, []} <> asks.rest(here) : List<&2, R.Ask>}
+
+# LAW: and the last is the top of the checkout, from which ez runs the whole
+# path down
+# EZ-WS-2
+law asks_top:
+  for +here: List<&2, String>
+  {R.asks(here) == List.append(&2, R.Ask, asks.init(here), [R.Ask{[], here}]) : List<&2, R.Ask>}
+
+# LAW: every directory asked about is above where ez runs, by the path it is
+# asked with
+# EZ-WS-2
+law asks_split:
+  for +here: List<&2, String>
+  {splits(R.asks(here), here) == True{} : Bool}
+
+# LAW: a directory with no ez.toml is passed by
+# EZ-WS-2
+law root_skips_none:
+  for ds: List<&2, String>
+  for rs: List<&2, String>
+  for ups: List<&2, R.Up>
+  {R.root.go(R.Up{ds, rs, None{}} <> ups) == R.root.go(ups) : R.Found}
+
+# LAW: and so is one whose ledger has no `[workspace]` table
+# EZ-WS-2
+law root_skips_lone:
+  for +ds: List<&2, String>
+  for +rs: List<&2, String>
+  for +tt: String
+  for +ups: List<&2, R.Up>
+  for ev: {W.spec.of(tt) == W.Lone{} : W.Read}
+  {R.root.go(R.Up{ds, rs, Some{tt}} <> ups) == R.root.go(ups) : R.Found}
+
+# LAW: a `[workspace]` table that could not be read stops the search, so a
+# command never takes a directory for a project of its own because the table
+# above it was broken
+# EZ-WS-2
+law root_bad_refuses:
+  for +ds: List<&2, String>
+  for +rs: List<&2, String>
+  for +tt: String
+  for +ups: List<&2, R.Up>
+  for +why: String
+  for ev: {W.spec.of(tt) == W.Bad{why} : W.Read}
+  {R.root.go(R.Up{ds, rs, Some{tt}} <> ups) == R.Broken{why} : R.Found}
+
+# LAW: a workspace root that claims where ez runs is its root, whatever is
+# above it
+# EZ-WS-2
+law root_claims_it:
+  for +ds: List<&2, String>
+  for +rs: List<&2, String>
+  for +tt: String
+  for +ups: List<&2, R.Up>
+  for +spec: W.Spec
+  for ev: {W.spec.of(tt) == W.Root{spec} : W.Read}
+  for ec: {R.claims(spec, rs) == True{} : Bool}
+  {R.root.go(R.Up{ds, rs, Some{tt}} <> ups) == R.Within{ds, rs} : R.Found}
+
+# LAW: and one that does not is passed by
+# EZ-WS-2
+law root_passes_by:
+  for +ds: List<&2, String>
+  for +rs: List<&2, String>
+  for +tt: String
+  for +ups: List<&2, R.Up>
+  for +spec: W.Spec
+  for ev: {W.spec.of(tt) == W.Root{spec} : W.Read}
+  for ec: {R.claims(spec, rs) == False{} : Bool}
+  {R.root.go(R.Up{ds, rs, Some{tt}} <> ups) == R.root.go(ups) : R.Found}
+
+# LAW: with no workspace above it, a directory is a project of its own
+# EZ-WS-2
+law root_none:
+  for ups: List<&2, R.Up>
+  for +ev: {quiet(ups) == True{} : Bool}
+  {R.root.go(ups) == R.Alone{} : R.Found}
+
+# LAW: a workspace root claims itself, whatever its members are
+# EZ-WS-2
+law claims_self:
+  for +spec: W.Spec
+  {R.claims(spec, []) == True{} : Bool}
+
+# LAW: and claims a directory below it exactly when that directory is a
+# member (EZ-WS-1)
+# EZ-WS-2
+law claims_member:
+  for +spec: W.Spec
+  for +hd: String
+  for +tl: List<&2, String>
+  {R.claims(spec, hd <> tl) == W.chosen(spec, hd <> tl) : Bool}
