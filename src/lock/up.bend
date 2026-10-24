@@ -761,10 +761,21 @@ def dep.tip(tip: Tip, +rs: List<&2, Reply>, +hub: String, +dep: M.Dep) -> Fate:
     case TipNo{why}:
       Halts{why}
 
+# why a pin is held, said for its source: a hub pin is pinned by its hash,
+# and a workspace member is the committed tree
+def held.why(src: M.Source) -> String:
+  match src:
+    case M.Hub{_nv}:
+      ": pinned by its hash"
+    case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+      ": pinned by its hash"
+    case M.Member{_path, _nv}:
+      ": a workspace member, locked from its committed files"
+
 # a hub pin named with `--package` is reported and left. An unselected
 # dependency is left quietly.
 def dep.hold(sel: Bool, +dep: M.Dep) -> Fate:
-  stay(dep, line.if(sel, M.dep.name(dep) ++ ": pinned by its hash"))
+  stay(dep, line.if(sel, M.dep.name(dep) ++ held.why(M.source.dep(dep))))
 
 # one dependency, by what it is asked
 def dep.one(aim: U.Aim, +rs: List<&2, Reply>, +only: String, +hub: String, +dep: M.Dep) -> Fate:
@@ -847,6 +858,8 @@ def set.go(
       M.Tool{name, entry, bin, M.Git{url, rev,
         Bool.pick(String, String.is_empty(tag), old, tag), M.root.or(root),
         nar, False{}}}
+    case M.Member{path, named}:
+      M.Tool{name, entry, bin, M.Member{path, named}}
 
 # a tool's pin with a commit, a tag and a NAR hash written in
 def set(tool: M.Tool, +rev: String, +tag: String, +nar: String) -> M.Tool:

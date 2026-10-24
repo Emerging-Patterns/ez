@@ -63,6 +63,8 @@ def fetch.ask(src: L.Src, +here: String, +hub: String, +hash: String) -> F.Ask:
       F.Hub{W.Pkg{hash, L.Hub{}, hub}}
     case L.Git{url, rev, _entry, _root, _nar, _tag}:
       F.Git{hash, Up.Clone{Path.anchor(here, url), rev}}
+    case L.Member{path, entry}:
+      F.Hub{W.Pkg{hash, L.Member{path, entry}, hub}}
 
 # ---------------------------------------------------------------------------
 # what arrived
@@ -400,6 +402,8 @@ def weighed.src(src: L.Src, +rs: List<&2, F.Reply>, +here: String, +hash: String
     case L.Git{+url, +rev, _entry, _root, nar, _tag}:
       weighed.heard(F.heard(rs, F.Git{hash, Up.Clone{Path.anchor(here, url), rev}}),
         hash, nar, url, rev)
+    case L.Member{_path, _entry}:
+      ""
 
 # why the checkout a package of the lock was fetched as may not be laid, ""
 # when it may. A hub package has no checkout. A git package's checkout, the

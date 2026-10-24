@@ -349,6 +349,8 @@ def src.values(source: L.Src) -> List<&2, String>:
       []
     case L.Git{url, rev, entry, root, nar, tag}:
       [url, rev, entry, root, nar, tag]
+    case L.Member{path, entry}:
+      [path, entry]
 
 # every path and sum a package's files write
 def file.values(fs: List<&2, K.Item>) -> List<&2, String>:
@@ -404,6 +406,8 @@ def tool.values(pin: M.Tool) -> List<&2, String>:
       [n, e, b]
     case M.Git{url, rev, tag, root, nar, _vend}:
       [n, e, b, url, rev, tag, root, nar]
+    case M.Member{_path, _named}:
+      [n, e, b]
 
 # whether every tool pin can be written
 def tools.ok(ts: List<&2, M.Tool>) -> Bool:
@@ -1144,6 +1148,8 @@ def anchor.src(+here: String, src: L.Src) -> L.Src:
       L.Hub{}
     case L.Git{url, rev, entry, root, nar, tag}:
       L.Git{Path.anchor(here, url), rev, entry, root, nar, tag}
+    case L.Member{path, entry}:
+      L.Member{path, entry}
 
 # each hash still to ask about, as the question for it, with its source
 # anchored

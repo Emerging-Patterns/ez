@@ -496,6 +496,8 @@ def lib_as_clone.src(src, _hash, _manifest, _ss):
       {==}
     case L.Git{url, rev, entry, root, nar, tag}:
       {==}
+    case L.Member{path, entry}:
+      {==}
 
 def Laws.lib_judged_as_clone(orgs, _hub, hash, manifest, ss):
   lib_as_clone.src(L.origin(orgs, hash), hash, manifest, ss)
@@ -2018,6 +2020,8 @@ def clone_passed.src(src, got, hash, manifest, ss, e):
           W.git.weighed("", hash, manifest, ss),
           Equal.cong(String, W.Verdict, why => W.git.weighed(why, hash, manifest, ss),
             L.nar.why(nar, got, url, rev), "", same)))
+    case L.Member{_path, _entry}:
+      {==}
 
 # LAW: a cloned tree, laid when it passed, is judged as it was
 law after.clone_judged:
@@ -2778,6 +2782,25 @@ def src_read.git(url, rev, entry, root, nar, tag):
     == L.Git{url, rev, entry, root, nar, tag} : L.Src}
   {==}
 
+# LAW: a workspace member's source reads back from the pairs it is written
+# as, with the source taken apart
+law src_read.member:
+  for +path: String
+  for +entry: String
+  {L.src_of(L.src.pairs(L.Member{path, entry})) == L.Member{path, entry} : L.Src}
+
+# each value, looked up in the run with every pair written, is the value
+def src_read.member(path, entry):
+  r0 = Equal.sym(String, T.value(kvs.of(["path", "entry"], [path, entry]), "path"),
+    T.value(full.of(["path", "entry"], [path, entry]), "path"),
+    kvs_full(["path", "entry"], [path, entry], "path", {==}))
+  %r0 : {L.Member{_, T.value(kvs.of(["path", "entry"], [path, entry]), "entry")} == L.Member{path, entry} : L.Src}
+  r1 = Equal.sym(String, T.value(kvs.of(["path", "entry"], [path, entry]), "entry"),
+    T.value(full.of(["path", "entry"], [path, entry]), "entry"),
+    kvs_full(["path", "entry"], [path, entry], "entry", {==}))
+  %r1 : {L.Member{T.value(full.of(["path", "entry"], [path, entry]), "path"), _} == L.Member{path, entry} : L.Src}
+  {==}
+
 # LAW: a package's source reads back from the pairs it is written as
 law src_read:
   for +src: L.Src
@@ -2789,6 +2812,8 @@ def src_read(src):
       {==}
     case L.Git{+url, +rev, +entry, +root, +nar, +tag}:
       src_read.git(url, rev, entry, root, nar, tag)
+    case L.Member{+path, +entry}:
+      src_read.member(path, entry)
 
 # LAW: a package's files read back from the pairs they are written as
 law pair_files:
@@ -3037,6 +3062,13 @@ def tools_read.src(n, e, b, s, rest):
           L.kv("bin", b)])),
         M.Tool{n, e, b, M.source.go(String.is_empty(url), url, rev, tag, M.root.or(root), nar, False{})},
         tool_of.git(n, url, rev, tag, root, nar, e, b))
+    case M.Member{+path, +named}:
+      f = Equal.sym(Bool, String.starts_with(n, ""), True{}, Eq.starts_nil(n))
+      %f : {M.tools.put(_, L.tool.sect(M.Tool{n, e, b, M.Member{path, named}}), M.tools(rest))
+        == Laws.tool.canon(M.Tool{n, e, b, M.Member{path, named}}) <> M.tools(rest) : List<&2, M.Tool>}
+      Equal.cong(M.Tool, List<&2, M.Tool>, x => x <> M.tools(rest),
+        M.tool_of("tools." ++ n, List.concat(&2, T.Kv, [L.kv("entry", e), L.kv("bin", b)])),
+        M.Tool{n, e, b, M.Hub{""}}, tool_of.hub(n, e, b))
 
 # LAW: every tool's table, read, is the tool list as the lock gives it back
 law tools_read:
@@ -3547,12 +3579,28 @@ def hub_source_holds(sel, _hv):
     case False{}:
       {==}
 
+# LAW: a workspace member's source is held, chosen or not
+law member_source_holds:
+  for sel: Bool
+  for path: String
+  for named: String
+  {U.aim(sel, M.Member{path, named}) == U.Hold{} : U.Aim}
+
+def member_source_holds(sel, _path, _named):
+  match sel:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
 def hub_holds(sel, s, e):
   match s:
     case M.Hub{hv}:
       hub_source_holds(sel, hv)
     case M.Git{url, rev, tag, root, nar, vend}:
       Eq.bit.absurd2(&2, {U.aim(sel, M.Git{url, rev, tag, root, nar, vend}) == U.Hold{} : U.Aim}, e)
+    case M.Member{path, named}:
+      member_source_holds(sel, path, named)
 
 # One dependency's fate keeps its name. Law vocabulary for the walk below.
 
@@ -3582,6 +3630,8 @@ def retarget_name(dep, _rev, _hash, _root, _nar):
         case M.Hub{hv}:
           {==}
         case M.Git{url, r, tag, rt, nr, vend}:
+          {==}
+        case M.Member{mp, mn}:
           {==}
 
 law moved_name:
@@ -4261,6 +4311,8 @@ def set_name(tool, _rev, _tag, _nar):
         case M.Hub{hv}:
           {==}
         case M.Git{url, r, old, root, nr, vend}:
+          {==}
+        case M.Member{mp, mn}:
           {==}
 
 law tpin_name:
@@ -6708,6 +6760,8 @@ def mv.self_dep(t, rs, d, g):
           g
         case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
           mv.self(t, rs, hn, hh, he, url, rev, tag, root, nar, vend)
+        case M.Member{mp, mn}:
+          g
 
 # LAW: a pin by its commit alone is from a repository
 law mv.bare_git:
@@ -6723,6 +6777,8 @@ def mv.bare_git(d, bare):
           bare
         case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
           {==}
+        case M.Member{mp, mn}:
+          bare
 
 # LAW: and so is one through a tag
 law mv.named_git:
@@ -6738,6 +6794,8 @@ def mv.named_git(d, named):
           named
         case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
           {==}
+        case M.Member{mp, mn}:
+          named
 
 # One pin's fate is sound against the tip it was moved by. The pin is
 # checked out when the tip is its own commit, and kept only when the checkout
@@ -7031,6 +7089,8 @@ def mv.fine_hub(hb, _hn, _hh, _he, src, _hash, _r, _root2, _nar2, _man, _srcs, _
           {==}
         case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
           {==}
+        case M.Member{mp, mn}:
+          {==}
     case Up.Clash{}:
       {==}
     case Up.HubWait{_ask}:
@@ -7257,6 +7317,10 @@ def mv.fwd_one(rs, only, hub, h, bare):
                 M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
                 mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), Up.forward(rs, url), rs,
                 mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}, bare)
+        case M.Member{mp, mn}:
+          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Member{mp, mn}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Member{mp, mn}}), Up.forward(rs, ""), rs, M.Dep{hn, hh, he, M.Member{mp, mn}})
+            == True{} : Bool}, bare)
 
 # LAW: a pin through a tag, asked about or not
 law mv.fol_sel:
@@ -7316,6 +7380,10 @@ def mv.fol_one(rs, only, hub, h, named):
             case SCon{+c, +ct}:
               mv.fol_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root, nar,
                 vend)
+        case M.Member{mp, mn}:
+          Eq.bit.absurd(&2, {mv.ok(Up.dep.one(U.aim(U.chosen(only, hn), M.Member{mp, mn}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Member{mp, mn}}), Up.follow(rs, "", ""), rs, M.Dep{hn, hh, he, M.Member{mp, mn}})
+            == True{} : Bool}, named)
 
 # The walk over the ledger's dependencies. `M.find` answers the first
 # dependency of a name, and every fate keeps its name, so the walk leaves the
@@ -8092,6 +8160,9 @@ def mv.fwd_off(rs, only, hub, h, tip, tg, br, bare, sel, head, moved, off):
               Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn),
                 M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
                 mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend))) == True{} : Bool}, bare)
+        case M.Member{mp, mn}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Member{mp, mn}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Member{mp, mn}})) == True{} : Bool}, bare)
 
 # LAW: a pin through a tag that is asked about, whose tag now names another
 # commit not descended from it, is refused
@@ -8193,6 +8264,9 @@ def mv.fol_off(rs, only, hub, h, tip, tg, br, named, sel, refs, moved, off):
             case SCon{+c, +ct}:
               mv.fol_off_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root,
                 nar, vend, tip, tg, br, sel, refs, moved, off)
+        case M.Member{mp, mn}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Member{mp, mn}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Member{mp, mn}})) == True{} : Bool}, named)
 
 # LAW: a pin through a tag that is asked about, whose tag still names its
 # commit but whose checkout no longer agrees with it, is refused
@@ -8328,6 +8402,9 @@ def mv.fol_drift(
             case SCon{+c, +ct}:
               mv.fol_drift_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root,
                 nar, vend, tip, tg, br, nar2, root2, man, srcs, sel, refs, same, co, drift)
+        case M.Member{mp, mn}:
+          Eq.bit.absurd(&2, {mv.halts(Up.dep.one(U.aim(U.chosen(only, hn), M.Member{mp, mn}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Member{mp, mn}})) == True{} : Bool}, named)
 
 # LAW: a walk with no dependencies has no refusal to carry, so none of them
 # refused
@@ -8993,6 +9070,9 @@ def mv.fwd_live(rs, only, hub, h, tip, tg, br, bare, sel, head):
                 M.Git{url, rev, SCon{c, ct}, root, nar, vend}), rs, only, hub,
                 mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)), tip,
                 mv.git(hn, hh, he, url, rev, SCon{c, ct}, root, nar, vend)) == True{} : Bool}, bare)
+        case M.Member{mp, mn}:
+          Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn), M.Member{mp, mn}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Member{mp, mn}}), tip, M.Dep{hn, hh, he, M.Member{mp, mn}}) == True{} : Bool}, bare)
 
 # LAW: a pin through a tag that is asked about reaches what its tag names
 law mv.fol_live_sel:
@@ -9092,6 +9172,9 @@ def mv.fol_live(rs, only, hub, h, tip, tg, br, named, sel, refs):
             case SCon{+c, +ct}:
               mv.fol_live_sel(U.chosen(only, hn), rs, only, hub, hn, hh, he, url, rev, c, ct, root,
                 nar, vend, tip, tg, br, sel, refs)
+        case M.Member{mp, mn}:
+          Eq.bit.absurd(&2, {mv.live(Up.dep.one(U.aim(U.chosen(only, hn), M.Member{mp, mn}), rs, only, hub,
+            M.Dep{hn, hh, he, M.Member{mp, mn}}), tip, M.Dep{hn, hh, he, M.Member{mp, mn}}) == True{} : Bool}, named)
 
 # LAW: a walk over no dependencies reaches the tip exactly when the blank pin
 # does
@@ -10565,6 +10648,39 @@ def a.hubsel(sel, g, rs, only, hub, hn, hh, he, hv, ec):
           M.Dep{hn, hh, he, M.Hub{hv}}))) : Up.Fate}
       {==}
 
+# LAW: and so is a workspace member's, as a hub source is
+law a.memsel:
+  for sel: Bool
+  for +g: String
+  for +rs: List<&2, Up.Reply>
+  for +only: String
+  for +hub: String
+  for +hn: String
+  for +hh: String
+  for +he: String
+  for +mp: String
+  for +mn: String
+  for ec: {U.chosen(only, hn) == sel : Bool}
+  {again(Up.dep.one(U.aim(sel, M.Member{mp, mn}), rs, only, hub, M.Dep{hn, hh, he, M.Member{mp, mn}}), g, rs, only, hub)
+    == still(Up.dep.one(U.aim(sel, M.Member{mp, mn}), rs, only, hub, M.Dep{hn, hh, he, M.Member{mp, mn}}),
+      fsays(again(Up.dep.one(U.aim(sel, M.Member{mp, mn}), rs, only, hub, M.Dep{hn, hh, he, M.Member{mp, mn}}), g, rs,
+        only, hub))) : Up.Fate}
+
+def a.memsel(sel, g, rs, only, hub, hn, hh, he, mp, mn, ec):
+  match sel:
+    case True{}:
+      nec = Equal.sym(Bool, U.chosen(only, hn), True{}, ec)
+      %nec : {Up.dep.one(U.aim(_, M.Member{mp, mn}), re(g, rs), only, hub, M.Dep{hn, hh, he, M.Member{mp, mn}})
+        == kept(M.Dep{hn, hh, he, M.Member{mp, mn}}, fsays(Up.dep.one(U.aim(_, M.Member{mp, mn}), re(g, rs), only, hub,
+          M.Dep{hn, hh, he, M.Member{mp, mn}}))) : Up.Fate}
+      {==}
+    case False{}:
+      nec = Equal.sym(Bool, U.chosen(only, hn), False{}, ec)
+      %nec : {Up.dep.one(U.aim(_, M.Member{mp, mn}), re(g, rs), only, hub, M.Dep{hn, hh, he, M.Member{mp, mn}})
+        == kept(M.Dep{hn, hh, he, M.Member{mp, mn}}, fsays(Up.dep.one(U.aim(_, M.Member{mp, mn}), re(g, rs), only, hub,
+          M.Dep{hn, hh, he, M.Member{mp, mn}}))) : Up.Fate}
+      {==}
+
 # LAW: whatever the upgrade makes of a dependency, the next upgrade, against
 # the same remote, keeps the pin it left, or stops as it did
 law a.one:
@@ -10587,6 +10703,8 @@ def a.one(g, rs, only, hub, d):
           a.hubsel(U.chosen(only, hn), g, rs, only, hub, hn, hh, he, hv, {==})
         case M.Git{+url, +r0, +tg, +rt0, +nr0, +vd}:
           a.gsel(U.chosen(only, hn), g, rs, only, hub, hn, hh, he, url, r0, tg, rt0, nr0, vd, {==})
+        case M.Member{mp, mn}:
+          a.memsel(U.chosen(only, hn), g, rs, only, hub, hn, hh, he, mp, mn, {==})
 
 # The pin a fate leaves is the one it had whenever the fate says it did not
 # move: only `dep.moved` changes a pin, and it says so.
@@ -11969,6 +12087,8 @@ def t.sel(sel, g, rs, only, n, e, b, s, ec):
         case M.Git{+url, +r0, +tg, +rt0, +nr0, +vd}:
           t.short(Bool.or(String.is_empty(r0), String.is_empty(nr0)), g, rs, only, n, e, b, url, r0, tg,
             rt0, nr0, vd, ec, {==})
+        case M.Member{mp, mn}:
+          {==}
 
 law t.one:
   for +g: String
@@ -15069,6 +15189,22 @@ def nv.hub.how(how, hash, manifest, ss):
     case W.Served{}:
       nv.body(hash, manifest, ss)
 
+law nv.member.how:
+  for how: W.How
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  {nv(hash, W.member.how(how, hash, manifest, ss)) == True{} : Bool}
+
+def nv.member.how(how, hash, manifest, ss):
+  match how:
+    case W.Lib{}:
+      nv.body(hash, manifest, ss)
+    case W.Clone{_got}:
+      nv.body(hash, manifest, ss)
+    case W.Served{}:
+      {==}
+
 law nv.src:
   for src: L.Src
   for how: W.How
@@ -15083,6 +15219,8 @@ def nv.src(src, how, hash, manifest, ss):
       nv.hub.how(how, hash, manifest, ss)
     case L.Git{+url, +rev, _entry, _root, +nar, _tag}:
       nv.git.how(how, hash, url, rev, nar, manifest, ss)
+    case L.Member{_path, _entry}:
+      nv.member.how(how, hash, manifest, ss)
 
 law nv.accept:
   for +orgs: List<&2, L.Origin>
@@ -15702,6 +15840,8 @@ def st.hub(hb, _hn, _hh, _he, src, _hash, _r, _root2, _nar2, _man, _srcs, _br):
           ({==}, Unit{})
         case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
           ({==}, Unit{})
+        case M.Member{mp, mn}:
+          ({==}, Unit{})
     case Up.Clash{}:
       Unit{}
     case Up.HubWait{_ask}:
@@ -16018,6 +16158,8 @@ def st.set(t, _rev, _tag, _nar):
         case M.Hub{hv}:
           {==}
         case M.Git{_url, _r, _g, _root, _nr, _v}:
+          {==}
+        case M.Member{mp, mn}:
           {==}
 
 law st.tpin:

@@ -162,10 +162,12 @@ def Laws.tools_skips_other_sections(n, ps, ss, e):
     : List<&2, M.Tool>}
   {==}
 
-def Laws.missing_finds_first(n, ps, ss, e0, e1):
-  %e0 : {M.missing.at(Bool.and(_, String.is_empty(M.value(ps, "hash"))), n,
+def Laws.missing_finds_first(n, ps, ss, e0, e1, e2):
+  %e0 : {M.missing.at(Bool.and(_, Bool.and(Bool.not(M.flag(M.value(ps, "workspace"))),
+    String.is_empty(M.value(ps, "hash")))), n, M.missing(ss)) == n : String}
+  %e2 : {M.missing.at(Bool.and(True{}, Bool.and(Bool.not(_), String.is_empty(M.value(ps, "hash")))), n,
     M.missing(ss)) == n : String}
-  %e1 : {M.missing.at(Bool.and(True{}, _), n, M.missing(ss)) == n : String}
+  %e1 : {M.missing.at(Bool.and(True{}, Bool.and(True{}, _)), n, M.missing(ss)) == n : String}
   {==}
 
 def Laws.problem_syntax_first(bad, miss, e):
@@ -1067,9 +1069,13 @@ def revend_again(k, s):
           {==}
         case M.Git{url, rev, tag, root, nar, vend}:
           {==}
+        case M.Member{_path, _named}:
+          {==}
     case False{}:
       match s:
         case M.Hub{_named}:
+          {==}
+        case M.Member{_path, _named}:
           {==}
         case M.Git{url, rev, tag, root, nar, vend}:
           match vend:
@@ -4326,7 +4332,8 @@ def row.ok(r: Row) -> Bool:
       Bool.and(T.bare(k), Bool.and(Str.clear(k, '='), Bool.and(Str.clear(k, '"'),
         Bool.and(Str.clear(k, '\n'), Str.clear(v, '\n')))))
     case B{+k, +v}:
-      Bool.or(String.is_empty(v), Bool.and(String.eq(k, "vendor"), String.eq(v, "true")))
+      Bool.or(String.is_empty(v),
+        Bool.and(Bool.or(String.eq(k, "vendor"), String.eq(k, "workspace")), String.eq(v, "true")))
 
 def rows.ok(rs: List<&2, Row>) -> Bool:
   match rs:
@@ -4562,6 +4569,8 @@ def src.rows(s: M.Source) -> List<&2, Row>:
     case M.Git{url, rev, tag, root, nar, vend}:
       [Q{"git", url}, Q{"rev", rev}, Q{"tag", tag}, Q{"root", root}, Q{"narHash", nar},
         B{"vendor", R.vendor.word(vend)}]
+    case M.Member{path, named}:
+      [B{"workspace", "true"}, Q{"path", path}, Q{"hub", named}]
 
 # the rows of a `[deps.<name>]` table
 def dep.rows(h: String, e: String, s: M.Source) -> List<&2, Row>:
@@ -4627,6 +4636,10 @@ def src_text(s):
         String.append(R.line.bare("vendor", R.vendor.word(vend)), ""),
         R.line.bare("vendor", R.vendor.word(vend)),
         Str.append_nil(R.line.bare("vendor", R.vendor.word(vend))))
+    case M.Member{+path, +named}:
+      Equal.cong(String, String,
+        y => String.append(R.line.bare("workspace", "true"), String.append(R.line("path", path), y)),
+        String.append(R.line("hub", named), ""), R.line("hub", named), Str.append_nil(R.line("hub", named)))
 
 # ---------------------------------------------------------------------------
 # a renderable ledger's tables read back
@@ -4709,6 +4722,30 @@ def src_rows_ok(s, rest, es, er):
                 clean_nl(nar, Eq.and.right(R.clean(root), R.clean(nar), c3)),
                 Str.and_true(row.ok(B{"vendor", R.vendor.word(vend)}), rows.ok(rest),
                   vend_ok(vend), er))))))
+    case M.Member{+path, +named}:
+      +em = es
+      Str.and_true(row.ok(B{"workspace", "true"}),
+        rows.ok(List.append(&2, Row, [Q{"path", path}, Q{"hub", named}], rest)), {==},
+        Str.and_true(Str.clear(path, '\n'), rows.ok(List.append(&2, Row, [Q{"hub", named}], rest)),
+          clean_nl(path, Eq.and.left(R.clean(path), R.clean(named), em)),
+          Str.and_true(Str.clear(named, '\n'), rows.ok(rest),
+            clean_nl(named, Eq.and.right(R.clean(path), R.clean(named), em)), er)))
+
+# LAW: a hash a dependency can be written with has no newline in it
+law hash_nl:
+  for +s: M.Source
+  for +h: String
+  for e: {R.hash.ok(s, h) == True{} : Bool}
+  {Str.clear(h, '\n') == True{} : Bool}
+
+def hash_nl(s, h, e):
+  match s:
+    case M.Hub{_named}:
+      clean_nl(h, Eq.and.right(Bool.not(String.is_empty(h)), R.clean(h), e))
+    case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+      clean_nl(h, Eq.and.right(Bool.not(String.is_empty(h)), R.clean(h), e))
+    case M.Member{_path, _named}:
+      clean_nl(h, e)
 
 # LAW: a dependency that can be written has a table that reads back
 law dep_sect_ok:
@@ -4719,16 +4756,15 @@ law dep_sect_ok:
 def dep_sect_ok(d, e):
   match d:
     case M.Dep{+n, +h, +en, +s}:
-      +l = Eq.and.left(Bool.and(R.clean(n), Bool.and(Bool.not(String.is_empty(h)), R.clean(h))),
+      +l = Eq.and.left(Bool.and(R.clean(n), R.hash.ok(s, h)),
         Bool.and(R.clean(en), R.source.ok(s)), e)
-      +r = Eq.and.right(Bool.and(R.clean(n), Bool.and(Bool.not(String.is_empty(h)), R.clean(h))),
+      +r = Eq.and.right(Bool.and(R.clean(n), R.hash.ok(s, h)),
         Bool.and(R.clean(en), R.source.ok(s)), e)
       Str.and_true(Str.clear(n, '\n'), rows.ok(dep.rows(h, en, s)),
-        clean_nl(n, Eq.and.left(R.clean(n), Bool.and(Bool.not(String.is_empty(h)), R.clean(h)), l)),
+        clean_nl(n, Eq.and.left(R.clean(n), R.hash.ok(s, h), l)),
         Str.and_true(Str.clear(h, '\n'),
           rows.ok(List.append(&2, Row, src.rows(s), [Q{"entry", en}])),
-          clean_nl(h, Eq.and.right(Bool.not(String.is_empty(h)), R.clean(h),
-            Eq.and.right(R.clean(n), Bool.and(Bool.not(String.is_empty(h)), R.clean(h)), l))),
+          hash_nl(s, h, Eq.and.right(R.clean(n), R.hash.ok(s, h), l)),
           src_rows_ok(s, [Q{"entry", en}], Eq.and.right(R.clean(en), R.source.ok(s), r),
             Str.and_true(Str.clear(en, '\n'), True{},
               clean_nl(en, Eq.and.left(R.clean(en), R.source.ok(s), r)), {==}))))
@@ -4759,6 +4795,8 @@ def tool_src_ok(s, e):
       {==}
     case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
       e
+    case M.Member{path, named}:
+      Eq.bit.absurd(&2, {R.source.ok(M.Member{path, named}) == True{} : Bool}, e)
 
 # LAW: and so does a pinned CLI that can be written
 law tool_sect_ok:
@@ -5147,6 +5185,12 @@ def dep_read(n, h, en, s, ok):
   match s:
     case M.Hub{+named}:
       +rs = dep.rows(h, en, M.Hub{named})
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "workspace"), M.value(rows.kvs(rs), "workspace"),
+        value_keep(rs, "workspace", {==}))
+        : {M.Dep{String.drop(n, 0n), M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(keep(rs)), "entry"),
+          M.source.ws(M.flag(_), M.value(rows.kvs(keep(rs)), "path"), M.value(rows.kvs(keep(rs)), "hub"),
+            M.source.named(M.value(rows.kvs(keep(rs)), "hub"), M.source_of(rows.kvs(keep(rs)))))}
+          == M.Dep{n, h, en, M.Hub{named}} : M.Dep}
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(rs), "hash"),
         value_keep(rs, "hash", {==}))
         : {M.Dep{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "entry"),
@@ -5170,11 +5214,17 @@ def dep_read(n, h, en, s, ok):
     case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
       +rs = dep.rows(h, en, M.Git{url, rev, tag, root, nar, vend})
       +es = Eq.and.right(R.clean(en), R.source.ok(M.Git{url, rev, tag, root, nar, vend}),
-        Eq.and.right(Bool.and(R.clean(n), Bool.and(Bool.not(String.is_empty(h)), R.clean(h))),
+        Eq.and.right(Bool.and(R.clean(n), R.hash.ok(M.Git{url, rev, tag, root, nar, vend}, h)),
           Bool.and(R.clean(en), R.source.ok(M.Git{url, rev, tag, root, nar, vend})), ok))
       +ne = Eq.and.left(Bool.and(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root))),
         Bool.and(Bool.and(R.clean(url), R.clean(rev)),
           Bool.and(R.clean(tag), Bool.and(R.clean(root), R.clean(nar)))), es)
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "workspace"), M.value(rows.kvs(rs), "workspace"),
+        value_keep(rs, "workspace", {==}))
+        : {M.Dep{String.drop(n, 0n), M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(keep(rs)), "entry"),
+          M.source.ws(M.flag(_), M.value(rows.kvs(keep(rs)), "path"), M.value(rows.kvs(keep(rs)), "hub"),
+            M.source.named(M.value(rows.kvs(keep(rs)), "hub"), M.source_of(rows.kvs(keep(rs)))))}
+          == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(rs), "hash"),
         value_keep(rs, "hash", {==}))
         : {M.Dep{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "entry"),
@@ -5197,6 +5247,34 @@ def dep_read(n, h, en, s, ok):
       %Equal.sym(String, String.drop(n, 0n), n, drop_zero(n))
         : {M.Dep{_, h, en, M.Git{url, rev, tag, root, nar, vend}}
           == M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} : M.Dep}
+      {==}
+    case M.Member{+path, +named}:
+      +rs = dep.rows(h, en, M.Member{path, named})
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "workspace"), M.value(rows.kvs(rs), "workspace"),
+        value_keep(rs, "workspace", {==}))
+        : {M.Dep{String.drop(n, 0n), M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(keep(rs)), "entry"),
+          M.source.ws(M.flag(_), M.value(rows.kvs(keep(rs)), "path"), M.value(rows.kvs(keep(rs)), "hub"),
+            M.source.named(M.value(rows.kvs(keep(rs)), "hub"), M.source_of(rows.kvs(keep(rs)))))} == M.Dep{n, h,
+                en, M.Member{path, named}} : M.Dep}
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(rs), "hash"),
+        value_keep(rs, "hash", {==}))
+        : {M.Dep{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "entry"),
+          M.Member{M.value(rows.kvs(keep(rs)), "path"), M.value(rows.kvs(keep(rs)), "hub")}} == M.Dep{n, h, en,
+              M.Member{path, named}} : M.Dep}
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "entry"), M.value(rows.kvs(rs), "entry"),
+        value_keep(rs, "entry", {==}))
+        : {M.Dep{String.drop(n, 0n), h, _,
+          M.Member{M.value(rows.kvs(keep(rs)), "path"), M.value(rows.kvs(keep(rs)), "hub")}} == M.Dep{n, h, en,
+              M.Member{path, named}} : M.Dep}
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "path"), M.value(rows.kvs(rs), "path"),
+        value_keep(rs, "path", {==}))
+        : {M.Dep{String.drop(n, 0n), h, en, M.Member{_, M.value(rows.kvs(keep(rs)), "hub")}} == M.Dep{n, h, en,
+            M.Member{path, named}} : M.Dep}
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hub"), M.value(rows.kvs(rs), "hub"),
+        value_keep(rs, "hub", {==}))
+        : {M.Dep{String.drop(n, 0n), h, en, M.Member{path, _}} == M.Dep{n, h, en, M.Member{path, named}} : M.Dep}
+      %Equal.sym(String, String.drop(n, 0n), n, drop_zero(n))
+        : {M.Dep{_, h, en, M.Member{path, named}} == M.Dep{n, h, en, M.Member{path, named}} : M.Dep}
       {==}
 
 # LAW: a pinned CLI's table, as it reads back, is read as the pin
@@ -5261,6 +5339,13 @@ def tool_read(n, en, b, s, ok):
           == M.Tool{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Tool}
       {==}
 
+    case M.Member{path, named}:
+      Eq.bit.absurd(&2,
+        {M.tool_of("tools." ++ n, rows.kvs(keep(tool.rows(en, b, M.Member{path, named}))))
+          == M.Tool{n, en, b, M.Member{path, named}} : M.Tool},
+        Eq.and.right(Bool.and(R.clean(en), R.clean(b)), R.tool.src.ok(M.Member{path, named}),
+          Eq.and.right(R.clean(n), Bool.and(Bool.and(R.clean(en), R.clean(b)),
+            R.tool.src.ok(M.Member{path, named})), ok)))
 # LAW: pinned CLIs' tables hold no dependency
 law tdeps_none:
   for +ts: List<&2, M.Tool>
@@ -5360,6 +5445,45 @@ def once_hash(_h, _en, s):
       {==}
     case M.Git{_u, _r, _t, _o, _n, _v}:
       {==}
+    case M.Member{_p, _n}:
+      {==}
+
+# LAW: a dependency's table that can be written is not one missing its hash:
+# it names a workspace member, or it has one
+law dep_kept:
+  for +h: String
+  for +en: String
+  for +s: M.Source
+  for +e: {R.hash.ok(s, h) == True{} : Bool}
+  {Bool.and(Bool.not(M.flag(M.value(rows.kvs(keep(dep.rows(h, en, s))), "workspace"))),
+    String.is_empty(M.value(rows.kvs(keep(dep.rows(h, en, s))), "hash"))) == False{} : Bool}
+
+def dep_kept(h, en, s, e):
+  match s:
+    case M.Hub{+named}:
+      +rs = dep.rows(h, en, M.Hub{named})
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "workspace"), M.value(rows.kvs(rs), "workspace"),
+        value_keep(rs, "workspace", {==}))
+        : {Bool.and(Bool.not(M.flag(_)), String.is_empty(M.value(rows.kvs(keep(rs)), "hash"))) == False{} : Bool}
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(rs), "hash"),
+        value_keep(rs, "hash", {==}))
+        : {Bool.and(True{}, String.is_empty(_)) == False{} : Bool}
+      Eq.not.true(String.is_empty(h), Eq.and.left(Bool.not(String.is_empty(h)), R.clean(h), e))
+    case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
+      +rs = dep.rows(h, en, M.Git{url, rev, tag, root, nar, vend})
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "workspace"), M.value(rows.kvs(rs), "workspace"),
+        value_keep(rs, "workspace", {==}))
+        : {Bool.and(Bool.not(M.flag(_)), String.is_empty(M.value(rows.kvs(keep(rs)), "hash"))) == False{} : Bool}
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(rs), "hash"),
+        value_keep(rs, "hash", {==}))
+        : {Bool.and(True{}, String.is_empty(_)) == False{} : Bool}
+      Eq.not.true(String.is_empty(h), Eq.and.left(Bool.not(String.is_empty(h)), R.clean(h), e))
+    case M.Member{+path, +named}:
+      +rs = dep.rows(h, en, M.Member{path, named})
+      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "workspace"), M.value(rows.kvs(rs), "workspace"),
+        value_keep(rs, "workspace", {==}))
+        : {Bool.and(Bool.not(M.flag(_)), String.is_empty(M.value(rows.kvs(keep(rs)), "hash"))) == False{} : Bool}
+      {==}
 
 # LAW: the tables of dependencies that have hashes, ahead of the pins', miss
 # no hash
@@ -5376,19 +5500,16 @@ def missing_read(ds, ts, e):
     case M.Dep{+n, +h, +en, +s} <> +t:
       +rs = dep.rows(h, en, s)
       +rest = dsects(t, tsects(ts))
-      +l = Eq.and.left(Bool.and(R.clean(n), Bool.and(Bool.not(String.is_empty(h)), R.clean(h))),
+      +l = Eq.and.left(Bool.and(R.clean(n), R.hash.ok(s, h)),
         Bool.and(R.clean(en), R.source.ok(s)),
         Eq.and.left(R.dep.ok(M.Dep{n, h, en, s}), R.deps.ok(t), e))
-      +eh = Eq.not.true(String.is_empty(h),
-        Eq.and.left(Bool.not(String.is_empty(h)), R.clean(h),
-          Eq.and.right(R.clean(n), Bool.and(Bool.not(String.is_empty(h)), R.clean(h)), l)))
       %Equal.sym(Bool, String.starts_with(n, ""), True{}, Eq.starts_nil(n))
-        : {M.missing.at(Bool.and(_, String.is_empty(M.value(rows.kvs(keep(rs)), "hash"))),
+        : {M.missing.at(Bool.and(_, Bool.and(Bool.not(M.flag(M.value(rows.kvs(keep(rs)), "workspace"))),
+          String.is_empty(M.value(rows.kvs(keep(rs)), "hash")))),
           "deps." ++ n, M.missing(sects.of(rest))) == "" : String}
-      %Equal.sym(String, M.value(rows.kvs(keep(rs)), "hash"), M.value(rows.kvs(rs), "hash"),
-        value_keep(rs, "hash", once_hash(h, en, s)))
-        : {M.missing.at(String.is_empty(_), "deps." ++ n, M.missing(sects.of(rest))) == "" : String}
-      %Equal.sym(Bool, String.is_empty(h), False{}, eh)
+      %Equal.sym(Bool, Bool.and(Bool.not(M.flag(M.value(rows.kvs(keep(rs)), "workspace"))),
+          String.is_empty(M.value(rows.kvs(keep(rs)), "hash"))), False{},
+        dep_kept(h, en, s, Eq.and.right(R.clean(n), R.hash.ok(s, h), l)))
         : {M.missing.at(_, "deps." ++ n, M.missing(sects.of(rest))) == "" : String}
       missing_read(t, ts, Eq.and.right(R.dep.ok(M.Dep{n, h, en, s}), R.deps.ok(t), e))
 

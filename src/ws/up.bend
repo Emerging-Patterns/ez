@@ -38,12 +38,29 @@ def source.back(own: M.Source, joint: M.Source) -> M.Source:
           M.Git{url, _rev, _tag, _root, _nar, vend}
         case M.Git{_ju, jr, jt, jo, jn, _jv}:
           M.Git{url, jr, jt, jo, jn, vend}
+        case M.Member{_jp, _jm}:
+          M.Git{url, _rev, _tag, _root, _nar, vend}
+    case M.Member{path, named}:
+      M.Member{path, named}
+
+# a dependency with the pin the joint ledger gives its name, by its own
+# source: a workspace member's section is kept as it is written, since the
+# hash and entry the joint ledger gives it are no ledger's to record
+def dep.back.src(own: M.Source, +nn: String, +hh: String, +ee: String, joint: M.Dep) -> M.Dep:
+  match own:
+    case M.Member{path, nv}:
+      M.Dep{nn, hh, ee, M.Member{path, nv}}
+    case M.Hub{nv}:
+      M.Dep{_jn, jh, je, js} = joint
+      M.Dep{nn, jh, je, source.back(M.Hub{nv}, js)}
+    case M.Git{url, rev, tag, root, nar, vend}:
+      M.Dep{_jn, jh, je, js} = joint
+      M.Dep{nn, jh, je, source.back(M.Git{url, rev, tag, root, nar, vend}, js)}
 
 # a dependency with the pin the joint ledger gives its name
 def dep.back.at(own: M.Dep, joint: M.Dep) -> M.Dep:
-  M.Dep{nn, _h, _e, os} = own
-  M.Dep{_jn, jh, je, js} = joint
-  M.Dep{nn, jh, je, source.back(os, js)}
+  M.Dep{nn, hh, ee, os} = own
+  dep.back.src(os, nn, hh, ee, joint)
 
 # a dependency of a ledger, after the upgrade
 def dep.back(+own: M.Dep, +js: List<&2, M.Dep>) -> M.Dep:

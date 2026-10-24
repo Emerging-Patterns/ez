@@ -36,6 +36,8 @@ def ref.at(src: M.Source, +url: String, +ref: String) -> Ref:
       Given{ref}
     case M.Git{_u, +rev, +tag, _o, _n, _v}:
       ref.pinned(url, rev, tag, ref)
+    case M.Member{_p, _n}:
+      Given{ref}
 
 # a place's ref: a git source's against the workspace's pins, as the root
 # reads the source from the member's directory, and anything else as given

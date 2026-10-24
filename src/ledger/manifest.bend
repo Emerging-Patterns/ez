@@ -16,9 +16,19 @@ import ../toml/toml.bend as T
 # committed, because a clone gets the ledger and not the vendoring cache.
 # `vend` is the committed tree: the package is allowlisted under `.ez/lib` and
 # an upgrade that moves it lays the new hash there. Absent, it is not.
+#
+# A member of the same workspace is the third kind (EZ-WS-5): a section with
+# `workspace = true` names the member whose `[package] name` is its key, and
+# records no hash and no source, because the member's package is a fact about
+# the committed tree. A member's own ledger reads it with an empty `path` and
+# `named`; the workspace's joint ledger (ws/joint.bend) fills in the member's
+# directory from the root, written as `path`, its hash, and, when the member
+# publishes under a name, the `<name>@<version>` it is imported by, written as
+# `hub`. No command writes those to a ledger a person keeps.
 type Source is Data:
   Hub{named: String}
   Git{url: String, rev: String, tag: String, root: String, nar: String, vend: Bool}
+  Member{path: String, named: String}
 
 # one tracked dependency
 type Dep is Data:
@@ -84,12 +94,23 @@ def source.named(named: String, src: Source) -> Source:
       Hub{named}
     case Git{url, rev, tag, root, nar, vend}:
       Git{url, rev, tag, root, nar, vend}
+    case Member{path, nv}:
+      Member{path, nv}
 
 # a git section that names no root was written from the top of its checkout,
 # which is the root a lock already spells out as "." and the only one a ledger
 # written before this key existed can have meant
 def root.or(+dir: String) -> String:
   Bool.pick(String, String.is_empty(dir), ".", dir)
+
+# a dependency section's source, once it is known whether it names a
+# workspace member, which only a dependency can be
+def source.ws(member: Bool, path: String, named: String, other: Source) -> Source:
+  match member:
+    case True{}:
+      Member{path, named}
+    case False{}:
+      other
 
 # where a dependency's section says its bytes come from
 def source_of(+pairs: List<&2, T.Kv>) -> Source:
@@ -102,7 +123,8 @@ def source_of(+pairs: List<&2, T.Kv>) -> Source:
 # was added, as a git dependency records its tag beside its rev.
 def dep_of(+full: String, +pairs: List<&2, T.Kv>) -> Dep:
   Dep{String.drop(full, 5n), value(pairs, "hash"), value(pairs, "entry"),
-    source.named(value(pairs, "hub"), source_of(pairs))}
+    source.ws(flag(value(pairs, "workspace")), value(pairs, "path"), value(pairs, "hub"),
+      source.named(value(pairs, "hub"), source_of(pairs)))}
 
 # a dependency's own name, for finding or replacing it
 def dep.name(dependency: Dep) -> String:
@@ -194,8 +216,9 @@ def missing.at(bad: Bool, name: String, rest: String) -> String:
 
 # a `[deps.<name>]` section is missing its hash when the key is absent
 def missing.is(sect: T.Sect) -> Bool:
-  T.Sect{n, ps} = sect
-  Bool.and(String.starts_with(n, "deps."), String.is_empty(value(ps, "hash")))
+  T.Sect{n, +ps} = sect
+  Bool.and(String.starts_with(n, "deps."),
+    Bool.and(Bool.not(flag(value(ps, "workspace"))), String.is_empty(value(ps, "hash"))))
 
 # the first dependency section with no hash, or "" when every one has one
 def missing(ss: List<&2, T.Sect>) -> String:
@@ -250,6 +273,8 @@ def show.source(src: Source) -> String:
       "hub"
     case Git{_url, _rev, _tag, _root, _nar, _vend}:
       "git"
+    case Member{_path, _named}:
+      "member"
 
 # `<name>=<hash>@<hub|git>`
 def show.dep(dependency: Dep) -> String:
@@ -315,6 +340,8 @@ def source.rev(src: Source) -> String:
       ""
     case Git{_url, rev, _tag, _root, _nar, _vend}:
       rev
+    case Member{_path, _named}:
+      ""
 
 # the tag a dependency was asked for, or "" when it was pinned by commit
 def source.tag(src: Source) -> String:
@@ -323,6 +350,8 @@ def source.tag(src: Source) -> String:
       ""
     case Git{_url, _rev, tag, _root, _nar, _vend}:
       tag
+    case Member{_path, _named}:
+      ""
 
 # the repo a dependency was vendored from, or "" when it is a hub package
 def source.url(src: Source) -> String:
@@ -331,6 +360,8 @@ def source.url(src: Source) -> String:
       ""
     case Git{url, _rev, _tag, _root, _nar, _vend}:
       url
+    case Member{_path, _named}:
+      ""
 
 # the directory inside the checkout a dependency's paths are written from
 def source.root(src: Source) -> String:
@@ -339,6 +370,8 @@ def source.root(src: Source) -> String:
       ""
     case Git{_url, _rev, _tag, root, _nar, _vend}:
       root
+    case Member{_path, _named}:
+      ""
 
 # the NAR hash nix rebuilds a dependency's checkout by
 def source.nar(src: Source) -> String:
@@ -347,6 +380,8 @@ def source.nar(src: Source) -> String:
       ""
     case Git{_url, _rev, _tag, _root, nar, _vend}:
       nar
+    case Member{_path, _named}:
+      ""
 
 # the `<name>@<version>` a hub dependency was added by, or "" for one added
 # by its hash, and for a git one
@@ -356,6 +391,8 @@ def source.nv(src: Source) -> String:
       named
     case Git{_url, _rev, _tag, _root, _nar, _vend}:
       ""
+    case Member{_path, named}:
+      named
 
 # whether a dependency names a repo rather than the hub
 def source.is_git(src: Source) -> Bool:
@@ -364,6 +401,8 @@ def source.is_git(src: Source) -> Bool:
       False{}
     case Git{_url, _rev, _tag, _root, _nar, _vend}:
       True{}
+    case Member{_path, _named}:
+      False{}
 
 # whether an upgrade that moves this dependency also commits the new tree
 def source.vendor(src: Source) -> Bool:
@@ -372,6 +411,8 @@ def source.vendor(src: Source) -> Bool:
       False{}
     case Git{_url, _rev, _tag, _root, _nar, vend}:
       vend
+    case Member{_path, _named}:
+      False{}
 
 # the source of a dependency that was found
 def source.dep(dependency: Dep) -> Source:

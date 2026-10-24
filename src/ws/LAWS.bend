@@ -20,6 +20,10 @@ import ../ez/target.bend as Tgt
 import ../lock/world.bend as LW
 import ../lock/plan.bend as LP
 import ../pkg/path.bend as P
+import ../pkg/pkg.bend as K
+import ../lock/lock.bend as L
+import ../ledger/ignore.bend as I
+import ../toml/toml.bend as T
 import ../ledger/manifest.bend as M
 
 # a path every path that starts with it extends. Law vocabulary: ez never
@@ -386,8 +390,9 @@ law claims_member:
 law joint_lone:
   for +text: String
   for +fs: List<&2, J.Found>
+  for +files: List<&2, K.Source>
   for ev: {W.spec.of(text) == W.Lone{} : W.Read}
-  {J.joint(text, fs) == J.Lone{} : J.Joint}
+  {J.joint(text, fs, files) == J.Lone{} : J.Joint}
 
 # LAW: and the lock planner reads that ledger's own text
 # EZ-WS-3
@@ -400,20 +405,22 @@ law lone_locks_own:
 law joint_bad_table:
   for +text: String
   for +fs: List<&2, J.Found>
+  for +files: List<&2, K.Source>
   for +why: String
   for ev: {W.spec.of(text) == W.Bad{why} : W.Read}
-  {J.joint(text, fs) == J.Clash{why} : J.Joint}
+  {J.joint(text, fs, files) == J.Clash{why} : J.Joint}
 
 # LAW: and so does a workspace with no member set (EZ-WS-1)
 # EZ-WS-3
 law joint_refused_members:
   for +text: String
   for +fs: List<&2, J.Found>
+  for +files: List<&2, K.Source>
   for +spec: W.Spec
   for +why: String
   for ev: {W.spec.of(text) == W.Root{spec} : W.Read}
   for em: {W.members(spec, W.root.of(text), J.ledgers(fs)) == W.Refused{why} : W.Members}
-  {J.joint(text, fs) == J.Clash{why} : J.Joint}
+  {J.joint(text, fs, files) == J.Clash{why} : J.Joint}
 
 # LAW: members that can be joined are: the root's package, with every
 # dependency and tool of the root and the members at its first declaration
@@ -825,3 +832,365 @@ law strs_refuses_other:
   for bit: Bool
   for rest: List<&2, E.Val>
   {W.strs(E.VBool{bit} <> rest) == None{} : Maybe<&2, List<&2, String>>}
+
+# ---------------------------------------------------------------------------
+# a member as a dependency (EZ-WS-5)
+
+# LAW: a member's section names the member whose `[package] name` is its
+# key, and the joint ledger holds that member's package: its hash is the `0x`
+# name of the walk from the member's entry over the committed files, with the
+# entry it walked from, as a path from the root, and the directory the walk
+# writes its paths from
+# EZ-WS-5
+law member_dep_walked:
+  for +name: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for +dir: List<&2, String>
+  for nn: String
+  for +ee: String
+  for bb: String
+  for hh: String
+  for pa: String
+  for pv: String
+  for ds: List<&2, M.Dep>
+  for ts: List<&2, M.Tool>
+  for +hash: String
+  for +root: String
+  for fs: List<&2, K.Source>
+  for sums: List<&2, K.Item>
+  for ef: {J.named(ms, name) == Some{J.Member{dir, M.Manifest{nn, ee, bb, hh, pa, pv, ds, ts}}}
+    : Maybe<&2, J.Member>}
+  for eo: {W.segs.eq(dir, self) == False{} : Bool}
+  for ew: {K.of(J.entry.at(dir, ee), files) == K.Walked{hash, root, fs, sums} : K.Walked}
+  {J.dep.res(M.Dep{name, "", "", M.Member{"", ""}}, ms, self, files)
+    == J.Got{M.Dep{name, hash, J.entry.at(dir, ee), M.Member{root, ""}}} : J.Res}
+
+# LAW: the member a section names is the first whose `[package] name` is the
+# section's key
+# EZ-WS-5
+law named_finds:
+  for +dir: List<&2, String>
+  for +name: String
+  for +ee: String
+  for +bb: String
+  for +hh: String
+  for +pa: String
+  for +pv: String
+  for +ds: List<&2, M.Dep>
+  for +ts: List<&2, M.Tool>
+  for +ms: List<&2, J.Member>
+  {J.named(J.Member{dir, M.Manifest{name, ee, bb, hh, pa, pv, ds, ts}} <> ms, name)
+    == Some{J.Member{dir, M.Manifest{name, ee, bb, hh, pa, pv, ds, ts}}} : Maybe<&2, J.Member>}
+
+# LAW: and a member named otherwise is passed over
+# EZ-WS-5
+law named_skips:
+  for +hd: J.Member
+  for +ms: List<&2, J.Member>
+  for +name: String
+  for en: {String.eq(J.member.name(hd), name) == False{} : Bool}
+  {J.named(hd <> ms, name) == J.named(ms, name) : Maybe<&2, J.Member>}
+
+# LAW: a section naming no member is refused
+# EZ-WS-5
+law member_dep_unknown:
+  for +name: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for ef: {J.named(ms, name) == None{} : Maybe<&2, J.Member>}
+  {J.dep.res(M.Dep{name, "", "", M.Member{"", ""}}, ms, self, files)
+    == J.Bad{"ez: " ++ J.ledger.at(self) ++ " names " ++ name ++ " as a workspace member, and no member's " ++
+      "[package] is named " ++ name} : J.Res}
+
+# LAW: and so is one naming the member it is written in
+# EZ-WS-5
+law member_dep_own:
+  for +name: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for +dir: List<&2, String>
+  for mm: M.Manifest
+  for ef: {J.named(ms, name) == Some{J.Member{dir, mm}} : Maybe<&2, J.Member>}
+  for eo: {W.segs.eq(dir, self) == True{} : Bool}
+  {J.dep.res(M.Dep{name, "", "", M.Member{"", ""}}, ms, self, files)
+    == J.Bad{"ez: " ++ J.ledger.at(self) ++ " names " ++ name ++ " as a workspace member, and that member is itself"}
+    : J.Res}
+
+# LAW: a member's section records no hash: one that gives a hash is refused
+# EZ-WS-5
+law member_dep_hashed:
+  for +name: String
+  for +hash: String
+  for +entry: String
+  for +path: String
+  for +nv: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for eg: {String.is_empty(hash) == False{} : Bool}
+  {J.dep.res(M.Dep{name, hash, entry, M.Member{path, nv}}, ms, self, files)
+    == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+      " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+
+# LAW: and no entry: one that gives an entry is refused
+# EZ-WS-5
+law member_dep_entried:
+  for +name: String
+  for +hash: String
+  for +entry: String
+  for +path: String
+  for +nv: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for eg: {String.is_empty(entry) == False{} : Bool}
+  {J.dep.res(M.Dep{name, hash, entry, M.Member{path, nv}}, ms, self, files)
+    == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+      " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+
+# LAW: and no source: one that names a directory is refused
+# EZ-WS-5
+law member_dep_pathed:
+  for +name: String
+  for +hash: String
+  for +entry: String
+  for +path: String
+  for +nv: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for eg: {String.is_empty(path) == False{} : Bool}
+  {J.dep.res(M.Dep{name, hash, entry, M.Member{path, nv}}, ms, self, files)
+    == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+      " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+
+# LAW: or a name to import it by
+# EZ-WS-5
+law member_dep_nv:
+  for +name: String
+  for +hash: String
+  for +entry: String
+  for +path: String
+  for +nv: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for eg: {String.is_empty(nv) == False{} : Bool}
+  {J.dep.res(M.Dep{name, hash, entry, M.Member{path, nv}}, ms, self, files)
+    == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+      " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+
+# LAW: every other dependency is left as it is written: a hub one
+# EZ-WS-5
+law member_dep_hub:
+  for +name: String
+  for +hash: String
+  for +entry: String
+  for +nv: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  {J.dep.res(M.Dep{name, hash, entry, M.Hub{nv}}, ms, self, files)
+    == J.Got{M.Dep{name, hash, entry, M.Hub{nv}}} : J.Res}
+
+# LAW: and a git one
+# EZ-WS-5
+law member_dep_git:
+  for +name: String
+  for +hash: String
+  for +entry: String
+  for +url: String
+  for +rev: String
+  for +tag: String
+  for +root: String
+  for +nar: String
+  for vend: Bool
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  {J.dep.res(M.Dep{name, hash, entry, M.Git{url, rev, tag, root, nar, vend}}, ms, self, files)
+    == J.Got{M.Dep{name, hash, entry, M.Git{url, rev, tag, root, nar, vend}}} : J.Res}
+
+# LAW: a refused section refuses its ledger's dependencies, the first in the
+# order written
+# EZ-WS-5
+law deps_res_refuses:
+  for +dd: M.Dep
+  for +ds: List<&2, M.Dep>
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for +why: String
+  for eb: {J.dep.res(dd, ms, self, files) == J.Bad{why} : J.Res}
+  {J.deps.res(dd <> ds, ms, self, files) == J.Unmet{why} : J.Deps}
+
+# LAW: a member whose dependencies are refused leaves the members unread
+# EZ-WS-5
+law res_one_refuses:
+  for +dir: List<&2, String>
+  for +mm: M.Manifest
+  for +ms: List<&2, J.Member>
+  for +files: List<&2, K.Source>
+  for rest: J.Read
+  for +why: String
+  for eu: {J.deps.res(J.deps.of(mm), ms, dir, files) == J.Unmet{why} : J.Deps}
+  {J.res.one(J.Member{dir, mm}, ms, files, rest) == J.Unread{why} : J.Read}
+
+# LAW: and so does any later member's refusal
+# EZ-WS-5
+law res_one_keeps_refusal:
+  for +dir: List<&2, String>
+  for +mm: M.Manifest
+  for +ms: List<&2, J.Member>
+  for +files: List<&2, K.Source>
+  for +ds: List<&2, M.Dep>
+  for +why: String
+  for eu: {J.deps.res(J.deps.of(mm), ms, dir, files) == J.Deps{ds} : J.Deps}
+  {J.res.one(J.Member{dir, mm}, ms, files, J.Unread{why}) == J.Unread{why} : J.Read}
+
+# LAW: members left unread leave nothing to lock: the joint ledger is refused
+# with why
+# EZ-WS-5
+law resolve_refuses:
+  for +root: M.Manifest
+  for +ms: List<&2, J.Member>
+  for +files: List<&2, K.Source>
+  for +why: String
+  for eu: {J.res.all(J.with.root(root, ms), J.with.root(root, ms), files) == J.Unread{why} : J.Read}
+  {J.resolve(root, ms, files) == J.Clash{why} : J.Joint}
+
+# LAW: and members resolved are joined as the ledgers they resolve to
+# EZ-WS-5
+law resolve_joins:
+  for +root: M.Manifest
+  for +ms: List<&2, J.Member>
+  for +files: List<&2, K.Source>
+  for dir: List<&2, String>
+  for +rr: M.Manifest
+  for +xs: List<&2, J.Member>
+  for eu: {J.res.all(J.with.root(root, ms), J.with.root(root, ms), files) == J.Read{J.Member{dir, rr} <> xs}
+    : J.Read}
+  {J.resolve(root, ms, files) == J.combine(rr, xs) : J.Joint}
+
+# LAW: the lock reads a member's package as its walk found it, fresh from the
+# committed files: one answer, under the hash the joint ledger gives it
+# EZ-WS-5
+law seed_walked:
+  for nn: String
+  for +hash: String
+  for +entry: String
+  for +path: String
+  for nv: String
+  for +files: List<&2, K.Source>
+  for hw: String
+  for rw: String
+  for +fs: List<&2, K.Source>
+  for +sums: List<&2, K.Item>
+  for ew: {K.of(entry, files) == K.Walked{hw, rw, fs, sums} : K.Walked}
+  {J.seed(M.Dep{nn, hash, entry, M.Member{path, nv}}, files)
+    == [LW.Reply{LW.Pkg{hash, L.Member{path, entry}, ""},
+      LW.Got{LW.Clone{""}, K.manifest_of(sums), J.texts(sums, fs)}}] : List<&2, LW.Reply>}
+
+# LAW: an answer read fresh is one the lock lays, as a clone's is
+# EZ-WS-5
+law seed_cloned:
+  for +hash: String
+  for src: L.Src
+  for hub: String
+  for nar: String
+  for manifest: String
+  for ss: List<&2, String>
+  {LP.cloned([LW.Reply{LW.Pkg{hash, src, hub}, LW.Got{LW.Clone{nar}, manifest, ss}}]) == [hash]
+    : List<&2, String>}
+
+# LAW: the lock takes a member's dependency for a member's tree
+# EZ-WS-5
+law member_origin:
+  for +nn: String
+  for +hash: String
+  for +entry: String
+  for +path: String
+  for +nv: String
+  {L.ledger.origins([M.Dep{nn, hash, entry, M.Member{path, nv}}]) == [L.Origin{hash, L.Member{path, entry}}]
+    : List<&2, L.Origin>}
+
+# LAW: and judges its bytes alone, read fresh or from BEND_LIB
+# EZ-WS-5
+law member_judged:
+  for path: String
+  for entry: String
+  for nar: String
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  {LW.accept.src(L.Member{path, entry}, LW.Clone{nar}, hash, manifest, ss) == LW.body(hash, manifest, ss)
+    : LW.Verdict}
+
+# LAW: the same when it is read from BEND_LIB
+# EZ-WS-5
+law member_judged_lib:
+  for path: String
+  for entry: String
+  for +hash: String
+  for +manifest: String
+  for +ss: List<&2, String>
+  {LW.accept.src(L.Member{path, entry}, LW.Lib{}, hash, manifest, ss) == LW.body(hash, manifest, ss)
+    : LW.Verdict}
+
+# LAW: the lock writes a member's source as its directory and entry, and reads
+# it back
+# EZ-WS-5
+law member_src_reads:
+  for +path: String
+  for +entry: String
+  {L.src_of(L.src.pairs(L.Member{path, entry})) == L.Member{path, entry} : L.Src}
+
+# LAW: a member is never vendored, so it is never laid under `.ez/lib`
+# EZ-WS-5
+law member_not_vended:
+  for nn: String
+  for hash: String
+  for entry: String
+  for path: String
+  for nv: String
+  for +ds: List<&2, M.Dep>
+  {I.vendors(M.Dep{nn, hash, entry, M.Member{path, nv}} <> ds) == I.vendors(ds) : List<&2, String>}
+
+# LAW: a fresh tree that passed and is not vendored is laid under BEND_LIB at
+# its hash
+# EZ-WS-5
+law member_laid:
+  for +hash: String
+  for +vs: List<&2, String>
+  for fs: List<&2, K.Item>
+  for ss: List<&2, String>
+  for +rest: List<&2, LP.Effect>
+  for ev: {L.seen.holds(vs, hash) == False{} : Bool}
+  {LP.lays([hash], vs, [LW.Judged{hash, LW.Ok{fs, ss}}], rest)
+    == LP.lay.verdict(LW.Ok{fs, ss}, LP.Cache{}, hash, rest) : List<&2, LP.Effect>}
+
+# LAW: a member's section is no ledger's to record anything in: the upgrade
+# writes it back as it was written
+# EZ-WS-5
+law member_back_kept:
+  for +nn: String
+  for +hash: String
+  for +entry: String
+  for path: String
+  for nv: String
+  for joint: M.Dep
+  {U.dep.back.at(M.Dep{nn, hash, entry, M.Member{path, nv}}, joint) == M.Dep{nn, hash, entry, M.Member{path, nv}}
+    : M.Dep}
+
+# LAW: a `[deps.<name>]` section with `workspace = true` is never one missing
+# its hash
+# EZ-WS-5
+law member_not_missing:
+  for n: String
+  for +ps: List<&2, T.Kv>
+  for ew: {M.flag(M.value(ps, "workspace")) == True{} : Bool}
+  {M.missing.is(T.Sect{n, ps}) == False{} : Bool}

@@ -571,6 +571,8 @@ def fetch_ask_anchored(s, here, _hub, h, ss, q):
       %Equal.sym(L.Src, L.pack.src(L.pack_of(ss, h)), L.Git{url, rev, entry, root, nar, tag}, q)
         : {String.eq(Path.anchor(here, url), Path.anchor(here, L.src.url(_))) == True{} : Bool}
       Eq.string_eq_self(Path.anchor(here, url))
+    case L.Member{_path, _entry}:
+      {==}
 
 # LAW: so is every question one package asks
 law asks_one:

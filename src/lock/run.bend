@@ -29,6 +29,7 @@ import ./up.bend as Up
 import ./plan.bend as Plan
 import ../ws/run.bend as WsRun
 import ../ws/up.bend as WsUp
+import ../ws/joint.bend as J
 
 # ---------------------------------------------------------------------------
 # the World's first fields
@@ -252,6 +253,8 @@ def answer.pkg(+lib: String, +hash: String, src: L.Src, +hub: String) -> IO(W.An
       answer.hub(hub, hash)
     case L.Git{url, rev, entry, _root, _nar, _tag}:
       answer.git(lib, hash, url, rev, entry)
+    case L.Member{path, _entry}:
+      IO.pure(W.Answer, W.Miss{"ez: the workspace member at " ++ path ++ " was not walked"})
 
 # what the hub says a name names, as it said it; the planner reads the hash
 # out of it
@@ -696,10 +699,44 @@ def loop(fuel: Nat, +lib: String, +back: WsUp.Back, +world: W.World) -> IO(Unit)
     case 1n+f:
       loop.step(Plan.step(world), lib, back, world, w => loop(f, lib, back, w))
 
-# the loop, on the ledger the lock is planned from
+# a member's package as the lock reads it: from BEND_LIB when a tree is laid
+# there under its hash, as a git package's is (`git.seen`), and fresh from
+# the committed tree, as the joint ledger walked it, otherwise
+def settle.seen(got: Maybe<&2, String>, ask: W.Ask, answer: W.Answer, +lib: String, +hash: String) -> IO(W.Reply):
+  match got:
+    case None{}:
+      IO.pure(W.Reply, W.Reply{ask, answer})
+    case Some{text}:
+      do IO<W.Reply>:
+        a : W.Answer <- answer.lib(lib ++ "/" ++ hash, text)
+        return W.Reply{ask, a}
+
+# one member's package, so
+def settle.one(rp: W.Reply, +lib: String) -> IO(W.Reply):
+  W.Reply{+ask, answer} = rp
+  +hash = W.ask.hash(ask)
+  do IO<W.Reply>:
+    got : Maybe<&2, String> <- F.read(lib ++ "/" ++ hash ++ "/manifest")
+    settle.seen(got, ask, answer, lib, hash)
+
+# every member's package, so
+def settle(rs: List<&2, W.Reply>, +lib: String) -> IO(List<&2, W.Reply>):
+  match rs:
+    case []:
+      IO.pure(List<&2, W.Reply>, [])
+    case hd <> tl:
+      do IO<List<&2, W.Reply>>:
+        rp : W.Reply <- settle.one(hd, lib)
+        rest : List<&2, W.Reply> <- settle(tl, lib)
+        return rp <> rest
+
+# the loop, on the ledger the lock is planned from, with the workspace's
+# members already answered
 def run.planned(pd: WsRun.Planned, +lib: String, up: Bool, only: String, here: String, ls: W.Listing) -> IO(Unit):
-  WsRun.Planned{led, back} = pd
-  loop(rounds(), lib, back, W.World{W.Args{up, only, here}, led, ls, [], []})
+  WsRun.Planned{led, back, seeds} = pd
+  do IO<Unit>:
+    rs : List<&2, W.Reply> <- settle(seeds, lib)
+    loop(rounds(), lib, back, W.World{W.Args{up, only, here}, led, ls, rs, []})
 
 # `ez lock` and `ez lock --upgrade [--package only]`: the directory it runs
 # in, the ledger and the listing read, every question answered, and the plan
@@ -710,6 +747,6 @@ def run(up: Bool, +only: String) -> IO(Unit):
     lib : String <- bend.lib()
     +pwd : String <- R.exec(["pwd"])
     own : Maybe<&2, String> <- read.ledger()
-    pd : WsRun.Planned <- WsRun.ledger(own)
-    ls : W.Listing <- read.listing()
+    +ls : W.Listing <- read.listing()
+    pd : WsRun.Planned <- WsRun.ledger(own, J.files(ls))
     run.planned(pd, lib, up, only, String.trim(R.text(pwd)), ls)

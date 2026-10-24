@@ -315,6 +315,19 @@ def hub.how(how: How, +hash: String, +manifest: String, +ss: List<&2, String>) -
     case Served{}:
       body(hash, manifest, ss)
 
+# a workspace member's package, by how it arrived. Its tree is the committed
+# one, read from the workspace as a tree under BEND_LIB is read, and judged
+# by its bytes alone, as any tree there is; only the hub could serve it
+# under another rule.
+def member.how(how: How, +hash: String, +manifest: String, +ss: List<&2, String>) -> Verdict:
+  match how:
+    case Lib{}:
+      body(hash, manifest, ss)
+    case Clone{_got}:
+      body(hash, manifest, ss)
+    case Served{}:
+      No{"ez: " ++ hash ++ " is a workspace member and was not read from the workspace"}
+
 # a package's answer against where the ledger says it comes from
 def accept.src(src: L.Src, how: How, +hash: String, +manifest: String, +ss: List<&2, String>) -> Verdict:
   match src:
@@ -322,6 +335,8 @@ def accept.src(src: L.Src, how: How, +hash: String, +manifest: String, +ss: List
       hub.how(how, hash, manifest, ss)
     case L.Git{url, rev, _entry, _root, nar, _tag}:
       git.how(how, hash, url, rev, nar, manifest, ss)
+    case L.Member{_path, _entry}:
+      member.how(how, hash, manifest, ss)
 
 # why a hub package could not be read. One the ledger names is explained the
 # way a hub miss always was. One it does not name is said to be unnamed, since
@@ -340,6 +355,8 @@ def miss.src(src: L.Src, named: Bool, +hash: String, +hub: String, +why: String)
     case L.Hub{}:
       hub.why(named, hash, hub, why)
     case L.Git{_url, _rev, _entry, _root, _nar, _tag}:
+      why
+    case L.Member{_path, _entry}:
       why
 
 # what the hub said a name names, once it is known whether the answer is a

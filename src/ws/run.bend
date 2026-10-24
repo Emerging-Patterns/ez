@@ -19,6 +19,8 @@ import ./up.bend as U
 import ./pin.bend as Pin
 import ../ledger/manifest.bend as M
 import ../pkg/path.bend as P
+import ../pkg/pkg.bend as K
+import ../lock/world.bend as LW
 
 # what the search found, and the top of the checkout it searched from
 type Searched is Data:
@@ -141,59 +143,73 @@ def lines(ss: List<&2, String>) -> List<&2, String>:
       +more = lines(tl)
       Bool.pick(List<&2, String>, String.is_empty(hd), more, hd <> more)
 
-# the ledger `ez lock` is planned from, and what an upgrade needs to write
-# its pins back
+# the ledger `ez lock` is planned from, what an upgrade needs to write its
+# pins back, and the answers the lock reads the workspace's members from
 type Planned is Data:
-  Planned{ledger: Maybe<&2, String>, back: U.Back}
+  Planned{ledger: Maybe<&2, String>, back: U.Back, seeds: List<&2, LW.Reply>}
 
 # the joint ledger, as the lock reads it, or the refusal that leaves none
-def joint.at(jj: J.Joint, +text: String, +spec: W.Spec, +fs: List<&2, J.Found>) -> IO(Planned):
+def joint.at(
+  jj: J.Joint,
+  +text: String,
+  +spec: W.Spec,
+  +fs: List<&2, J.Found>,
+  +files: List<&2, K.Source>
+) -> IO(Planned):
   match jj:
     case J.Lone{}:
-      IO.pure(Planned, Planned{Some{text}, U.Alone{}})
+      IO.pure(Planned, Planned{Some{text}, U.Alone{}, []})
     case J.Clash{why}:
       IO.die(Planned, 1, why)
-    case J.Joint{mm}:
-      IO.pure(Planned, Planned{Some{Rend.show(mm)}, U.Back{text, spec, fs}})
+    case J.Joint{+mm}:
+      IO.pure(Planned, Planned{Some{Rend.show(mm)}, U.Back{text, spec, fs},
+        J.seeds(J.Joint{mm}, files)})
 
 # a workspace root's ledger joined with every member's, once git listed them
-def joint.listed(ok: Bool, +text: String, +spec: W.Spec, +out: String) -> IO(Planned):
+def joint.listed(
+  ok: Bool,
+  +text: String,
+  +spec: W.Spec,
+  +out: String,
+  +files: List<&2, K.Source>
+) -> IO(Planned):
   match ok:
     case True{}:
       do IO<Planned>:
         +fs : List<&2, J.Found> <- read.found(lines(String.lines(out)))
-        joint.at(J.joint(text, fs), text, spec, fs)
+        joint.at(J.joint(text, fs, files), text, spec, fs, files)
     case False{}:
       IO.die(Planned, 1,
         "ez: a workspace is locked from the ez.toml files git tracks, and git could not list them: " ++
           String.trim(out))
 
 # a workspace root's ledger joined with every member's
-def joint.go(+text: String, +spec: W.Spec) -> IO(Planned):
+def joint.go(+text: String, +spec: W.Spec, +files: List<&2, K.Source>) -> IO(Planned):
   do IO<Planned>:
     +out : String <- Sn.exec(["git", "-c", "core.quotepath=off", "ls-files", "--", ":(glob)**/ez.toml"])
-    joint.listed(Sn.ok(out), text, spec, Sn.text(out))
+    joint.listed(Sn.ok(out), text, spec, Sn.text(out), files)
 
 # what one ledger's text says: no workspace, read as it is; a workspace root,
 # whose members are read and joined; or a table that cannot be read, which
 # the joint ledger refuses
-def joint.read(rd: W.Read, +text: String) -> IO(Planned):
+def joint.read(rd: W.Read, +text: String, +files: List<&2, K.Source>) -> IO(Planned):
   match rd:
     case W.Lone{}:
-      IO.pure(Planned, Planned{Some{text}, U.Alone{}})
+      IO.pure(Planned, Planned{Some{text}, U.Alone{}, []})
     case W.Bad{why}:
       IO.die(Planned, 1, why)
     case W.Root{+spec}:
-      joint.go(text, spec)
+      joint.go(text, spec, files)
 
 # the ledger `ez lock` is planned from: ez.toml as it is, or, at a workspace
-# root, the joint ledger of the root and every member
-def ledger(led: Maybe<&2, String>) -> IO(Planned):
+# root, the joint ledger of the root and every member. `files` are the
+# committed `.bend` files, which a member's package is walked over.
+def ledger(led: Maybe<&2, String>, +files: List<&2, K.Source>) -> IO(Planned):
   match led:
     case None{}:
-      IO.pure(Planned, Planned{None{}, U.Alone{}})
+      IO.pure(Planned, Planned{None{}, U.Alone{}, []})
     case Some{+text}:
-      joint.read(W.spec.of(text), text)
+      joint.read(W.spec.of(text), text, files)
 
 # ---------------------------------------------------------------------------
 # a member's own commands
@@ -267,6 +283,17 @@ def pins.joint(jj: J.Joint) -> List<&2, M.Dep>:
     case _:
       []
 
+# every listed file under a directory, read, as the walk takes it
+def files.under(+dir: String, ps: List<&2, String>) -> IO(List<&2, K.Source>):
+  match ps:
+    case []:
+      IO.pure(List<&2, K.Source>, [])
+    case +hd <> tl:
+      do IO<List<&2, K.Source>>:
+        mm : Maybe<&2, String> <- F.read(dir ++ "/" ++ hd)
+        rest : List<&2, K.Source> <- files.under(dir, tl)
+        return K.Source{hd, F.text_of(mm)} <> rest
+
 # every dependency of the workspace a directory is in, as its root reads them
 def pins.at(+dir: String) -> IO(List<&2, M.Dep>):
   do IO<List<&2, M.Dep>>:
@@ -274,7 +301,9 @@ def pins.at(+dir: String) -> IO(List<&2, M.Dep>):
     +out : String <- Sn.exec(["git", "-C", dir, "-c", "core.quotepath=off", "ls-files", "--",
       ":(glob)**/ez.toml"])
     fs : List<&2, J.Found> <- read.under(dir, lines(String.lines(Sn.text(out))))
-    return pins.joint(J.joint(F.text_of(mm), fs))
+    +bend : String <- Sn.exec(["git", "-C", dir, "-c", "core.quotepath=off", "ls-files", "--", "*.bend"])
+    files : List<&2, K.Source> <- files.under(dir, lines(String.lines(Sn.text(bend))))
+    return pins.joint(J.joint(F.text_of(mm), fs, files))
 
 # the ref, once the workspace's pins are known
 def ref.held(rr: Pin.Ref) -> IO(String):

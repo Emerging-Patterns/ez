@@ -1110,6 +1110,8 @@ def source.canon(source: M.Source) -> M.Source:
     case M.Git{url, rev, tag, root, nar, _vend}:
       +u = url
       M.source.go(String.is_empty(u), u, rev, tag, M.root.or(root), nar, False{})
+    case M.Member{_path, _named}:
+      M.Hub{""}
 
 # a tool pin as the lock gives it back
 def tool.canon(pin: M.Tool) -> M.Tool:
@@ -1171,6 +1173,8 @@ def rev_only.src(src: M.Source) -> Bool:
       False{}
     case M.Git{_url, _rev, tag, _root, _nar, _vend}:
       String.is_empty(tag)
+    case M.Member{_path, _named}:
+      False{}
 
 # whether a dependency is pinned by its commit alone
 def rev_only(dep: M.Dep) -> Bool:
@@ -1183,6 +1187,8 @@ def tagged.src(src: M.Source) -> Bool:
       False{}
     case M.Git{_url, _rev, tag, _root, _nar, _vend}:
       Bool.not(String.is_empty(tag))
+    case M.Member{_path, _named}:
+      False{}
 
 # whether a dependency is pinned through a tag
 def tagged(dep: M.Dep) -> Bool:

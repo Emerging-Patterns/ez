@@ -14,6 +14,10 @@ import ./root.bend as R
 import ./joint.bend as J
 import ../ledger/manifest.bend as M
 import ../ledger/render.bend as Rend
+import ../pkg/pkg.bend as K
+import ../lock/lock.bend as L
+import ../ledger/ignore.bend as I
+import ../toml/toml.bend as T
 import ./up.bend as U
 import ./pin.bend as Pin
 import ../ez/target.bend as Tgt
@@ -523,22 +527,22 @@ def Laws.claims_member(_spec, _hd, _tl):
 # ---------------------------------------------------------------------------
 # one lock
 
-def Laws.joint_lone(text, fs, ev):
-  Equal.cong(W.Read, J.Joint, rd => J.joint.spec(rd, text, fs), W.spec.of(text), W.Lone{}, ev)
+def Laws.joint_lone(text, fs, files, ev):
+  Equal.cong(W.Read, J.Joint, rd => J.joint.spec(rd, text, fs, files), W.spec.of(text), W.Lone{}, ev)
 
 def Laws.lone_locks_own(_own):
   {==}
 
-def Laws.joint_bad_table(text, fs, why, ev):
-  Equal.cong(W.Read, J.Joint, rd => J.joint.spec(rd, text, fs), W.spec.of(text), W.Bad{why}, ev)
+def Laws.joint_bad_table(text, fs, files, why, ev):
+  Equal.cong(W.Read, J.Joint, rd => J.joint.spec(rd, text, fs, files), W.spec.of(text), W.Bad{why}, ev)
 
-def Laws.joint_refused_members(text, fs, spec, why, ev, em):
+def Laws.joint_refused_members(text, fs, files, spec, why, ev, em):
   Equal.trans(J.Joint,
-    J.joint.spec(W.spec.of(text), text, fs),
-    J.joint.members(W.members(spec, W.root.of(text), J.ledgers(fs)), text, fs),
+    J.joint.spec(W.spec.of(text), text, fs, files),
+    J.joint.members(W.members(spec, W.root.of(text), J.ledgers(fs)), text, fs, files),
     J.Clash{why},
-    Equal.cong(W.Read, J.Joint, rd => J.joint.spec(rd, text, fs), W.spec.of(text), W.Root{spec}, ev),
-    Equal.cong(W.Members, J.Joint, mm => J.joint.members(mm, text, fs),
+    Equal.cong(W.Read, J.Joint, rd => J.joint.spec(rd, text, fs, files), W.spec.of(text), W.Root{spec}, ev),
+    Equal.cong(W.Members, J.Joint, mm => J.joint.members(mm, text, fs, files),
       W.members(spec, W.root.of(text), J.ledgers(fs)), W.Refused{why}, em))
 
 def Laws.combine_when_ok(root, ms, ev):
@@ -1215,3 +1219,196 @@ def Laws.array_at_key(key, items, rest):
 
 def Laws.strs_refuses_other(_bit, _rest):
   {==}
+
+# ---------------------------------------------------------------------------
+# a member as a dependency
+
+def Laws.member_dep_walked(
+  name,
+  ms,
+  self,
+  files,
+  dir,
+  nn,
+  ee,
+  bb,
+  hh,
+  pa,
+  pv,
+  ds,
+  ts,
+  hash,
+  root,
+  fs,
+  sums,
+  ef,
+  eo,
+  ew
+):
+  %Equal.sym(Maybe<&2, J.Member>, J.named(ms, name),
+    Some{J.Member{dir, M.Manifest{nn, ee, bb, hh, pa, pv, ds, ts}}}, ef)
+    : {J.target(_, self, name, files) == J.Got{M.Dep{name, hash, J.entry.at(dir, ee), M.Member{root, ""}}} : J.Res}
+  %Equal.sym(Bool, W.segs.eq(dir, self), False{}, eo)
+    : {J.target.at(_, name, M.Manifest{nn, ee, bb, hh, pa, pv, ds, ts}, dir, files, self)
+      == J.Got{M.Dep{name, hash, J.entry.at(dir, ee), M.Member{root, ""}}} : J.Res}
+  %Equal.sym(K.Walked, K.of(J.entry.at(dir, ee), files), K.Walked{hash, root, fs, sums}, ew)
+    : {J.walked(_, name, J.entry.at(dir, ee))
+      == J.Got{M.Dep{name, hash, J.entry.at(dir, ee), M.Member{root, ""}}} : J.Res}
+  {==}
+
+def Laws.named_finds(dir, name, ee, bb, hh, pa, pv, ds, ts, ms):
+  %Equal.sym(Bool, String.eq(name, name), True{}, Eq.string_eq_self(name))
+    : {J.named.at(_, J.Member{dir, M.Manifest{name, ee, bb, hh, pa, pv, ds, ts}}, J.named(ms, name))
+      == Some{J.Member{dir, M.Manifest{name, ee, bb, hh, pa, pv, ds, ts}}} : Maybe<&2, J.Member>}
+  {==}
+
+def Laws.named_skips(hd, ms, name, en):
+  %Equal.sym(Bool, String.eq(J.member.name(hd), name), False{}, en)
+    : {J.named.at(_, hd, J.named(ms, name)) == J.named(ms, name) : Maybe<&2, J.Member>}
+  {==}
+
+def Laws.member_dep_unknown(name, ms, self, files, ef):
+  %Equal.sym(Maybe<&2, J.Member>, J.named(ms, name), None{}, ef)
+    : {J.target(_, self, name, files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " names " ++ name ++ " as a workspace member, and no member's " ++
+        "[package] is named " ++ name} : J.Res}
+  {==}
+
+def Laws.member_dep_own(name, ms, self, files, dir, mm, ef, eo):
+  %Equal.sym(Maybe<&2, J.Member>, J.named(ms, name), Some{J.Member{dir, mm}}, ef)
+    : {J.target(_, self, name, files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " names " ++ name ++ " as a workspace member, and that member is itself"}
+      : J.Res}
+  %Equal.sym(Bool, W.segs.eq(dir, self), True{}, eo)
+    : {J.target.at(_, name, mm, dir, files, self)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " names " ++ name ++ " as a workspace member, and that member is itself"}
+      : J.Res}
+  {==}
+
+def Laws.member_dep_hashed(name, hash, entry, path, nv, ms, self, files, eg):
+  %Equal.sym(Bool, String.is_empty(hash), False{}, eg)
+    : {J.section(Bool.and(Bool.and(_, String.is_empty(entry)), Bool.and(String.is_empty(path),
+        String.is_empty(nv))), J.named(ms, name), self, name, files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+        " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+  {==}
+
+def Laws.member_dep_entried(name, hash, entry, path, nv, ms, self, files, eg):
+  %Equal.sym(Bool, String.is_empty(entry), False{}, eg)
+    : {J.section(Bool.and(Bool.and(String.is_empty(hash), _), Bool.and(String.is_empty(path),
+        String.is_empty(nv))), J.named(ms, name), self, name, files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+        " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+  %Equal.sym(Bool, Bool.and(String.is_empty(hash), False{}), False{}, Str.and_false(String.is_empty(hash)))
+    : {J.section(Bool.and(_, Bool.and(String.is_empty(path), String.is_empty(nv))), J.named(ms, name), self, name,
+        files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+        " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+  {==}
+
+def Laws.member_dep_pathed(name, hash, entry, path, nv, ms, self, files, eg):
+  %Equal.sym(Bool, String.is_empty(path), False{}, eg)
+    : {J.section(Bool.and(Bool.and(String.is_empty(hash), String.is_empty(entry)), Bool.and(_,
+        String.is_empty(nv))), J.named(ms, name), self, name, files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+        " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+  %Equal.sym(Bool, Bool.and(Bool.and(String.is_empty(hash), String.is_empty(entry)), False{}), False{},
+      Str.and_false(Bool.and(String.is_empty(hash), String.is_empty(entry))))
+    : {J.section(_, J.named(ms, name), self, name, files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+        " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+  {==}
+
+def Laws.member_dep_nv(name, hash, entry, path, nv, ms, self, files, eg):
+  %Equal.sym(Bool, String.is_empty(nv), False{}, eg)
+    : {J.section(Bool.and(Bool.and(String.is_empty(hash), String.is_empty(entry)), Bool.and(String.is_empty(path),
+        _)), J.named(ms, name), self, name, files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+        " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+  %Equal.sym(Bool, Bool.and(String.is_empty(path), False{}), False{}, Str.and_false(String.is_empty(path)))
+    : {J.section(Bool.and(Bool.and(String.is_empty(hash), String.is_empty(entry)), _), J.named(ms, name), self,
+        name, files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+        " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+  %Equal.sym(Bool, Bool.and(Bool.and(String.is_empty(hash), String.is_empty(entry)), False{}), False{},
+      Str.and_false(Bool.and(String.is_empty(hash), String.is_empty(entry))))
+    : {J.section(_, J.named(ms, name), self, name, files)
+      == J.Bad{"ez: " ++ J.ledger.at(self) ++ " gives the workspace member " ++ name ++
+        " a hash, an entry or a source; its section is `workspace = true` alone"} : J.Res}
+  {==}
+
+def Laws.member_dep_hub(_name, _hash, _entry, _nv, _ms, _self, _files):
+  {==}
+
+def Laws.member_dep_git(_name, _hash, _entry, _url, _rev, _tag, _root, _nar, _vend, _ms, _self, _files):
+  {==}
+
+def Laws.deps_res_refuses(dd, ds, ms, self, files, why, eb):
+  %Equal.sym(J.Res, J.dep.res(dd, ms, self, files), J.Bad{why}, eb)
+    : {J.deps.cons(_, J.deps.res(ds, ms, self, files)) == J.Unmet{why} : J.Deps}
+  {==}
+
+def Laws.res_one_refuses(dir, mm, ms, files, rest, why, eu):
+  %Equal.sym(J.Deps, J.deps.res(J.deps.of(mm), ms, dir, files), J.Unmet{why}, eu)
+    : {J.res.put(_, dir, mm, rest) == J.Unread{why} : J.Read}
+  {==}
+
+def Laws.res_one_keeps_refusal(dir, mm, ms, files, ds, why, eu):
+  %Equal.sym(J.Deps, J.deps.res(J.deps.of(mm), ms, dir, files), J.Deps{ds}, eu)
+    : {J.res.put(_, dir, mm, J.Unread{why}) == J.Unread{why} : J.Read}
+  {==}
+
+def Laws.resolve_refuses(root, ms, files, why, eu):
+  %Equal.sym(J.Read, J.res.all(J.with.root(root, ms), J.with.root(root, ms), files), J.Unread{why}, eu)
+    : {J.res.read(_) == J.Clash{why} : J.Joint}
+  {==}
+
+def Laws.resolve_joins(root, ms, files, dir, rr, xs, eu):
+  %Equal.sym(J.Read, J.res.all(J.with.root(root, ms), J.with.root(root, ms), files),
+    J.Read{J.Member{dir, rr} <> xs}, eu)
+    : {J.res.read(_) == J.combine(rr, xs) : J.Joint}
+  {==}
+
+def Laws.seed_walked(_nn, hash, entry, path, _nv, files, hw, rw, fs, sums, ew):
+  %Equal.sym(K.Walked, K.of(entry, files), K.Walked{hw, rw, fs, sums}, ew)
+    : {J.seed.walked(_, hash, path, entry)
+      == [LW.Reply{LW.Pkg{hash, L.Member{path, entry}, ""},
+        LW.Got{LW.Clone{""}, K.manifest_of(sums), J.texts(sums, fs)}}] : List<&2, LW.Reply>}
+  {==}
+
+def Laws.seed_cloned(_hash, _src, _hub, _nar, _manifest, _ss):
+  {==}
+
+def Laws.member_origin(_nn, _hash, _entry, _path, _nv):
+  {==}
+
+def Laws.member_judged(_path, _entry, _nar, _hash, _manifest, _ss):
+  {==}
+
+def Laws.member_judged_lib(_path, _entry, _hash, _manifest, _ss):
+  {==}
+
+def Laws.member_src_reads(path, entry):
+  LPF.src_read.member(path, entry)
+
+def Laws.member_not_vended(_nn, _hash, _entry, _path, _nv, _ds):
+  {==}
+
+def Laws.member_laid(hash, vs, fs, ss, rest, ev):
+  %Equal.sym(Bool, String.eq(hash, hash), True{}, Eq.string_eq_self(hash))
+    : {LP.lay.pick(L.any.step(_, _u => L.seen.holds([], hash)), LW.Ok{fs, ss},
+        LP.place.of(L.seen.holds(vs, hash)), hash, rest)
+      == LP.lay.verdict(LW.Ok{fs, ss}, LP.Cache{}, hash, rest) : List<&2, LP.Effect>}
+  %Equal.sym(Bool, L.seen.holds(vs, hash), False{}, ev)
+    : {LP.lay.verdict(LW.Ok{fs, ss}, LP.place.of(_), hash, rest)
+      == LP.lay.verdict(LW.Ok{fs, ss}, LP.Cache{}, hash, rest) : List<&2, LP.Effect>}
+  {==}
+
+def Laws.member_back_kept(_nn, _hash, _entry, _path, _nv, _joint):
+  {==}
+
+def Laws.member_not_missing(n, ps, ew):
+  %Equal.sym(Bool, M.flag(M.value(ps, "workspace")), True{}, ew)
+    : {Bool.and(String.starts_with(n, "deps."), Bool.and(Bool.not(_), String.is_empty(M.value(ps, "hash"))))
+      == False{} : Bool}
+  Str.and_false(String.starts_with(n, "deps."))
