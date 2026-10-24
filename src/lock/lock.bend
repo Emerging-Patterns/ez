@@ -19,9 +19,12 @@ import ../pkg/pkg.bend as K
 # where a package's bytes come from. A hub package needs nothing else; a git
 # one pins a commit, the entry its hash was computed from, the directory inside
 # the checkout its paths are written from, and the NAR hash nix rebuilds it by.
+# A workspace member's (EZ-WS-5) is the committed tree: the directory, from
+# the workspace root, its paths are written from, and its entry there.
 type Src is Data:
   Hub{}
   Git{url: String, rev: String, entry: String, root: String, nar: String, tag: String}
+  Member{path: String, entry: String}
 
 # a package the lock records
 type Pack is Data:
@@ -214,18 +217,38 @@ def at3(ss: List<&2, T.Sect>, +first: String, +second: String, +third: String) -
     case +h <> t:
       at.pick(is3(segs(h), first, second, third), h, at3(t, first, second, third))
 
-# a git origin keeps every key it was written with; anything else is the hub
-def src.go(git: Bool, +ps: List<&2, T.Kv>) -> Src:
+# a member's origin keeps its directory and entry; anything else is the hub
+def src.member(member: Bool, +ps: List<&2, T.Kv>) -> Src:
+  match member:
+    case True{}:
+      Member{T.value(ps, "path"), T.value(ps, "entry")}
+    case False{}:
+      Hub{}
+
+# a git origin keeps every key it was written with
+def src.go(git: Bool, +member: Bool, +ps: List<&2, T.Kv>) -> Src:
   match git:
     case True{}:
       Git{T.value(ps, "url"), T.value(ps, "rev"), T.value(ps, "entry"),
         T.value(ps, "root"), T.value(ps, "narHash"), T.value(ps, "tag")}
     case False{}:
-      Hub{}
+      src.member(member, ps)
 
 # where a table says a package's bytes come from
 def src_of(+ps: List<&2, T.Kv>) -> Src:
-  src.go(String.eq(T.value(ps, "kind"), "git"), ps)
+  +kind = T.value(ps, "kind")
+  src.go(String.eq(kind, "git"), String.eq(kind, "member"), ps)
+
+# a dependency that is not a git one as an origin: a workspace member's tree,
+# which only the joint ledger names, or the hub
+def ledger.other(src: M.Source, +entry: String) -> Src:
+  match src:
+    case M.Hub{_named}:
+      Hub{}
+    case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+      Hub{}
+    case M.Member{path, _named}:
+      Member{path, entry}
 
 # a ledger's dependency as an origin: the repo and rev it names, or the hub.
 # A hub dependency is recorded too, so that a package the ledger names is told
@@ -239,7 +262,7 @@ def ledger.put(git: Bool, +dep: M.Dep) -> List<&2, Origin>:
         M.source.root(M.source.dep(dep)), M.source.nar(M.source.dep(dep)),
         M.source.tag(M.source.dep(dep))}}]
     case False{}:
-      [Origin{M.dep.hash(dep), Hub{}}]
+      [Origin{M.dep.hash(dep), ledger.other(M.source.dep(dep), M.dep.entry(dep))}]
 
 # every origin a ledger's dependencies record, in the order written
 def ledger.origins(ds: List<&2, M.Dep>) -> List<&2, Origin>:
@@ -410,6 +433,8 @@ def src.pairs(source: Src) -> List<&2, T.Kv>:
       List.concat(&2, T.Kv,
         [[T.Kv{"kind", "git"}], kv("url", url), kv("rev", rev), kv("entry", entry),
          kv("root", root), kv("narHash", nar), kv("tag", tag)])
+    case Member{path, entry}:
+      List.concat(&2, T.Kv, [[T.Kv{"kind", "member"}], kv("path", path), kv("entry", entry)])
 
 # a file of a package as a `"<path>" = "<sha256>"` pair
 def file.pair(item: K.Item) -> T.Kv:
@@ -540,6 +565,8 @@ def tool.pairs(+entry: String, +binary: String, source: M.Source) -> List<&2, T.
       List.concat(&2, T.Kv,
         [kv("git", url), kv("rev", rev), kv("tag", tag), kv("root", root),
          kv("narHash", nar), kv("entry", entry), kv("bin", binary)])
+    case M.Member{_path, _named}:
+      List.concat(&2, T.Kv, [kv("entry", entry), kv("bin", binary)])
 
 # one `[tools.<name>]` table
 def tool.sect(pin: M.Tool) -> T.Sect:
@@ -708,6 +735,8 @@ def src.kind(source: Src) -> String:
       "hub"
     case Git{_u, _r, _e, _ro, _n, _t}:
       "git"
+    case Member{_p, _e}:
+      "member"
 
 # the commit a package is pinned to, or "" when it comes from the hub
 def src.rev(source: Src) -> String:
@@ -716,6 +745,8 @@ def src.rev(source: Src) -> String:
       ""
     case Git{_u, rev, _e, _ro, _n, _t}:
       rev
+    case Member{_p, _e}:
+      ""
 
 # the repo a package was vendored from, or "" when it comes from the hub
 def src.url(source: Src) -> String:
@@ -724,6 +755,8 @@ def src.url(source: Src) -> String:
       ""
     case Git{url, _r, _e, _ro, _n, _t}:
       url
+    case Member{_p, _e}:
+      ""
 
 # the directory inside a checkout a vendored package's paths are written from
 def src.root(source: Src) -> String:
@@ -732,6 +765,8 @@ def src.root(source: Src) -> String:
       ""
     case Git{_u, _r, _e, root, _n, _t}:
       root
+    case Member{_p, _e}:
+      ""
 
 # the NAR hash nix rebuilds a vendored package's checkout by, or "" when it
 # comes from the hub
@@ -741,3 +776,5 @@ def src.nar(source: Src) -> String:
       ""
     case Git{_u, _r, _e, _ro, nar, _t}:
       nar
+    case Member{_p, _e}:
+      ""

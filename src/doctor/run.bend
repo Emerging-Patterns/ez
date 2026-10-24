@@ -23,6 +23,8 @@ import ../lock/world.bend as W
 import ../lock/lock.bend as L
 import ./world.bend as DW
 import ./plan.bend as DP
+import ../ws/run.bend as WsRun
+import ../ws/doctor.bend as WsDoc
 
 # how a program is asked for its version, once it is known whether this is
 # bend. Everything else answers the flag.
@@ -114,12 +116,12 @@ def rounds() -> Nat:
 # the loop, under fuel. Every round adds at least one answer, since the
 # planner never asks what the World answers already, and the lock check asks
 # about each package at most once.
-def loop(fuel: Nat, +lib: String, +world: DW.World) -> IO(Unit):
+def loop(fuel: Nat, +lib: String, +back: WsDoc.Back, +world: DW.World) -> IO(Unit):
   match fuel:
     case 0n:
       IO.die(Unit, 1, "ez: ez doctor kept asking questions")
     case 1n+f:
-      loop.step(DP.step(world), lib, world, w => loop(f, lib, w))
+      loop.step(WsDoc.step(back, world), lib, world, w => loop(f, lib, back, w))
 
 # a variable's text, "" when it is unset
 def var(name: String) -> IO(String):
@@ -127,11 +129,17 @@ def var(name: String) -> IO(String):
     r : Result<&1, &1, U32 & String, String> <- IO.get_env(name)
     return Args.text_of(r)
 
+# the loop, on the ledger the doctor judges
+def run.doctored(dd: WsDoc.Doctored, +cc: String, +lib: String, lk: Maybe<&2, String>) -> IO(Unit):
+  WsDoc.Doctored{led, back} = dd
+  loop(rounds(), DP.lib.at(lib), back, DW.World{cc, lib, led, lk, []})
+
 # `ez doctor`: the toolchain and the project, reported on
 def run() -> IO(Unit):
   do IO<Unit>:
     cc : String <- var("CC")
     +lib : String <- var("BEND_LIB")
-    led : Maybe<&2, String> <- F.read(DW.toml())
+    own : Maybe<&2, String> <- F.read(DW.toml())
+    dd : WsDoc.Doctored <- WsRun.doctor.ledger(own)
     lk : Maybe<&2, String> <- F.read(DW.lockfile())
-    loop(rounds(), DP.lib.at(lib), DW.World{cc, lib, led, lk, []})
+    run.doctored(dd, cc, lib, lk)

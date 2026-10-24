@@ -31,6 +31,8 @@ def gap(pin: M.Tool) -> String:
       "ez: tools." ++ n ++ " has no git"
     case M.Git{_url, rev, _tag, _root, nar, _vend}:
       gap.git(String.is_empty(rev), String.is_empty(nar), n)
+    case M.Member{_path, _named}:
+      "ez: tools." ++ n ++ " has no git"
 
 # this pin's gap when it has one, otherwise the rest's. The rest arrives as a
 # thunk and only the arm that wants it applies it, so the first gap stops the

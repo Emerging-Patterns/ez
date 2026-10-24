@@ -21,6 +21,7 @@ import ../pkg/path.bend as Path
 # failed, and a tree already there is not removed. Its plan has no effect at
 # all; the reason is how it ends.
 # EZ-OUT-2
+# EZ-WS-8
 law fetch_refusal_writes_nothing:
   for +w: F.World
   for r: {FP.refuses(w) == True{} : Bool}
@@ -70,6 +71,7 @@ law fetch_needs_lock_asks_nothing:
 # from a checkout. Equal digests are the strongest match: a hub body whose
 # digest equals the lock's sum is one whose digest starts with it.
 # EZ-FETCH-1
+# EZ-WS-8
 law fetch_lays_the_lock:
   for +w: F.World
   {FP.lays.locked(F.sects(w), FP.effects(FP.plan(w))) == True{} : Bool}
@@ -235,3 +237,70 @@ law fetch_lays_the_names:
   for +w: F.World
   for ok: {FP.refuses(w) == False{} : Bool}
   {names.laid(FP.effects(FP.plan(w))) == puts(FP.name.parts.of(F.sects(w), w)) : List<&2, L.Name>}
+
+# ---------------------------------------------------------------------------
+# a workspace member's package (EZ-WS-8)
+
+# LAW: a member's package is asked for as the committed files, under the hash
+# the lock records it by
+# EZ-WS-8
+law fetch_member_asks_tree:
+  for path: String
+  for +entry: String
+  for here: String
+  for hub: String
+  for +hash: String
+  {FP.fetch.ask(L.Member{path, entry}, here, hub, hash) == F.Tree{hash, entry} : F.Ask}
+
+# LAW: and, once they are listed, it is the member walked from its entry over
+# them
+# EZ-WS-8
+law fetch_member_walks:
+  for +rs: List<&2, F.Reply>
+  for +path: String
+  for +entry: String
+  for fs: List<&2, K.Item>
+  for here: String
+  for hub: String
+  for +hash: String
+  for ls: List<&2, W.Source>
+  for eh: {F.heard(rs, F.Tree{hash, entry}) == F.Heard{F.Seen{W.Listed{ls}}} : F.Heard}
+  {FP.part.fetch(rs, L.Member{path, entry}, fs, here, hub, hash)
+    == FP.member.walked(K.of(entry, FP.files.of(ls)), fs, path, hash) : FP.Part}
+
+# LAW: a walk that hashes to the hash the lock records arrives as the files it
+# walked, which the lock's sums then judge as any tree's
+# EZ-WS-8
+law fetch_member_same:
+  for +hash: String
+  for root: String
+  for wfs: List<&2, K.Source>
+  for sums: List<&2, K.Item>
+  for fs: List<&2, K.Item>
+  for +path: String
+  {FP.member.walked(K.Walked{hash, root, wfs, sums}, fs, path, hash) == FP.Got{FP.cand(fs, "", wfs)} : FP.Part}
+
+# LAW: and one that hashes to any other is refused, naming the member
+# EZ-WS-8
+law fetch_member_moved:
+  for +now: String
+  for root: String
+  for wfs: List<&2, K.Source>
+  for sums: List<&2, K.Item>
+  for fs: List<&2, K.Item>
+  for +path: String
+  for +hash: String
+  for en: {String.eq(now, hash) == False{} : Bool}
+  {FP.member.walked(K.Walked{now, root, wfs, sums}, fs, path, hash)
+    == FP.No{"ez: workspace member " ++ path ++ " is " ++ now ++ " in the committed files, and the lock records " ++
+      hash ++ "; run ez lock"} : FP.Part}
+
+# LAW: a package refused stops the fetch with its reason, so the fetch lays
+# nothing (`fetch_refusal_writes_nothing`)
+# EZ-WS-8
+law fetch_member_stops:
+  for fs: List<&2, K.Item>
+  for hash: String
+  for +why: String
+  for vs: List<&2, FP.Verdict>
+  {FP.outcome.of(FP.judge(fs, hash, FP.No{why}) <> vs) == P.Refused{why} : P.Outcome}

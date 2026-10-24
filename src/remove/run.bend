@@ -13,6 +13,8 @@ import ../lock/run.bend as Run
 import ../lock/world.bend as W
 import ./plan.bend as RP
 import ./relock.bend as RR
+import ../ws/relock.bend as Rel
+import ../ws/run.bend as WsRun
 
 # the World with more of the lock's answers in it
 def more(world: RR.World, rs: List<&2, W.Reply>) -> RR.World:
@@ -32,12 +34,12 @@ def loop.step(st: RR.Next, +lib: String, world: RR.World, go: RR.World -> IO(Uni
 
 # the loop, under fuel. Every round adds an answer, since the lock never asks
 # what the World answers already, so the fuel (`Run.rounds`) is only a guard.
-def loop(fuel: Nat, +lib: String, +world: RR.World) -> IO(Unit):
+def loop(fuel: Nat, +lib: String, +ws: Rel.Ws, +world: RR.World) -> IO(Unit):
   match fuel:
     case 0n:
       IO.die(Unit, 1, "ez: ez remove kept asking questions")
     case 1n+f:
-      loop.step(RR.next(world), lib, world, w => loop(f, lib, w))
+      loop.step(Rel.remove.next(ws, world), lib, world, w => loop(f, lib, ws, w))
 
 # `ez remove <name>`
 def run(+name: String) -> IO(Unit):
@@ -47,5 +49,6 @@ def run(+name: String) -> IO(Unit):
     led : Maybe<&2, String> <- F.read(RP.toml())
     ig : Maybe<&2, String> <- F.read(RP.ignore.file())
     ls : W.Listing <- Run.read.listing()
-    loop(Run.rounds(), lib, RR.World{RP.World{name, led, F.text_of(ig)},
+    ws : Rel.Ws <- WsRun.relock.ws()
+    loop(Run.rounds(), lib, ws, RR.World{RP.World{name, led, F.text_of(ig)},
       String.trim(R.text(pwd)), ls, []})

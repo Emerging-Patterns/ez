@@ -849,6 +849,8 @@ def origin.say(src: M.Source) -> String:
       "hub"
     case M.Git{url, _rev, _tag, _root, _nar, _vend}:
       "git " ++ url
+    case M.Member{_path, _named}:
+      "workspace member"
 
 # a dependency as a refusal names it: its key and its origin
 def dep.say(item: M.Dep) -> String:

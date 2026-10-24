@@ -96,6 +96,8 @@ def from(src: M.Source, +url: String) -> Bool:
       False{}
     case M.Git{u, _rev, _tag, _root, _nar, _vend}:
       String.eq(u, url)
+    case M.Member{_path, _named}:
+      False{}
 
 # a dependency's name when it is this source, or the answer further on
 def had.at(same: Bool, name: String, rest: String) -> String:
@@ -202,6 +204,8 @@ def hub.from(src: M.Source, +part: String) -> Bool:
     case M.Hub{named}:
       String.eq(hub.part(named), part)
     case M.Git{_u, _rev, _tag, _root, _nar, _vend}:
+      False{}
+    case M.Member{_path, _named}:
       False{}
 
 # the name the ledger already gives a hub package of this name part, first in

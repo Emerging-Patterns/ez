@@ -238,6 +238,7 @@ def put.doc(doc: P.Doc) -> P.Wrote:
 # those write the same bytes to ez.lock.toml, or both write none, however they
 # differ otherwise.
 # EZ-DOC-3
+# EZ-WS-3
 law lock_reproducible:
   for w1: W.World
   for w2: W.World
@@ -254,10 +255,34 @@ law clone_reproduces:
 
 # LAW: a plain lock never writes ez.toml
 # EZ-DOC-5
+# EZ-WS-3
 law plain_lock_keeps_ledger:
   for w: W.World
   for e: {W.args.upgrade(w) == False{} : Bool}
   {P.put(w, "ez.toml") == P.Kept{} : P.Wrote}
+
+# LAW: a plain lock writes no path but the lock's: whatever else is at a path,
+# a ledger among it, it leaves as it was. In a workspace the lock is planned
+# from the joint ledger (src/ws/joint.bend) on a World like any other, so this
+# holds of the workspace's lock too.
+# EZ-DOC-5
+# EZ-WS-3
+# EZ-WS-6
+law plain_lock_writes_only_lock:
+  for w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
+  for +path: String
+  for ep: {String.eq(P.lockfile(), path) == False{} : Bool}
+  {P.put(w, path) == P.Kept{} : P.Wrote}
+
+# LAW: and so it writes no member's ledger: no path that ends in a directory's
+# `ez.toml`
+# EZ-WS-3
+law plain_lock_keeps_members:
+  for w: W.World
+  for e: {W.args.upgrade(w) == False{} : Bool}
+  for +pre: String
+  {P.put(w, pre ++ "/ez.toml") == P.Kept{} : P.Wrote}
 
 # a package with the source the ledger records for its hash. Law vocabulary:
 # ez never calls it.
@@ -803,6 +828,7 @@ def fresh(world: W.World) -> List<&2, String>:
 # and writes none. A laid tree read from BEND_LIB is judged as the clone that
 # passed was, which is `clone_reproduces` read backwards.
 # EZ-DOC-4
+# EZ-WS-3
 law lock_idempotent:
   for +w: W.World
   for e: {W.args.upgrade(w) == False{} : Bool}
@@ -1085,6 +1111,8 @@ def source.canon(source: M.Source) -> M.Source:
     case M.Git{url, rev, tag, root, nar, _vend}:
       +u = url
       M.source.go(String.is_empty(u), u, rev, tag, M.root.or(root), nar, False{})
+    case M.Member{_path, _named}:
+      M.Hub{""}
 
 # a tool pin as the lock gives it back
 def tool.canon(pin: M.Tool) -> M.Tool:
@@ -1146,6 +1174,8 @@ def rev_only.src(src: M.Source) -> Bool:
       False{}
     case M.Git{_url, _rev, tag, _root, _nar, _vend}:
       String.is_empty(tag)
+    case M.Member{_path, _named}:
+      False{}
 
 # whether a dependency is pinned by its commit alone
 def rev_only(dep: M.Dep) -> Bool:
@@ -1158,6 +1188,8 @@ def tagged.src(src: M.Source) -> Bool:
       False{}
     case M.Git{_url, _rev, tag, _root, _nar, _vend}:
       Bool.not(String.is_empty(tag))
+    case M.Member{_path, _named}:
+      False{}
 
 # whether a dependency is pinned through a tag
 def tagged(dep: M.Dep) -> Bool:
@@ -1763,6 +1795,7 @@ law lock_names_agree:
 # LAW: a name ez.toml records resolves to the hash ez.toml records beside
 # it, whatever the answers say
 # EZ-HUB-1
+# EZ-WS-6
 law ledger_names_first:
   for +led: M.Read
   for +js: List<&2, W.Judged>
@@ -1783,6 +1816,7 @@ law lock_answer_names:
 # LAW: a name the table resolves, because ez.toml records it or the lock
 # being rewritten does, is never put to the hub
 # EZ-HUB-2
+# EZ-WS-6
 law resolved_not_asked:
   for +w: W.World
   for +nv: String
@@ -1792,6 +1826,7 @@ law resolved_not_asked:
 # LAW: a lock that is made lays a names file for every name the lock it
 # writes records, with the hash it records, and none other
 # EZ-HUB-4
+# EZ-WS-6
 law lock_lays_its_names:
   for +w: W.World
   for +t: String

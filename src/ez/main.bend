@@ -19,6 +19,7 @@ import ../tool/world.bend as TW
 import ../share/say.bend as Say
 import ../io/file.bend as F
 import ../ez/line.bend as L
+import ../ws/run.bend as WsRun
 
 # what a subcommand runs. `L.line` never runs `CHelp`, which names no
 # command; it is here so the match is whole, and it writes the help a bare
@@ -31,20 +32,27 @@ def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(U
       Cmd.init(L.get(matched, "name"), L.get(matched, "entry"),
         L.get(matched, "description"))
     case L.CAdd{}:
-      Cmd.add(L.get(matched, "target"), L.get(matched, "ref"),
-        L.get(matched, "entry"), L.get(matched, "rename"))
+      +target = L.get(matched, "target")
+      +ref = L.get(matched, "ref")
+      +entry = L.get(matched, "entry")
+      +rename = L.get(matched, "rename")
+      WsRun.in.member(_u => Cmd.add(target, ref, entry, rename))
     case L.CRemove{}:
-      Cmd.remove(L.get(matched, "name"))
+      +name = L.get(matched, "name")
+      WsRun.in.member(_u => Cmd.remove(name))
     case L.CLock{}:
-      Cmd.lock(Shake.on(matched, "upgrade"), L.get(matched, "package"))
+      +up = Shake.on(matched, "upgrade")
+      +only = L.get(matched, "package")
+      WsRun.at.root(_u => Cmd.lock(up, only))
     case L.CFetch{}:
-      Cmd.fetch()
+      WsRun.at.root(_u => Cmd.fetch())
     case L.CCheck{}:
-      Cmd.check()
+      WsRun.in.member(_u => Cmd.check())
     case L.CBuild{}:
-      Cmd.build(L.get(matched, "out"))
+      +out = L.get(matched, "out")
+      WsRun.in.member(_u => Cmd.build(out))
     case L.CRun{}:
-      Cmd.run(as)
+      WsRun.in.member(_u => Cmd.run(as))
     case L.CToolSync{}:
       ToolRun.sync()
     case L.CToolRun{}:
@@ -55,13 +63,13 @@ def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(U
     case L.CToolUpgrade{}:
       ToolRun.run(TW.Upgrade{}, L.get(matched, "target"), L.get(matched, "entry"))
     case L.CPublish{}:
-      Cmd.publish()
+      WsRun.in.member(_u => Cmd.publish())
     case L.CTest{}:
       Test.run()
     case L.CProve{}:
       Prove.run()
     case L.CDoctor{}:
-      DoctorRun.run()
+      WsRun.at.root(_u => DoctorRun.run())
     case L.CHelp{}:
       IO.write(Shake.help(L.spec(), []))
 

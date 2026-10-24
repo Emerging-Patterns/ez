@@ -63,6 +63,8 @@ def fetch.ask(src: L.Src, +here: String, +hub: String, +hash: String) -> F.Ask:
       F.Hub{W.Pkg{hash, L.Hub{}, hub}}
     case L.Git{url, rev, _entry, _root, _nar, _tag}:
       F.Git{hash, Up.Clone{Path.anchor(here, url), rev}}
+    case L.Member{_path, entry}:
+      F.Tree{hash, entry}
 
 # ---------------------------------------------------------------------------
 # what arrived
@@ -114,6 +116,8 @@ def tree.of(answer: F.Answer, +root: String) -> Tree:
     case F.Said{a}:
       tree.said(a, root)
     case F.Held{_got}:
+      Gone{"ez: a tree was not answered with one"}
+    case F.Seen{_listing}:
       Gone{"ez: a tree was not answered with one"}
 
 # a text looked up, "" when it is not there
@@ -268,6 +272,66 @@ def part.fetch.heard(got: F.Heard, fs: List<&2, K.Item>, +root: String) -> Part:
     case F.Heard{answer}:
       part.tree(tree.of(answer, root), fs)
 
+# the committed files a listing names, as the walk takes them
+def files.of(ls: List<&2, W.Source>) -> List<&2, K.Source>:
+  match ls:
+    case []:
+      []
+    case W.Source{at, text} <> tl:
+      K.Source{at, text} <> files.of(tl)
+
+# a member's walk, once it is known whether it hashes to the hash the lock
+# records: the files it walked, or a refusal naming the member
+def member.same(
+  same: Bool,
+  +now: String,
+  wfs: List<&2, K.Source>,
+  fs: List<&2, K.Item>,
+  +path: String,
+  +hash: String
+) -> Part:
+  match same:
+    case True{}:
+      Got{cand(fs, "", wfs)}
+    case False{}:
+      No{"ez: workspace member " ++ path ++ " is " ++ now ++ " in the committed files, and the lock records " ++
+        hash ++ "; run ez lock"}
+
+# a member's package walked from its entry over the committed files
+def member.walked(got: K.Walked, fs: List<&2, K.Item>, +path: String, +hash: String) -> Part:
+  match got:
+    case K.Walked{+now, _root, wfs, _sums}:
+      member.same(String.eq(now, hash), now, wfs, fs, path, hash)
+    case K.Asks{at}:
+      No{"ez: workspace member " ++ path ++ " imports " ++ at ++ ", which git does not track"}
+    case K.Refused{why}:
+      No{why}
+
+# a workspace member's package, once the committed files were asked for
+def member.listed(listing: W.Listing, fs: List<&2, K.Item>, +path: String, +entry: String, +hash: String) -> Part:
+  match listing:
+    case W.Listed{ls}:
+      member.walked(K.of(entry, files.of(ls)), fs, path, hash)
+    case W.Unlisted{why}:
+      No{why}
+
+# a workspace member's package, by what the question was answered with
+def member.answer(answer: F.Answer, fs: List<&2, K.Item>, +path: String, +entry: String, +hash: String) -> Part:
+  match answer:
+    case F.Seen{listing}:
+      member.listed(listing, fs, path, entry, hash)
+    case _:
+      No{"ez: workspace member " ++ path ++ " was not read from the workspace"}
+
+# a workspace member's package (EZ-WS-8): laid from the committed files only
+# when its walk from its entry hashes to the hash the lock records for it
+def part.member(got: F.Heard, fs: List<&2, K.Item>, +path: String, +entry: String, +hash: String) -> Part:
+  match got:
+    case F.Open{}:
+      AskFetch{}
+    case F.Heard{answer}:
+      member.answer(answer, fs, path, entry, hash)
+
 # a package fetched, from where the lock says it comes from
 def part.fetch(
   +rs: List<&2, F.Reply>,
@@ -277,7 +341,14 @@ def part.fetch(
   +hub: String,
   +hash: String
 ) -> Part:
-  part.fetch.heard(F.heard(rs, fetch.ask(src, here, hub, hash)), fs, L.src.root(src))
+  match src:
+    case L.Member{+path, +entry}:
+      part.member(F.heard(rs, F.Tree{hash, entry}), fs, path, entry, hash)
+    case L.Hub{}:
+      part.fetch.heard(F.heard(rs, fetch.ask(L.Hub{}, here, hub, hash)), fs, L.src.root(L.Hub{}))
+    case L.Git{url, rev, entry, root, nar, tag}:
+      part.fetch.heard(F.heard(rs, fetch.ask(L.Git{url, rev, entry, root, nar, tag}, here, hub, hash)), fs,
+        L.src.root(L.Git{url, rev, entry, root, nar, tag}))
 
 # a tree under BEND_LIB that passes is kept; any other is fetched
 def part.kept(
@@ -385,6 +456,8 @@ def weighed.answer(answer: F.Answer, +hash: String, +nar: String, +url: String, 
       unweighed(hash)
     case F.Held{_got}:
       unweighed(hash)
+    case F.Seen{_listing}:
+      unweighed(hash)
 
 def weighed.heard(got: F.Heard, +hash: String, +nar: String, +url: String, +rev: String) -> String:
   match got:
@@ -400,6 +473,8 @@ def weighed.src(src: L.Src, +rs: List<&2, F.Reply>, +here: String, +hash: String
     case L.Git{+url, +rev, _entry, _root, nar, _tag}:
       weighed.heard(F.heard(rs, F.Git{hash, Up.Clone{Path.anchor(here, url), rev}}),
         hash, nar, url, rev)
+    case L.Member{_path, _entry}:
+      ""
 
 # why the checkout a package of the lock was fetched as may not be laid, ""
 # when it may. A hub package has no checkout. A git package's checkout, the
@@ -869,6 +944,8 @@ def ask.hash(ask: F.Ask) -> String:
       W.ask.hash(q)
     case F.Named{nv}:
       nv
+    case F.Tree{hash, _entry}:
+      hash
 
 # whether a git question asks for the source the lock records for its
 # package, taken from the project: the lock's url anchored at `here`

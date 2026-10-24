@@ -34,6 +34,8 @@ def source(src: M.Source) -> String:
     case M.Git{url, rev, tag, root, nar, vend}:
       line("git", url) ++ line("rev", rev) ++ line("tag", tag) ++
       line("root", root) ++ line("narHash", nar) ++ line.bare("vendor", vendor.word(vend))
+    case M.Member{path, named}:
+      line.bare("workspace", "true") ++ line("path", path) ++ line("hub", named)
 
 # one `[deps.<name>]` section
 def dep(dependency: M.Dep) -> String:
@@ -115,6 +117,8 @@ def vendored(src: M.Source) -> M.Source:
       M.Hub{named}
     case M.Git{url, rev, tag, root, nar, _vend}:
       M.Git{url, rev, tag, root, nar, True{}}
+    case M.Member{path, named}:
+      M.Member{path, named}
 
 # a source that keeps a vendor bit the ledger already set, or is left as given
 def revend(keep: Bool, src: M.Source) -> M.Source:
@@ -159,6 +163,8 @@ def clean(+text: String) -> Bool:
 # whether a source reads back as itself. A git source names its repo and the
 # directory its paths are written from: the reader takes a section with no
 # `git` for a hub package and one with no `root` for the top of the checkout.
+# A workspace member's is `workspace = true`, with the directory and the name
+# only the joint ledger gives it.
 def source.ok(src: M.Source) -> Bool:
   match src:
     case M.Hub{+named}:
@@ -167,12 +173,26 @@ def source.ok(src: M.Source) -> Bool:
       Bool.and(Bool.and(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root))),
         Bool.and(Bool.and(clean(url), clean(rev)),
           Bool.and(clean(tag), Bool.and(clean(root), clean(nar)))))
+    case M.Member{+path, +named}:
+      Bool.and(clean(path), clean(named))
 
-# whether a dependency does: it has a hash, which the reader asks every
-# dependency for, and every name and value is clean
+# whether a dependency's hash can be written: one is there, which the reader
+# asks every dependency for but a workspace member's, whose ledger records
+# none and whose hash only the joint ledger gives
+def hash.ok(src: M.Source, +hash: String) -> Bool:
+  match src:
+    case M.Hub{_named}:
+      Bool.and(Bool.not(String.is_empty(hash)), clean(hash))
+    case M.Git{_url, _rev, _tag, _root, _nar, _vend}:
+      Bool.and(Bool.not(String.is_empty(hash)), clean(hash))
+    case M.Member{_path, _named}:
+      clean(hash)
+
+# whether a dependency does: it has a hash, but for a workspace member, and
+# every name and value is clean
 def dep.ok(dependency: M.Dep) -> Bool:
-  M.Dep{+n, +h, +e, s} = dependency
-  Bool.and(Bool.and(clean(n), Bool.and(Bool.not(String.is_empty(h)), clean(h))),
+  M.Dep{+n, +h, +e, +s} = dependency
+  Bool.and(Bool.and(clean(n), hash.ok(s, h)),
     Bool.and(clean(e), source.ok(s)))
 
 # whether every dependency does
@@ -193,6 +213,8 @@ def tool.src.ok(src: M.Source) -> Bool:
       String.is_empty(named)
     case M.Git{url, rev, tag, root, nar, vend}:
       source.ok(M.Git{url, rev, tag, root, nar, vend})
+    case M.Member{_path, _named}:
+      False{}
 
 # whether a pinned CLI does
 def tool.ok(pin: M.Tool) -> Bool:

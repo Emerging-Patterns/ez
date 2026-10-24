@@ -83,6 +83,8 @@ def aim.src(source: M.Source) -> Aim:
       Hold{}
     case M.Git{_url, _rev, +tag, _root, _nar, _vend}:
       aim.tag(String.is_empty(tag), tag)
+    case M.Member{_path, _named}:
+      Hold{}
 
 # what this dependency is asked. Unselected dependencies are left alone,
 # including a git one, so `--package` does not move its neighbours.
@@ -161,6 +163,8 @@ def retarget.go(
       M.Dep{name, hash, entry, M.Hub{named}}
     case M.Git{url, _rev, tag, _root, _nar, vend}:
       M.Dep{name, hash, entry, M.Git{url, rev, tag, root, nar, vend}}
+    case M.Member{path, named}:
+      M.Dep{name, hash, entry, M.Member{path, named}}
 
 # the dependency with a new commit written in
 def retarget(dep: M.Dep, +rev: String, +hash: String, +root: String, +nar: String) -> M.Dep:

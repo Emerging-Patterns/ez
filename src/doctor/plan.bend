@@ -534,6 +534,8 @@ def tree.how(src: L.Src) -> W.How:
       W.Served{}
     case L.Git{_url, _rev, _entry, _root, _nar, _tag}:
       W.Lib{}
+    case L.Member{_path, _entry}:
+      W.Lib{}
 
 # the source a lock question names
 def ask.src(ask: W.Ask) -> L.Src:
