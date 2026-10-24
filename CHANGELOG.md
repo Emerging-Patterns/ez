@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/Emerging-Patterns/ez/compare/v1.9.0...v1.10.0) (2026-10-24)
+
+
+### Features
+
+* uv-style workspaces (EZ-WS-1 to EZ-WS-10) ([#153](https://github.com/Emerging-Patterns/ez/issues/153)) ([2aaa270](https://github.com/Emerging-Patterns/ez/commit/2aaa270e10d40c56c3f4e2d69bc47959c51273e4))
+
 ## [1.9.0](https://github.com/Emerging-Patterns/ez/compare/v1.8.0...v1.9.0) (2026-10-23)
 
 
