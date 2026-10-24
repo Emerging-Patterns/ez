@@ -154,7 +154,8 @@ def joint.at(
   +text: String,
   +spec: W.Spec,
   +fs: List<&2, J.Found>,
-  +files: List<&2, K.Source>
+  +files: List<&2, K.Source>,
+  +lock: String
 ) -> IO(Planned):
   match jj:
     case J.Lone{}:
@@ -162,7 +163,7 @@ def joint.at(
     case J.Clash{why}:
       IO.die(Planned, 1, why)
     case J.Joint{+mm}:
-      IO.pure(Planned, Planned{Some{Rend.show(mm)}, U.Back{text, spec, fs},
+      IO.pure(Planned, Planned{Some{Rend.show(mm)}, U.Back{text, spec, fs, lock},
         J.seeds(J.Joint{mm}, files)})
 
 # a workspace root's ledger joined with every member's, once git listed them
@@ -177,7 +178,8 @@ def joint.listed(
     case True{}:
       do IO<Planned>:
         +fs : List<&2, J.Found> <- read.found(lines(String.lines(out)))
-        joint.at(J.joint(text, fs, files), text, spec, fs, files)
+        lk : Maybe<&2, String> <- F.read("ez.lock.toml")
+        joint.at(J.joint(text, fs, files), text, spec, fs, files, F.text_of(lk))
     case False{}:
       IO.die(Planned, 1,
         "ez: a workspace is locked from the ez.toml files git tracks, and git could not list them: " ++

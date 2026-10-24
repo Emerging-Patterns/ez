@@ -15,6 +15,8 @@ import ./root.bend as R
 import ./joint.bend as J
 import ./hop.bend as H
 import ./up.bend as U
+import ./moved.bend as Mv
+import ../ledger/upgrade.bend as LU
 import ./pin.bend as Pin
 import ../ez/target.bend as Tgt
 import ../lock/world.bend as LW
@@ -556,12 +558,14 @@ law up_alone:
   {U.plan(U.Alone{}, world) == LP.plan(world) : LP.Plan}
 
 # LAW: and a plain lock at a workspace root runs it too, since it writes no
-# ledger back
+# ledger back, unless a committed line names the hash the lock being
+# rewritten records for a member that has moved since (EZ-WS-7)
 # EZ-WS-4
 law up_plain:
   for +back: U.Back
   for +world: LW.World
   for ev: {LW.args.upgrade(world) == False{} : Bool}
+  for es: {U.stale(back, world) == "" : String}
   {U.plan(back, world) == LP.plan(world) : LP.Plan}
 
 # LAW: an upgrade moves a ledger's git dependency to the pin the joint ledger
@@ -620,22 +624,27 @@ law tool_pin_back:
     == M.Tool{nn, ee, bb, M.Git{url, jr, jt, jo, jnar, vend}} : M.Tool}
 
 # LAW: an upgrade at a workspace root that refuses writes nothing: no ledger,
-# no lock, no tree (EZ-OUT-2)
+# no lock, no tree, and no source it would have rewritten (EZ-OUT-2). The
+# World it refuses on is the one it plans on, with every moved member's import
+# lines rewritten (EZ-WS-7).
 # EZ-WS-4
+# EZ-WS-7
 law up_refusal_writes_nothing:
   for +back: U.Back
   for +world: LW.World
-  for +er: {LP.refuses(world) == True{} : Bool}
+  for +er: {LP.refuses(U.plans.on(back, world)) == True{} : Bool}
   {LP.writes(U.plan(back, world)) == False{} : Bool}
 
 # LAW: and the lock it writes is the one the lock planner plans on the joint
-# ledger: writing the ledgers back in place of the joint one leaves the lock
-# as it was
+# ledger: writing the ledgers back in place of the joint one, and the sources
+# the member moves rewrite ahead of the plan, leaves the lock as it was
 # EZ-WS-4
+# EZ-WS-7
 law up_writes_the_lock:
   for +back: U.Back
   for +world: LW.World
-  {LP.put.plan(U.plan(back, world), LP.lockfile()) == LP.put(world, LP.lockfile()) : LP.Wrote}
+  for es: {U.stale(back, world) == "" : String}
+  {LP.put.plan(U.plan(back, world), LP.lockfile()) == LP.put(U.plans.on(back, world), LP.lockfile()) : LP.Wrote}
 
 # LAW: `ez add` of a source no member records goes on with the ref it was
 # given
@@ -1298,3 +1307,235 @@ law member_not_missing:
   for +ps: List<&2, T.Kv>
   for ew: {M.flag(M.value(ps, "workspace")) == True{} : Bool}
   {M.missing.is(T.Sect{n, ps}) == False{} : Bool}
+
+# ---------------------------------------------------------------------------
+# a member imported by its hash, once it moved (EZ-WS-7)
+
+# LAW: a plain lock at a workspace root with a committed line naming the hash
+# the lock being rewritten records for a member that has moved since refuses
+# with why, writing nothing
+# EZ-WS-7
+law stale_plain_refuses:
+  for +text: String
+  for +spec: W.Spec
+  for +fs: List<&2, J.Found>
+  for +lock: String
+  for +world: LW.World
+  for +why: String
+  for ev: {LW.args.upgrade(world) == False{} : Bool}
+  for ew: {Mv.stale.world(lock, world) == why : String}
+  for en: {String.is_empty(why) == False{} : Bool}
+  {U.plan(U.Back{text, spec, fs, lock}, world) == LP.Plan{[], LP.Refused{why}} : LP.Plan}
+
+# LAW: and it asks nothing first
+# EZ-WS-7
+law stale_plain_asks_nothing:
+  for +text: String
+  for +spec: W.Spec
+  for +fs: List<&2, J.Found>
+  for +lock: String
+  for +world: LW.World
+  for +why: String
+  for ev: {LW.args.upgrade(world) == False{} : Bool}
+  for ew: {Mv.stale.world(lock, world) == why : String}
+  for en: {String.is_empty(why) == False{} : Bool}
+  {U.step(U.Back{text, spec, fs, lock}, world) == LP.Run{LP.Plan{[], LP.Refused{why}}} : LP.Step}
+
+# LAW: a file whose line names a moved member's recorded hash is the one the
+# refusal names, with the member and the upgrade that rewrites the line
+# EZ-WS-7
+law stale_names_upgrade:
+  for +name: String
+  for +old: String
+  for +new: String
+  for rest: List<&2, Mv.Shift>
+  for +at: String
+  for +text: String
+  for eh: {String.eq(LU.reimport.many([LU.Swap{old, new}], text), text) == False{} : Bool}
+  {Mv.stale.moves(Mv.Shift{name, old, new} <> rest, at, text)
+    == "ez: " ++ at ++ " imports workspace member " ++ name ++ " by " ++ old ++
+      ", the hash the lock records for it, and the member is " ++ new ++
+      " now; ez lock --upgrade --package " ++ name ++ " rewrites the import" : String}
+
+# LAW: and a move no line of the file names is passed over
+# EZ-WS-7
+law stale_skips_move:
+  for +name: String
+  for +old: String
+  for +new: String
+  for +rest: List<&2, Mv.Shift>
+  for +at: String
+  for +text: String
+  for eh: {String.eq(LU.reimport.many([LU.Swap{old, new}], text), text) == True{} : Bool}
+  {Mv.stale.moves(Mv.Shift{name, old, new} <> rest, at, text) == Mv.stale.moves(rest, at, text) : String}
+
+# LAW: the first committed file that names a moved member's recorded hash
+# stops the lock
+# EZ-WS-7
+law stale_first_file:
+  for +ms: List<&2, Mv.Shift>
+  for +at: String
+  for +text: String
+  for +tl: List<&2, K.Source>
+  for +why: String
+  for eh: {Mv.stale.moves(ms, at, text) == why : String}
+  for en: {String.is_empty(why) == False{} : Bool}
+  {Mv.stale(ms, K.Source{at, text} <> tl) == why : String}
+
+# LAW: and a file that names none is passed over
+# EZ-WS-7
+law stale_skips_file:
+  for +ms: List<&2, Mv.Shift>
+  for +at: String
+  for +text: String
+  for +tl: List<&2, K.Source>
+  for eh: {Mv.stale.moves(ms, at, text) == "" : String}
+  {Mv.stale(ms, K.Source{at, text} <> tl) == Mv.stale(ms, tl) : String}
+
+# LAW: a member the lock records moves when its hash is not the one the lock
+# records and it is chosen: every member for a plain lock and for an upgrade
+# with no `--package`, the one named otherwise
+# EZ-WS-7
+law move_chosen:
+  for +path: String
+  for +name: String
+  for +new: String
+  for +base: String
+  for +old: String
+  for +only: String
+  for +rest: List<&2, Mv.Shift>
+  for eo: {String.eq(new, old) == False{} : Bool}
+  for ec: {LU.chosen(only, name) == True{} : Bool}
+  {Mv.move.found(Some{Mv.Held{path, name, new}}, base, old, only, rest) == Mv.Shift{name, old, new} <> rest
+    : List<&2, Mv.Shift>}
+
+# LAW: and so does one that is not chosen once the upgrade rewrote its files,
+# which moved its hash from the one it had before any line was rewritten
+# EZ-WS-7
+law move_rewritten:
+  for +path: String
+  for +name: String
+  for +new: String
+  for +base: String
+  for +old: String
+  for +only: String
+  for +rest: List<&2, Mv.Shift>
+  for eo: {String.eq(new, old) == False{} : Bool}
+  for ec: {LU.chosen(only, name) == False{} : Bool}
+  for eb: {String.eq(new, base) == False{} : Bool}
+  {Mv.move.found(Some{Mv.Held{path, name, new}}, base, old, only, rest) == Mv.Shift{name, old, new} <> rest
+    : List<&2, Mv.Shift>}
+
+# LAW: a member whose hash is the one the lock records does not move
+# EZ-WS-7
+law move_same:
+  for +path: String
+  for +name: String
+  for +new: String
+  for +base: String
+  for +old: String
+  for +only: String
+  for +rest: List<&2, Mv.Shift>
+  for eo: {String.eq(new, old) == True{} : Bool}
+  {Mv.move.found(Some{Mv.Held{path, name, new}}, base, old, only, rest) == rest : List<&2, Mv.Shift>}
+
+# LAW: nor does one not chosen whose files the upgrade did not rewrite
+# EZ-WS-7
+law move_untouched:
+  for +path: String
+  for +name: String
+  for +new: String
+  for +base: String
+  for +old: String
+  for +only: String
+  for +rest: List<&2, Mv.Shift>
+  for ec: {LU.chosen(only, name) == False{} : Bool}
+  for eb: {String.eq(new, base) == True{} : Bool}
+  {Mv.move.found(Some{Mv.Held{path, name, new}}, base, old, only, rest) == rest : List<&2, Mv.Shift>}
+
+# LAW: a round of the upgrade rewrites every committed line naming a moved
+# member's recorded hash, as an upgrade rewrites a moved dependency's
+# (`LU.reimport.many`, EZ-VEN-2, EZ-VEN-3), from the files as they were
+# EZ-WS-7
+law rewrite_reimports:
+  for +ss: List<&2, LU.Swap>
+  for +at: String
+  for +text: String
+  for +tl: List<&2, K.Source>
+  {Mv.rewrite(ss, K.Source{at, text} <> tl) == K.Source{at, LU.reimport.many(ss, text)} <> Mv.rewrite(ss, tl)
+    : List<&2, K.Source>}
+
+# LAW: and walks every member again over them, for the moves the next round
+# makes
+# EZ-WS-7
+law round_walks_again:
+  for +text: String
+  for +fs: List<&2, J.Found>
+  for +files: List<&2, K.Source>
+  for +old: List<&2, Mv.Held>
+  for +base: List<&2, Mv.Held>
+  for +only: String
+  for +ms: List<&2, Mv.Shift>
+  {Mv.round(Mv.Ctx{text, fs, files, old, base, only}, ms)
+    == Mv.moves(old, Mv.now(J.joint(text, fs, Mv.rewrite(Mv.swaps(ms), files))), base, only)
+    : List<&2, Mv.Shift>}
+
+# LAW: the rounds stop at the first that moves no member further
+# EZ-WS-7
+law cascade_stops:
+  for fuel: Nat
+  for +ctx: Mv.Ctx
+  for +ms: List<&2, Mv.Shift>
+  for es: {Mv.moves.eq(ms, Mv.round(ctx, ms)) == True{} : Bool}
+  {Mv.cascade.go((1n + fuel : Nat), ctx, ms) == ms : List<&2, Mv.Shift>}
+
+# LAW: and go on from one that does
+# EZ-WS-7
+law cascade_goes_on:
+  for fuel: Nat
+  for +ctx: Mv.Ctx
+  for +ms: List<&2, Mv.Shift>
+  for es: {Mv.moves.eq(ms, Mv.round(ctx, ms)) == False{} : Bool}
+  {Mv.cascade.go((1n + fuel : Nat), ctx, ms) == Mv.cascade.go(fuel, ctx, Mv.round(ctx, ms)) : List<&2, Mv.Shift>}
+
+# LAW: an upgrade at a workspace root plans on the committed files rewritten
+# with every move, the joint ledger and its members' answers made again over
+# them
+# EZ-WS-7
+law up_plans_moved:
+  for +text: String
+  for spec: W.Spec
+  for +fs: List<&2, J.Found>
+  for +lock: String
+  for +world: LW.World
+  for ev: {LW.args.upgrade(world) == True{} : Bool}
+  {U.plans.on(U.Back{text, spec, fs, lock}, world)
+    == Mv.world.moved(
+      J.joint(text, fs, Mv.rewrite(Mv.swaps(Mv.cascade(Mv.ctx(text, fs, U.files.of(world), lock,
+        LW.args.only(world)))), U.files.of(world))),
+      Mv.rewrite(Mv.swaps(Mv.cascade(Mv.ctx(text, fs, U.files.of(world), lock, LW.args.only(world)))),
+        U.files.of(world)),
+      world) : LW.World}
+
+# LAW: and writes every committed file a move changes, with its lines
+# rewritten
+# EZ-WS-7
+law edits_write_changed:
+  for +ss: List<&2, LU.Swap>
+  for +at: String
+  for +text: String
+  for +tl: List<&2, K.Source>
+  for ec: {String.eq(LU.reimport.many(ss, text), text) == False{} : Bool}
+  for el: {String.eq(at, LP.lockfile()) == False{} : Bool}
+  {Mv.edits(ss, K.Source{at, text} <> tl) == LP.Write{at, LU.reimport.many(ss, text)} <> Mv.edits(ss, tl)
+    : List<&2, LP.Effect>}
+
+# LAW: and none it leaves as it was
+# EZ-WS-7
+law edits_skip_unchanged:
+  for +ss: List<&2, LU.Swap>
+  for +at: String
+  for +text: String
+  for +tl: List<&2, K.Source>
+  for ec: {String.eq(LU.reimport.many(ss, text), text) == True{} : Bool}
+  {Mv.edits(ss, K.Source{at, text} <> tl) == Mv.edits(ss, tl) : List<&2, LP.Effect>}

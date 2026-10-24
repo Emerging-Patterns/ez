@@ -20,6 +20,8 @@ import ../ledger/ignore.bend as I
 import ../toml/toml.bend as T
 import ../pub/plan.bend as PP
 import ./up.bend as U
+import ./moved.bend as Mv
+import ../ledger/upgrade.bend as LU
 import ./pin.bend as Pin
 import ../ez/target.bend as Tgt
 import ../lock/world.bend as LW
@@ -754,27 +756,32 @@ def Laws.hop_keeps_words(_dir, _pwd, _prog, _words):
 def Laws.up_alone(_world):
   {==}
 
-# a workspace's plan under a plain lock is the planner's
+# a workspace's plan under a plain lock is the planner's, when no line is
+# stale
 def up_plain_at(
   up: Bool,
   +text: String,
   +spec: W.Spec,
   +fs: List<&2, J.Found>,
+  +lock: String,
   +world: LW.World,
-  ev: {up == False{} : Bool}
-) -> {U.plan.at(up, U.Back{text, spec, fs}, world) == LP.plan(world) : LP.Plan}:
+  ev: {up == False{} : Bool},
+  es: {U.stale.at(up, lock, world) == "" : String}
+) -> {U.plan.at(up, U.Back{text, spec, fs, lock}, world) == LP.plan(world) : LP.Plan}:
   match up:
     case True{}:
-      Eq.bit.absurd2(&2, {U.plan.at(True{}, U.Back{text, spec, fs}, world) == LP.plan(world) : LP.Plan}, ev)
+      Eq.bit.absurd2(&2, {U.plan.at(True{}, U.Back{text, spec, fs, lock}, world) == LP.plan(world) : LP.Plan}, ev)
     case False{}:
+      %Equal.sym(String, Mv.stale.world(lock, world), "", es)
+        : {U.plan.plain(String.is_empty(_), _, world) == LP.plan(world) : LP.Plan}
       {==}
 
-def Laws.up_plain(back, world, ev):
+def Laws.up_plain(back, world, ev, es):
   match back:
     case U.Alone{}:
       {==}
-    case U.Back{+text, +spec, +fs}:
-      up_plain_at(LW.args.upgrade(world), text, spec, fs, world, ev)
+    case U.Back{+text, +spec, +fs, +lock}:
+      up_plain_at(LW.args.upgrade(world), text, spec, fs, lock, world, ev, es)
 
 def Laws.pin_back(nn, _hh, _ee, url, _rev, _tag, _root, _nar, vend, js, jn, jh, je, ju, jr, jt, jo, jnar, jv, ev):
   Equal.cong(M.Dep, M.Dep, dd => U.dep.back.at(M.Dep{nn, _hh, _ee, M.Git{url, _rev, _tag, _root, _nar, vend}}, dd),
@@ -816,28 +823,49 @@ def back_plan_writes_none(
     case LP.Plan{es, _outcome}:
       back_writes_none(es, ws, ev)
 
+# a plain lock's plan on a World that refuses writes nothing, whether a
+# line is stale or not
+def plain_refused(
+  fine: Bool,
+  +why: String,
+  +world: LW.World,
+  +er: {LP.refuses(world) == True{} : Bool}
+) -> {LP.writes(U.plan.plain(fine, why, world)) == False{} : Bool}:
+  match fine:
+    case True{}:
+      LL.lock_refusal_writes_nothing(world, er)
+    case False{}:
+      {==}
+
 # a workspace's plan that refuses writes nothing, upgrade or not
 def up_refused_at(
   up: Bool,
   +text: String,
   +spec: W.Spec,
   +fs: List<&2, J.Found>,
+  +lock: String,
   +world: LW.World,
-  +er: {LP.refuses(world) == True{} : Bool}
-) -> {LP.writes(U.plan.at(up, U.Back{text, spec, fs}, world)) == False{} : Bool}:
+  +er: {LP.refuses(U.world.at(up, text, fs, lock, world)) == True{} : Bool}
+) -> {LP.writes(U.plan.at(up, U.Back{text, spec, fs, lock}, world)) == False{} : Bool}:
   match up:
     case True{}:
-      back_plan_writes_none(LP.plan(world), U.writes(U.Back{text, spec, fs}, LP.ledger.next(world)),
-        LL.lock_refusal_writes_nothing(world, er))
+      +w2 = U.up.world(U.up.of(text, fs, lock, world))
+      %Equal.sym(Bool, LP.refuses(w2), True{}, er)
+        : {LP.writes(U.edits.put(_, Mv.edits(Mv.swaps(Mv.cascade(Mv.ctx(text, fs, U.files.of(world), lock,
+            LW.args.only(world)))), U.files.of(world)),
+          U.plan.back(LP.plan(w2), U.writes(U.Back{text, spec, fs, lock}, LP.ledger.next(w2)))))
+          == False{} : Bool}
+      back_plan_writes_none(LP.plan(w2), U.writes(U.Back{text, spec, fs, lock}, LP.ledger.next(w2)),
+        LL.lock_refusal_writes_nothing(w2, er))
     case False{}:
-      LL.lock_refusal_writes_nothing(world, er)
+      plain_refused(String.is_empty(Mv.stale.world(lock, world)), Mv.stale.world(lock, world), world, er)
 
 def Laws.up_refusal_writes_nothing(back, world, er):
   match back:
     case U.Alone{}:
       LL.lock_refusal_writes_nothing(world, er)
-    case U.Back{+text, +spec, +fs}:
-      up_refused_at(LW.args.upgrade(world), text, spec, fs, world, er)
+    case U.Back{+text, +spec, +fs, +lock}:
+      up_refused_at(LW.args.upgrade(world), text, spec, fs, lock, world, er)
 
 # whether no effect of a list writes at a path
 def misses(es: List<&2, LP.Effect>, +path: String) -> Bool:
@@ -1110,28 +1138,130 @@ def up_lock_plan(
     case LP.Plan{es, _outcome}:
       effects_back_lock(es, ws, ev)
 
-# a workspace's plan writes the lock its planner does, upgrade or not
+# effects that write nothing at a path, ahead of others, leave what the
+# others leave there
+def put_skip(
+  eds: List<&2, LP.Effect>,
+  +es: List<&2, LP.Effect>,
+  +path: String,
+  +em: {misses(eds, path) == True{} : Bool}
+) -> {LP.put.in(List.append(&2, LP.Effect, eds, es), path) == LP.put.in(es, path) : LP.Wrote}:
+  match eds:
+    case []:
+      {==}
+    case LP.Write{+at, +text} <> +tl:
+      +rest = put_skip(tl, es, path, Eq.and.right(Bool.not(String.eq(at, path)), misses(tl, path), em))
+      Equal.trans(LP.Wrote,
+        LP.put.one(LP.Write{at, text}, path, LP.put.in(List.append(&2, LP.Effect, tl, es), path)),
+        LP.put.one(LP.Write{at, text}, path, LP.put.in(es, path)),
+        LP.put.in(es, path),
+        Equal.cong(LP.Wrote, LP.Wrote, w => LP.put.one(LP.Write{at, text}, path, w),
+          LP.put.in(List.append(&2, LP.Effect, tl, es), path), LP.put.in(es, path), rest),
+        put_one_miss(at, text, path, LP.put.in(es, path),
+          Eq.not.true(String.eq(at, path), Eq.and.left(Bool.not(String.eq(at, path)), misses(tl, path), em))))
+    case LP.Lay{_pl, _hash, _files} <> +tl:
+      put_skip(tl, es, path, em)
+    case LP.Drop{_hash} <> +tl:
+      put_skip(tl, es, path, em)
+    case LP.Say{_text} <> +tl:
+      put_skip(tl, es, path, em)
+    case LP.Name{_nv, _hash} <> +tl:
+      put_skip(tl, es, path, em)
+
+# a rewritten file's write, once it is known whether it would land on the lock
+def edit_pick_miss(
+  hit: Bool,
+  +at: String,
+  +text: String,
+  +rest: List<&2, LP.Effect>,
+  eh: {String.eq(at, LP.lockfile()) == hit : Bool},
+  +er: {misses(rest, LP.lockfile()) == True{} : Bool}
+) -> {misses(Bool.pick(List<&2, LP.Effect>, hit, rest, LP.Write{at, text} <> rest), LP.lockfile()) == True{} : Bool}:
+  match hit:
+    case True{}:
+      er
+    case False{}:
+      %Equal.sym(Bool, String.eq(at, LP.lockfile()), False{}, eh)
+        : {Bool.and(Bool.not(_), misses(rest, LP.lockfile())) == True{} : Bool}
+      er
+
+# a rewritten file's write misses the lock, changed or not
+def edit_miss(
+  changed: Bool,
+  +at: String,
+  +text: String,
+  +rest: List<&2, LP.Effect>,
+  +er: {misses(rest, LP.lockfile()) == True{} : Bool}
+) -> {misses(Mv.edit.put(changed, at, text, rest), LP.lockfile()) == True{} : Bool}:
+  match changed:
+    case True{}:
+      edit_pick_miss(String.eq(at, LP.lockfile()), at, text, rest, {==}, er)
+    case False{}:
+      er
+
+# the files the moves rewrite never write the lock
+def edits_miss(
+  +ss: List<&2, LU.Swap>,
+  fs: List<&2, K.Source>
+) -> {misses(Mv.edits(ss, fs), LP.lockfile()) == True{} : Bool}:
+  match fs:
+    case []:
+      {==}
+    case K.Source{+at, +text} <> +tl:
+      edit_miss(Bool.not(String.eq(LU.reimport.many(ss, text), text)), at, LU.reimport.many(ss, text),
+        Mv.edits(ss, tl), edits_miss(ss, tl))
+
+# the files an upgrade rewrites, put ahead of a plan, leave its lock as it was
+def edits_put_lock(
+  refuses: Bool,
+  +eds: List<&2, LP.Effect>,
+  pl: LP.Plan,
+  +em: {misses(eds, LP.lockfile()) == True{} : Bool}
+) -> {LP.put.plan(U.edits.put(refuses, eds, pl), LP.lockfile()) == LP.put.plan(pl, LP.lockfile()) : LP.Wrote}:
+  match refuses:
+    case True{}:
+      {==}
+    case False{}:
+      match pl:
+        case LP.Plan{+es, _outcome}:
+          put_skip(eds, es, LP.lockfile(), em)
+
+# a workspace's plan writes the lock its planner does on the World it plans
+# on, upgrade or not
 def up_lock_at(
   up: Bool,
   +text: String,
   +spec: W.Spec,
   +fs: List<&2, J.Found>,
-  +world: LW.World
-) -> {LP.put.plan(U.plan.at(up, U.Back{text, spec, fs}, world), LP.lockfile())
-    == LP.put(world, LP.lockfile()) : LP.Wrote}:
+  +lock: String,
+  +world: LW.World,
+  es: {U.stale.at(up, lock, world) == "" : String}
+) -> {LP.put.plan(U.plan.at(up, U.Back{text, spec, fs, lock}, world), LP.lockfile())
+    == LP.put(U.world.at(up, text, fs, lock, world), LP.lockfile()) : LP.Wrote}:
   match up:
     case True{}:
-      up_lock_plan(LP.plan(world), U.writes(U.Back{text, spec, fs}, LP.ledger.next(world)),
-        joint_miss(LP.ledger.next(world), text, spec, fs))
+      +w2 = U.up.world(U.up.of(text, fs, lock, world))
+      +ss = Mv.swaps(Mv.cascade(Mv.ctx(text, fs, U.files.of(world), lock, LW.args.only(world))))
+      +pb = U.plan.back(LP.plan(w2), U.writes(U.Back{text, spec, fs, lock}, LP.ledger.next(w2)))
+      Equal.trans(LP.Wrote,
+        LP.put.plan(U.edits.put(LP.refuses(w2), Mv.edits(ss, U.files.of(world)), pb), LP.lockfile()),
+        LP.put.plan(pb, LP.lockfile()),
+        LP.put(w2, LP.lockfile()),
+        edits_put_lock(LP.refuses(w2), Mv.edits(ss, U.files.of(world)), pb, edits_miss(ss, U.files.of(world))),
+        up_lock_plan(LP.plan(w2), U.writes(U.Back{text, spec, fs, lock}, LP.ledger.next(w2)),
+          joint_miss(LP.ledger.next(w2), text, spec, fs)))
     case False{}:
+      %Equal.sym(String, Mv.stale.world(lock, world), "", es)
+        : {LP.put.plan(U.plan.plain(String.is_empty(_), _, world), LP.lockfile())
+          == LP.put(world, LP.lockfile()) : LP.Wrote}
       {==}
 
-def Laws.up_writes_the_lock(back, world):
+def Laws.up_writes_the_lock(back, world, es):
   match back:
     case U.Alone{}:
       {==}
-    case U.Back{+text, +spec, +fs}:
-      up_lock_at(LW.args.upgrade(world), text, spec, fs, world)
+    case U.Back{+text, +spec, +fs, +lock}:
+      up_lock_at(LW.args.upgrade(world), text, spec, fs, lock, world, es)
 
 def Laws.ref_unpinned(_nv, _url, _ref):
   {==}
@@ -1510,3 +1640,141 @@ def Laws.member_not_missing(n, ps, ew):
     : {Bool.and(String.starts_with(n, "deps."), Bool.and(Bool.not(_), String.is_empty(M.value(ps, "hash"))))
       == False{} : Bool}
   Str.and_false(String.starts_with(n, "deps."))
+
+# ---------------------------------------------------------------------------
+# a member imported by its hash, once it moved
+
+def Laws.stale_plain_refuses(text, spec, fs, lock, world, why, ev, ew, en):
+  %Equal.sym(Bool, LW.args.upgrade(world), False{}, ev)
+    : {U.plan.at(_, U.Back{text, spec, fs, lock}, world) == LP.Plan{[], LP.Refused{why}} : LP.Plan}
+  %Equal.sym(String, Mv.stale.world(lock, world), why, ew)
+    : {U.plan.plain(String.is_empty(_), _, world) == LP.Plan{[], LP.Refused{why}} : LP.Plan}
+  %Equal.sym(Bool, String.is_empty(why), False{}, en)
+    : {U.plan.plain(_, why, world) == LP.Plan{[], LP.Refused{why}} : LP.Plan}
+  {==}
+
+def Laws.stale_plain_asks_nothing(text, spec, fs, lock, world, why, ev, ew, en):
+  %Equal.sym(Bool, LW.args.upgrade(world), False{}, ev)
+    : {U.step.plain(String.is_empty(U.stale.at(_, lock, world)), U.stale.at(_, lock, world),
+        U.plans.on(U.Back{text, spec, fs, lock}, world))
+      == LP.Run{LP.Plan{[], LP.Refused{why}}} : LP.Step}
+  %Equal.sym(String, Mv.stale.world(lock, world), why, ew)
+    : {U.step.plain(String.is_empty(_), _, U.plans.on(U.Back{text, spec, fs, lock}, world))
+      == LP.Run{LP.Plan{[], LP.Refused{why}}} : LP.Step}
+  %Equal.sym(Bool, String.is_empty(why), False{}, en)
+    : {U.step.plain(_, why, U.plans.on(U.Back{text, spec, fs, lock}, world))
+      == LP.Run{LP.Plan{[], LP.Refused{why}}} : LP.Step}
+  {==}
+
+def Laws.stale_names_upgrade(name, old, new, rest, at, text, eh):
+  %Equal.sym(Bool, String.eq(LU.reimport.many([LU.Swap{old, new}], text), text), False{}, eh)
+    : {Bool.pick(String, _, Mv.stale.moves(rest, at, text),
+        "ez: " ++ at ++ " imports workspace member " ++ name ++ " by " ++ old ++
+          ", the hash the lock records for it, and the member is " ++ new ++
+          " now; ez lock --upgrade --package " ++ name ++ " rewrites the import")
+      == "ez: " ++ at ++ " imports workspace member " ++ name ++ " by " ++ old ++
+        ", the hash the lock records for it, and the member is " ++ new ++
+        " now; ez lock --upgrade --package " ++ name ++ " rewrites the import" : String}
+  {==}
+
+def Laws.stale_skips_move(name, old, new, rest, at, text, eh):
+  %Equal.sym(Bool, String.eq(LU.reimport.many([LU.Swap{old, new}], text), text), True{}, eh)
+    : {Bool.pick(String, _, Mv.stale.moves(rest, at, text),
+        "ez: " ++ at ++ " imports workspace member " ++ name ++ " by " ++ old ++
+          ", the hash the lock records for it, and the member is " ++ new ++
+          " now; ez lock --upgrade --package " ++ name ++ " rewrites the import")
+      == Mv.stale.moves(rest, at, text) : String}
+  {==}
+
+def Laws.stale_first_file(ms, at, text, tl, why, eh, en):
+  %Equal.sym(String, Mv.stale.moves(ms, at, text), why, eh)
+    : {Bool.pick(String, String.is_empty(_), Mv.stale(ms, tl), _) == why : String}
+  %Equal.sym(Bool, String.is_empty(why), False{}, en)
+    : {Bool.pick(String, _, Mv.stale(ms, tl), why) == why : String}
+  {==}
+
+def Laws.stale_skips_file(ms, at, text, tl, eh):
+  %Equal.sym(String, Mv.stale.moves(ms, at, text), "", eh)
+    : {Bool.pick(String, String.is_empty(_), Mv.stale(ms, tl), _) == Mv.stale(ms, tl) : String}
+  {==}
+
+def Laws.move_chosen(_path, name, new, base, old, only, rest, eo, ec):
+  %Equal.sym(Bool, String.eq(new, old), False{}, eo)
+    : {Mv.move.put(Bool.and(Bool.not(_), Bool.or(LU.chosen(only, name), Bool.not(String.eq(new, base)))),
+        name, old, new, rest) == Mv.Shift{name, old, new} <> rest : List<&2, Mv.Shift>}
+  %Equal.sym(Bool, LU.chosen(only, name), True{}, ec)
+    : {Mv.move.put(Bool.or(_, Bool.not(String.eq(new, base))), name, old, new, rest)
+      == Mv.Shift{name, old, new} <> rest : List<&2, Mv.Shift>}
+  {==}
+
+def Laws.move_rewritten(_path, name, new, base, old, only, rest, eo, ec, eb):
+  %Equal.sym(Bool, String.eq(new, old), False{}, eo)
+    : {Mv.move.put(Bool.and(Bool.not(_), Bool.or(LU.chosen(only, name), Bool.not(String.eq(new, base)))),
+        name, old, new, rest) == Mv.Shift{name, old, new} <> rest : List<&2, Mv.Shift>}
+  %Equal.sym(Bool, LU.chosen(only, name), False{}, ec)
+    : {Mv.move.put(Bool.or(_, Bool.not(String.eq(new, base))), name, old, new, rest)
+      == Mv.Shift{name, old, new} <> rest : List<&2, Mv.Shift>}
+  %Equal.sym(Bool, String.eq(new, base), False{}, eb)
+    : {Mv.move.put(Bool.not(_), name, old, new, rest) == Mv.Shift{name, old, new} <> rest : List<&2, Mv.Shift>}
+  {==}
+
+def Laws.move_same(_path, name, new, base, old, only, rest, eo):
+  %Equal.sym(Bool, String.eq(new, old), True{}, eo)
+    : {Mv.move.put(Bool.and(Bool.not(_), Bool.or(LU.chosen(only, name), Bool.not(String.eq(new, base)))),
+        name, old, new, rest) == rest : List<&2, Mv.Shift>}
+  {==}
+
+def Laws.move_untouched(_path, name, new, base, old, only, rest, ec, eb):
+  %Equal.sym(Bool, LU.chosen(only, name), False{}, ec)
+    : {Mv.move.put(Bool.and(Bool.not(String.eq(new, old)), Bool.or(_, Bool.not(String.eq(new, base)))),
+        name, old, new, rest) == rest : List<&2, Mv.Shift>}
+  %Equal.sym(Bool, String.eq(new, base), True{}, eb)
+    : {Mv.move.put(Bool.and(Bool.not(String.eq(new, old)), Bool.not(_)), name, old, new, rest) == rest
+      : List<&2, Mv.Shift>}
+  %Equal.sym(Bool, Bool.and(Bool.not(String.eq(new, old)), False{}), False{},
+    Str.and_false(Bool.not(String.eq(new, old))))
+    : {Mv.move.put(_, name, old, new, rest) == rest : List<&2, Mv.Shift>}
+  {==}
+
+def Laws.rewrite_reimports(_ss, _at, _text, _tl):
+  {==}
+
+def Laws.round_walks_again(_text, _fs, _files, _old, _base, _only, _ms):
+  {==}
+
+def Laws.cascade_stops(fuel, ctx, ms, es):
+  %Equal.sym(Bool, Mv.moves.eq(ms, Mv.round(ctx, ms)), True{}, es)
+    : {Mv.cascade.pick(_, ms, _u => Mv.cascade.go(fuel, ctx, Mv.round(ctx, ms))) == ms : List<&2, Mv.Shift>}
+  {==}
+
+def Laws.cascade_goes_on(fuel, ctx, ms, es):
+  %Equal.sym(Bool, Mv.moves.eq(ms, Mv.round(ctx, ms)), False{}, es)
+    : {Mv.cascade.pick(_, ms, _u => Mv.cascade.go(fuel, ctx, Mv.round(ctx, ms)))
+      == Mv.cascade.go(fuel, ctx, Mv.round(ctx, ms)) : List<&2, Mv.Shift>}
+  {==}
+
+def Laws.up_plans_moved(text, _spec, fs, lock, world, ev):
+  %Equal.sym(Bool, LW.args.upgrade(world), True{}, ev)
+    : {U.world.at(_, text, fs, lock, world)
+      == Mv.world.moved(
+        J.joint(text, fs, Mv.rewrite(Mv.swaps(Mv.cascade(Mv.ctx(text, fs, U.files.of(world), lock,
+          LW.args.only(world)))), U.files.of(world))),
+        Mv.rewrite(Mv.swaps(Mv.cascade(Mv.ctx(text, fs, U.files.of(world), lock, LW.args.only(world)))),
+          U.files.of(world)),
+        world) : LW.World}
+  {==}
+
+def Laws.edits_write_changed(ss, at, text, tl, ec, el):
+  %Equal.sym(Bool, String.eq(LU.reimport.many(ss, text), text), False{}, ec)
+    : {Mv.edit.put(Bool.not(_), at, LU.reimport.many(ss, text), Mv.edits(ss, tl))
+      == LP.Write{at, LU.reimport.many(ss, text)} <> Mv.edits(ss, tl) : List<&2, LP.Effect>}
+  %Equal.sym(Bool, String.eq(at, LP.lockfile()), False{}, el)
+    : {Bool.pick(List<&2, LP.Effect>, _, Mv.edits(ss, tl), LP.Write{at, LU.reimport.many(ss, text)} <> Mv.edits(ss, tl))
+      == LP.Write{at, LU.reimport.many(ss, text)} <> Mv.edits(ss, tl) : List<&2, LP.Effect>}
+  {==}
+
+def Laws.edits_skip_unchanged(ss, at, text, tl, ec):
+  %Equal.sym(Bool, String.eq(LU.reimport.many(ss, text), text), True{}, ec)
+    : {Mv.edit.put(Bool.not(_), at, LU.reimport.many(ss, text), Mv.edits(ss, tl)) == Mv.edits(ss, tl)
+      : List<&2, LP.Effect>}
+  {==}

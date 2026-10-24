@@ -697,7 +697,7 @@ def loop(fuel: Nat, +lib: String, +back: WsUp.Back, +world: W.World) -> IO(Unit)
     case 0n:
       IO.die(Unit, 1, "ez: the lock kept asking questions")
     case 1n+f:
-      loop.step(Plan.step(world), lib, back, world, w => loop(f, lib, back, w))
+      loop.step(WsUp.step(back, world), lib, back, world, w => loop(f, lib, back, w))
 
 # a member's package as the lock reads it: from BEND_LIB when a tree is laid
 # there under its hash, as a git package's is (`git.seen`), and fresh from
