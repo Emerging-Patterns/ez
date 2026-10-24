@@ -47,3 +47,67 @@ def program(+pwd: String, +prog: String) -> String:
 def line(+dir: String, +pwd: String, +prog: String, words: List<&2, String>) -> List<&2, String>:
   List.append(&2, String,
     ["sh", "-c", "cd -- \"$1\" && shift && exec \"$@\"", "sh", dir, program(pwd, prog)], words)
+
+# ---------------------------------------------------------------------------
+# the library a member's own command uses
+
+# the BEND_LIB a command run in a member uses: the one the environment sets,
+# or, when it sets none, the root's `.ez/lib`, where the workspace's lock lays
+# its packages
+type Lib is Data:
+  Keep{}
+  Set{lib: String}
+
+# the root a member found, once it is known whether that is where ez runs
+def lib.within(+top: String, root: List<&2, String>, rel: List<&2, String>) -> Lib:
+  match rel:
+    case []:
+      Keep{}
+    case _hd <> _tl:
+      Set{P.join(P.join(top, W.segs.text(root)), ".ez/lib")}
+
+# the library, once it is known whether the environment sets one
+def lib.found(set: Bool, +top: String, found: R.Found) -> Lib:
+  match set:
+    case True{}:
+      Keep{}
+    case False{}:
+      match found:
+        case R.Alone{}:
+          Keep{}
+        case R.Within{root, rel}:
+          lib.within(top, root, rel)
+        case R.Broken{_why}:
+          Keep{}
+
+# the library a member's own command uses: `env` is BEND_LIB as the
+# environment has it, "" for unset
+def lib(+top: String, found: R.Found, +env: String) -> Lib:
+  lib.found(Bool.not(String.is_empty(env)), top, found)
+
+# the line that runs the same command where it is, with BEND_LIB set
+def lib.line(+lib: String, +pwd: String, +prog: String, words: List<&2, String>) -> List<&2, String>:
+  List.append(&2, String,
+    ["sh", "-c", "BEND_LIB=\"$1\"; export BEND_LIB; shift; exec \"$@\"", "sh", lib, program(pwd, prog)], words)
+
+# ---------------------------------------------------------------------------
+# the lock a member's own command reads
+
+# the root a member found, once it is known whether that is where ez runs
+def lock.within(+top: String, root: List<&2, String>, rel: List<&2, String>) -> String:
+  match rel:
+    case []:
+      "ez.lock.toml"
+    case _hd <> _tl:
+      P.join(P.join(top, W.segs.text(root)), "ez.lock.toml")
+
+# the lock a command run in a directory reads: the root's, which is the only
+# one a workspace has, or its own in a project of its own and at the root
+def lock(+top: String, found: R.Found) -> String:
+  match found:
+    case R.Alone{}:
+      "ez.lock.toml"
+    case R.Within{root, rel}:
+      lock.within(top, root, rel)
+    case R.Broken{_why}:
+      "ez.lock.toml"

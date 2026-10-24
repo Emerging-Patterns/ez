@@ -32,10 +32,14 @@ def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(U
       Cmd.init(L.get(matched, "name"), L.get(matched, "entry"),
         L.get(matched, "description"))
     case L.CAdd{}:
-      Cmd.add(L.get(matched, "target"), L.get(matched, "ref"),
-        L.get(matched, "entry"), L.get(matched, "rename"))
+      +target = L.get(matched, "target")
+      +ref = L.get(matched, "ref")
+      +entry = L.get(matched, "entry")
+      +rename = L.get(matched, "rename")
+      WsRun.in.member(_u => Cmd.add(target, ref, entry, rename))
     case L.CRemove{}:
-      Cmd.remove(L.get(matched, "name"))
+      +name = L.get(matched, "name")
+      WsRun.in.member(_u => Cmd.remove(name))
     case L.CLock{}:
       +up = Shake.on(matched, "upgrade")
       +only = L.get(matched, "package")
@@ -43,11 +47,12 @@ def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(U
     case L.CFetch{}:
       WsRun.at.root(_u => Cmd.fetch())
     case L.CCheck{}:
-      Cmd.check()
+      WsRun.in.member(_u => Cmd.check())
     case L.CBuild{}:
-      Cmd.build(L.get(matched, "out"))
+      +out = L.get(matched, "out")
+      WsRun.in.member(_u => Cmd.build(out))
     case L.CRun{}:
-      Cmd.run(as)
+      WsRun.in.member(_u => Cmd.run(as))
     case L.CToolSync{}:
       ToolRun.sync()
     case L.CToolRun{}:
@@ -58,7 +63,7 @@ def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(U
     case L.CToolUpgrade{}:
       ToolRun.run(TW.Upgrade{}, L.get(matched, "target"), L.get(matched, "entry"))
     case L.CPublish{}:
-      Cmd.publish()
+      WsRun.in.member(_u => Cmd.publish())
     case L.CTest{}:
       Test.run()
     case L.CProve{}:

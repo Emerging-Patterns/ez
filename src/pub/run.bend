@@ -29,6 +29,7 @@ import ../hub/get.bend as Net
 import ../share/env.bend as Env
 import ./world.bend as PW
 import ./plan.bend as PP
+import ../ws/run.bend as WsRun
 
 # what a program printed, and whether it exited 0
 def ran(+out: String) -> PW.Answer:
@@ -52,7 +53,8 @@ def answer(+lib: String, ask: PW.Ask) -> IO(PW.Answer):
         return ran(out)
     case PW.Lock{}:
       do IO<PW.Answer>:
-        m : Maybe<&2, String> <- F.read(PW.lockfile())
+        at : String <- WsRun.lock.path()
+        m : Maybe<&2, String> <- F.read(at)
         return PW.Told{TW.Plain{m}}
     case PW.Hub{+url}:
       do IO<PW.Answer>:

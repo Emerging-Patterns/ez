@@ -28,6 +28,7 @@ import ./world.bend as W
 import ./up.bend as Up
 import ./plan.bend as Plan
 import ../ws/run.bend as WsRun
+import ../ws/up.bend as WsUp
 
 # ---------------------------------------------------------------------------
 # the World's first fields
@@ -666,7 +667,7 @@ def exec.plan(+lib: String, pl: Plan.Plan) -> IO(Unit):
 
 # the planner's step: its questions answered and the loop gone round again,
 # or its plan run
-def loop.step(st: Plan.Step, +lib: String, world: W.World, go: W.World -> IO(Unit)) -> IO(Unit):
+def loop.step(st: Plan.Step, +lib: String, back: WsUp.Back, world: W.World, go: W.World -> IO(Unit)) -> IO(Unit):
   match st:
     case Plan.Asking{asks, ups, names}:
       do IO<Unit>:
@@ -674,8 +675,8 @@ def loop.step(st: Plan.Step, +lib: String, world: W.World, go: W.World -> IO(Uni
         us : List<&2, Up.Reply> <- answer.queries(lib, ups)
         ns : List<&2, W.Reply> <- answer.all(lib, names)
         go(more(world, List.append(&2, W.Reply, rs, ns), us))
-    case Plan.Run{pl}:
-      exec.plan(lib, pl)
+    case Plan.Run{_pl}:
+      exec.plan(lib, WsUp.plan(back, world))
 
 # the rounds the loop may take. Each round's questions come from the last
 # round's answers (a package's imports are known once git has answered for
@@ -688,23 +689,27 @@ def rounds() -> Nat:
 
 # the loop, under fuel. Every round adds at least one answer, since the
 # planner never asks what the World answers already.
-def loop(fuel: Nat, +lib: String, +world: W.World) -> IO(Unit):
+def loop(fuel: Nat, +lib: String, +back: WsUp.Back, +world: W.World) -> IO(Unit):
   match fuel:
     case 0n:
       IO.die(Unit, 1, "ez: the lock kept asking questions")
     case 1n+f:
-      loop.step(Plan.step(world), lib, world, w => loop(f, lib, w))
+      loop.step(Plan.step(world), lib, back, world, w => loop(f, lib, back, w))
+
+# the loop, on the ledger the lock is planned from
+def run.planned(pd: WsRun.Planned, +lib: String, up: Bool, only: String, here: String, ls: W.Listing) -> IO(Unit):
+  WsRun.Planned{led, back} = pd
+  loop(rounds(), lib, back, W.World{W.Args{up, only, here}, led, ls, [], []})
 
 # `ez lock` and `ez lock --upgrade [--package only]`: the directory it runs
 # in, the ledger and the listing read, every question answered, and the plan
 # run
-def run(+up: Bool, +only: String) -> IO(Unit):
+def run(up: Bool, +only: String) -> IO(Unit):
   do IO<Unit>:
     IO.print_err(Say.resolving())
     lib : String <- bend.lib()
     +pwd : String <- R.exec(["pwd"])
     own : Maybe<&2, String> <- read.ledger()
-    led : Maybe<&2, String> <- WsRun.ledger(own, up)
+    pd : WsRun.Planned <- WsRun.ledger(own)
     ls : W.Listing <- read.listing()
-    loop(rounds(), lib,
-      W.World{W.Args{up, only, String.trim(R.text(pwd))}, led, ls, [], []})
+    run.planned(pd, lib, up, only, String.trim(R.text(pwd)), ls)

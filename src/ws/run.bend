@@ -15,6 +15,10 @@ import ./workspace.bend as W
 import ./root.bend as R
 import ./hop.bend as H
 import ./joint.bend as J
+import ./up.bend as U
+import ./pin.bend as Pin
+import ../ledger/manifest.bend as M
+import ../pkg/path.bend as P
 
 # what the search found, and the top of the checkout it searched from
 type Searched is Data:
@@ -137,57 +141,178 @@ def lines(ss: List<&2, String>) -> List<&2, String>:
       +more = lines(tl)
       Bool.pick(List<&2, String>, String.is_empty(hd), more, hd <> more)
 
+# the ledger `ez lock` is planned from, and what an upgrade needs to write
+# its pins back
+type Planned is Data:
+  Planned{ledger: Maybe<&2, String>, back: U.Back}
+
 # the joint ledger, as the lock reads it, or the refusal that leaves none
-def joint.at(jj: J.Joint, +own: Maybe<&2, String>) -> IO(Maybe<&2, String>):
+def joint.at(jj: J.Joint, +text: String, +spec: W.Spec, +fs: List<&2, J.Found>) -> IO(Planned):
   match jj:
     case J.Lone{}:
-      IO.pure(Maybe<&2, String>, own)
+      IO.pure(Planned, Planned{Some{text}, U.Alone{}})
     case J.Clash{why}:
-      IO.die(Maybe<&2, String>, 1, why)
+      IO.die(Planned, 1, why)
     case J.Joint{mm}:
-      IO.pure(Maybe<&2, String>, Some{Rend.show(mm)})
+      IO.pure(Planned, Planned{Some{Rend.show(mm)}, U.Back{text, spec, fs}})
 
 # a workspace root's ledger joined with every member's, once git listed them
-def joint.listed(ok: Bool, +text: String, +out: String) -> IO(Maybe<&2, String>):
+def joint.listed(ok: Bool, +text: String, +spec: W.Spec, +out: String) -> IO(Planned):
   match ok:
     case True{}:
-      do IO<Maybe<&2, String>>:
-        fs : List<&2, J.Found> <- read.found(lines(String.lines(out)))
-        joint.at(J.joint(text, fs), Some{text})
+      do IO<Planned>:
+        +fs : List<&2, J.Found> <- read.found(lines(String.lines(out)))
+        joint.at(J.joint(text, fs), text, spec, fs)
     case False{}:
-      IO.die(Maybe<&2, String>, 1,
+      IO.die(Planned, 1,
         "ez: a workspace is locked from the ez.toml files git tracks, and git could not list them: " ++
           String.trim(out))
 
-# a workspace root's ledger joined with every member's. An upgrade writes back
-# the ledger it was planned from, and a workspace's pins live in its members'
-# ledgers, so `ez lock --upgrade` at a workspace root is refused until it
-# moves them there.
-def joint.go(up: Bool, +text: String) -> IO(Maybe<&2, String>):
-  match up:
-    case True{}:
-      IO.die(Maybe<&2, String>, 1,
-        "ez: ez lock --upgrade does not move a workspace's pins yet; run it in a project of its own")
-    case False{}:
-      do IO<Maybe<&2, String>>:
-        +out : String <- Sn.exec(["git", "-c", "core.quotepath=off", "ls-files", "--",
-          ":(glob)**/ez.toml"])
-        joint.listed(Sn.ok(out), text, Sn.text(out))
+# a workspace root's ledger joined with every member's
+def joint.go(+text: String, +spec: W.Spec) -> IO(Planned):
+  do IO<Planned>:
+    +out : String <- Sn.exec(["git", "-c", "core.quotepath=off", "ls-files", "--", ":(glob)**/ez.toml"])
+    joint.listed(Sn.ok(out), text, spec, Sn.text(out))
 
-# what one ledger's text says: no workspace, read as it is, or a workspace
-# root, whose members are read and joined
-def joint.read(rd: W.Read, up: Bool, +text: String) -> IO(Maybe<&2, String>):
+# what one ledger's text says: no workspace, read as it is; a workspace root,
+# whose members are read and joined; or a table that cannot be read, which
+# the joint ledger refuses
+def joint.read(rd: W.Read, +text: String) -> IO(Planned):
   match rd:
     case W.Lone{}:
-      IO.pure(Maybe<&2, String>, Some{text})
-    case _:
-      joint.go(up, text)
+      IO.pure(Planned, Planned{Some{text}, U.Alone{}})
+    case W.Bad{why}:
+      IO.die(Planned, 1, why)
+    case W.Root{+spec}:
+      joint.go(text, spec)
 
 # the ledger `ez lock` is planned from: ez.toml as it is, or, at a workspace
 # root, the joint ledger of the root and every member
-def ledger(led: Maybe<&2, String>, up: Bool) -> IO(Maybe<&2, String>):
+def ledger(led: Maybe<&2, String>) -> IO(Planned):
   match led:
     case None{}:
-      IO.pure(Maybe<&2, String>, None{})
+      IO.pure(Planned, Planned{None{}, U.Alone{}})
     case Some{+text}:
-      joint.read(W.spec.of(text), up, text)
+      joint.read(W.spec.of(text), text)
+
+# ---------------------------------------------------------------------------
+# a member's own commands
+
+# an environment variable's text; unset, ""
+def env.text(rr: Result<&1, &1, U32 & String, String>) -> String:
+  match rr:
+    case Fail{_e}:
+      ""
+    case Done{ss}:
+      String.trim(ss)
+
+# BEND_LIB as the environment has it, "" for unset
+def env.lib() -> IO(String):
+  do IO<String>:
+    rr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_LIB")
+    return env.text(rr)
+
+# the same words run again where they are, with BEND_LIB set
+def lib.go(+at: String, +pwd: String, xs: List<&2, String>) -> IO(U32):
+  match xs:
+    case []:
+      IO.pure(U32, 1)
+    case +prog <> rest:
+      Pass.run(H.lib.line(at, pwd, prog, rest))
+
+# a command acted on as the library decision says: where it is, or again
+# where it is with BEND_LIB set to the root's
+def lib.at(lib: H.Lib, go: Unit -> IO(Unit)) -> IO(Unit):
+  match lib:
+    case H.Keep{}:
+      go(Unit{})
+    case H.Set{+at}:
+      do IO<Unit>:
+        +pwd : String <- Sn.exec(["pwd"])
+        xs : List<&2, String> <- argv()
+        +code : U32 <- lib.go(at, String.trim(Sn.text(pwd)), xs)
+        hop.end(U32.is_eq(code, 0), code)
+
+# what the search found, acted on for a member's own command
+def in.searched(st: Searched, +env: String, go: Unit -> IO(Unit)) -> IO(Unit):
+  Searched{+top, found} = st
+  lib.at(H.lib(top, found, env), go)
+
+# a command that acts on a member's own ledger and entry, `ez add`, `ez
+# remove`, `ez check`, `ez build`, `ez run` and `ez publish`: run where it is,
+# with the root's library when it is run in a member
+def in.member(go: Unit -> IO(Unit)) -> IO(Unit):
+  do IO<Unit>:
+    st : Searched <- search()
+    +env : String <- env.lib()
+    in.searched(st, env, go)
+
+# every listed ez.toml under a directory, read
+def read.under(+dir: String, ps: List<&2, String>) -> IO(List<&2, J.Found>):
+  match ps:
+    case []:
+      IO.pure(List<&2, J.Found>, [])
+    case +hd <> tl:
+      do IO<List<&2, J.Found>>:
+        mm : Maybe<&2, String> <- F.read(dir ++ "/" ++ hd)
+        rest : List<&2, J.Found> <- read.under(dir, tl)
+        return J.Found{hd, F.text_of(mm)} <> rest
+
+# the joint ledger's dependencies, or none when it has none
+def pins.joint(jj: J.Joint) -> List<&2, M.Dep>:
+  match jj:
+    case J.Joint{mm}:
+      M.Manifest{_n, _e, _b, _h, _pa, _pv, ds, _ts} = mm
+      ds
+    case _:
+      []
+
+# every dependency of the workspace a directory is in, as its root reads them
+def pins.at(+dir: String) -> IO(List<&2, M.Dep>):
+  do IO<List<&2, M.Dep>>:
+    mm : Maybe<&2, String> <- F.read(dir ++ "/ez.toml")
+    +out : String <- Sn.exec(["git", "-C", dir, "-c", "core.quotepath=off", "ls-files", "--",
+      ":(glob)**/ez.toml"])
+    fs : List<&2, J.Found> <- read.under(dir, lines(String.lines(Sn.text(out))))
+    return pins.joint(J.joint(F.text_of(mm), fs))
+
+# the ref, once the workspace's pins are known
+def ref.held(rr: Pin.Ref) -> IO(String):
+  match rr:
+    case Pin.Given{ref}:
+      IO.pure(String, ref)
+    case Pin.Held{why}:
+      IO.die(String, 1, why)
+
+# the ref an add goes on with, in what the search found
+def ref.found(+top: String, found: R.Found, +home: String, +target: String, +ref: String) -> IO(String):
+  match found:
+    case R.Within{+root, +rel}:
+      do IO<String>:
+        +pins : List<&2, M.Dep> <- pins.at(P.join(top, W.segs.text(root)))
+        ref.held(Pin.ref(pins, W.segs.text(rel), home, target, ref))
+    case _:
+      IO.pure(String, ref)
+
+# and once the search was made
+def add.searched(st: Searched, +home: String, +target: String, +ref: String) -> IO(String):
+  Searched{+top, found} = st
+  ref.found(top, found, home, target, ref)
+# the ref `ez add <target> [ref]` goes on with: in a workspace, the pin the
+# workspace already records for the source (EZ-WS-4)
+def add.ref(+home: String, +target: String, +ref: String) -> IO(String):
+  do IO<String>:
+    st : Searched <- search()
+    add.searched(st, home, target, ref)
+
+
+# the lock, once the search was made
+def lock.searched(st: Searched) -> String:
+  Searched{+top, found} = st
+  H.lock(top, found)
+
+# the lock a member's own command reads: the root's, in a workspace
+def lock.path() -> IO(String):
+  do IO<String>:
+    st : Searched <- search()
+    return lock.searched(st)

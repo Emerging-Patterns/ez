@@ -16,6 +16,7 @@ import ../lock/run.bend as Run
 import ../lock/up.bend as Up
 import ../lock/world.bend as W
 import ./world.bend as A
+import ../ws/run.bend as WsRun
 import ./plan.bend as AP
 
 # the World with more answers in it
@@ -65,7 +66,9 @@ def run(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Un
     lib : String <- Run.bend.lib()
     +pwd : String <- R.exec(["pwd"])
     h : Result<&1, &1, U32 & String, String> <- IO.get_env("HOME")
+    +home : String <- IO.pure(String, Run.env.text(h))
+    pinned : String <- WsRun.add.ref(home, target, ref)
     led : Maybe<&2, String> <- F.read(A.toml())
     ig : Maybe<&2, String> <- F.read(A.ignore.file())
-    loop(rounds(), lib, A.World{A.Args{target, ref, entry, rename}, String.trim(R.text(pwd)),
-      Run.env.text(h), led, F.text_of(ig), [], []})
+    loop(rounds(), lib, A.World{A.Args{target, pinned, entry, rename}, String.trim(R.text(pwd)),
+      home, led, F.text_of(ig), [], []})

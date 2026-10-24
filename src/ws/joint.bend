@@ -223,6 +223,61 @@ def tools.clash.go(ts: List<&2, M.Tool>, +all: List<&2, M.Tool>) -> String:
       Bool.pick(String, tool.eq(hd, M.tool.find(all, M.tool.name(hd))), rest, M.tool.name(hd))
 
 # ---------------------------------------------------------------------------
+# one pin per git source (EZ-WS-4)
+
+# the pin a source is recorded at, once it is known whether it is the url
+def pin.at(hit: Bool, src: M.Source, rest: M.Source) -> M.Source:
+  match hit:
+    case True{}:
+      src
+    case False{}:
+      rest
+
+# the first git source among the dependencies with this url, as the root
+# reads it, or a hub source when there is none
+def pin.of(ds: List<&2, M.Dep>, +url: String) -> M.Source:
+  match ds:
+    case []:
+      M.Hub{""}
+    case M.Dep{_n, _h, _e, +src} <> tl:
+      rest = pin.of(tl, url)
+      pin.at(String.eq(M.source.url(src), url), src, rest)
+
+# whether two git sources are pinned alike: one commit and one tag
+def pin.same(aa: M.Source, bb: M.Source) -> Bool:
+  match aa:
+    case M.Hub{_an}:
+      True{}
+    case M.Git{_au, ar, at, _ao, _an, _av}:
+      match bb:
+        case M.Hub{_bn}:
+          True{}
+        case M.Git{_bu, br, bt, _bo, _bn, _bv}:
+          Bool.and(String.eq(ar, br), String.eq(at, bt))
+
+# whether every git dependency is pinned as the first declaration of its url
+def pins.go(ds: List<&2, M.Dep>, +all: List<&2, M.Dep>) -> Bool:
+  match ds:
+    case []:
+      True{}
+    case M.Dep{_n, _h, _e, +src} <> tl:
+      rest = pins.go(tl, all)
+      Bool.and(pin.same(src, pin.of(all, M.source.url(src))), rest)
+
+# whether every git source has one pin across the workspace
+def pins(+ds: List<&2, M.Dep>) -> Bool:
+  pins.go(ds, ds)
+
+# the first git source pinned two ways, "" for none
+def pins.clash.go(ds: List<&2, M.Dep>, +all: List<&2, M.Dep>) -> String:
+  match ds:
+    case []:
+      ""
+    case M.Dep{_n, _h, _e, +src} <> tl:
+      rest = pins.clash.go(tl, all)
+      Bool.pick(String, pin.same(src, pin.of(all, M.source.url(src))), rest, M.source.url(src))
+
+# ---------------------------------------------------------------------------
 # the hub
 
 # whether a member's ledger names the root's hub: it names none, which is the
@@ -257,20 +312,26 @@ def root.hub(root: M.Manifest) -> String:
   M.Manifest{_n, _e, _b, hh, _pa, _pv, _ds, _ts} = root
   hh
 
-# whether the members can be joined: every one names the root's hub, and
-# every declaration of a dependency and of a tool agrees with the first
+# whether the members can be joined: every one names the root's hub, every
+# declaration of a dependency and of a tool agrees with the first, and every
+# git source is pinned at one commit and one tag
 def ok(+root: M.Manifest, +ms: List<&2, Member>) -> Bool:
   Bool.and(hubs(root.hub(root), ms),
-    Bool.and(agree(all.deps(root, ms)), tools.agree(all.tools(root, ms))))
+    Bool.and(Bool.and(agree(all.deps(root, ms)), pins(all.deps(root, ms))),
+      tools.agree(all.tools(root, ms))))
 
 # why the members cannot be joined
 def why(+root: M.Manifest, +ms: List<&2, Member>) -> String:
   +other = hubs.other(root.hub(root), ms)
   +dep = clash.go(all.deps(root, ms), all.deps(root, ms))
+  +pin = pins.clash.go(all.deps(root, ms), all.deps(root, ms))
   +tool = tools.clash.go(all.tools(root, ms), all.tools(root, ms))
   Bool.pick(String, String.is_empty(other),
     Bool.pick(String, String.is_empty(dep),
-      "ez: workspace members pin the tool " ++ tool ++ " differently",
+      Bool.pick(String, String.is_empty(pin),
+        "ez: workspace members pin the tool " ++ tool ++ " differently",
+        "ez: workspace members pin " ++ pin ++ " at different commits; " ++
+          "move it for all of them with ez lock --upgrade --package"),
       "ez: workspace members depend on " ++ dep ++ " differently"),
     "ez: workspace member " ++ other ++ " names another hub than the root's")
 

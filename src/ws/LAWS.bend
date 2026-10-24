@@ -10,9 +10,15 @@
 # its root.
 import Base
 import ./workspace.bend as W
+import 0xc5d9d3e28b79ea98be22eb42c7e37802/main.bend as E
 import ./root.bend as R
 import ./joint.bend as J
 import ./hop.bend as H
+import ./up.bend as U
+import ./pin.bend as Pin
+import ../ez/target.bend as Tgt
+import ../lock/world.bend as LW
+import ../lock/plan.bend as LP
 import ../pkg/path.bend as P
 import ../ledger/manifest.bend as M
 
@@ -459,6 +465,15 @@ law combine_needs_deps:
   for +ev: {J.ok(root, ms) == True{} : Bool}
   {J.agree(J.all.deps(root, ms)) == True{} : Bool}
 
+# LAW: and every git source, as the root reads it, is pinned at one commit
+# and one tag across the workspace
+# EZ-WS-4
+law combine_needs_pins:
+  for +root: M.Manifest
+  for +ms: List<&2, J.Member>
+  for +ev: {J.ok(root, ms) == True{} : Bool}
+  {J.pins(J.all.deps(root, ms)) == True{} : Bool}
+
 # LAW: and every declaration of a tool
 # EZ-WS-3
 law combine_needs_tools:
@@ -521,3 +536,292 @@ law hop_keeps_words:
   for +prog: String
   for +words: List<&2, String>
   {past(6n, H.line(dir, pwd, prog, words)) == words : List<&2, String>}
+
+# ---------------------------------------------------------------------------
+# one pin per source (EZ-WS-4)
+
+# LAW: for a project of its own, `ez lock` runs the plan the lock planner
+# makes, plain or `--upgrade`, as it always has
+# EZ-WS-4
+law up_alone:
+  for +world: LW.World
+  {U.plan(U.Alone{}, world) == LP.plan(world) : LP.Plan}
+
+# LAW: and a plain lock at a workspace root runs it too, since it writes no
+# ledger back
+# EZ-WS-4
+law up_plain:
+  for +back: U.Back
+  for +world: LW.World
+  for ev: {LW.args.upgrade(world) == False{} : Bool}
+  {U.plan(back, world) == LP.plan(world) : LP.Plan}
+
+# LAW: an upgrade moves a ledger's git dependency to the pin the joint ledger
+# gives its name, its hash, entry, commit, tag, root and narHash, and keeps
+# the source as that ledger records it, relative to its own directory, and its
+# vendor bit
+# EZ-WS-4
+law pin_back:
+  for +nn: String
+  for hh: String
+  for ee: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for +vend: Bool
+  for +js: List<&2, M.Dep>
+  for jn: String
+  for +jh: String
+  for +je: String
+  for ju: String
+  for +jr: String
+  for +jt: String
+  for +jo: String
+  for +jnar: String
+  for jv: Bool
+  for ev: {M.find(js, nn) == M.Dep{jn, jh, je, M.Git{ju, jr, jt, jo, jnar, jv}} : M.Dep}
+  {U.dep.back(M.Dep{nn, hh, ee, M.Git{url, rev, tag, root, nar, vend}}, js)
+    == M.Dep{nn, jh, je, M.Git{url, jr, jt, jo, jnar, vend}} : M.Dep}
+
+# LAW: and moves a tool's pin the same way, keeping what it builds
+# EZ-WS-4
+law tool_pin_back:
+  for +nn: String
+  for +ee: String
+  for +bb: String
+  for +url: String
+  for rev: String
+  for tag: String
+  for root: String
+  for nar: String
+  for +vend: Bool
+  for +ts: List<&2, M.Tool>
+  for jn: String
+  for je: String
+  for jb: String
+  for ju: String
+  for +jr: String
+  for +jt: String
+  for +jo: String
+  for +jnar: String
+  for jv: Bool
+  for ev: {M.tool.find(ts, nn) == M.Tool{jn, je, jb, M.Git{ju, jr, jt, jo, jnar, jv}} : M.Tool}
+  {U.tool.back(M.Tool{nn, ee, bb, M.Git{url, rev, tag, root, nar, vend}}, ts)
+    == M.Tool{nn, ee, bb, M.Git{url, jr, jt, jo, jnar, vend}} : M.Tool}
+
+# LAW: an upgrade at a workspace root that refuses writes nothing: no ledger,
+# no lock, no tree (EZ-OUT-2)
+# EZ-WS-4
+law up_refusal_writes_nothing:
+  for +back: U.Back
+  for +world: LW.World
+  for +er: {LP.refuses(world) == True{} : Bool}
+  {LP.writes(U.plan(back, world)) == False{} : Bool}
+
+# LAW: and the lock it writes is the one the lock planner plans on the joint
+# ledger: writing the ledgers back in place of the joint one leaves the lock
+# as it was
+# EZ-WS-4
+law up_writes_the_lock:
+  for +back: U.Back
+  for +world: LW.World
+  {LP.put.plan(U.plan(back, world), LP.lockfile()) == LP.put(world, LP.lockfile()) : LP.Wrote}
+
+# LAW: `ez add` of a source no member records goes on with the ref it was
+# given
+# EZ-WS-4
+law ref_unpinned:
+  for nv: String
+  for +url: String
+  for +ref: String
+  {Pin.ref.at(M.Hub{nv}, url, ref) == Pin.Given{ref} : Pin.Ref}
+
+# LAW: with no ref, of a source the workspace pins with a tag, it takes that
+# tag
+# EZ-WS-4
+law ref_takes_tag:
+  for url: String
+  for +ju: String
+  for +rev: String
+  for +ch: Char
+  for +tt: String
+  for jo: String
+  for jn: String
+  for jv: Bool
+  {Pin.ref.at(M.Git{ju, rev, SCon{ch, tt}, jo, jn, jv}, url, "") == Pin.Given{SCon{ch, tt}} : Pin.Ref}
+
+# LAW: and of one it pins by its commit alone, that commit
+# EZ-WS-4
+law ref_takes_rev:
+  for url: String
+  for +ju: String
+  for +rev: String
+  for jo: String
+  for jn: String
+  for jv: Bool
+  {Pin.ref.at(M.Git{ju, rev, "", jo, jn, jv}, url, "") == Pin.Given{rev} : Pin.Ref}
+
+# LAW: a ref the workspace's pin is recorded by, its tag, goes on as given
+# EZ-WS-4
+law ref_keeps_pin:
+  for url: String
+  for +ju: String
+  for +rev: String
+  for +ch: Char
+  for +tt: String
+  for jo: String
+  for jn: String
+  for jv: Bool
+  {Pin.ref.at(M.Git{ju, rev, SCon{ch, tt}, jo, jn, jv}, url, SCon{ch, tt}) == Pin.Given{SCon{ch, tt}} : Pin.Ref}
+
+# LAW: and any other ref is refused, naming the pin and the upgrade that moves
+# it, so a member never adds a second commit of one source
+# EZ-WS-4
+law ref_holds_other:
+  for +url: String
+  for +ju: String
+  for +rev: String
+  for +tag: String
+  for jo: String
+  for jn: String
+  for jv: Bool
+  for +rc: Char
+  for +rt: String
+  for et: {String.eq(SCon{rc, rt}, tag) == False{} : Bool}
+  for er: {String.eq(SCon{rc, rt}, rev) == False{} : Bool}
+  {Pin.ref.at(M.Git{ju, rev, tag, jo, jn, jv}, url, SCon{rc, rt})
+    == Pin.Held{"ez: the workspace pins " ++ url ++ " at " ++ Pin.held(rev, tag) ++
+      "; move it for every member with ez lock --upgrade --package"} : Pin.Ref}
+
+# LAW: a hub package added by its `<name>@<version>` has no ref to take
+# EZ-WS-4
+law ref_named_free:
+  for +pins: List<&2, M.Dep>
+  for +dir: String
+  for +home: String
+  for +target: String
+  for +ref: String
+  for ev: {Tgt.aim.named(Tgt.aim(target)) == True{} : Bool}
+  {Pin.ref(pins, dir, home, target, ref) == Pin.Given{ref} : Pin.Ref}
+
+# ---------------------------------------------------------------------------
+# a member's own commands use the root's library (EZ-WS-2)
+
+# LAW: a library the environment sets is kept, wherever ez runs
+# EZ-WS-2
+law lib_keeps_env:
+  for top: String
+  for found: R.Found
+  for +ch: Char
+  for +tt: String
+  {H.lib(top, found, SCon{ch, tt}) == H.Keep{} : H.Lib}
+
+# LAW: with none set, a command run in a member uses the root's `.ez/lib`
+# EZ-WS-2
+law lib_member:
+  for +top: String
+  for +root: List<&2, String>
+  for hd: String
+  for tl: List<&2, String>
+  {H.lib(top, R.Within{root, hd <> tl}, "")
+    == H.Set{P.join(P.join(top, W.segs.text(root)), ".ez/lib")} : H.Lib}
+
+# LAW: and one run at the root, or in a project of its own, uses its own, as
+# it always did
+# EZ-WS-2
+law lib_own:
+  for top: String
+  for root: List<&2, String>
+  {H.lib(top, R.Within{root, []}, "") == H.Keep{} : H.Lib}
+
+# LAW: in a project of its own too
+# EZ-WS-2
+law lib_alone:
+  for top: String
+  {H.lib(top, R.Alone{}, "") == H.Keep{} : H.Lib}
+
+# LAW: the run with the root's library is handed every word, unchanged and in
+# order
+# EZ-WS-2
+law lib_keeps_words:
+  for +lib: String
+  for +pwd: String
+  for +prog: String
+  for +words: List<&2, String>
+  {past(6n, H.lib.line(lib, pwd, prog, words)) == words : List<&2, String>}
+
+# LAW: a command run in a member reads the root's lock, the workspace's only
+# one
+# EZ-WS-2
+law lock_member:
+  for +top: String
+  for +root: List<&2, String>
+  for hd: String
+  for tl: List<&2, String>
+  {H.lock(top, R.Within{root, hd <> tl}) == P.join(P.join(top, W.segs.text(root)), "ez.lock.toml") : String}
+
+# LAW: and one run at the root reads the lock beside it
+# EZ-WS-2
+law lock_own:
+  for top: String
+  for root: List<&2, String>
+  {H.lock(top, R.Within{root, []}) == "ez.lock.toml" : String}
+
+# ---------------------------------------------------------------------------
+# reading the `[workspace]` table (EZ-WS-1)
+
+# LAW: the `[workspace]` table is found among a ledger's tables, wherever it
+# stands after the ones before it
+# EZ-WS-1
+law spec_finds_table:
+  for path: String
+  for +sub: List<&2, E.Val>
+  for rest: List<&2, E.Val>
+  {W.spec.rows(E.VPair{"workspace", E.VHead{path, sub}} <> rest) == W.table(sub) : W.Read}
+
+# LAW: and a ledger whose tables hold none is no workspace root
+# EZ-WS-1
+law spec_none_lone:
+  for path: String
+  for sub: List<&2, E.Val>
+  for +ch: Char
+  for +tt: String
+  for rest: List<&2, E.Val>
+  for ev: {String.eq(SCon{ch, tt}, "workspace") == False{} : Bool}
+  {W.spec.rows(E.VPair{SCon{ch, tt}, E.VHead{path, sub}} <> rest) == W.spec.rows(rest) : W.Read}
+
+# LAW: a table's entries and exclusions are the arrays its `members` and
+# `exclude` keys hold, each text read as a path's segments
+# EZ-WS-1
+law table_reads:
+  for +rows: List<&2, E.Val>
+  for +ms: List<&2, String>
+  for +xs: List<&2, String>
+  for em: {W.array(rows, "members") == Some{ms} : Maybe<&2, List<&2, String>>}
+  for ex: {W.array(rows, "exclude") == Some{xs} : Maybe<&2, List<&2, String>>}
+  {W.table(rows) == W.Root{W.Spec{W.entries.of(ms), W.paths.of(xs)}} : W.Read}
+
+# LAW: a `members` that is not an array of strings is refused, never read as
+# a shorter list
+# EZ-WS-1
+law table_refuses_members:
+  for +rows: List<&2, E.Val>
+  for em: {W.array(rows, "members") == None{} : Maybe<&2, List<&2, String>>}
+  {W.table(rows) == W.Bad{"ez: [workspace] members is not a list of strings"} : W.Read}
+
+# LAW: a key's array is the strings it holds
+# EZ-WS-1
+law array_at_key:
+  for +key: String
+  for +items: List<&2, E.Val>
+  for rest: List<&2, E.Val>
+  {W.array(E.VPair{key, E.VArr{items}} <> rest, key) == W.strs(items) : Maybe<&2, List<&2, String>>}
+
+# LAW: and an array holding anything but strings holds none
+# EZ-WS-1
+law strs_refuses_other:
+  for bit: Bool
+  for rest: List<&2, E.Val>
+  {W.strs(E.VBool{bit} <> rest) == None{} : Maybe<&2, List<&2, String>>}

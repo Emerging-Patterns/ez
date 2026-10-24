@@ -9,10 +9,18 @@ import Base
 import ../check/eq.bend as Eq
 import ../check/str.bend as Str
 import ./workspace.bend as W
+import 0xc5d9d3e28b79ea98be22eb42c7e37802/main.bend as E
 import ./root.bend as R
 import ./joint.bend as J
 import ../ledger/manifest.bend as M
 import ../ledger/render.bend as Rend
+import ./up.bend as U
+import ./pin.bend as Pin
+import ../ez/target.bend as Tgt
+import ../lock/world.bend as LW
+import ../lock/plan.bend as LP
+import ../lock/LAWS.bend as LL
+import ../lock/PROOF.bend as LPF
 import ./LAWS.bend as Laws
 
 # a cut at the last segment, by induction on the segments before it: the
@@ -684,17 +692,38 @@ def Laws.tools_firsts_find(ts, name):
 
 def Laws.combine_needs_hub(root, ms, ev):
   Eq.and.left(J.hubs(J.root.hub(root), ms),
-    Bool.and(J.agree(J.all.deps(root, ms)), J.tools.agree(J.all.tools(root, ms))), ev)
+    Bool.and(Bool.and(J.agree(J.all.deps(root, ms)), J.pins(J.all.deps(root, ms))),
+      J.tools.agree(J.all.tools(root, ms))), ev)
+
+# what is left of a join once its hub is taken off
+def join.rest(
+  +root: M.Manifest,
+  +ms: List<&2, J.Member>,
+  +ev: {J.ok(root, ms) == True{} : Bool}
+) -> {Bool.and(Bool.and(J.agree(J.all.deps(root, ms)), J.pins(J.all.deps(root, ms))),
+    J.tools.agree(J.all.tools(root, ms))) == True{} : Bool}:
+  Eq.and.right(J.hubs(J.root.hub(root), ms),
+    Bool.and(Bool.and(J.agree(J.all.deps(root, ms)), J.pins(J.all.deps(root, ms))),
+      J.tools.agree(J.all.tools(root, ms))), ev)
+
+# and its dependencies' half
+def join.deps(
+  +root: M.Manifest,
+  +ms: List<&2, J.Member>,
+  +ev: {J.ok(root, ms) == True{} : Bool}
+) -> {Bool.and(J.agree(J.all.deps(root, ms)), J.pins(J.all.deps(root, ms))) == True{} : Bool}:
+  Eq.and.left(Bool.and(J.agree(J.all.deps(root, ms)), J.pins(J.all.deps(root, ms))),
+    J.tools.agree(J.all.tools(root, ms)), join.rest(root, ms, ev))
 
 def Laws.combine_needs_deps(root, ms, ev):
-  Eq.and.left(J.agree(J.all.deps(root, ms)), J.tools.agree(J.all.tools(root, ms)),
-    Eq.and.right(J.hubs(J.root.hub(root), ms),
-      Bool.and(J.agree(J.all.deps(root, ms)), J.tools.agree(J.all.tools(root, ms))), ev))
+  Eq.and.left(J.agree(J.all.deps(root, ms)), J.pins(J.all.deps(root, ms)), join.deps(root, ms, ev))
+
+def Laws.combine_needs_pins(root, ms, ev):
+  Eq.and.right(J.agree(J.all.deps(root, ms)), J.pins(J.all.deps(root, ms)), join.deps(root, ms, ev))
 
 def Laws.combine_needs_tools(root, ms, ev):
-  Eq.and.right(J.agree(J.all.deps(root, ms)), J.tools.agree(J.all.tools(root, ms)),
-    Eq.and.right(J.hubs(J.root.hub(root), ms),
-      Bool.and(J.agree(J.all.deps(root, ms)), J.tools.agree(J.all.tools(root, ms))), ev))
+  Eq.and.right(Bool.and(J.agree(J.all.deps(root, ms)), J.pins(J.all.deps(root, ms))),
+    J.tools.agree(J.all.tools(root, ms)), join.rest(root, ms, ev))
 
 # ---------------------------------------------------------------------------
 # where a whole-workspace command runs
@@ -712,4 +741,477 @@ def Laws.hop_broken(_top, _why):
   {==}
 
 def Laws.hop_keeps_words(_dir, _pwd, _prog, _words):
+  {==}
+
+# ---------------------------------------------------------------------------
+# one pin per source
+
+def Laws.up_alone(_world):
+  {==}
+
+# a workspace's plan under a plain lock is the planner's
+def up_plain_at(
+  up: Bool,
+  +text: String,
+  +spec: W.Spec,
+  +fs: List<&2, J.Found>,
+  +world: LW.World,
+  ev: {up == False{} : Bool}
+) -> {U.plan.at(up, U.Back{text, spec, fs}, world) == LP.plan(world) : LP.Plan}:
+  match up:
+    case True{}:
+      Eq.bit.absurd2(&2, {U.plan.at(True{}, U.Back{text, spec, fs}, world) == LP.plan(world) : LP.Plan}, ev)
+    case False{}:
+      {==}
+
+def Laws.up_plain(back, world, ev):
+  match back:
+    case U.Alone{}:
+      {==}
+    case U.Back{+text, +spec, +fs}:
+      up_plain_at(LW.args.upgrade(world), text, spec, fs, world, ev)
+
+def Laws.pin_back(nn, _hh, _ee, url, _rev, _tag, _root, _nar, vend, js, jn, jh, je, ju, jr, jt, jo, jnar, jv, ev):
+  Equal.cong(M.Dep, M.Dep, dd => U.dep.back.at(M.Dep{nn, _hh, _ee, M.Git{url, _rev, _tag, _root, _nar, vend}}, dd),
+    M.find(js, nn), M.Dep{jn, jh, je, M.Git{ju, jr, jt, jo, jnar, jv}}, ev)
+
+def Laws.tool_pin_back(nn, ee, bb, url, _rev, _tag, _root, _nar, vend, ts, jn, je, jb, ju, jr, jt, jo, jnar, jv, ev):
+  Equal.cong(M.Tool, M.Tool,
+    dd => U.tool.back.at(M.Tool{nn, ee, bb, M.Git{url, _rev, _tag, _root, _nar, vend}}, dd),
+    M.tool.find(ts, nn), M.Tool{jn, je, jb, M.Git{ju, jr, jt, jo, jnar, jv}}, ev)
+
+# effects that write nothing write nothing once the ledgers' writes take the
+# place of ez.toml's, since there was no write of ez.toml to replace
+def back_writes_none(
+  es: List<&2, LP.Effect>,
+  +ws: List<&2, LP.Effect>,
+  +ev: {LP.writes.in(es) == False{} : Bool}
+) -> {LP.writes.in(U.effects.back(es, ws)) == False{} : Bool}:
+  match es:
+    case []:
+      {==}
+    case LP.Write{at, text} <> tl:
+      Eq.bit.absurd2(&2, {LP.writes.in(U.effects.back(LP.Write{at, text} <> tl, ws)) == False{} : Bool}, ev)
+    case LP.Lay{pl, hash, files} <> tl:
+      Eq.bit.absurd2(&2, {LP.writes.in(U.effects.back(LP.Lay{pl, hash, files} <> tl, ws)) == False{} : Bool}, ev)
+    case LP.Drop{hash} <> tl:
+      Eq.bit.absurd2(&2, {LP.writes.in(U.effects.back(LP.Drop{hash} <> tl, ws)) == False{} : Bool}, ev)
+    case LP.Say{_text} <> +tl:
+      back_writes_none(tl, ws, ev)
+    case LP.Name{nv, hash} <> tl:
+      Eq.bit.absurd2(&2, {LP.writes.in(U.effects.back(LP.Name{nv, hash} <> tl, ws)) == False{} : Bool}, ev)
+
+# and so for a plan
+def back_plan_writes_none(
+  pl: LP.Plan,
+  +ws: List<&2, LP.Effect>,
+  +ev: {LP.writes(pl) == False{} : Bool}
+) -> {LP.writes(U.plan.back(pl, ws)) == False{} : Bool}:
+  match pl:
+    case LP.Plan{es, _outcome}:
+      back_writes_none(es, ws, ev)
+
+# a workspace's plan that refuses writes nothing, upgrade or not
+def up_refused_at(
+  up: Bool,
+  +text: String,
+  +spec: W.Spec,
+  +fs: List<&2, J.Found>,
+  +world: LW.World,
+  +er: {LP.refuses(world) == True{} : Bool}
+) -> {LP.writes(U.plan.at(up, U.Back{text, spec, fs}, world)) == False{} : Bool}:
+  match up:
+    case True{}:
+      back_plan_writes_none(LP.plan(world), U.writes(U.Back{text, spec, fs}, LP.ledger.next(world)),
+        LL.lock_refusal_writes_nothing(world, er))
+    case False{}:
+      LL.lock_refusal_writes_nothing(world, er)
+
+def Laws.up_refusal_writes_nothing(back, world, er):
+  match back:
+    case U.Alone{}:
+      LL.lock_refusal_writes_nothing(world, er)
+    case U.Back{+text, +spec, +fs}:
+      up_refused_at(LW.args.upgrade(world), text, spec, fs, world, er)
+
+# whether no effect of a list writes at a path
+def misses(es: List<&2, LP.Effect>, +path: String) -> Bool:
+  match es:
+    case []:
+      True{}
+    case LP.Write{at, _text} <> tl:
+      Bool.and(Bool.not(String.eq(at, path)), misses(tl, path))
+    case _hd <> tl:
+      misses(tl, path)
+
+# a write elsewhere leaves what the effects after it leave at a path
+def put_one_miss(
+  +at: String,
+  text: String,
+  +path: String,
+  rest: LP.Wrote,
+  ev: {String.eq(at, path) == False{} : Bool}
+) -> {LP.put.one(LP.Write{at, text}, path, rest) == rest : LP.Wrote}:
+  match rest:
+    case LP.Kept{}:
+      Equal.cong(Bool, LP.Wrote, bb => Bool.pick(LP.Wrote, bb, LP.Put{text}, LP.Kept{}),
+        String.eq(at, path), False{}, ev)
+    case LP.Put{_later}:
+      {==}
+
+# writes that miss a path, put in front, leave it as what follows leaves it
+def app_misses(
+  ws: List<&2, LP.Effect>,
+  +rest: List<&2, LP.Effect>,
+  +path: String,
+  +ev: {misses(ws, path) == True{} : Bool}
+) -> {LP.put.in(List.append(&2, LP.Effect, ws, rest), path) == LP.put.in(rest, path) : LP.Wrote}:
+  match ws:
+    case []:
+      {==}
+    case LP.Write{+at, +text} <> +tl:
+      Equal.trans(LP.Wrote,
+        LP.put.one(LP.Write{at, text}, path, LP.put.in(List.append(&2, LP.Effect, tl, rest), path)),
+        LP.put.in(List.append(&2, LP.Effect, tl, rest), path),
+        LP.put.in(rest, path),
+        put_one_miss(at, text, path, LP.put.in(List.append(&2, LP.Effect, tl, rest), path),
+          Eq.not.true(String.eq(at, path),
+            Eq.and.left(Bool.not(String.eq(at, path)), misses(tl, path), ev))),
+        app_misses(tl, rest, path, Eq.and.right(Bool.not(String.eq(at, path)), misses(tl, path), ev)))
+    case LP.Lay{_pl, _hash, _files} <> +tl:
+      app_misses(tl, rest, path, ev)
+    case LP.Drop{_hash} <> +tl:
+      app_misses(tl, rest, path, ev)
+    case LP.Say{_text} <> +tl:
+      app_misses(tl, rest, path, ev)
+    case LP.Name{_nv, _hash} <> +tl:
+      app_misses(tl, rest, path, ev)
+
+# a write kept, or the ledgers' in place of ez.toml's, leaves the lock as the
+# plan left it
+def write_back_lock(
+  hit: Bool,
+  +at: String,
+  +text: String,
+  +ws: List<&2, LP.Effect>,
+  +tl: List<&2, LP.Effect>,
+  eh: {String.eq(at, "ez.toml") == hit : Bool},
+  +ev: {misses(ws, LP.lockfile()) == True{} : Bool},
+  ih: {LP.put.in(U.effects.back(tl, ws), LP.lockfile()) == LP.put.in(tl, LP.lockfile()) : LP.Wrote}
+) -> {LP.put.in(U.effect.write(hit, at, text, ws, U.effects.back(tl, ws)), LP.lockfile())
+    == LP.put.one(LP.Write{at, text}, LP.lockfile(), LP.put.in(tl, LP.lockfile())) : LP.Wrote}:
+  match hit:
+    case True{}:
+      Equal.trans(LP.Wrote,
+        LP.put.in(List.append(&2, LP.Effect, ws, U.effects.back(tl, ws)), LP.lockfile()),
+        LP.put.in(tl, LP.lockfile()),
+        LP.put.one(LP.Write{at, text}, LP.lockfile(), LP.put.in(tl, LP.lockfile())),
+        Equal.trans(LP.Wrote,
+          LP.put.in(List.append(&2, LP.Effect, ws, U.effects.back(tl, ws)), LP.lockfile()),
+          LP.put.in(U.effects.back(tl, ws), LP.lockfile()),
+          LP.put.in(tl, LP.lockfile()),
+          app_misses(ws, U.effects.back(tl, ws), LP.lockfile(), ev), ih),
+        Equal.sym(LP.Wrote,
+          LP.put.one(LP.Write{at, text}, LP.lockfile(), LP.put.in(tl, LP.lockfile())),
+          LP.put.in(tl, LP.lockfile()),
+          put_one_miss(at, text, LP.lockfile(), LP.put.in(tl, LP.lockfile()),
+            Equal.cong(String, Bool, ss => String.eq(ss, LP.lockfile()), at, "ez.toml",
+              Str.string_eq_true(at, "ez.toml", eh)))))
+    case False{}:
+      Equal.cong(LP.Wrote, LP.Wrote, rr => LP.put.one(LP.Write{at, text}, LP.lockfile(), rr),
+        LP.put.in(U.effects.back(tl, ws), LP.lockfile()), LP.put.in(tl, LP.lockfile()), ih)
+
+# by induction on the effects: each is kept, or is the write of ez.toml,
+# which the ledgers' writes replace and none of which is the lock's
+def effects_back_lock(
+  es: List<&2, LP.Effect>,
+  +ws: List<&2, LP.Effect>,
+  +ev: {misses(ws, LP.lockfile()) == True{} : Bool}
+) -> {LP.put.in(U.effects.back(es, ws), LP.lockfile()) == LP.put.in(es, LP.lockfile()) : LP.Wrote}:
+  match es:
+    case []:
+      {==}
+    case LP.Write{+at, +text} <> +tl:
+      write_back_lock(String.eq(at, "ez.toml"), at, text, ws, tl, {==}, ev, effects_back_lock(tl, ws, ev))
+    case LP.Lay{_pl, _hash, _files} <> +tl:
+      effects_back_lock(tl, ws, ev)
+    case LP.Drop{_hash} <> +tl:
+      effects_back_lock(tl, ws, ev)
+    case LP.Say{_text} <> +tl:
+      effects_back_lock(tl, ws, ev)
+    case LP.Name{_nv, _hash} <> +tl:
+      effects_back_lock(tl, ws, ev)
+
+# the two halves of a list of writes miss a path when each does
+def misses_app(
+  as: List<&2, LP.Effect>,
+  +bs: List<&2, LP.Effect>,
+  +path: String,
+  +ea: {misses(as, path) == True{} : Bool},
+  eb: {misses(bs, path) == True{} : Bool}
+) -> {misses(List.append(&2, LP.Effect, as, bs), path) == True{} : Bool}:
+  match as:
+    case []:
+      eb
+    case LP.Write{+at, _text} <> +tl:
+      Str.and_true(Bool.not(String.eq(at, path)), misses(List.append(&2, LP.Effect, tl, bs), path),
+        Eq.and.left(Bool.not(String.eq(at, path)), misses(tl, path), ea),
+        misses_app(tl, bs, path, Eq.and.right(Bool.not(String.eq(at, path)), misses(tl, path), ea), eb))
+    case LP.Lay{_pl, _hash, _files} <> +tl:
+      misses_app(tl, bs, path, ea, eb)
+    case LP.Drop{_hash} <> +tl:
+      misses_app(tl, bs, path, ea, eb)
+    case LP.Say{_text} <> +tl:
+      misses_app(tl, bs, path, ea, eb)
+    case LP.Name{_nv, _hash} <> +tl:
+      misses_app(tl, bs, path, ea, eb)
+
+# a ledger written back, or not, misses the lock when its path is not the
+# lock's
+def pick_miss(
+  bb: Bool,
+  +at: String,
+  text: String,
+  ev: {String.eq(at, LP.lockfile()) == False{} : Bool}
+) -> {misses(Bool.pick(List<&2, LP.Effect>, bb, [], [LP.Write{at, text}]), LP.lockfile()) == True{} : Bool}:
+  match bb:
+    case True{}:
+      {==}
+    case False{}:
+      Equal.cong(Bool, Bool, xx => Bool.and(Bool.not(xx), True{}), String.eq(at, LP.lockfile()), False{}, ev)
+
+# a member's ledger is not the lock: its path holds a `/`
+def member_not_lock(
+  hit: Bool,
+  +pre: String,
+  eh: {String.eq(pre ++ "/ez.toml", LP.lockfile()) == hit : Bool}
+) -> {String.eq(pre ++ "/ez.toml", LP.lockfile()) == False{} : Bool}:
+  match hit:
+    case False{}:
+      eh
+    case True{}:
+      Eq.bit.absurd2(&2, {String.eq(pre ++ "/ez.toml", LP.lockfile()) == False{} : Bool},
+        Equal.trans(Bool, True{}, Str.clear(pre ++ "/ez.toml", '/'), False{},
+          Equal.sym(Bool, Str.clear(pre ++ "/ez.toml", '/'), True{},
+            Equal.cong(String, Bool, ss => Str.clear(ss, '/'), pre ++ "/ez.toml", LP.lockfile(),
+              Str.string_eq_true(pre ++ "/ez.toml", LP.lockfile(), eh))),
+          LPF.slash_member(pre)))
+
+# a member's ledger written back misses the lock
+def member_write_miss(
+  rd: M.Read,
+  +ds: List<&2, String>,
+  +joint: M.Manifest
+) -> {misses(U.member.write(rd, ds, joint), LP.lockfile()) == True{} : Bool}:
+  match rd:
+    case M.Bad{_why}:
+      {==}
+    case M.Good{+mm}:
+      pick_miss(String.eq(Rend.show(mm), Rend.show(U.ledger.back(mm, joint))),
+        W.segs.text(ds) ++ "/ez.toml", Rend.show(U.ledger.back(mm, joint)),
+        member_not_lock(String.eq(W.segs.text(ds) ++ "/ez.toml", LP.lockfile()), W.segs.text(ds), {==}))
+
+# a member's, kept or passed by
+def found_pick_miss(
+  bb: Bool,
+  +text: String,
+  +ds: List<&2, String>,
+  +joint: M.Manifest
+) -> {misses(U.found.pick(bb, text, ds, joint), LP.lockfile()) == True{} : Bool}:
+  match bb:
+    case True{}:
+      member_write_miss(M.parse(text), ds, joint)
+    case False{}:
+      {==}
+
+# one ez.toml git listed, written back or not, misses the lock
+def found_write_miss(
+  lg: Maybe<&2, W.Ledger>,
+  +text: String,
+  +dirs: List<&2, List<&2, String>>,
+  +joint: M.Manifest
+) -> {misses(U.found.write(lg, text, dirs, joint), LP.lockfile()) == True{} : Bool}:
+  match lg:
+    case None{}:
+      {==}
+    case Some{W.Ledger{+ds, nn, ww}}:
+      found_pick_miss(W.has(dirs, ds), text, ds, joint)
+
+# every member's ledger written back misses the lock
+def members_write_miss(
+  fs: List<&2, J.Found>,
+  +dirs: List<&2, List<&2, String>>,
+  +joint: M.Manifest
+) -> {misses(U.members.write(fs, dirs, joint), LP.lockfile()) == True{} : Bool}:
+  match fs:
+    case []:
+      {==}
+    case J.Found{+pp, +tt} <> +tl:
+      misses_app(U.found.write(W.ledger.of(pp, tt), tt, dirs, joint), U.members.write(tl, dirs, joint),
+        LP.lockfile(), found_write_miss(W.ledger.of(pp, tt), tt, dirs, joint),
+        members_write_miss(tl, dirs, joint))
+
+# the root's ledger written back misses the lock: it is ez.toml
+def root_write_miss(
+  rd: M.Read,
+  +spec: W.Spec,
+  +root: W.Root,
+  +joint: M.Manifest
+) -> {misses(U.root.write(rd, spec, root, joint), LP.lockfile()) == True{} : Bool}:
+  match rd:
+    case M.Bad{_why}:
+      {==}
+    case M.Good{+mm}:
+      pick_miss(String.eq(Rend.show(mm), Rend.show(U.ledger.back(mm, joint))), "ez.toml",
+        U.root.text(U.ledger.back(mm, joint), spec, root), {==})
+
+# every ledger written back misses the lock, once the member set is known
+def members_miss(
+  ms: W.Members,
+  +text: String,
+  +spec: W.Spec,
+  +fs: List<&2, J.Found>,
+  +joint: M.Manifest
+) -> {misses(U.writes.members(ms, text, spec, fs, joint), LP.lockfile()) == True{} : Bool}:
+  match ms:
+    case W.Refused{_why}:
+      {==}
+    case W.Members{_root, +dirs}:
+      misses_app(U.root.write(M.parse(text), spec, W.root.of(text), joint), U.members.write(fs, dirs, joint),
+        LP.lockfile(), root_write_miss(M.parse(text), spec, W.root.of(text), joint),
+        members_write_miss(fs, dirs, joint))
+
+# and once the joint ledger was read
+def joint_miss(
+  joint: M.Read,
+  +text: String,
+  +spec: W.Spec,
+  +fs: List<&2, J.Found>
+) -> {misses(U.writes.joint(joint, text, spec, fs), LP.lockfile()) == True{} : Bool}:
+  match joint:
+    case M.Bad{_why}:
+      {==}
+    case M.Good{+jm}:
+      members_miss(W.members(spec, W.root.of(text), J.ledgers(fs)), text, spec, fs, jm)
+
+# a plan with the ledgers' writes in place of ez.toml's leaves the lock as it
+# was
+def up_lock_plan(
+  pl: LP.Plan,
+  +ws: List<&2, LP.Effect>,
+  +ev: {misses(ws, LP.lockfile()) == True{} : Bool}
+) -> {LP.put.plan(U.plan.back(pl, ws), LP.lockfile()) == LP.put.plan(pl, LP.lockfile()) : LP.Wrote}:
+  match pl:
+    case LP.Plan{es, _outcome}:
+      effects_back_lock(es, ws, ev)
+
+# a workspace's plan writes the lock its planner does, upgrade or not
+def up_lock_at(
+  up: Bool,
+  +text: String,
+  +spec: W.Spec,
+  +fs: List<&2, J.Found>,
+  +world: LW.World
+) -> {LP.put.plan(U.plan.at(up, U.Back{text, spec, fs}, world), LP.lockfile())
+    == LP.put(world, LP.lockfile()) : LP.Wrote}:
+  match up:
+    case True{}:
+      up_lock_plan(LP.plan(world), U.writes(U.Back{text, spec, fs}, LP.ledger.next(world)),
+        joint_miss(LP.ledger.next(world), text, spec, fs))
+    case False{}:
+      {==}
+
+def Laws.up_writes_the_lock(back, world):
+  match back:
+    case U.Alone{}:
+      {==}
+    case U.Back{+text, +spec, +fs}:
+      up_lock_at(LW.args.upgrade(world), text, spec, fs, world)
+
+def Laws.ref_unpinned(_nv, _url, _ref):
+  {==}
+
+def Laws.ref_takes_tag(_url, _ju, _rev, _ch, _tt, _jo, _jn, _jv):
+  {==}
+
+def Laws.ref_takes_rev(_url, _ju, _rev, _jo, _jn, _jv):
+  {==}
+
+# the tag compares equal to itself, so it is the pin
+def Laws.ref_keeps_pin(url, _ju, rev, ch, tt, _jo, _jn, _jv):
+  Equal.cong(Bool, Pin.Ref,
+    bb => Bool.pick(Pin.Ref, bb, Pin.Given{SCon{ch, tt}},
+      Pin.Held{"ez: the workspace pins " ++ url ++ " at " ++ Pin.held(rev, SCon{ch, tt}) ++
+        "; move it for every member with ez lock --upgrade --package"}),
+    Bool.or(String.eq(SCon{ch, tt}, SCon{ch, tt}), String.eq(SCon{ch, tt}, rev)), True{},
+    Equal.cong(Bool, Bool, bb => Bool.or(bb, String.eq(SCon{ch, tt}, rev)),
+      String.eq(SCon{ch, tt}, SCon{ch, tt}), True{}, Eq.string_eq_self(SCon{ch, tt})))
+
+# neither the tag nor the commit, so the ref is held
+def Laws.ref_holds_other(url, _ju, rev, tag, _jo, _jn, _jv, rc, rt, et, er):
+  Equal.cong(Bool, Pin.Ref,
+    bb => Bool.pick(Pin.Ref, bb, Pin.Given{SCon{rc, rt}},
+      Pin.Held{"ez: the workspace pins " ++ url ++ " at " ++ Pin.held(rev, tag) ++
+        "; move it for every member with ez lock --upgrade --package"}),
+    Bool.or(String.eq(SCon{rc, rt}, tag), String.eq(SCon{rc, rt}, rev)), False{},
+    Equal.trans(Bool, Bool.or(String.eq(SCon{rc, rt}, tag), String.eq(SCon{rc, rt}, rev)),
+      Bool.or(False{}, String.eq(SCon{rc, rt}, rev)), False{},
+      Equal.cong(Bool, Bool, bb => Bool.or(bb, String.eq(SCon{rc, rt}, rev)),
+        String.eq(SCon{rc, rt}, tag), False{}, et), er))
+
+def Laws.ref_named_free(pins, dir, home, target, ref, ev):
+  Equal.cong(Bool, Pin.Ref,
+    bb => Bool.pick(Pin.Ref, bb, Pin.Given{ref}, Pin.ref.place(Tgt.classify(target), pins, dir, home, ref)),
+    Tgt.aim.named(Tgt.aim(target)), True{}, ev)
+
+def Laws.lib_keeps_env(_top, _found, _ch, _tt):
+  {==}
+
+def Laws.lib_member(_top, _root, _hd, _tl):
+  {==}
+
+def Laws.lib_own(_top, _root):
+  {==}
+
+def Laws.lib_alone(_top):
+  {==}
+
+def Laws.lib_keeps_words(_lib, _pwd, _prog, _words):
+  {==}
+
+def Laws.lock_member(_top, _root, _hd, _tl):
+  {==}
+
+def Laws.lock_own(_top, _root):
+  {==}
+
+# ---------------------------------------------------------------------------
+# reading the `[workspace]` table
+
+def Laws.spec_finds_table(_path, _sub, _rest):
+  {==}
+
+def Laws.spec_none_lone(_path, sub, ch, tt, rest, ev):
+  Equal.cong(Bool, W.Read, bb => W.spec.at(bb, sub, W.spec.rows(rest)),
+    String.eq(SCon{ch, tt}, "workspace"), False{}, ev)
+
+def Laws.table_reads(rows, ms, xs, em, ex):
+  Equal.trans(W.Read,
+    W.table.go(W.array(rows, "members"), W.array(rows, "exclude")),
+    W.table.go(Some{ms}, W.array(rows, "exclude")),
+    W.Root{W.Spec{W.entries.of(ms), W.paths.of(xs)}},
+    Equal.cong(Maybe<&2, List<&2, String>>, W.Read, mm => W.table.go(mm, W.array(rows, "exclude")),
+      W.array(rows, "members"), Some{ms}, em),
+    Equal.cong(Maybe<&2, List<&2, String>>, W.Read, mm => W.table.go(Some{ms}, mm),
+      W.array(rows, "exclude"), Some{xs}, ex))
+
+def Laws.table_refuses_members(rows, em):
+  Equal.cong(Maybe<&2, List<&2, String>>, W.Read, mm => W.table.go(mm, W.array(rows, "exclude")),
+    W.array(rows, "members"), None{}, em)
+
+def Laws.array_at_key(key, items, rest):
+  Equal.cong(Bool, Maybe<&2, List<&2, String>>, bb => W.array.at(bb, E.VArr{items}, W.array(rest, key)),
+    String.eq(key, key), True{}, Eq.string_eq_self(key))
+
+def Laws.strs_refuses_other(_bit, _rest):
   {==}

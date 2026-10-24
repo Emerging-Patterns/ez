@@ -79,6 +79,8 @@ We keep the pin in each member's ledger rather than in a root table, so a member
 
 A hub dependency is pinned by its hash already, so two members with the same hub name at the same version agree by construction, and two versions of one hub name are two packages, as they are today.
 
+**Update (W4):** the joint ledger is refused when a git source, as the root reads it, is declared at two commits or two tags (`combine_needs_pins`). `ez lock --upgrade` at a workspace root is planned on the joint ledger like a plain lock (`src/ws/up.bend`), so a source moves once for the whole workspace; the plan's one write of ez.toml, which would hold the joint ledger, is replaced by a write of every ledger the upgrade changed, the root's with its `[workspace]` table rendered back, each dependency and tool taking its new pin from the joint ledger and keeping its own source path and vendor bit (`pin_back`, `tool_pin_back`). Every other effect is kept, so the sources rewritten, `.gitignore` and the lock are the planner's (`up_writes_the_lock`), and a refusal still writes nothing (`up_refusal_writes_nothing`). For `ez add` we chose the plainest rule that keeps one pin: with no ref, a source the workspace pins is added at the tag it is pinned at, or its commit when it has none, which `ez add` resolves as any named ref; a ref that is neither is refused before anything is asked, rather than resolved and compared, since the answer is the same and refusing early asks the remote nothing (`src/ws/pin.bend`). A member's own commands run where they are, with BEND_LIB at the root's `.ez/lib` when the environment sets none, by running again in place with it set, and `ez publish` in a member reads the root's lock (`src/ws/hop.bend`, `lib_member`, `lock_member`). On the binary, `ez lock --upgrade` in `libs/b` moved `dep` in both members' ledgers, each keeping `../../../dep`, rewrote the import in `libs/a`, and left the root's ledger, which pins nothing, as it was; `ez add ../../../dep` in a new member took the workspace's `master` at its commit and laid the tree under the root's `.ez/lib`, and with the old commit as its ref it was refused and wrote nothing.
+
 ## Member dependencies (EZ-WS-5 to EZ-WS-7)
 
 A member depends on another with a section that names it by its `[package] name`:
@@ -121,7 +123,7 @@ On a fresh clone, every import already names the hash the committed tree walks t
 | W1 (landed) | `[workspace]` read beside the ledger model, in `src/ws/workspace.bend`; the member set as a pure function of the root ledger and the committed listing | EZ-WS-1 |
 | W2 (landed) | Root finding as a pure function of the directories above and their ledgers; every command's interpreter reads the ancestors and calls it | EZ-WS-2 |
 | W3 (landed) | The lock planned from the members' joint ledger; one lock at the root; EZ-DOC-3 to EZ-DOC-5 hold of it as of any World | EZ-WS-3 |
-| W4 | The one-pin check in the lock; `ez add` reusing a member's pin; `ez lock --upgrade` moving a source in every member | EZ-WS-4 |
+| W4 (landed) | The one-pin check in the lock; `ez add` reusing a member's pin; `ez lock --upgrade` moving a source in every member | EZ-WS-4 |
 | W5 | `workspace = true` sources (a `Member` constructor of `M.Source`); the lock walks each member and lays it | EZ-WS-5 |
 | W6 | Named members resolved before the ledger, the lock and the hub; EZ-HUB-1 and EZ-HUB-2 reworded | EZ-WS-6 |
 | W7 | Moved hash members refused by a plain lock and rewritten by the upgrade | EZ-WS-7 |
