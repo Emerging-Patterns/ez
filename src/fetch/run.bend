@@ -58,6 +58,10 @@ def answer(+lib: String, ask: FW.Ask) -> IO(FW.Answer):
       do IO<FW.Answer>:
         m : Maybe<&2, String> <- F.read(lib ++ "/names/" ++ nv)
         return FW.Held{m}
+    case FW.Tree{_hash, _entry}:
+      do IO<FW.Answer>:
+        l : W.Listing <- Run.read.listing()
+        return FW.Seen{l}
 
 # every question, answered
 def answer.all(+lib: String, asks: List<&2, FW.Ask>) -> IO(List<&2, FW.Reply>):

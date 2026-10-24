@@ -21,6 +21,11 @@ import ../toml/toml.bend as T
 import ../pub/plan.bend as PP
 import ./up.bend as U
 import ./moved.bend as Mv
+import ./doctor.bend as Doc
+import ../doctor/plan.bend as DP
+import ../doctor/world.bend as DW
+import ../doctor/PROOF.bend as DPF
+import ../doctor/LAWS.bend as DL
 import ../ledger/upgrade.bend as LU
 import ./pin.bend as Pin
 import ../ez/target.bend as Tgt
@@ -1778,3 +1783,71 @@ def Laws.edits_skip_unchanged(ss, at, text, tl, ec):
     : {Mv.edit.put(Bool.not(_), at, LU.reimport.many(ss, text), Mv.edits(ss, tl)) == Mv.edits(ss, tl)
       : List<&2, LP.Effect>}
   {==}
+
+# ---------------------------------------------------------------------------
+# `ez doctor` over a workspace
+
+def Laws.doc_alone(_world):
+  {==}
+
+def Laws.doc_judges_joint(_mm, _text, _fs):
+  {==}
+
+def Laws.doc_lines(_why, _text, _fs, _world):
+  {==}
+
+def Laws.doc_member_file(hd, tl, dirs, at, text, fs, eu):
+  %Equal.sym(Bool, Doc.under(W.segs.text(hd <> tl), at), True{}, eu)
+    : {Doc.own.put(_, LW.Source{at, text}, Doc.own.files(hd <> tl, dirs, fs))
+      == LW.Source{at, text} <> Doc.own.files(hd <> tl, dirs, fs) : List<&2, LW.Source>}
+  {==}
+
+def Laws.doc_other_file(hd, tl, dirs, at, text, fs, eu):
+  %Equal.sym(Bool, Doc.under(W.segs.text(hd <> tl), at), False{}, eu)
+    : {Doc.own.put(_, LW.Source{at, text}, Doc.own.files(hd <> tl, dirs, fs))
+      == Doc.own.files(hd <> tl, dirs, fs) : List<&2, LW.Source>}
+  {==}
+
+def Laws.doc_root_file(dirs, at, text, fs, eu):
+  %Equal.sym(Bool, Doc.under.any(dirs, at), False{}, eu)
+    : {Doc.own.put(Bool.not(_), LW.Source{at, text}, Doc.own.files([], dirs, fs))
+      == LW.Source{at, text} <> Doc.own.files([], dirs, fs) : List<&2, LW.Source>}
+  {==}
+
+def Laws.doc_member_drift(_dir, _mm, _dirs, _nvs, _fs):
+  {==}
+
+def Laws.doc_drift_lines(_place, _hs, _ln, _ls):
+  {==}
+
+def Laws.doc_member_moved(_path, _name, held, root, now, en):
+  %Equal.sym(Bool, String.eq(now, held), False{}, en)
+    : {Bool.pick(List<&2, DP.Note>, _, [], [DP.Note{True{}, Doc.moved.line(root, now, held)}])
+      == [DP.Note{True{}, Doc.moved.line(root, now, held)}] : List<&2, DP.Note>}
+  {==}
+
+def Laws.doc_member_same(_path, _name, held, root, now, en):
+  %Equal.sym(Bool, String.eq(now, held), True{}, en)
+    : {Bool.pick(List<&2, DP.Note>, _, [], [DP.Note{True{}, Doc.moved.line(root, now, held)}])
+      == [] : List<&2, DP.Note>}
+  {==}
+
+def Laws.doc_member_walks(_dir, _nn, _ee, _bb, _hh, _pa, _pv, _ds, _ts, _files, _locked):
+  {==}
+
+def Laws.doc_fails_on_problem(why, text, fs, world, ew):
+  %Equal.sym(Bool, DP.wrong(Doc.notes(why, text, fs, world)), True{}, ew)
+    : {DP.refuses.plan(LP.Plan{DP.says(Doc.notes(why, text, fs, world)), DP.outcome.of(_)}) == True{} : Bool}
+  {==}
+
+def Laws.doc_passes_when_fine(why, text, fs, world, ew):
+  %Equal.sym(Bool, DP.wrong(Doc.notes(why, text, fs, world)), False{}, ew)
+    : {DP.refuses.plan(LP.Plan{DP.says(Doc.notes(why, text, fs, world)), DP.outcome.of(_)}) == False{} : Bool}
+  {==}
+
+def Laws.doc_writes_nothing(back, world):
+  match back:
+    case Doc.Alone{}:
+      DL.doctor_writes_nothing(world)
+    case Doc.Back{+text, +fs, +why}:
+      DPF.says_quiet(Doc.notes(why, text, fs, world))

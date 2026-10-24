@@ -18,6 +18,10 @@
 #
 # A name the lock records is asked about too: the file bend reads its hash
 # from, `$BEND_LIB/names/<nv>` (`Named`), as it is, or that there is none.
+#
+# A workspace member's package (EZ-WS-8) is asked about as the committed
+# `.bend` files (`Tree`), answered the way `ez lock` lists them, and the
+# planner walks the member from its entry over them itself.
 import Base
 import ../toml/toml.bend as T
 import ../lock/lock.bend as L
@@ -30,6 +34,7 @@ type Ask is Data:
   Git{hash: String, ask: Up.Ask}   # a checkout at the pinned rev (`Up.Clone`)
   Hub{ask: W.Ask}                  # the hub's manifest and every file it names (`W.Pkg`)
   Named{nv: String}                # the file BEND_LIB/names/<nv>, as it is
+  Tree{hash: String, entry: String}  # the committed files, a member's package walked over them
 
 # the answer to one question: a manifest and the texts of the files it
 # names, what a clone answered, or a names file's text, None when there is
@@ -38,6 +43,7 @@ type Answer is Data:
   Read{answer: W.Answer}           # Laid, Hub
   Said{answer: Up.Answer}          # Git
   Held{got: Maybe<&2, String>}     # Named
+  Seen{listing: W.Listing}         # Tree
 
 # one question, answered
 type Reply is Data:
@@ -110,6 +116,8 @@ def key(ask: Ask) -> String:
       hub.key(q)
     case Named{nv}:
       "named\n" ++ nv
+    case Tree{hash, _entry}:
+      "tree\n" ++ hash
 
 # an answer looked up, or none yet
 type Heard is Data:

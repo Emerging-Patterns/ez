@@ -10,6 +10,12 @@
 # are relative to the package's own root: the entry file's directory, unless a
 # module of it was reached through `..` and re-rooted the package above that.
 #
+# A workspace member's package (`kind = "member"`) is the committed tree: its
+# files are taken from the workspace the lock sits at the root of, under the
+# directory the lock records, and each is checked against its sum as a git
+# package's is. The lock has to be a file of that workspace, so pass it as a
+# path into the source tree (`./ez.lock.toml`), not as a copy of its text.
+#
 # Every name the lock's `[names]` table records is laid as `ez fetch` lays it:
 # `names/<name>@<version>` holding the `0x` hash and a newline, the file bend
 # reads a named import's hash from, so a package that imports another by its
@@ -47,11 +53,13 @@ let
     hash = source.narHash;
   };
 
-  pkg = hash: entry:
-    let files = entry.files; in
-    if entry.source.kind == "git" then ''
+  # the workspace a member's package is taken from: the directory the lock is in
+  workspace = dirOf lockFile;
+
+  # one package's files copied from a tree, each checked against the lock
+  copied = hash: from: files: ''
       mkdir -p "$out/${hash}"
-      from=${gitSrc hash entry.source}/${entry.source.root}
+      from=${from}
       ${lib.concatStrings (lib.mapAttrsToList (at: sha256: ''
         mkdir -p "$out/${hash}/$(dirname ${lib.escapeShellArg at})"
         cp "$from/${at}" "$out/${hash}/${at}"
@@ -60,7 +68,15 @@ let
         [ "$got" = "${sha256}" ] || { echo "${hash}/${at}: got $got, want ${sha256}"; exit 1; }
       '') files)}
       printf '%s' ${lib.escapeShellArg (manifest files)} > "$out/${hash}/manifest"
-    '' else ''
+    '';
+
+  pkg = hash: entry:
+    let files = entry.files; in
+    if entry.source.kind == "member" then
+      copied hash "${workspace}/${entry.source.path}" files
+    else if entry.source.kind == "git" then
+      copied hash "${gitSrc hash entry.source}/${entry.source.root}" files
+    else ''
       ${lib.concatStrings (lib.mapAttrsToList (at: sha256: ''
         mkdir -p "$out/${hash}/$(dirname ${lib.escapeShellArg at})"
         cp ${hubFile hash at sha256} "$out/${hash}/${at}"

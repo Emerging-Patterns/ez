@@ -2,7 +2,7 @@
 
 ## Draft Status
 
-State: Accepted. Nothing here changes ez yet. The rows are in `SPEC.md` as EZ-WS-1 to EZ-WS-9, all pending, and the work packages below land them.
+State: Implemented. The rows are in `SPEC.md` as EZ-WS-1 to EZ-WS-9, all proved, and every work package below has landed.
 
 This is the design for workspaces in the style of uv's: one repository holding several ez packages, sharing one lock, one `BEND_LIB` and one pin per git source, where one package can depend on another in the same repository. It follows the planner pattern of [ez-lock-planner.md](ez-lock-planner.md) and [ez-add-planner.md](ez-add-planner.md): every decision below is a pure function a law can reach, and the interpreter gains only the reads it needs to answer new questions.
 
@@ -122,6 +122,8 @@ On a fresh clone, every import already names the hash the committed tree walks t
 
 `ez doctor` runs its drift check per member, each member's import lines against its own ledger, because a dependency is declared where it is used. It judges the root lock as EZ-VEN-6 does, over every member's ledger, and reports a member whose committed tree no longer walks to the hash the lock records.
 
+**Update (W8):** `ez fetch` asks for a member's package as the committed `.bend` files, a new question the interpreter answers the way `ez lock` lists them, and the fetch planner walks the member from its entry over them itself (`fetch_member_asks_tree`, `fetch_member_walks`). A walk that hashes to the lock's hash arrives as the files it walked and is judged against the lock's sums as any tree is (`fetch_member_same`, `fetch_lays_the_lock`); one that hashes to another is refused naming the member (`fetch_member_moved`), and a refusal lays nothing (`fetch_member_stops`, `fetch_refusal_writes_nothing`). A tree BEND_LIB already holds that passes the lock's check is kept, as it always was. The nix BEND_LIB builder lays a member's files from the workspace the lock sits in, checking each against its sum as it does a git package's, so a workspace builds in the sandbox from its lock alone. `ez doctor` at a root (`src/ws/doctor.bend`) judges the joint ledger, the text `ez lock` plans from (`doc_judges_joint`), so its ledger, lock, library and lock-check lines are the doctor's own over the whole workspace (`doc_lines`); in place of the one drift report it says each member's, over the files under its directory, or for the root those under none (`doc_member_file`, `doc_other_file`, `doc_root_file`), against the member's own ledger with each section resolved and every member that publishes under a name counting as named (`doc_member_drift`, `doc_drift_lines`), and a line for each member whose walk the lock records another hash for (`doc_member_moved`, `doc_member_same`, `doc_member_walks`). Any problem fails the command (`doc_fails_on_problem`, `doc_passes_when_fine`) and it writes nothing (`doc_writes_nothing`); for a project of its own the plan is the one it always made (`doc_alone`). On the binary, `ez fetch` from `libs/c` with `.ez` removed laid both members the root lock records from the committed tree and `libs/c` ran; with `libs/a` edited and committed and no new lock it refused naming `libs/a` and both hashes, and laid nothing; the nix builder built the same BEND_LIB from the lock and `libs/c` ran against it. `ez doctor` said every member's line with nothing to report and exited 0; with an unused section in `libs/a` and `libs/a` edited, it reported the section, `libs/a`'s move, and `libs/b`'s import of the old hash, and exited 1; on ez's own repository, no workspace, it said what it always says.
+
 ## Work packages
 
 | WP | Lands | Rows |
@@ -133,7 +135,7 @@ On a fresh clone, every import already names the hash the committed tree walks t
 | W5 (landed) | `workspace = true` sources (a `Member` constructor of `M.Source`); the lock walks each member and lays it | EZ-WS-5 |
 | W6 (landed) | Named members resolved before the ledger, the lock and the hub; EZ-HUB-1 and EZ-HUB-2 reworded | EZ-WS-6 |
 | W7 (landed) | Moved hash members refused by a plain lock and rewritten by the upgrade | EZ-WS-7 |
-| W8 | `ez fetch` and `ez doctor` over a workspace | EZ-WS-8, EZ-WS-9 |
+| W8 (landed) | `ez fetch` and `ez doctor` over a workspace | EZ-WS-8, EZ-WS-9 |
 
 W1 and W2 come first, since every later package needs the member set and the root. W5 adds a constructor to `M.Source`, which every match on a source has to handle, so it lands before W6 and W7 and after W4, whose check is over git sources only.
 

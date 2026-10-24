@@ -21,6 +21,7 @@ import ../ledger/manifest.bend as M
 import ../pkg/path.bend as P
 import ../pkg/pkg.bend as K
 import ../lock/world.bend as LW
+import ./doctor.bend as Doc
 
 # what the search found, and the top of the checkout it searched from
 type Searched is Data:
@@ -347,3 +348,34 @@ def lock.path() -> IO(String):
   do IO<String>:
     st : Searched <- search()
     return lock.searched(st)
+
+# ---------------------------------------------------------------------------
+# `ez doctor` at a workspace root
+
+# a workspace root's ledger and every member's, read for the doctor
+def doctor.root(+text: String) -> IO(Doc.Doctored):
+  do IO<Doc.Doctored>:
+    +out : String <- Sn.exec(["git", "-c", "core.quotepath=off", "ls-files", "--", ":(glob)**/ez.toml"])
+    +fs : List<&2, J.Found> <- read.found(lines(String.lines(Sn.text(out))))
+    +bend : String <- Sn.exec(["git", "-c", "core.quotepath=off", "ls-files", "--", "*.bend"])
+    files : List<&2, K.Source> <- files.under(".", lines(String.lines(Sn.text(bend))))
+    return Doc.joint(J.joint(text, fs, files), text, fs)
+
+# what one ledger's text says, for the doctor
+def doctor.read(rd: W.Read, +text: String) -> IO(Doc.Doctored):
+  match rd:
+    case W.Lone{}:
+      IO.pure(Doc.Doctored, Doc.Doctored{Some{text}, Doc.Alone{}})
+    case W.Bad{why}:
+      IO.pure(Doc.Doctored, Doc.Doctored{Some{text}, Doc.Back{text, [], why}})
+    case W.Root{_spec}:
+      doctor.root(text)
+
+# the ledger `ez doctor` judges: ez.toml as it is, or, at a workspace root,
+# the joint ledger of the root and every member
+def doctor.ledger(led: Maybe<&2, String>) -> IO(Doc.Doctored):
+  match led:
+    case None{}:
+      IO.pure(Doc.Doctored, Doc.Doctored{None{}, Doc.Alone{}})
+    case Some{+text}:
+      doctor.read(W.spec.of(text), text)

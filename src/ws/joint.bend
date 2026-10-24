@@ -861,6 +861,56 @@ def joint.spec(rd: W.Read, +text: String, +fs: List<&2, Found>, +files: List<&2,
     case W.Root{+spec}:
       joint.members(W.members(spec, W.root.of(text), ledgers(fs)), text, fs, files)
 
+# ---------------------------------------------------------------------------
+# the members, resolved, for `ez doctor` (EZ-WS-9)
+
+# the members resolved, once each was read: the root first, as the member at
+# its own directory
+def resolved.read(rd: Read, +root: M.Manifest, +files: List<&2, K.Source>) -> Read:
+  match rd:
+    case Unread{why}:
+      Unread{why}
+    case Read{ms}:
+      +all = with.root(root, ms)
+      res.all(all, all, files)
+
+# the members resolved, once the root's ledger was read
+def resolved.root(
+  rd: M.Read,
+  +fs: List<&2, Found>,
+  +dirs: List<&2, List<&2, String>>,
+  +files: List<&2, K.Source>
+) -> Read:
+  match rd:
+    case M.Bad{why}:
+      Unread{why}
+    case M.Good{+root}:
+      resolved.read(read.all(fs, dirs), root, files)
+
+# the members resolved, once the member set is known
+def resolved.members(ms: W.Members, +text: String, +fs: List<&2, Found>, +files: List<&2, K.Source>) -> Read:
+  match ms:
+    case W.Refused{why}:
+      Unread{why}
+    case W.Members{_root, dirs}:
+      resolved.root(M.parse(text), fs, dirs, files)
+
+# the members resolved, by what the root's `[workspace]` table says
+def resolved.spec(rd: W.Read, +text: String, +fs: List<&2, Found>, +files: List<&2, K.Source>) -> Read:
+  match rd:
+    case W.Lone{}:
+      Read{[]}
+    case W.Bad{why}:
+      Unread{why}
+    case W.Root{+spec}:
+      resolved.members(W.members(spec, W.root.of(text), ledgers(fs)), text, fs, files)
+
+# every member's ledger, the root's first, with each section resolved
+# against every member, as the joint ledger resolves them before it joins
+# them; none for a project of its own
+def resolved(+text: String, +fs: List<&2, Found>, +files: List<&2, K.Source>) -> Read:
+  resolved.spec(W.spec.of(text), text, fs, files)
+
 # what a project is locked from: its own ledger when it is no workspace root,
 # the joint ledger of the root and every member when it is one, or why there
 # is none. `text` is the root's ez.toml, `fs` every other ez.toml git lists
