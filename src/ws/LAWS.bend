@@ -31,6 +31,13 @@ import ../ledger/ignore.bend as I
 import ../toml/toml.bend as T
 import ../pub/plan.bend as PP
 import ../ledger/manifest.bend as M
+import ../ledger/render.bend as Rend
+import ./relock.bend as Rel
+import ../relock/relock.bend as RL
+import ../add/world.bend as A
+import ../add/relock.bend as AR
+import ../remove/relock.bend as RR
+import ../remove/plan.bend as RP
 
 # a path every path that starts with it extends. Law vocabulary: ez never
 # calls it.
@@ -1711,3 +1718,382 @@ law doc_writes_nothing:
   for +back: Doc.Back
   for +world: DW.World
   {LP.writes(Doc.plan(back, world)) == False{} : Bool}
+
+# ---------------------------------------------------------------------------
+# `ez add` and `ez remove` in a workspace (ws/relock.bend)
+
+# LAW: an effect of the root's lock writes a file at its path from the root
+# EZ-WS-10
+law at_write:
+  for +at: String
+  for path: String
+  for text: String
+  {Rel.at.effect(at, LP.Write{path, text}) == LP.Write{P.join(at, path), text} : LP.Effect}
+
+# LAW: lays a committed tree in the root's `.ez/lib`
+# EZ-WS-10
+law at_committed:
+  for +at: String
+  for hash: String
+  for fs: List<&2, LW.Source>
+  {Rel.at.effect(at, LP.Lay{LP.Committed{}, hash, fs}) == LP.Lay{LP.Under{at}, hash, fs} : LP.Effect}
+
+# LAW: lays any other tree in BEND_LIB as it is
+# EZ-WS-10
+law at_cache:
+  for +at: String
+  for hash: String
+  for fs: List<&2, LW.Source>
+  {Rel.at.effect(at, LP.Lay{LP.Cache{}, hash, fs}) == LP.Lay{LP.Cache{}, hash, fs} : LP.Effect}
+
+# LAW: removes a committed tree from the root's `.ez/lib`
+# EZ-WS-10
+law at_drop:
+  for +at: String
+  for hash: String
+  {Rel.at.effect(at, LP.Drop{hash}) == LP.Lay{LP.Under{at}, hash, []} : LP.Effect}
+
+# LAW: and says what it says as it is
+# EZ-WS-10
+law at_say:
+  for +at: String
+  for text: String
+  {Rel.at.effect(at, LP.Say{text}) == LP.Say{text} : LP.Effect}
+
+# LAW: and writes a names file in BEND_LIB as it is
+# EZ-WS-10
+law at_name:
+  for +at: String
+  for nv: String
+  for hash: String
+  {Rel.at.effect(at, LP.Name{nv, hash}) == LP.Name{nv, hash} : LP.Effect}
+
+# LAW: the root's lock runs every effect of its plan, so, in order
+# EZ-WS-10
+law at_plan_effects:
+  for +at: String
+  for pl: LP.Plan
+  {LP.effects(Rel.at.plan(at, pl)) == Rel.at.effects(at, LP.effects(pl)) : List<&2, LP.Effect>}
+
+# LAW: and refuses exactly when its plan does
+# EZ-WS-10
+law at_plan_refuses:
+  for +at: String
+  for pl: LP.Plan
+  {RL.refuses(Rel.at.plan(at, pl)) == RL.refuses(pl) : Bool}
+
+# LAW: a ledger written at a workspace root keeps the root's `[workspace]`
+# table, written back as an upgrade writes the root's ledger
+# EZ-WS-10
+law keep_root:
+  for +old: String
+  for +text: String
+  for +spec: W.Spec
+  for +mm: M.Manifest
+  for ws: {W.spec.of(old) == W.Root{spec} : W.Read}
+  for rd: {M.parse(text) == M.Good{mm} : M.Read}
+  {Rel.keep(old, text) == U.root.text(mm, spec, W.root.of(old)) : String}
+
+# LAW: and a root with no `[workspace]` table is written as it is
+# EZ-WS-10
+law keep_lone:
+  for +old: String
+  for +text: String
+  for ws: {W.spec.of(old) == W.Lone{} : W.Read}
+  {Rel.keep(old, text) == text : String}
+
+# LAW: at the root, the command's write of ez.toml is kept so
+# EZ-WS-10
+law keep_ledger_write:
+  for +old: String
+  for text: String
+  {Rel.keep.effect(old, LP.Write{"ez.toml", text}) == LP.Write{"ez.toml", Rel.keep(old, text)} : LP.Effect}
+
+# LAW: and every other file it writes is written as it is
+# EZ-WS-10
+law keep_other_write:
+  for +old: String
+  for +path: String
+  for text: String
+  for other: {String.eq(path, "ez.toml") == False{} : Bool}
+  {Rel.keep.effect(old, LP.Write{path, text}) == LP.Write{path, text} : LP.Effect}
+
+# LAW: the command's own plan at the root is every effect so kept, ending as
+# it ends
+# EZ-WS-10
+law edit_root:
+  for +old: String
+  for es: List<&2, LP.Effect>
+  for outcome: LP.Outcome
+  {Rel.edit.at([], old, LP.Plan{es, outcome}) == LP.Plan{Rel.keep.effects(old, es), outcome} : LP.Plan}
+
+# LAW: and in a member it is the command's own plan as it is
+# EZ-WS-10
+law edit_member:
+  for hd: String
+  for tl: List<&2, String>
+  for +old: String
+  for pl: LP.Plan
+  {Rel.edit.at(hd <> tl, old, pl) == pl : LP.Plan}
+
+# LAW: the ledgers a command at the root leaves are the one it writes as the
+# root's, and every other as git lists it
+# EZ-WS-10
+law ledgers_root:
+  for +new: String
+  for +text: String
+  for +fs: List<&2, J.Found>
+  {Rel.ledgers.at([], new, text, fs) == Rel.Ledgers{new, fs} : Rel.Ledgers}
+
+# LAW: and those a command in a member leaves are the root's, and every
+# other, the member's ez.toml holding the one it writes
+# EZ-WS-10
+law ledgers_member:
+  for hd: String
+  for tl: List<&2, String>
+  for +new: String
+  for +text: String
+  for +fs: List<&2, J.Found>
+  {Rel.ledgers.at(hd <> tl, new, text, fs)
+    == Rel.Ledgers{text, Rel.put.found(fs, P.join(W.segs.text(hd <> tl), "ez.toml"), new)} : Rel.Ledgers}
+
+# LAW: a listed ez.toml at that path holds the text the command writes
+# EZ-WS-10
+law put_found_hit:
+  for +path: String
+  for was: String
+  for tl: List<&2, J.Found>
+  for +text: String
+  {Rel.put.found(J.Found{path, was} <> tl, path, text) == J.Found{path, text} <> Rel.put.found(tl, path, text)
+    : List<&2, J.Found>}
+
+# LAW: and every other holds what it held
+# EZ-WS-10
+law put_found_miss:
+  for +fp: String
+  for was: String
+  for tl: List<&2, J.Found>
+  for +path: String
+  for +text: String
+  for other: {String.eq(fp, path) == False{} : Bool}
+  {Rel.put.found(J.Found{fp, was} <> tl, path, text) == J.Found{fp, was} <> Rel.put.found(tl, path, text)
+    : List<&2, J.Found>}
+
+# LAW: the ledger the command writes is the one those ledgers hold
+# EZ-WS-10
+law ledgers_write:
+  for at: String
+  for rel: List<&2, String>
+  for +text: String
+  for fs: List<&2, J.Found>
+  for listing: LW.Listing
+  for lock: String
+  for pl: LP.Plan
+  for was: Maybe<&2, String>
+  for +new: String
+  for put: {LP.put.plan(pl, "ez.toml") == LP.Put{new} : LP.Wrote}
+  {Rel.ledgers(Rel.Rooted{at, rel, text, fs, listing, lock}, pl, was) == Rel.ledgers.at(rel, new, text, fs)
+    : Rel.Ledgers}
+
+# LAW: the lock over those ledgers is exactly the plan a plain `ez lock` at the
+# root makes: on the joint ledger, with what an upgrade needs to write each
+# ledger back, and on a plain lock's World at the root's directory holding the
+# members' answers ahead of the rest
+# EZ-WS-10
+law lock_root_plain:
+  for +at: String
+  for rel: List<&2, String>
+  for was: String
+  for found: List<&2, J.Found>
+  for +listing: LW.Listing
+  for +lock: String
+  for +text: String
+  for +fs: List<&2, J.Found>
+  for rs: List<&2, LW.Reply>
+  for +spec: W.Spec
+  for +mm: M.Manifest
+  for ws: {W.spec.of(text) == W.Root{spec} : W.Read}
+  for jj: {J.joint(text, fs, J.files(listing)) == J.Joint{mm} : J.Joint}
+  {Rel.lock.plan(Rel.lock.of(Rel.Ledgers{text, fs}, Rel.Rooted{at, rel, was, found, listing, lock}, rs))
+    == U.plan(U.Back{text, spec, fs, lock}, LW.World{LW.Args{False{}, "", at}, Some{Rend.show(mm)}, listing,
+      List.append(&2, LW.Reply, J.seeds(J.Joint{mm}, J.files(listing)), rs), []}) : LP.Plan}
+
+# LAW: and when those ledgers cannot be joined it refuses with why, with no
+# effect
+# EZ-WS-10
+law lock_root_clash:
+  for +at: String
+  for rel: List<&2, String>
+  for was: String
+  for found: List<&2, J.Found>
+  for +listing: LW.Listing
+  for +lock: String
+  for +text: String
+  for +fs: List<&2, J.Found>
+  for rs: List<&2, LW.Reply>
+  for +spec: W.Spec
+  for +why: String
+  for ws: {W.spec.of(text) == W.Root{spec} : W.Read}
+  for jj: {J.joint(text, fs, J.files(listing)) == J.Clash{why} : J.Joint}
+  {Rel.lock.plan(Rel.lock.of(Rel.Ledgers{text, fs}, Rel.Rooted{at, rel, was, found, listing, lock}, rs))
+    == LP.Plan{[], LP.Refused{why}} : LP.Plan}
+
+# LAW: as it does when the root's `[workspace]` table cannot be read
+# EZ-WS-10
+law lock_root_bad:
+  for +at: String
+  for rel: List<&2, String>
+  for was: String
+  for found: List<&2, J.Found>
+  for +listing: LW.Listing
+  for +lock: String
+  for +text: String
+  for +fs: List<&2, J.Found>
+  for rs: List<&2, LW.Reply>
+  for +why: String
+  for ws: {W.spec.of(text) == W.Bad{why} : W.Read}
+  {Rel.lock.plan(Rel.lock.of(Rel.Ledgers{text, fs}, Rel.Rooted{at, rel, was, found, listing, lock}, rs))
+    == LP.Plan{[], LP.Refused{why}} : LP.Plan}
+
+# LAW: `ez add` in a workspace locks the ledgers its own plan leaves, with the
+# answers it has for the lock ahead of the lock's own
+# EZ-WS-10
+law add_ws_locks_what_it_writes:
+  for +root: Rel.Rooted
+  for +aw: A.World
+  for listing: LW.Listing
+  for locks: List<&2, LW.Reply>
+  {Rel.add.lock(root, AR.World{aw, listing, locks}) == Rel.lock.of(Rel.ledgers(root, Rel.add.edit(root, aw),
+    A.ledger(aw)), root, List.append(&2, LW.Reply, AR.seeds(aw), locks)) : Rel.Lock}
+
+# LAW: `ez add` in a workspace that succeeds runs the add's effects as the
+# workspace runs them, then the note, then exactly the effects of that lock,
+# each written from the root
+# EZ-WS-10
+law add_ws_runs_add_then_lock:
+  for +root: Rel.Rooted
+  for +w: AR.World
+  for ok: {RL.refuses(Rel.add.plan(root, w)) == False{} : Bool}
+  {LP.effects(Rel.add.plan(root, w)) == List.append(&2, LP.Effect, LP.effects(Rel.add.edit(root, AR.add(w))),
+    List.append(&2, LP.Effect, Rel.add.notes(Rel.add.lock(root, w), AR.add(w)),
+      LP.effects(Rel.at.plan(Rel.rooted.at(root), Rel.lock.plan(Rel.add.lock(root, w))))))
+    : List<&2, LP.Effect>}
+
+# LAW: when that lock refuses, `ez add` refuses
+# EZ-WS-10
+law add_ws_refuses_with_lock:
+  for +root: Rel.Rooted
+  for +w: AR.World
+  for r: {RL.refuses(Rel.lock.plan(Rel.add.lock(root, w))) == True{} : Bool}
+  {RL.refuses(Rel.add.plan(root, w)) == True{} : Bool}
+
+# LAW: `ez add` in a workspace that refuses writes, lays and removes nothing
+# EZ-WS-10
+# EZ-OUT-2
+law add_ws_refusal_writes_nothing:
+  for +root: Rel.Rooted
+  for +w: AR.World
+  for r: {RL.refuses(Rel.add.plan(root, w)) == True{} : Bool}
+  {LP.writes(Rel.add.plan(root, w)) == False{} : Bool}
+
+# LAW: and ends with the status of whether it refuses
+# EZ-OUT-1
+law add_ws_exits_as_it_refuses:
+  for +root: Rel.Rooted
+  for +w: AR.World
+  {LP.code(Rel.add.plan(root, w)) == LP.status.of(RL.refuses(Rel.add.plan(root, w))) : U32}
+
+# LAW: the note says whether the root's lock holds the package added
+# EZ-WS-10
+law add_ws_notes:
+  for back: U.Back
+  for +world: LW.World
+  for +aw: A.World
+  {Rel.add.notes(Rel.Lock{back, world}, aw) == AR.notes.of(AR.held(LP.packs(world), AR.added(aw)), AR.added(aw))
+    : List<&2, LP.Effect>}
+
+# LAW: in a project of its own `ez add` runs the plan EZ-DOC-6 says
+# EZ-WS-10
+law add_own:
+  for +w: AR.World
+  {Rel.add.planned(Rel.Own{}, w) == AR.plan(w) : LP.Plan}
+
+# LAW: and asks what it asks
+# EZ-WS-10
+law add_own_next:
+  for +w: AR.World
+  {Rel.add.next(Rel.Own{}, w) == AR.next(w) : AR.Next}
+
+# LAW: and in a workspace, the add and the root's lock
+# EZ-WS-10
+law add_inside:
+  for +root: Rel.Rooted
+  for +w: AR.World
+  {Rel.add.planned(Rel.Inside{root}, w) == Rel.add.plan(root, w) : LP.Plan}
+
+# LAW: `ez remove` in a workspace locks the ledgers its own plan leaves
+# EZ-WS-10
+law remove_ws_locks_what_it_writes:
+  for +root: Rel.Rooted
+  for +rw: RP.World
+  for here: String
+  for listing: LW.Listing
+  for locks: List<&2, LW.Reply>
+  {Rel.remove.lock(root, RR.World{rw, here, listing, locks}) == Rel.lock.of(Rel.ledgers(root,
+    Rel.remove.edit(root, rw), RR.ledger.was(rw)), root, locks) : Rel.Lock}
+
+# LAW: `ez remove` in a workspace that succeeds runs the remove's effects as
+# the workspace runs them, then exactly the effects of that lock, each
+# written from the root
+# EZ-WS-10
+law remove_ws_runs_remove_then_lock:
+  for +root: Rel.Rooted
+  for +w: RR.World
+  for ok: {RL.refuses(Rel.remove.plan(root, w)) == False{} : Bool}
+  {LP.effects(Rel.remove.plan(root, w)) == List.append(&2, LP.Effect,
+    LP.effects(Rel.remove.edit(root, RR.remove(w))),
+    LP.effects(Rel.at.plan(Rel.rooted.at(root), Rel.lock.plan(Rel.remove.lock(root, w))))) : List<&2, LP.Effect>}
+
+# LAW: when that lock refuses, `ez remove` refuses
+# EZ-WS-10
+law remove_ws_refuses_with_lock:
+  for +root: Rel.Rooted
+  for +w: RR.World
+  for r: {RL.refuses(Rel.lock.plan(Rel.remove.lock(root, w))) == True{} : Bool}
+  {RL.refuses(Rel.remove.plan(root, w)) == True{} : Bool}
+
+# LAW: `ez remove` in a workspace that refuses writes, lays and removes
+# nothing
+# EZ-WS-10
+# EZ-OUT-2
+law remove_ws_refusal_writes_nothing:
+  for +root: Rel.Rooted
+  for +w: RR.World
+  for r: {RL.refuses(Rel.remove.plan(root, w)) == True{} : Bool}
+  {LP.writes(Rel.remove.plan(root, w)) == False{} : Bool}
+
+# LAW: and ends with the status of whether it refuses
+# EZ-OUT-1
+law remove_ws_exits_as_it_refuses:
+  for +root: Rel.Rooted
+  for +w: RR.World
+  {LP.code(Rel.remove.plan(root, w)) == LP.status.of(RL.refuses(Rel.remove.plan(root, w))) : U32}
+
+# LAW: in a project of its own `ez remove` runs the plan EZ-DOC-6 says
+# EZ-WS-10
+law remove_own:
+  for +w: RR.World
+  {Rel.remove.planned(Rel.Own{}, w) == RR.plan(w) : LP.Plan}
+
+# LAW: and asks what it asks
+# EZ-WS-10
+law remove_own_next:
+  for +w: RR.World
+  {Rel.remove.next(Rel.Own{}, w) == RR.next(w) : RR.Next}
+
+# LAW: and in a workspace, the remove and the root's lock
+# EZ-WS-10
+law remove_inside:
+  for +root: Rel.Rooted
+  for +w: RR.World
+  {Rel.remove.planned(Rel.Inside{root}, w) == Rel.remove.plan(root, w) : LP.Plan}

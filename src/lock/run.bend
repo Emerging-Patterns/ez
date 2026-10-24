@@ -613,6 +613,8 @@ def place(+lib: String, pl: Plan.Place) -> String:
       ".ez/lib"
     case Plan.Cache{}:
       lib
+    case Plan.Under{dir}:
+      dir ++ "/.ez/lib"
 
 # one effect
 def exec(+lib: String, effect: Plan.Effect) -> IO(Unit):

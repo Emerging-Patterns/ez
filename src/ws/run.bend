@@ -22,6 +22,7 @@ import ../pkg/path.bend as P
 import ../pkg/pkg.bend as K
 import ../lock/world.bend as LW
 import ./doctor.bend as Doc
+import ./relock.bend as Rel
 
 # what the search found, and the top of the checkout it searched from
 type Searched is Data:
@@ -337,6 +338,72 @@ def add.ref(+home: String, +target: String, +ref: String) -> IO(String):
     st : Searched <- search()
     add.searched(st, home, target, ref)
 
+
+# ---------------------------------------------------------------------------
+# what `ez add` and `ez remove` read of the root
+
+# every listed file under a directory, read, as the lock takes it
+def sources.under(+dir: String, ps: List<&2, String>) -> IO(List<&2, LW.Source>):
+  match ps:
+    case []:
+      IO.pure(List<&2, LW.Source>, [])
+    case +hd <> tl:
+      do IO<List<&2, LW.Source>>:
+        mm : Maybe<&2, String> <- F.read(dir ++ "/" ++ hd)
+        rest : List<&2, LW.Source> <- sources.under(dir, tl)
+        return LW.Source{hd, F.text_of(mm)} <> rest
+
+# the `.bend` files git lists under a directory, once it listed them
+def listing.listed(ok: Bool, +dir: String, +out: String) -> IO(LW.Listing):
+  match ok:
+    case True{}:
+      do IO<LW.Listing>:
+        fs : List<&2, LW.Source> <- sources.under(dir, lines(String.lines(out)))
+        return LW.Listed{fs}
+    case False{}:
+      IO.pure(LW.Listing, LW.Unlisted{
+        "ez: ez lock reads the .bend files git tracks, and git could not list them: " ++ String.trim(out)})
+
+# every `.bend` file git tracks under a directory, with its text, each path
+# from it, as `ez lock` run there lists them
+def listing.at(+dir: String) -> IO(LW.Listing):
+  do IO<LW.Listing>:
+    +out : String <- Sn.exec(["git", "-C", dir, "-c", "core.quotepath=off", "ls-files", "--", "*.bend"])
+    listing.listed(Sn.ok(out), dir, Sn.text(out))
+
+# what a command run at `rel` from the root at `at` reads of the root: its
+# ledger, every ez.toml and `.bend` file git lists under it, and its lock
+def rooted(+at: String, rel: List<&2, String>) -> IO(Rel.Rooted):
+  do IO<Rel.Rooted>:
+    mm : Maybe<&2, String> <- F.read(at ++ "/ez.toml")
+    +out : String <- Sn.exec(["git", "-C", at, "-c", "core.quotepath=off", "ls-files", "--",
+      ":(glob)**/ez.toml"])
+    fs : List<&2, J.Found> <- read.under(at, lines(String.lines(Sn.text(out))))
+    ls : LW.Listing <- listing.at(at)
+    lk : Maybe<&2, String> <- F.read(at ++ "/ez.lock.toml")
+    return Rel.Rooted{at, rel, F.text_of(mm), fs, ls, F.text_of(lk)}
+
+# where `ez add` or `ez remove` runs, in what the search found
+def ws.found(+top: String, found: R.Found) -> IO(Rel.Ws):
+  match found:
+    case R.Within{root, rel}:
+      do IO<Rel.Ws>:
+        rt : Rel.Rooted <- rooted(P.join(top, W.segs.text(root)), rel)
+        return Rel.Inside{rt}
+    case _:
+      IO.pure(Rel.Ws, Rel.Own{})
+
+# and once the search was made
+def ws.searched(st: Searched) -> IO(Rel.Ws):
+  Searched{+top, found} = st
+  ws.found(top, found)
+
+# where `ez add` or `ez remove` runs: in a project of its own, or in a
+# workspace, with what it reads of the root (EZ-WS-10)
+def relock.ws() -> IO(Rel.Ws):
+  do IO<Rel.Ws>:
+    st : Searched <- search()
+    ws.searched(st)
 
 # the lock, once the search was made
 def lock.searched(st: Searched) -> String:

@@ -707,10 +707,13 @@ def decide(ins: W.Inputs) -> Doc:
 # the plan
 
 # where a package is laid: `.ez/lib`, which is committed for a vendored
-# dependency, or `$BEND_LIB`, which is a cache
+# dependency, `$BEND_LIB`, which is a cache, or `<dir>/.ez/lib`, the committed
+# trees of the workspace root at `dir`, where `ez add` and `ez remove` in a
+# workspace lay the root lock's (ws/relock.bend)
 type Place is Data:
   Committed{}
   Cache{}
+  Under{dir: String}
 
 # one thing the interpreter does. A `Lay` writes each file under
 # `<place>/<hash>`, in order; the manifest comes last, so a tree that has one

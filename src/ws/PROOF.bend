@@ -33,6 +33,13 @@ import ../lock/world.bend as LW
 import ../lock/plan.bend as LP
 import ../lock/LAWS.bend as LL
 import ../lock/PROOF.bend as LPF
+import ./relock.bend as Rel
+import ../relock/relock.bend as RL
+import ../relock/PROOF.bend as Rp
+import ../add/world.bend as A
+import ../add/relock.bend as AR
+import ../remove/relock.bend as RR
+import ../remove/plan.bend as RP
 import ./LAWS.bend as Laws
 
 # a cut at the last segment, by induction on the segments before it: the
@@ -1851,3 +1858,203 @@ def Laws.doc_writes_nothing(back, world):
       DL.doctor_writes_nothing(world)
     case Doc.Back{+text, +fs, +why}:
       DPF.says_quiet(Doc.notes(why, text, fs, world))
+
+# ---------------------------------------------------------------------------
+# `ez add` and `ez remove` in a workspace
+
+def Laws.at_write(_at, _path, _text):
+  {==}
+
+def Laws.at_committed(_at, _hash, _fs):
+  {==}
+
+def Laws.at_cache(_at, _hash, _fs):
+  {==}
+
+def Laws.at_drop(_at, _hash):
+  {==}
+
+def Laws.at_say(_at, _text):
+  {==}
+
+def Laws.at_name(_at, _nv, _hash):
+  {==}
+
+def Laws.at_plan_effects(_at, pl):
+  match pl:
+    case LP.Plan{_es, _o}:
+      {==}
+
+def Laws.at_plan_refuses(_at, pl):
+  match pl:
+    case LP.Plan{_es, o}:
+      match o:
+        case LP.Success{}:
+          {==}
+        case LP.Refused{_why}:
+          {==}
+
+def Laws.keep_root(old, text, spec, mm, ws, rd):
+  %Equal.sym(W.Read, W.spec.of(old), W.Root{spec}, ws)
+    : {Rel.keep.read(_, old, text) == U.root.text(mm, spec, W.root.of(old)) : String}
+  %Equal.sym(M.Read, M.parse(text), M.Good{mm}, rd)
+    : {Rel.keep.parsed(_, spec, W.root.of(old), text) == U.root.text(mm, spec, W.root.of(old)) : String}
+  {==}
+
+def Laws.keep_lone(old, text, ws):
+  %Equal.sym(W.Read, W.spec.of(old), W.Lone{}, ws) : {Rel.keep.read(_, old, text) == text : String}
+  {==}
+
+def Laws.keep_ledger_write(_old, _text):
+  {==}
+
+def Laws.keep_other_write(old, path, text, other):
+  %Equal.sym(Bool, String.eq(path, "ez.toml"), False{}, other)
+    : {Rel.keep.write(_, old, path, text) == LP.Write{path, text} : LP.Effect}
+  {==}
+
+def Laws.edit_root(_old, _es, _outcome):
+  {==}
+
+def Laws.edit_member(_hd, _tl, _old, _pl):
+  {==}
+
+def Laws.ledgers_root(_new, _text, _fs):
+  {==}
+
+def Laws.ledgers_member(_hd, _tl, _new, _text, _fs):
+  {==}
+
+def Laws.put_found_hit(path, was, tl, text):
+  %Equal.sym(Bool, String.eq(path, path), True{}, Eq.string_eq_self(path))
+    : {Rel.put.pick(_, path, was, text, Rel.put.found(tl, path, text))
+      == J.Found{path, text} <> Rel.put.found(tl, path, text) : List<&2, J.Found>}
+  {==}
+
+def Laws.put_found_miss(fp, was, tl, path, text, other):
+  %Equal.sym(Bool, String.eq(fp, path), False{}, other)
+    : {Rel.put.pick(_, fp, was, text, Rel.put.found(tl, path, text))
+      == J.Found{fp, was} <> Rel.put.found(tl, path, text) : List<&2, J.Found>}
+  {==}
+
+def Laws.ledgers_write(_at, rel, text, fs, _listing, _lock, pl, was, new, put):
+  %Equal.sym(LP.Wrote, LP.put.plan(pl, "ez.toml"), LP.Put{new}, put)
+    : {Rel.ledgers.at(rel, Rel.new.of(RL.ledger.of(_, was)), text, fs) == Rel.ledgers.at(rel, new, text, fs)
+      : Rel.Ledgers}
+  {==}
+
+def Laws.lock_root_plain(at, _rel, _was, _found, listing, lock, text, fs, rs, spec, mm, ws, jj):
+  %Equal.sym(W.Read, W.spec.of(text), W.Root{spec}, ws)
+    : {Rel.lock.plan(Rel.lock.read(_, at, text, fs, listing, lock, rs))
+      == U.plan(U.Back{text, spec, fs, lock}, LW.World{LW.Args{False{}, "", at}, Some{Rend.show(mm)}, listing,
+      List.append(&2, LW.Reply, J.seeds(J.Joint{mm}, J.files(listing)), rs), []}) : LP.Plan}
+  %Equal.sym(J.Joint, J.joint(text, fs, J.files(listing)), J.Joint{mm}, jj)
+    : {Rel.lock.plan(Rel.lock.joint(_, at, text, spec, fs, listing, lock, rs))
+      == U.plan(U.Back{text, spec, fs, lock}, LW.World{LW.Args{False{}, "", at}, Some{Rend.show(mm)}, listing,
+      List.append(&2, LW.Reply, J.seeds(J.Joint{mm}, J.files(listing)), rs), []}) : LP.Plan}
+  {==}
+
+def Laws.lock_root_clash(at, _rel, _was, _found, listing, lock, text, fs, rs, spec, why, ws, jj):
+  %Equal.sym(W.Read, W.spec.of(text), W.Root{spec}, ws)
+    : {Rel.lock.plan(Rel.lock.read(_, at, text, fs, listing, lock, rs)) == LP.Plan{[], LP.Refused{why}} : LP.Plan}
+  %Equal.sym(J.Joint, J.joint(text, fs, J.files(listing)), J.Clash{why}, jj)
+    : {Rel.lock.plan(Rel.lock.joint(_, at, text, spec, fs, listing, lock, rs)) == LP.Plan{[], LP.Refused{why}}
+      : LP.Plan}
+  {==}
+
+def Laws.lock_root_bad(at, _rel, _was, _found, listing, lock, text, fs, rs, why, ws):
+  %Equal.sym(W.Read, W.spec.of(text), W.Bad{why}, ws)
+    : {Rel.lock.plan(Rel.lock.read(_, at, text, fs, listing, lock, rs)) == LP.Plan{[], LP.Refused{why}} : LP.Plan}
+  {==}
+
+def Laws.add_ws_locks_what_it_writes(_root, _aw, _listing, _locks):
+  {==}
+
+def Laws.add_ws_runs_add_then_lock(root, w, ok):
+  match w:
+    case AR.World{+a, +listing, +locks}:
+      Rp.join_effects(Rel.add.edit(root, a),
+        Rel.at.plan(Rel.rooted.at(root), Rel.lock.plan(Rel.add.lock(root, AR.World{a, listing, locks}))),
+        Rel.add.notes(Rel.add.lock(root, AR.World{a, listing, locks}), a), AR.tail(a), ok)
+
+# LAW: the root's lock plan, from the root, refuses when the plan does
+law at_plan_refused:
+  for +at: String
+  for pl: LP.Plan
+  for r: {RL.refuses(pl) == True{} : Bool}
+  {RL.refuses(Rel.at.plan(at, pl)) == True{} : Bool}
+
+def at_plan_refused(at, pl, r):
+  match pl:
+    case LP.Plan{es, o}:
+      match o:
+        case LP.Success{}:
+          Eq.bit.absurd(&2, {RL.refuses(Rel.at.plan(at, LP.Plan{es, LP.Success{}})) == True{} : Bool}, r)
+        case LP.Refused{_why}:
+          {==}
+
+def Laws.add_ws_refuses_with_lock(root, w, r):
+  match w:
+    case AR.World{+a, +listing, +locks}:
+      +lk = Rel.lock.plan(Rel.add.lock(root, AR.World{a, listing, locks}))
+      Rp.join_refuses_lock(Rel.add.edit(root, a), Rel.at.plan(Rel.rooted.at(root), lk),
+        Rel.add.notes(Rel.add.lock(root, AR.World{a, listing, locks}), a), AR.tail(a),
+        at_plan_refused(Rel.rooted.at(root), lk, r))
+
+def Laws.add_ws_refusal_writes_nothing(root, w, r):
+  match w:
+    case AR.World{+a, +listing, +locks}:
+      Rp.join_quiet(Rel.add.edit(root, a),
+        Rel.at.plan(Rel.rooted.at(root), Rel.lock.plan(Rel.add.lock(root, AR.World{a, listing, locks}))),
+        Rel.add.notes(Rel.add.lock(root, AR.World{a, listing, locks}), a), AR.tail(a), r)
+
+def Laws.add_ws_exits_as_it_refuses(root, w):
+  Rp.join_code(Rel.add.plan(root, w))
+
+def Laws.add_ws_notes(_back, _world, _aw):
+  {==}
+
+def Laws.add_own(_w):
+  {==}
+
+def Laws.add_own_next(_w):
+  {==}
+
+def Laws.add_inside(_root, _w):
+  {==}
+
+def Laws.remove_ws_locks_what_it_writes(_root, _rw, _here, _listing, _locks):
+  {==}
+
+def Laws.remove_ws_runs_remove_then_lock(root, w, ok):
+  match w:
+    case RR.World{+r, +here, +listing, +locks}:
+      Rp.join_effects(Rel.remove.edit(root, r),
+        Rel.at.plan(Rel.rooted.at(root), Rel.lock.plan(Rel.remove.lock(root, RR.World{r, here, listing, locks}))),
+        [], RR.tail(), ok)
+
+def Laws.remove_ws_refuses_with_lock(root, w, rf):
+  match w:
+    case RR.World{+r, +here, +listing, +locks}:
+      +lk = Rel.lock.plan(Rel.remove.lock(root, RR.World{r, here, listing, locks}))
+      Rp.join_refuses_lock(Rel.remove.edit(root, r), Rel.at.plan(Rel.rooted.at(root), lk), [], RR.tail(),
+        at_plan_refused(Rel.rooted.at(root), lk, rf))
+
+def Laws.remove_ws_refusal_writes_nothing(root, w, rf):
+  match w:
+    case RR.World{+r, +here, +listing, +locks}:
+      Rp.join_quiet(Rel.remove.edit(root, r),
+        Rel.at.plan(Rel.rooted.at(root), Rel.lock.plan(Rel.remove.lock(root, RR.World{r, here, listing, locks}))),
+        [], RR.tail(), rf)
+
+def Laws.remove_ws_exits_as_it_refuses(root, w):
+  Rp.join_code(Rel.remove.plan(root, w))
+
+def Laws.remove_own(_w):
+  {==}
+
+def Laws.remove_own_next(_w):
+  {==}
+
+def Laws.remove_inside(_root, _w):
+  {==}

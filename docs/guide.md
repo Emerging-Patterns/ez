@@ -774,7 +774,7 @@ member. With none, the directory is a project of its own, as before
 | `ez lock`, `ez lock --upgrade` | every member's ledger; writes one `ez.lock.toml` at the root |
 | `ez fetch` | the root's lock, into the root's `.ez/lib` |
 | `ez doctor` | every member, and the root's lock |
-| `ez add`, `ez remove` | the member's own ledger |
+| `ez add`, `ez remove` | the member's own ledger, then the root's `ez.lock.toml` |
 | `ez check`, `ez build`, `ez run` | the member's own entry, with `BEND_LIB` at the root's `.ez/lib` |
 | `ez publish` | the member's own package, judged against the root's lock |
 
@@ -786,6 +786,12 @@ both (EZ-WS-3, EZ-WS-4). `ez add` in a member, of a source the workspace
 already pins, takes that pin when you give no ref, and refuses any other ref,
 naming `ez lock --upgrade --package <name>`, which moves the source in every
 member's ledger at once.
+
+`ez add` and `ez remove` in a member, or at the root, write the ledger they
+act on and then the root's lock, as a plain `ez lock` at the root would
+write it, in one plan, and never a lock in the member (EZ-WS-10). When that
+lock refuses, they write nothing. A ledger written at the root keeps its
+`[workspace]` table.
 
 ### Depending on a member
 
