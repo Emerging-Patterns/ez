@@ -25,6 +25,7 @@ import ../pkg/path.bend as P
 import ../pkg/pkg.bend as K
 import ../lock/lock.bend as L
 import ../lock/world.bend as LW
+import ../pub/plan.bend as PP
 import ./workspace.bend as W
 
 # one ez.toml git lists under the root, other than the root's own: its path
@@ -429,15 +430,35 @@ def named(ms: List<&2, Member>, +name: String) -> Maybe<&2, Member>:
       named.at(String.eq(member.name(hd), name), hd, rest)
 
 # a member's package, walked, as the dependency on it: the walk's hash, the
-# entry it walked from, and the directory it writes its paths from
-def walked(got: K.Walked, +name: String, +entry: String) -> Res:
+# entry it walked from, the directory it writes its paths from, and the name
+# it is imported by, "" when it is imported by its hash
+def walked(got: K.Walked, +name: String, +entry: String, +nv: String) -> Res:
   match got:
     case K.Walked{hash, root, _fs, _sums}:
-      Got{M.Dep{name, hash, entry, M.Member{root, ""}}}
+      Got{M.Dep{name, hash, entry, M.Member{root, nv}}}
     case K.Asks{at}:
       Bad{"ez: workspace member " ++ name ++ " imports " ++ at ++ ", which git does not track"}
     case K.Refused{why}:
       Bad{why}
+
+# a member's package, by the name `ez publish` would publish it under
+# (EZ-WS-6): imported by that name when it has one, by its hash when its
+# ledger gives neither `publish-as` nor `version`, and refused when it gives
+# a name publish refuses
+def by.name(named: PP.Named, got: K.Walked, +name: String, +entry: String) -> Res:
+  match named:
+    case PP.ByHash{}:
+      walked(got, name, entry, "")
+    case PP.ByName{nv}:
+      walked(got, name, entry, nv)
+    case PP.Unnamed{why}:
+      Bad{why ++ "; workspace member " ++ name ++ " is imported by the name ez publish would give it"}
+
+# a member's package, as the dependency on it
+def member.dep(mm: M.Manifest, +dir: List<&2, String>, +name: String, +files: List<&2, K.Source>) -> Res:
+  M.Manifest{_n, ee, _b, _h, pa, pv, _ds, _ts} = mm
+  +entry = entry.at(dir, ee)
+  by.name(PP.naming(pa, pv), K.of(entry, files), name, entry)
 
 # the member a section names, once it is known whether it is the member
 # that names it
@@ -453,9 +474,7 @@ def target.at(
     case True{}:
       Bad{"ez: " ++ ledger.at(self) ++ " names " ++ name ++ " as a workspace member, and that member is itself"}
     case False{}:
-      M.Manifest{_n, ee, _b, _h, _pa, _pv, _ds, _ts} = mm
-      +entry = entry.at(dir, ee)
-      walked(K.of(entry, files), name, entry)
+      member.dep(mm, dir, name, files)
 
 # the member a section names, once it was looked for
 def target(
@@ -589,21 +608,61 @@ def res.all(xs: List<&2, Member>, +ms: List<&2, Member>, +files: List<&2, K.Sour
       rest = res.all(tl, ms, files)
       res.one(hd, ms, files, rest)
 
-# the root's ledger and the members', resolved, joined
-def res.joint(xs: List<&2, Member>) -> Joint:
+# the name `ez publish` would publish a member under, or that it has none
+def member.naming(mb: Member) -> PP.Named:
+  Member{_dir, mm} = mb
+  M.Manifest{_n, _e, _b, _h, pa, pv, _ds, _ts} = mm
+  PP.naming(pa, pv)
+
+# a member imported by name, as a dependency of the joint ledger, in front of
+# the rest; any other member adds none
+def named.one(named: PP.Named, mb: Member, +files: List<&2, K.Source>, rest: Deps) -> Deps:
+  match named:
+    case PP.ByHash{}:
+      rest
+    case PP.Unnamed{_why}:
+      rest
+    case PP.ByName{_nv}:
+      Member{+dir, +mm} = mb
+      deps.cons(member.dep(mm, dir, member.name(Member{dir, mm}), files), rest)
+
+# every member imported by name, as a dependency of the joint ledger, whether
+# or not a section names it, so that the lock resolves its name from the
+# ledger and never puts it to the hub or to the lock being rewritten
+# (EZ-WS-6). A member whose name publish refuses is imported by none, and
+# adds none.
+def names.deps(xs: List<&2, Member>, +files: List<&2, K.Source>) -> Deps:
+  match xs:
+    case []:
+      Deps{[]}
+    case +hd <> tl:
+      rest = names.deps(tl, files)
+      named.one(member.naming(hd), hd, files, rest)
+
+# the root's ledger and the members', resolved, joined, the members imported
+# by name after the root's own dependencies
+def res.joint(xs: List<&2, Member>, +ns: List<&2, M.Dep>) -> Joint:
   match xs:
     case []:
       Clash{"ez: the workspace root has no ledger"}
-    case Member{_dir, root} <> ms:
-      combine(root, ms)
+    case Member{_dir, +root} <> ms:
+      combine(with.deps(root, List.append(&2, M.Dep, deps.of(root), ns)), ms)
+
+# the members imported by name, once every ledger was resolved
+def res.named(xs: List<&2, Member>, got: Deps) -> Joint:
+  match got:
+    case Unmet{why}:
+      Clash{why}
+    case Deps{ns}:
+      res.joint(xs, ns)
 
 # the resolved ledgers joined, or why one could not be resolved
-def res.read(rd: Read) -> Joint:
+def res.read(rd: Read, got: Deps) -> Joint:
   match rd:
     case Unread{why}:
       Clash{why}
     case Read{xs}:
-      res.joint(xs)
+      res.named(xs, got)
 
 # the root, as the member at the root's own directory, ahead of the members
 def with.root(root: M.Manifest, ms: List<&2, Member>) -> List<&2, Member>:
@@ -615,7 +674,7 @@ def with.root(root: M.Manifest, ms: List<&2, Member>) -> List<&2, Member>:
 # member's are.
 def resolve(+root: M.Manifest, ms: List<&2, Member>, +files: List<&2, K.Source>) -> Joint:
   +all = with.root(root, ms)
-  res.read(res.all(all, all, files))
+  res.read(res.all(all, all, files), names.deps(all, files))
 
 # ---------------------------------------------------------------------------
 # the answers the lock reads a member's package from

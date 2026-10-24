@@ -24,6 +24,7 @@ import ../pkg/pkg.bend as K
 import ../lock/lock.bend as L
 import ../ledger/ignore.bend as I
 import ../toml/toml.bend as T
+import ../pub/plan.bend as PP
 import ../ledger/manifest.bend as M
 
 # a path every path that starts with it extends. Law vocabulary: ez never
@@ -840,7 +841,8 @@ law strs_refuses_other:
 # key, and the joint ledger holds that member's package: its hash is the `0x`
 # name of the walk from the member's entry over the committed files, with the
 # entry it walked from, as a path from the root, and the directory the walk
-# writes its paths from
+# writes its paths from; one whose ledger names it neither way is imported by
+# its hash
 # EZ-WS-5
 law member_dep_walked:
   for +name: String
@@ -863,9 +865,67 @@ law member_dep_walked:
   for ef: {J.named(ms, name) == Some{J.Member{dir, M.Manifest{nn, ee, bb, hh, pa, pv, ds, ts}}}
     : Maybe<&2, J.Member>}
   for eo: {W.segs.eq(dir, self) == False{} : Bool}
+  for en: {PP.naming(pa, pv) == PP.ByHash{} : PP.Named}
   for ew: {K.of(J.entry.at(dir, ee), files) == K.Walked{hash, root, fs, sums} : K.Walked}
   {J.dep.res(M.Dep{name, "", "", M.Member{"", ""}}, ms, self, files)
     == J.Got{M.Dep{name, hash, J.entry.at(dir, ee), M.Member{root, ""}}} : J.Res}
+
+# LAW: a member whose ledger gives `publish-as` and `version` is imported by
+# the name `ez publish` would publish it under, `<publish-as>@<version>.0`,
+# and the joint ledger records that name beside its hash
+# EZ-WS-5
+# EZ-WS-6
+law member_dep_named:
+  for +name: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for +dir: List<&2, String>
+  for nn: String
+  for +ee: String
+  for bb: String
+  for hh: String
+  for pa: String
+  for pv: String
+  for ds: List<&2, M.Dep>
+  for ts: List<&2, M.Tool>
+  for +hash: String
+  for +root: String
+  for fs: List<&2, K.Source>
+  for sums: List<&2, K.Item>
+  for ef: {J.named(ms, name) == Some{J.Member{dir, M.Manifest{nn, ee, bb, hh, pa, pv, ds, ts}}}
+    : Maybe<&2, J.Member>}
+  for eo: {W.segs.eq(dir, self) == False{} : Bool}
+  for +nv: String
+  for en: {PP.naming(pa, pv) == PP.ByName{nv} : PP.Named}
+  for ew: {K.of(J.entry.at(dir, ee), files) == K.Walked{hash, root, fs, sums} : K.Walked}
+  {J.dep.res(M.Dep{name, "", "", M.Member{"", ""}}, ms, self, files)
+    == J.Got{M.Dep{name, hash, J.entry.at(dir, ee), M.Member{root, nv}}} : J.Res}
+
+# LAW: and a section naming a member whose name publish would refuse is
+# refused with publish's reason
+# EZ-WS-6
+law member_dep_unnamed:
+  for +name: String
+  for +ms: List<&2, J.Member>
+  for +self: List<&2, String>
+  for +files: List<&2, K.Source>
+  for +dir: List<&2, String>
+  for nn: String
+  for +ee: String
+  for bb: String
+  for hh: String
+  for pa: String
+  for pv: String
+  for ds: List<&2, M.Dep>
+  for ts: List<&2, M.Tool>
+  for ef: {J.named(ms, name) == Some{J.Member{dir, M.Manifest{nn, ee, bb, hh, pa, pv, ds, ts}}}
+    : Maybe<&2, J.Member>}
+  for eo: {W.segs.eq(dir, self) == False{} : Bool}
+  for +why: String
+  for en: {PP.naming(pa, pv) == PP.Unnamed{why} : PP.Named}
+  {J.dep.res(M.Dep{name, "", "", M.Member{"", ""}}, ms, self, files)
+    == J.Bad{why ++ "; workspace member " ++ name ++ " is imported by the name ez publish would give it"} : J.Res}
 
 # LAW: the member a section names is the first whose `[package] name` is the
 # section's key
@@ -1063,8 +1123,10 @@ law resolve_refuses:
   for eu: {J.res.all(J.with.root(root, ms), J.with.root(root, ms), files) == J.Unread{why} : J.Read}
   {J.resolve(root, ms, files) == J.Clash{why} : J.Joint}
 
-# LAW: and members resolved are joined as the ledgers they resolve to
+# LAW: and members resolved are joined as the ledgers they resolve to, every
+# member imported by name a dependency after the root's own
 # EZ-WS-5
+# EZ-WS-6
 law resolve_joins:
   for +root: M.Manifest
   for +ms: List<&2, J.Member>
@@ -1072,9 +1134,51 @@ law resolve_joins:
   for dir: List<&2, String>
   for +rr: M.Manifest
   for +xs: List<&2, J.Member>
+  for +ns: List<&2, M.Dep>
   for eu: {J.res.all(J.with.root(root, ms), J.with.root(root, ms), files) == J.Read{J.Member{dir, rr} <> xs}
     : J.Read}
-  {J.resolve(root, ms, files) == J.combine(rr, xs) : J.Joint}
+  for en: {J.names.deps(J.with.root(root, ms), files) == J.Deps{ns} : J.Deps}
+  {J.resolve(root, ms, files) == J.combine(J.with.deps(rr, List.append(&2, M.Dep, J.deps.of(rr), ns)), xs)
+    : J.Joint}
+
+# LAW: a member imported by name is a dependency of the joint ledger whether
+# or not a section names it
+# EZ-WS-6
+law names_deps_named:
+  for +dir: List<&2, String>
+  for +mm: M.Manifest
+  for +xs: List<&2, J.Member>
+  for +files: List<&2, K.Source>
+  for +nv: String
+  for +dd: M.Dep
+  for +ds: List<&2, M.Dep>
+  for en: {J.member.naming(J.Member{dir, mm}) == PP.ByName{nv} : PP.Named}
+  for eg: {J.member.dep(mm, dir, J.member.name(J.Member{dir, mm}), files) == J.Got{dd} : J.Res}
+  for er: {J.names.deps(xs, files) == J.Deps{ds} : J.Deps}
+  {J.names.deps(J.Member{dir, mm} <> xs, files) == J.Deps{dd <> ds} : J.Deps}
+
+# LAW: and a member imported by its hash adds none
+# EZ-WS-6
+law names_deps_hashed:
+  for +hd: J.Member
+  for +xs: List<&2, J.Member>
+  for +files: List<&2, K.Source>
+  for en: {J.member.naming(hd) == PP.ByHash{} : PP.Named}
+  {J.names.deps(hd <> xs, files) == J.names.deps(xs, files) : J.Deps}
+
+# LAW: the lock's name table holds a named member's name with its hash, as it
+# holds a name ez.toml records, so the lock resolves it from the ledger
+# (`ledger_names_first`) and never asks the hub or the lock being rewritten
+# for it (`resolved_not_asked`)
+# EZ-WS-6
+law member_name_recorded:
+  for +nn: String
+  for +hash: String
+  for entry: String
+  for path: String
+  for +nv: String
+  for en: {String.is_empty(nv) == False{} : Bool}
+  {L.ledger.names.of([M.Dep{nn, hash, entry, M.Member{path, nv}}]) == [L.Name{nv, hash}] : List<&2, L.Name>}
 
 # LAW: the lock reads a member's package as its walk found it, fresh from the
 # committed files: one answer, under the hash the joint ledger gives it

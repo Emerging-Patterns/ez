@@ -267,6 +267,7 @@ law plain_lock_keeps_ledger:
 # holds of the workspace's lock too.
 # EZ-DOC-5
 # EZ-WS-3
+# EZ-WS-6
 law plain_lock_writes_only_lock:
   for w: W.World
   for e: {W.args.upgrade(w) == False{} : Bool}
@@ -1794,6 +1795,7 @@ law lock_names_agree:
 # LAW: a name ez.toml records resolves to the hash ez.toml records beside
 # it, whatever the answers say
 # EZ-HUB-1
+# EZ-WS-6
 law ledger_names_first:
   for +led: M.Read
   for +js: List<&2, W.Judged>
@@ -1814,6 +1816,7 @@ law lock_answer_names:
 # LAW: a name the table resolves, because ez.toml records it or the lock
 # being rewritten does, is never put to the hub
 # EZ-HUB-2
+# EZ-WS-6
 law resolved_not_asked:
   for +w: W.World
   for +nv: String
@@ -1823,6 +1826,7 @@ law resolved_not_asked:
 # LAW: a lock that is made lays a names file for every name the lock it
 # writes records, with the hash it records, and none other
 # EZ-HUB-4
+# EZ-WS-6
 law lock_lays_its_names:
   for +w: W.World
   for +t: String
