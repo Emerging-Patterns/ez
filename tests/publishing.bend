@@ -8,7 +8,7 @@
 # since a dirty tree is refused before anything is sent, or reach
 # check/liar.bend, a `bend` that uploads nothing.
 import Base
-import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
+import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/pub/plan.bend as P

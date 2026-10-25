@@ -7,7 +7,7 @@ import Base
 import 0xa4d47e5f0f6044ac1a983d1b051fa47a/main.bend as Http
 import 0xa4d47e5f0f6044ac1a983d1b051fa47a/src/client.bend as Client
 import 0xa4d47e5f0f6044ac1a983d1b051fa47a/src/url.bend as Url
-import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
+import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../io/file.bend as F
 import ./hub.bend as Hub
 

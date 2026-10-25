@@ -10,7 +10,7 @@
 # the line all the same: a status says nothing about what was checked, and
 # only that first line says every term was proved outright.
 import Base
-import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
+import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../share/args.bend as Args
 import ../share/env.bend as Env
 import ../share/cap.bend as Cap

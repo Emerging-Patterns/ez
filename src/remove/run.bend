@@ -7,7 +7,7 @@
 # (`Run.exec.plan`), which exits 1 with the reason when the plan refuses. It
 # decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
 import Base
-import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
+import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../lock/world.bend as W
