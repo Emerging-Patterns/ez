@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/Emerging-Patterns/ez/compare/v1.11.0...v1.12.0) (2026-10-25)
+
+
+### Features
+
+* **nix:** build and check on x86_64-linux, aarch64-linux and aarch64-darwin ([#155](https://github.com/Emerging-Patterns/ez/issues/155)) ([e21a5e0](https://github.com/Emerging-Patterns/ez/commit/e21a5e01cbf9b50aa0056e150ef9ef3abbd188ed))
+
 ## [1.11.0](https://github.com/Emerging-Patterns/ez/compare/v1.10.0...v1.11.0) (2026-10-25)
 
 
