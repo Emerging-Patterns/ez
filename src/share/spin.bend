@@ -5,7 +5,7 @@
 # whose imports reach foreign code, so a law may import share/say but never
 # this.
 import Base
-import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
+import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ./say.bend as Say
 
 # one fd of this process, as a path. A failure is not a terminal.

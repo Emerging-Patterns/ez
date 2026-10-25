@@ -5,7 +5,7 @@
 # through snap's foreign effect, and bend 2.0.32 fails a proof whose imports
 # reach foreign code, so a law may import git/git but never this.
 import Base
-import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
+import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../pkg/path.bend as P
 import ../sha/dump.bend as Dump
 import ../share/say.bend as Say

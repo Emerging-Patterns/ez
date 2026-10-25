@@ -6,7 +6,7 @@
 # from are the pure modules'. That it reads and runs faithfully is
 # EZ-TRUST-2. It runs programs, so no law imports it.
 import Base
-import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as Sn
+import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as Sn
 import ../io/file.bend as F
 import ../share/args.bend as Args
 import ../share/pass.bend as Pass

@@ -6,7 +6,7 @@
 # directory, and `setsid --fork` returns as soon as the child is a session of
 # its own. Nothing here goes through a shell.
 import Base
-import 0xead4c7939c9eaca8d47da53b4496b731/main.bend as R
+import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 
 # the non-empty strings, which is what a program's output amounts to once its
 # trailing newline has been counted as a line
