@@ -126,9 +126,11 @@
               nativeBuildInputs = [ ez.cc ];
             };
           };
+          # `ez` is this tree's build, so `nix develop -c ez lock --upgrade`
+          # runs here as it does in a project that depends on ez.
           devShells.default = ez.mkShell {
             src = self;
-            packages = [ bend bend-cc pkgs.git pkgs.openssl pkgs.cacert ];
+            packages = [ ezBin bend bend-cc pkgs.git pkgs.openssl pkgs.cacert ];
             # EZ_LIBSSL and SSL_CERT_FILE are what ezhttp's client needs: it
             # opens libssl by name at run time, and OpenSSL takes its trust store
             # from SSL_CERT_FILE.
