@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/Emerging-Patterns/ez/compare/v1.10.0...v1.11.0) (2026-10-25)
+
+
+### Bug Fixes
+
+* **deps:** snap v1.4.0 ([#156](https://github.com/Emerging-Patterns/ez/issues/156)) ([8319c26](https://github.com/Emerging-Patterns/ez/commit/8319c26aa01a95aabce9dcdd577c0e0980451442))
+
 ## [1.10.0](https://github.com/Emerging-Patterns/ez/compare/v1.9.0...v1.10.0) (2026-10-24)
 
 
