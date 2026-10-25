@@ -9,14 +9,32 @@ let
   lib = pkgs.lib;
   llvm = pkgs.llvmPackages_19;
 
-  # clang 19, unwrapped, with the system's ld and dynamic linker, so a GPU
-  # build can still load the system libstdc++.
-  bend-cc = pkgs.writeShellScriptBin "bend-cc" ''
-    exec ${llvm.clang-unwrapped}/bin/clang \
-      -resource-dir ${llvm.clang}/resource-root \
-      --ld-path=/usr/bin/ld \
-      -Wl,--dynamic-linker=/lib64/ld-linux-x86-64.so.2 "$@"
-  '';
+  platform = pkgs.stdenv.hostPlatform;
+
+  # The C compiler `bend -o` runs in a build: clang 19 for this system.
+  cc = llvm.clang;
+
+  # The system's dynamic linker, which a binary bend-cc links on Linux names.
+  systemLoader = {
+    x86_64 = "/lib64/ld-linux-x86-64.so.2";
+    aarch64 = "/lib/ld-linux-aarch64.so.1";
+  }.${platform.parsed.cpu.name} or (throw "bend-cc: no system dynamic linker known for ${platform.system}");
+
+  # CC for a shell. On Linux, clang 19 unwrapped, with the system's ld and
+  # dynamic linker, so a GPU build can still load the system libstdc++. On
+  # macOS, clang 19 with the SDK nixpkgs builds with.
+  bend-cc =
+    if platform.isLinux then
+      pkgs.writeShellScriptBin "bend-cc" ''
+        exec ${llvm.clang-unwrapped}/bin/clang \
+          -resource-dir ${llvm.clang}/resource-root \
+          --ld-path=/usr/bin/ld \
+          -Wl,--dynamic-linker=${systemLoader} "$@"
+      ''
+    else
+      pkgs.writeShellScriptBin "bend-cc" ''
+        exec ${cc}/bin/clang "$@"
+      '';
 
   # An ez.lock.toml as a BEND_LIB store path.
   bendLib = lock: pkgs.callPackage ./bend-lib.nix { } lock;
@@ -133,12 +151,13 @@ let
     );
 in
 rec {
-  inherit bend-cc bendLib rtsFlags;
+  inherit bend-cc bendLib rtsFlags cc;
 
   # Build the program the ledger names and wrap it onto $out/bin/<pname>.
   # PATH starts with bend. wrapFlags are appended. wrapEnv is `--set`;
   # defaultWrapEnv is `--set-default`. extraPath is appended to that PATH.
-  # extraInstall runs after the wrap (a second binary, for one).
+  # extraInstall runs after the wrap (a second binary, for one). `bend -o`
+  # compiles with `cc`, clang 19 for this system, as CC.
   mkPackage = {
     bend,
     src,
@@ -167,6 +186,7 @@ rec {
       nativeBuildInputs = [ bend ] ++ nativeBuildInputs ++ [ pkgs.makeWrapper ];
       meta = { mainProgram = name; } // meta;
       buildPhase = ''
+        export CC=${cc}/bin/clang
         bend ${lib.escapeShellArg file} -o ${lib.escapeShellArg "${name}.bin"}
       '';
       installPhase = ''
@@ -304,7 +324,7 @@ rec {
         nativeBuildInputs = [ bend pkgs.git ] ++ nativeBuildInputs;
         inherit after;
       } ''
-        export HOME=$TMPDIR/home
+        export HOME=$TMPDIR/home CC=${cc}/bin/clang
         mkdir -p "$HOME"
         cp -r ${src} src
         chmod -R u+w src

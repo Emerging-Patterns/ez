@@ -175,6 +175,22 @@ inputs.ez.url = "github:Emerging-Patterns/ez";
 pkg = inputs.ez.lib.${system}.mkPackage { inherit bend; src = self; };
 ```
 
+`bendLib` is that `BEND_LIB` tree on its own, for a build of your own:
+
+```nix
+BEND_LIB = inputs.ez.lib.${system}.bendLib ./ez.lock.toml;
+```
+
+`lib`, `packages` and `checks` are there for `x86_64-linux`,
+`aarch64-linux` and `aarch64-darwin`. To build with your own `bend` rather
+than the one ez pins, have ez follow it:
+
+```nix
+inputs.bend.url = "github:bendlang/bend";
+inputs.ez.url = "github:Emerging-Patterns/ez";
+inputs.ez.inputs.bend.follows = "bend";
+```
+
 ## More
 
 - [docs/guide.md](docs/guide.md): every command in detail: the ledger and
