@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/Emerging-Patterns/ez/compare/v1.12.0...v1.13.0) (2026-10-25)
+
+
+### Bug Fixes
+
+* **nix:** put ez on the dev shell's PATH ([#159](https://github.com/Emerging-Patterns/ez/issues/159)) ([f9ab7cd](https://github.com/Emerging-Patterns/ez/commit/f9ab7cdccfaf772b78cd400f8d27cdbcc5aa2257))
+
 ## [1.12.0](https://github.com/Emerging-Patterns/ez/compare/v1.11.0...v1.12.0) (2026-10-25)
 
 
