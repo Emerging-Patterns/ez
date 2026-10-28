@@ -196,6 +196,8 @@ inputs.ez.inputs.bend.follows = "bend";
 - [docs/guide.md](docs/guide.md): every command in detail: the ledger and
   naming, lock and upgrade, fetch and vendoring, tools, the hub, publish,
   doctor, nix, and prove and test.
+- [docs/formats.md](docs/formats.md): every key of `ez.toml` and
+  `ez.lock.toml`, and what a tool that rewrites them must keep.
 - [SPEC.md](SPEC.md): what ez guarantees, each requirement with the laws that
   prove it.
 - [docs/rfc/ez-spec.md](docs/rfc/ez-spec.md): the design, and how ez got
