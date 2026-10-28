@@ -116,6 +116,8 @@ Paths in the ledger use forward slashes, on every system: write
 The ledger is enough on its own: no command writes or reads a record of
 origins beside it (there is no `.ez/origins.toml`).
 
+[formats.md](formats.md) defines every key of `ez.toml` and `ez.lock.toml`.
+
 ### What ez will write
 
 `ez init`, `ez add`, `ez remove` and `ez lock --upgrade` write only a ledger
