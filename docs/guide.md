@@ -80,8 +80,12 @@ the vendoring allowlist needs (see [Fetch and vendoring](#fetch-and-vendoring)).
 
 ## The ledger
 
-`ez.toml` is the ledger. A ledger, and a dependency vendored from a repo that
-never published:
+`ez.toml` is the ledger. It lists each direct dependency and tool pinned to
+one exact source and hash. Reading it never picks a version: only `ez add`,
+`ez remove` and `ez lock --upgrade` change a pin, and Bend imports what the
+pin names.
+
+A ledger, and a dependency vendored from a repo that never published:
 
 ```toml
 [package]

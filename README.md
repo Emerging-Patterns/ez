@@ -149,8 +149,12 @@ ez doctor                        report on the toolchain and the project
 
 `ez help` prints that list, and `ez help test` the flags of one command.
 
-The ledger, `ez.toml`, with a dependency vendored from a repo that never
-published:
+The ledger, `ez.toml`, lists each direct dependency and tool pinned to one
+exact source and hash. Reading it never picks a version: only `ez add`,
+`ez remove` and `ez lock --upgrade` change a pin, and Bend imports what the
+pin names.
+
+A ledger, with a dependency vendored from a repo that never published:
 
 ```toml
 [package]
