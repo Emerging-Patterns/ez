@@ -587,7 +587,7 @@ law gap_of_narless_pin:
 
 # ---------------------------------------------------------------------------
 # line: the status a line exits with before any command runs (ez/line.bend).
-# ez/main.bend exits with `L.status` of `L.line` of what Shake parsed, and a
+# ez/app.bend exits with `L.status` of `L.line` of what Shake parsed, and a
 # line that names a command runs it, whose plan's end is its own status.
 
 # LAW: a request for help, `ez help` or `ez help <path>`, shows help and

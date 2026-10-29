@@ -39,11 +39,11 @@ def repo(+at: String) -> IO(Unit):
 # what ez says a file's package would be, without publishing it: the hash on
 # the first line, the directory its paths are written from on the second, then
 # the manifest. One run answers both questions, because a second `bend` over
-# `src/pkg/main.bend` would cost a whole check to learn nothing new. The check
+# `src/pkg/print.bend` would cost a whole check to learn nothing new. The check
 # report shares the stream with the answer, so the caller takes it back out.
 def ours(+here: String, +entry: String) -> IO(String):
   R.exec(["env", "BEND_LIB=" ++ here ++ "/.ez/lib", "EZ_ENTRY=" ++ entry,
-    "bend", here ++ "/src/pkg/main.bend"])
+    "bend", here ++ "/src/pkg/print.bend"])
 
 # the hash `bend --publish` mined, which is the line of its output that names a
 # package: the proof of work reports as it goes, on the same stream.
