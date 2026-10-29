@@ -6,7 +6,7 @@ How to work in this repository. It is written for coding agents, and it holds fo
 
 ez is a project manager for Bend 2, written in Bend. Each command is a pure planner (`src/<cmd>/plan.bend`) over a World (`src/<cmd>/world.bend`), run by a thin interpreter (`src/<cmd>/run.bend`). What ez guarantees is listed in `SPEC.md`. The design and its history are in `docs/rfc/ez-spec.md`. The user guide is `docs/guide.md`.
 
-The top-level `main.bend` is ez's program and the entry the hub publishes as `ezx`; it calls `src/ez/main.bend`. Every module lives under `src/`, so the package bend publishes is `main.bend`, the LICENSE beside it and what it imports under `src/`, and `main.bend`'s first line is the hub's description. No file the program reaches may import a `LAWS.bend`, a `PROOF.bend`, `src/check/` or `tests/`.
+The top-level `main.bend` is ez's program and the entry the hub publishes as `ezx`; it calls `src/ez/app.bend`. Every module lives under `src/`, so the package bend publishes is `main.bend`, the LICENSE beside it and what it imports under `src/`, and `main.bend`'s first line is the hub's description. No file the program reaches may import a `LAWS.bend`, a `PROOF.bend`, `src/check/` or `tests/`.
 
 ## Build and check
 

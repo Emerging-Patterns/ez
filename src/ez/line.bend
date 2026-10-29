@@ -2,7 +2,7 @@
 # the program, `command` names what a matched path runs, and `line` decides
 # how a parse ends: a command runs, help is shown, or the line is misused.
 # All of it is pure, so the status a line exits with before any command runs
-# is a law (EZ-OUT-1); ez/main.bend prints and exits as `line` and `status`
+# is a law (EZ-OUT-1); ez/app.bend prints and exits as `line` and `status`
 # say, and runs the command a line names, whose own end decides the rest.
 import Base
 import 0xa383b26a5a0ef35663b3615d7aedf9e3/main.bend as Shake
