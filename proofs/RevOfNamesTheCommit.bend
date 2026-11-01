@@ -1,7 +1,7 @@
 # proofs of laws/RevOfNamesTheCommit.bend
 import Base
 import ../src/ledger/manifest.bend as M
-import ../laws/FindFirst.bend as L1
+import ../laws/LookupFindsFirstDependency.bend as L1
 import ../laws/RevOfNamesTheCommit.bend as Laws
 import ./lemmas/FirstFound.bend as M1
 

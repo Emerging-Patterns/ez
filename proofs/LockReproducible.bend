@@ -5,9 +5,9 @@ import ../src/pkg/pkg.bend as K
 import ../src/lock/lock.bend as L
 import ../src/lock/world.bend as W
 import ../src/lock/up.bend as Up
-import ../laws/HubNamed.bend as L1
+import ../laws/HashPathIsHubImport.bend as L1
 import ../laws/LockReproducible.bend as Laws
-import ../laws/SpecHash.bend as L2
+import ../laws/ImportHashIsFirstComponent.bend as L2
 import ../laws/defs/Slashless.bend as D1
 import ./lemmas/ContainsSlash.bend as M1
 import ./lemmas/PlanEffectFacts.bend as M2

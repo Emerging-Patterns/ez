@@ -10,8 +10,8 @@
 # the command refuses and writes nothing. Outside a workspace it runs the plan
 # laws/AddRemoveRelock.bend says.
 #
-# also rests on: laws/AddWsRefusalWritesNothing.bend,
-# laws/RemoveWsRefusalWritesNothing.bend
+# also rests on: laws/WorkspaceAddRefusalWritesNothing.bend,
+# laws/WorkspaceRemoveRefusalWritesNothing.bend
 import Base
 import ../src/pkg/path.bend as Path
 import ../src/ledger/manifest.bend as M

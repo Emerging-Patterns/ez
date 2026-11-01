@@ -23,15 +23,15 @@ import ../../src/remove/plan.bend as RP
 import ../../src/ws/joint.bend as J
 import ../../src/ez/key.bend as KKey
 import ../../laws/LockReproducible.bend as L1
-import ../../laws/NarWhyAgrees.bend as L2
+import ../../laws/MatchingNarHashPasses.bend as L2
 import ../../laws/PlainLockWritesOnlyLock.bend as L3
 import ../../laws/PublishNeedsCleanTree.bend as L4
 import ../../laws/PublishSaysDescription.bend as L5
 import ../../laws/RemoveDependencyIdempotent.bend as L6
-import ../../laws/SkipId.bend as L7
-import ../../laws/SpecHash.bend as L8
-import ../../laws/SplitPlain.bend as L9
-import ../../laws/WithoutIdem.bend as L10
+import ../../laws/SkippedComponentChangesNothing.bend as L7
+import ../../laws/ImportHashIsFirstComponent.bend as L8
+import ../../laws/SlashlessPathSplitsToItself.bend as L9
+import ../../laws/LedgerRemoveIdempotent.bend as L10
 import ../../laws/defs/LockInputs.bend as D1
 import ../../laws/defs/Slashless.bend as D2
 

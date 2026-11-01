@@ -9,7 +9,7 @@ import ../src/lock/world.bend as W
 import ../src/lock/up.bend as Up
 import ../src/add/world.bend as A
 import ../laws/LockIgnoresWalkOrder.bend as Laws
-import ../laws/SortPerm.bend as L1
+import ../laws/SortIgnoresFileOrder.bend as L1
 import ../laws/WalkKeepsHashesDistinct.bend as L2
 import ../laws/defs/DistinctPackHashes.bend as D1
 import ../laws/defs/LockInputs.bend as D2

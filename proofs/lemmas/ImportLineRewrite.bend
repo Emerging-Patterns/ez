@@ -5,7 +5,7 @@ import ../../src/check/eq.bend as Eq
 import ../../src/check/str.bend as Str
 import ../../src/ledger/upgrade.bend as U
 import ../../src/add/world.bend as A
-import ../../laws/RewriteByLine.bend as L1
+import ../../laws/RewriteGoesLineByLine.bend as L1
 import ../../laws/RewriteKeepsOtherLines.bend as L2
 import ../../laws/defs/LockInputs.bend as D1
 import ../../laws/defs/WorldAfterLock.bend as D2

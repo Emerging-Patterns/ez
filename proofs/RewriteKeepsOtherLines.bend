@@ -6,7 +6,7 @@ import ../src/lock/plan.bend as P
 import ../src/ledger/upgrade.bend as U
 import ../src/lock/world.bend as W
 import ../src/lock/up.bend as Up
-import ../laws/RewriteByLine.bend as L1
+import ../laws/RewriteGoesLineByLine.bend as L1
 import ../laws/RewriteKeepsOtherLines.bend as Laws
 import ../laws/UpgradeRewritesSources.bend as L2
 import ../laws/defs/WorldAfterLock.bend as D1

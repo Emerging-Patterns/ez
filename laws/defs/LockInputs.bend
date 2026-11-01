@@ -165,9 +165,7 @@ def passed(verdict: W.Verdict) -> Bool:
 
 # The lock document reads back, trusted in src/lock/lock.bend: a round trip
 # through the pinned eztoml reader: the text `ez lock` writes, parsed, gives
-# back the packages, the hub and the tool pins it was written from. The
-# reader trims every line and strips the quotes off every value; these two
-# laws are the first step: a quoted value survives both, whatever it holds.
+# back the packages, the hub and the tool pins it was written from.
 
 # What an upgrade writes around the ledger
 # (laws/GitignoreAllowlistIsLedger.bend's `ez lock --upgrade` half,

@@ -16,8 +16,8 @@ import ../../src/check/eq.bend as Eq
 import ../../src/pkg/pkg.bend as K
 import ../../src/pub/blurb.bend as B
 import ../../src/add/world.bend as A
-import ../../laws/ManifestPerm.bend as L1
-import ../../laws/SortPerm.bend as L2
+import ../../laws/ManifestIgnoresFileOrder.bend as L1
+import ../../laws/SortIgnoresFileOrder.bend as L2
 import ../../laws/defs/LockInputs.bend as D1
 import ./LockPlannerFacts.bend as M1
 import ./RenderedLedgerRows.bend as M2

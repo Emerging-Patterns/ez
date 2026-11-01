@@ -5,7 +5,7 @@ import ../src/ledger/manifest.bend as M
 import ../src/ledger/render.bend as Rend
 import ../src/add/world.bend as A
 import ../laws/AddDependencyIdempotent.bend as Laws
-import ../laws/AddIdem.bend as L1
+import ../laws/LedgerAddIdempotent.bend as L1
 import ./lemmas/AddPlanEffects.bend as M1
 import ./lemmas/LockPlannerFacts.bend as M2
 

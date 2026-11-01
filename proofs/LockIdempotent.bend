@@ -14,7 +14,7 @@ import ../src/add/world.bend as A
 import ../laws/GitignoreAllowlistIsLedger.bend as L1
 import ../laws/LockIdempotent.bend as Laws
 import ../laws/LockReproducible.bend as L2
-import ../laws/NarWhyAgrees.bend as L3
+import ../laws/MatchingNarHashPasses.bend as L3
 import ../laws/defs/LedgerReadsBackPremise.bend as D1
 import ../laws/defs/LockInputs.bend as D2
 import ../laws/defs/WorldAfterLock.bend as D3

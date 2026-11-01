@@ -5,7 +5,7 @@ import ../src/check/str.bend as Str
 import ../src/lock/plan.bend as P
 import ../src/ledger/upgrade.bend as U
 import ../src/add/world.bend as A
-import ../laws/RewriteByLine.bend as L1
+import ../laws/RewriteGoesLineByLine.bend as L1
 import ../laws/RewriteKeepsOtherLines.bend as L2
 import ../laws/UpgradeRewritesImports.bend as Laws
 import ../laws/UpgradeRewritesSources.bend as L3

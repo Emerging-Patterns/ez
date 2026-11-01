@@ -7,7 +7,8 @@
 # in turn every member imported by hash whose files it rewrote, until no
 # import line names a moved member's old hash.
 #
-# also rests on: laws/UpRefusalWritesNothing.bend, laws/UpWritesTheLock.bend
+# also rests on: laws/WorkspaceUpgradeRefusalWritesNothing.bend,
+# laws/WorkspaceUpgradeWritesJointLock.bend
 import Base
 import ../src/pkg/pkg.bend as K
 import ../src/ledger/upgrade.bend as U

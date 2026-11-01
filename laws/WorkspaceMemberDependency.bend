@@ -7,7 +7,7 @@
 # records the package of each one an import line names in the lock, as `kind =
 # "member"` with its directory and entry.
 #
-# also rests on: laws/ResolveJoins.bend
+# also rests on: laws/ResolvedMembersJoin.bend
 import Base
 import ../src/pkg/pkg.bend as K
 import ../src/toml/toml.bend as T

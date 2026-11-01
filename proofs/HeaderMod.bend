@@ -1,6 +1,0 @@
-# proofs of laws/HeaderMod.bend
-import Base
-import ../laws/HeaderMod.bend as Laws
-
-def Laws.header_mod(_spec, _mods, _foreign):
-  {==}

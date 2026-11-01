@@ -1,7 +1,7 @@
 # a string that holds a `/` after a prefix contains `/`
 import Base
 import ../../src/check/eq.bend as Eq
-import ../../laws/HubNamed.bend as L1
+import ../../laws/HashPathIsHubImport.bend as L1
 
 # LAW: a string that holds a `/` somewhere after a prefix contains `/`
 law contains_slash.arm:

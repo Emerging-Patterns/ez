@@ -3,7 +3,7 @@ import Base
 import ../src/ledger/manifest.bend as M
 import ../src/ledger/render.bend as Rend
 import ../laws/RemoveDependencyIdempotent.bend as Laws
-import ../laws/WithoutIdem.bend as L1
+import ../laws/LedgerRemoveIdempotent.bend as L1
 import ./lemmas/PlanEffectFacts.bend as M1
 
 # Removing twice is the inner list dropped twice, which is `without_idem`.

@@ -2,7 +2,7 @@
 import Base
 import ../../src/check/eq.bend as Eq
 import ../../src/ledger/manifest.bend as M
-import ../../laws/FindFirst.bend as L1
+import ../../laws/LookupFindsFirstDependency.bend as L1
 
 def L1.find_first(n, h, en, s, t):
   Equal.cong(Bool, M.Dep,

@@ -11,7 +11,8 @@
 # and keeps its own source path and vendor bit. It writes the lock the lock
 # planner plans on the joint ledger, and refused it writes nothing.
 #
-# also rests on: laws/UpRefusalWritesNothing.bend, laws/UpWritesTheLock.bend
+# also rests on: laws/WorkspaceUpgradeRefusalWritesNothing.bend,
+# laws/WorkspaceUpgradeWritesJointLock.bend
 import Base
 import ../src/ledger/manifest.bend as M
 import ../src/lock/plan.bend as P

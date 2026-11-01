@@ -8,7 +8,7 @@
 # such a member and running `ez lock` rewrites no source.
 #
 # also rests on: laws/LedgerNamesFirst.bend, laws/LockLaysItsNames.bend,
-# laws/PlainLockWritesOnlyLock.bend, laws/ResolveJoins.bend,
+# laws/PlainLockWritesOnlyLock.bend, laws/ResolvedMembersJoin.bend,
 # laws/ResolvedNotAsked.bend
 import Base
 import ../src/pkg/pkg.bend as K

@@ -3,7 +3,7 @@ import Base
 import ../src/pkg/pkg.bend as K
 import ../src/sha/nar.bend as Nar
 import ../laws/NarIgnoresEntryOrder.bend as Laws
-import ../laws/SortPerm.bend as L1
+import ../laws/SortIgnoresFileOrder.bend as L1
 import ../laws/defs/LockInputs.bend as D1
 import ./lemmas/FileInsertOrder.bend as M1
 

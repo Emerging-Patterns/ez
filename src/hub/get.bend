@@ -6,10 +6,12 @@
 #
 # Trusted, not proved: HTTP framing and URL parsing are correct. Framing is
 # proved in ezhttp v0.14.0, the rev ez.toml pins; ez's gate does not
-# re-check it. ez's GET rests on ezhttp's HTTP-CLI-4 to HTTP-CLI-7 and
-# HTTP-CLI-9 (the request it writes, when a response is complete, and
-# reading it by the GET method), with ezhttp's own HTTP-TRUST-3 and
-# HTTP-TRUST-5 for the wire effect and the read loop; ezhttp states no row
+# re-check it. ez's GET rests on ezhttp's laws/RequestLineAndHost.bend,
+# laws/ResponseCompleteByFraming.bend, laws/ReadsJudgedByCount.bend,
+# laws/ExchangeCarriesMethod.bend and laws/InterimResponsesSkipped.bend (the
+# request it writes, when a response is complete, and reading it by the GET
+# method), with what ezhttp trusts of the wire effect and the read loop
+# (trusted in ezhttp's src/wire.bend and src/client.bend); ezhttp has no law
 # for `parse_url` itself, so URL parsing stays trusted here. ez imports its
 # interface, `main.bend`, and `src/client.bend` and `src/url.bend` for the
 # two types whose constructors this file matches, which `main.bend` names

@@ -3,7 +3,7 @@ import Base
 import ../src/pkg/pkg.bend as K
 import ../src/share/sha.bend as Sha
 import ../laws/HashIgnoresFileOrder.bend as Laws
-import ../laws/ManifestPerm.bend as L1
+import ../laws/ManifestIgnoresFileOrder.bend as L1
 import ../laws/defs/LockInputs.bend as D1
 import ./lemmas/FileInsertOrder.bend as M1
 

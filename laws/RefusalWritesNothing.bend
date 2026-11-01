@@ -1,8 +1,9 @@
 # A command that refuses writes nothing: every file it would otherwise write
 # or remove is left as it found it.
 #
-# also rests on: laws/AddWsRefusalWritesNothing.bend,
-# laws/FetchRefusalWritesNothing.bend, laws/RemoveWsRefusalWritesNothing.bend
+# also rests on: laws/WorkspaceAddRefusalWritesNothing.bend,
+# laws/FetchRefusalWritesNothing.bend,
+# laws/WorkspaceRemoveRefusalWritesNothing.bend
 #
 # This guarantee is proved for every command, each over the plan its planner
 # makes. `ez lock`, plain or `--upgrade`: a World on which the planner
