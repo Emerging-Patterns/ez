@@ -142,8 +142,8 @@ def absent(+name: String) -> String:
   "ez: " ++ toml() ++ " has no dependency named " ++ name
 
 # the refusal for a ledger that names the dependency but, with it dropped,
-# cannot be written so that it reads back (EZ-LED-4), or for a name it does
-# not have
+# cannot be written so that it reads back
+# (laws/WrittenLedgerReadsBack.bend), or for a name it does not have
 def refusal(named: Bool, +name: String) -> String:
   Bool.pick(String, named, Rend.unrenderable(), absent(name))
 

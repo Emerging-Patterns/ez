@@ -1,0 +1,10 @@
+# proofs of laws/ByEffectKeeps.bend
+import Base
+import ../laws/ByEffectKeeps.bend as Laws
+
+# The clock's pure half: a non-empty deadline is rewritten into the
+# pick that keeps it.
+
+def Laws.by_effect_keeps(d, e):
+  %e : {Bool.pick(String, _, "0", d) == d : String}
+  {==}

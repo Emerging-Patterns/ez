@@ -1,10 +1,11 @@
-# ws/pin: the ref `ez add` in a workspace member takes (EZ-WS-4). A git source
-# has one pin across a workspace, so a member adding a source another member
-# already records takes that pin: with no ref, the tag it records, or its
-# commit when it records none; with the tag or commit it records, that; with
-# any other ref, nothing, since moving the source is an upgrade of every
-# member that records it. A source no member records, and a hub package, take
-# the ref as it was given.
+# ws/pin: the ref `ez add` in a workspace member takes
+# (laws/WorkspaceOnePinPerSource.bend). A git source has one pin across a
+# workspace, so a member adding a source another member already records
+# takes that pin: with no ref, the tag it records, or its commit when it
+# records none; with the tag or commit it records, that; with any other ref,
+# nothing, since moving the source is an upgrade of every member that
+# records it. A source no member records, and a hub package, take the ref as
+# it was given.
 import Base
 import ../ledger/manifest.bend as M
 import ../pkg/path.bend as P

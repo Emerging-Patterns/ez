@@ -3,7 +3,7 @@
 # as its new form, and writing either gives the new form, byte for byte: the
 # old files in every Emerging-Patterns repository keep reading, and ez writes
 # one layout. The step checked is `toml/toml.bend`'s, between eztoml's
-# document and ez's sections, which no law covers (EZ-TRUST-8).
+# document and ez's sections, which no law covers (trusted in src/toml/toml.bend).
 import Base
 import ../src/toml/toml.bend as T
 import ../src/ledger/manifest.bend as M

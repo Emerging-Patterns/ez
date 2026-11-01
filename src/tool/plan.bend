@@ -5,35 +5,37 @@
 # answering each question by IO, then executes the plan.
 #
 # Before it asks anything the planner refuses what needs no answer: an
-# install or upgrade with nowhere to link (EZ-TOOL-1), no cache root, a
-# project ledger that does not parse, a target that names nothing or a cache
-# slug that could leave the cache (EZ-TOOL-8), a name the ledger pins that
-# the lock does not, or pins at no commit. Then it resolves the commit
-# (EZ-TOOL-4): a `[tools.*]` pin is the lock's rev, url, entry and bin; a
-# remote is what its HEAD names; a path is its clean HEAD, and a path with
-# uncommitted or untracked changes, or one that is not the top of a
-# checkout, is no commit (EZ-TOOL-3). Then the checkout: a remote's is
-# cached per commit and read from there when its record says it finished,
-# otherwise asked of git with every file's text; a path is read where it is.
-# Then its ledger, which names the file built (EZ-TOOL-7) and the link, and
-# a name that is not a TOML bare key is refused. A checkout with no ez.toml
-# is a plain Bend repository: it builds `main.bend`, or the file `--entry`
-# names, needs no lock, and is linked under that file's stem, or under the
-# repository's name when the stem is `main`. A file to build that is not in
-# the checkout is refused. Then the binary's record:
-# the binary is reused only when it is there and its record is this commit,
-# this file and this bend (EZ-TOOL-2). Every binary lives in a directory
-# named by its record, so no two records share one, and a link made by an
-# install is never rebuilt under it by a run of another commit or file.
+# install or upgrade with nowhere to link (laws/ToolBinDirChosen.bend), no
+# cache root, a project ledger that does not parse, a target that names
+# nothing or a cache slug that could leave the cache
+# (laws/ToolRefusesBadSlug.bend), a name the ledger pins that the lock does
+# not, or pins at no commit. Then it resolves the commit
+# (laws/ToolTargetBuildsPin.bend): a `[tools.*]` pin is the lock's rev, url,
+# entry and bin; a remote is what its HEAD names; a path is its clean HEAD,
+# and a path with uncommitted or untracked changes, or one that is not the
+# top of a checkout, is no commit (laws/DirtyTargetRebuilt.bend). Then the
+# checkout: a remote's is cached per commit and read from there when its
+# record says it finished, otherwise asked of git with every file's text; a
+# path is read where it is. Then its ledger, which names the file built
+# (laws/ToolBuiltFileChosen.bend) and the link, and a name that is not a
+# TOML bare key is refused. A checkout with no ez.toml is a plain Bend
+# repository: it builds `main.bend`, or the file `--entry` names, needs no
+# lock, and is linked under that file's stem, or under the repository's name
+# when the stem is `main`. A file to build that is not in the checkout is
+# refused. Then the binary's record: the binary is reused only when it is
+# there and its record is this commit, this file and this bend
+# (laws/ToolCacheReused.bend). Every binary lives in a directory named by
+# its record, so no two records share one, and a link made by an install is
+# never rebuilt under it by a run of another commit or file.
 #
 # The plan of a command that goes on, in order: the checkout laid under the
 # cache when it was cloned, with its record written last; the lock fetched,
 # for an ez project, and the binary built with its record, unless it is
-# reused; then the
-# program started, for `run`, or the link written, for `install` and
-# `upgrade`. A refusal has no effect at all. The program is started only as
-# the last thing, so its status is the command's (EZ-TOOL-5), and `install`
-# and `upgrade` never start it (EZ-TOOL-6).
+# reused; then the program started, for `run`, or the link written, for
+# `install` and `upgrade`. A refusal has no effect at all. The program is
+# started only as the last thing, so its status is the command's
+# (laws/ToolRunExitsWithProgram.bend), and `install` and `upgrade` never
+# start it (laws/ToolLinkNeverRuns.bend).
 import Base
 import ./world.bend as TW
 import ../lock/plan.bend as P
@@ -140,7 +142,7 @@ def src.read(led: M.Read, +world: TW.World) -> Src:
     case M.Good{m}:
       src.pick(unpinned(m, TW.target(world)), world)
 
-# what the target names (EZ-TOOL-4)
+# what the target names (laws/ToolTargetBuildsPin.bend)
 def src(+world: TW.World) -> Src:
   src.read(TW.project(world), world)
 
@@ -226,7 +228,7 @@ def loc.abs(spot: Loc) -> String:
 # the commit a local path builds: HEAD, when `git status` answered and named
 # nothing, and the path is the top of its checkout. A path in a checkout
 # whose top is elsewhere may be ignored there, or hold files the commit does
-# not; either way it is no commit (EZ-TOOL-3).
+# not; either way it is no commit (laws/DirtyTargetRebuilt.bend).
 def local.same(same: Bool, +head: String) -> String:
   match same:
     case True{}:
@@ -295,7 +297,7 @@ def rev.of(found: Src, +world: TW.World) -> String:
     case NoSrc{_why}:
       ""
 
-# the commit built, "" for none (EZ-TOOL-4)
+# the commit built, "" for none (laws/ToolTargetBuildsPin.bend)
 def rev(+world: TW.World) -> String:
   rev.of(src(world), world)
 
@@ -628,7 +630,7 @@ def name.ok(+name: String) -> Bool:
   Bool.or(String.is_empty(name), Named.bare(name))
 
 # the file built: the pin's `bin`, then its `entry`, then the checkout's
-# `bin`, then its `entry`, then `main.bend` (EZ-TOOL-7)
+# `bin`, then its `entry`, then `main.bend` (laws/ToolBuiltFileChosen.bend)
 def chosen(+over: String, +binary: String, +entry: String) -> String:
   Bool.pick(String, String.is_empty(over), Tgt.file.of(binary, entry), over)
 
@@ -640,7 +642,7 @@ def wish(+over: String, +want: String) -> String:
   Bool.pick(String, String.is_empty(over), want, over)
 
 # the file built, relative to the checkout: `main.bend` for a plain
-# repository unless `--entry` names another (EZ-TOOL-7)
+# repository unless `--entry` names another (laws/ToolBuiltFileChosen.bend)
 def choice(+world: TW.World) -> String:
   chosen(wish(over(world), TW.want(world)), bin(world), entry(world))
 
@@ -700,11 +702,12 @@ def name.of(bare: Bool, +world: TW.World) -> String:
 def name.raw(+world: TW.World) -> String:
   name.of(plain(world), world)
 
-# the link's name: the package's, or `app` (EZ-TOOL-7)
+# the link's name: the package's, or `app` (laws/ToolBuiltFileChosen.bend)
 def name(+world: TW.World) -> String:
   Tgt.out.name(name.raw(world))
 
-# what the binary is made from: the commit, the file and the bend (EZ-TOOL-2)
+# what the binary is made from: the commit, the file and the bend
+# (laws/ToolCacheReused.bend)
 def key(+world: TW.World) -> Key.Stamp:
   Key.Stamp{rev(world), file(world), TW.bend(world)}
 
@@ -988,7 +991,7 @@ def decide.head(found: Src, +url: String, +world: TW.World) -> Verdict:
     case NoSrc{why}:
       Stop{why}
 
-# a slug that could leave the cache is refused (EZ-TOOL-8)
+# a slug that could leave the cache is refused (laws/ToolRefusesBadSlug.bend)
 def decide.slug(ok: Bool, +url: String, +world: TW.World) -> Verdict:
   match ok:
     case True{}:
@@ -1171,8 +1174,8 @@ def sync(ledger: Maybe<&2, String>, lock: Maybe<&2, String>) -> Sync:
       sync.read(M.parse(text), lock)
 
 # how a sync ends once every install it runs has ended: 1 with the reason
-# when it refused, and 0 when it did not (EZ-OUT-1). An install that refuses
-# ends the sync there, with its own status.
+# when it refused, and 0 when it did not (laws/ExitStatusSaysFailure.bend).
+# An install that refuses ends the sync there, with its own status.
 def sync.outcome(synced: Sync) -> P.Outcome:
   match synced:
     case Sync{_ns}:
@@ -1319,9 +1322,9 @@ def exit(pl: Plan) -> Exit:
       Refusal{}
 
 # the status a tool command exits with, given the status the program it
-# started exited with (EZ-OUT-1): 1 for a refusal, 0 for a command that
-# ends without starting one, and the program's own status for `ez tool run`.
-# A command that starts nothing is handed 0 for it.
+# started exited with (laws/ExitStatusSaysFailure.bend): 1 for a refusal, 0
+# for a command that ends without starting one, and the program's own status
+# for `ez tool run`. A command that starts nothing is handed 0 for it.
 def code(ended: Exit, program: U32) -> U32:
   match ended:
     case Refusal{}:

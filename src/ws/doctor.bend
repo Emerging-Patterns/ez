@@ -1,13 +1,14 @@
-# ws/doctor: `ez doctor` at a workspace root (EZ-WS-9). The doctor runs at the
-# root, as `ez lock` does (ws/hop.bend), on a World whose ledger is the joint
-# ledger (ws/joint.bend), so the toolchain, the ledger, the lock, the library
-# and the lock check are judged over every member's ledger as the lock is
-# made from them. The drift report is each member's own: the hashes its import
+# ws/doctor: `ez doctor` at a workspace root
+# (laws/WorkspaceDoctorPerMember.bend). The doctor runs at the root, as `ez
+# lock` does (ws/hop.bend), on a World whose ledger is the joint ledger
+# (ws/joint.bend), so the toolchain, the ledger, the lock, the library and
+# the lock check are judged over every member's ledger as the lock is made
+# from them. The drift report is each member's own: the hashes its import
 # lines name that its ledger does not, and the dependencies of its ledger no
-# import line of its own names, with each `workspace = true` section resolved
-# to the member's package as the joint ledger resolves it. A member whose
-# package walks to a hash the lock does not record for it is reported too.
-# Every report that is a problem fails the command (`DP.plan.notes`).
+# import line of its own names, with each `workspace = true` section
+# resolved to the member's package as the joint ledger resolves it. A member
+# whose package walks to a hash the lock does not record for it is reported
+# too. Every report that is a problem fails the command (`DP.plan.notes`).
 import Base
 import ../doctor/plan.bend as DP
 import ../doctor/world.bend as DW
@@ -112,8 +113,8 @@ def nv.of(named: PP.Named) -> List<&2, String>:
       []
 
 # every name a member is imported by. Such a name is resolved in the
-# workspace whether or not a section names it (EZ-WS-6), so no member's
-# ledger has to.
+# workspace whether or not a section names it
+# (laws/PublishedMemberImportedByName.bend), so no member's ledger has to.
 def nvs.of(xs: List<&2, J.Member>) -> List<&2, String>:
   match xs:
     case []:

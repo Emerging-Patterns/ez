@@ -1,17 +1,18 @@
 # add/relock: `ez add` as it runs, the add and the lock in one plan
-# (EZ-DOC-6). The add is planned as before (`AP.command`, add/plan.bend);
-# once it is known to succeed, the plain `ez lock` planner is run over the
-# World it leaves (`R.world`, relock/relock.bend): the ledger the add writes,
-# the `.bend` files git lists, and the lock's answers. The package the add
-# walked is handed to the lock as the answer for its hash, read as a tree
-# under BEND_LIB, which is where the add lays it, so it is not read twice; a
-# hub package's answers are the ones the add was given. Every other package
-# the lock asks about is answered by the lock's interpreter as `ez lock`
-# answers it.
+# (laws/AddRemoveRelock.bend). The add is planned as before (`AP.command`,
+# add/plan.bend); once it is known to succeed, the plain `ez lock` planner
+# is run over the World it leaves (`R.world`, relock/relock.bend): the
+# ledger the add writes, the `.bend` files git lists, and the lock's
+# answers. The package the add walked is handed to the lock as the answer
+# for its hash, read as a tree under BEND_LIB, which is where the add lays
+# it, so it is not read twice; a hub package's answers are the ones the add
+# was given. Every other package the lock asks about is answered by the
+# lock's interpreter as `ez lock` answers it.
 #
 # The plan, when both succeed: the add's effects, a note when the lock does
-# not hold the package added (EZ-DOC-7), then the lock's effects, the lock
-# last. When either refuses, a refusal with no effect at all.
+# not hold the package added (laws/AddNotesUnlockedPackage.bend), then the
+# lock's effects, the lock last. When either refuses, a refusal with no
+# effect at all.
 import Base
 import ./world.bend as A
 import ./plan.bend as AP
@@ -103,7 +104,7 @@ def lock(world: World) -> P.Plan:
   P.plan(lock.world(world))
 
 # ---------------------------------------------------------------------------
-# the note (EZ-DOC-7)
+# the note (laws/AddNotesUnlockedPackage.bend)
 
 # the hash of the package the add records
 def added.of(named: Bool, +aw: A.World) -> String:

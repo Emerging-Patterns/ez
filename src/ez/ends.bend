@@ -1,15 +1,30 @@
-# ez/ends: how the commands that are not planners end. `ez check` and
-# `ez build` start one bend and end on its answer; `ez test` and `ez prove`
+# ez/ends: how the commands that are not planners end. `ez check` and `ez
+# build` start one bend and end on its answer; `ez test` and `ez prove`
 # start one per file and end on the count. Each ends with a `P.Outcome`, the
 # same end a planner's plan has, and the interpreter exits with its
-# `P.status` (`Run.end`), so the status each exits with is a law (EZ-OUT-1).
-# That the answer is what bend printed is EZ-TRUST-2. `ez run` reads no
-# answer: it exits with the program's own status (`code` in ez/start.bend).
+# `P.status` (`Run.end`), so the status each exits with is a law
+# (laws/ExitStatusSaysFailure.bend). That the answer is what bend printed is
+# trusted (below). `ez run` reads no answer: it exits with the program's own
+# status (`code` in ez/start.bend).
+#
+# Trusted, not proved: a law may read snap's answers, `code`, `text` and
+# `ok`, from `src/answer.bend`, the pure module snap's `main.bend` returns
+# them from unchanged. ez imports that module deliberately, here and in the
+# laws that read answers: bend 2.0.32's verdict fails every proof whose
+# imports reach snap's foreign effects, which `main.bend` holds, so no law
+# may import `main.bend`. That `main.bend`'s `code`, `text` and `ok` are
+# `src/answer.bend`'s is snap's SNAP-TRUST-5, a one-line delegate each in
+# snap v1.4.0, the rev ez.toml pins; the interpreters read the same answers
+# through `main.bend`.
+#
+# Trusted, not proved: the answer this file reads is what bend printed and
+# the status it exited with, 128 plus the signal for one a signal ended and
+# 127 for one that could not be started.
 import Base
 # snap's answer reading, from the file its main.bend re-exports it from:
 # main.bend itself reaches the foreign effects that run programs, which a
 # law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs
-# (snap's SNAP-TRUST-5, trusted as EZ-TRUST-9).
+# (trusted above).
 import 0x8e26a6f8c31689519e618374376ee3dd/src/answer.bend as R
 import ../lock/plan.bend as P
 

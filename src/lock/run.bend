@@ -5,13 +5,13 @@
 # planner's plan. It decides nothing: which packages to read, whether their
 # bytes are the ones the ledger names, where an upgrade moves a pin, and what
 # is written are the planner's. That it reads and executes faithfully is
-# EZ-TRUST-2. It answers a name's question by asking the hub once, and the
+# trusted in ez/app.bend. It answers a name's question by asking the hub once, and the
 # lock's by reading ez.lock.toml. Under `--upgrade` it also answers the
 # upgrade's questions (lock/up.bend): what git prints for refs, the default
 # branch and tags, ancestry, checkouts at a rev, the hub's manifest for a
 # moved hash, `.gitignore`, and the project's sources. A new checkout's package is walked
-# from its entry here, by `K.pkg_of`, which is interpreter code under
-# EZ-TRUST-2 until `ez add` is converted.
+# from its entry here, by `K.pkg_of`, which is interpreter code trusted
+# in ez/app.bend until `ez add` is converted.
 import Base
 import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../io/file.bend as F
@@ -655,7 +655,8 @@ def end.at(zero: Bool, +code: U32, +why: String) -> IO(Unit):
       IO.die(Unit, code, why)
 
 # how the command ends: with the status the planner gave its outcome
-# (`Plan.status`, EZ-OUT-1), and the reason when it refused
+# (`Plan.status`, laws/ExitStatusSaysFailure.bend), and the reason when it
+# refused
 def end(+outcome: Plan.Outcome) -> IO(Unit):
   +code = Plan.status(outcome)
   end.at(U32.is_eq(code, 0), code, Plan.why(outcome))

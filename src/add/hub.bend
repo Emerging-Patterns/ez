@@ -12,7 +12,7 @@
 # then the package it names. The hub's answer must be a `0x` name, and the
 # package is judged as `ez lock` judges a hub package (`W.hub.how`): its
 # manifest hashes to that name, no path leaves it, each file hashes to its
-# sum, and the files hash to the name (EZ-HASH-3).
+# sum, and the files hash to the name (laws/LaidTreeNamedByManifest.bend).
 #
 # With the package in hand, the entry is the one given, which the package
 # must hold, else its `main.bend`, else its first top-level `.bend` file in
@@ -25,7 +25,7 @@
 # is told, the hash the name names and, when there is an entry, the import
 # line. A refusal has no effect at all. `ez add` writes no lock, for a name
 # as for a git package: the next `ez lock` reads the name from ez.toml and
-# asks the hub nothing (EZ-HUB-2).
+# asks the hub nothing (laws/ResolvedNotAsked.bend).
 import Base
 import ./world.bend as A
 import ../lock/plan.bend as P
@@ -50,7 +50,7 @@ def nv(world: A.World) -> String:
 def part(+world: A.World) -> String:
   Named.hub.part(nv(world))
 
-# the key the dependency is recorded under (EZ-LED-7)
+# the key the dependency is recorded under (laws/DependencyNameChosen.bend)
 def key(+world: A.World) -> String:
   Named.hub.key(A.deps(world), part(world), A.rename(world))
 
@@ -250,7 +250,7 @@ def dep.of(+hash: String, +fs: List<&2, K.Item>, +world: A.World) -> M.Dep:
 
 # the ledger with the package added, once it is known to read back. A
 # ledger that could not be written so that it reads back is refused
-# (EZ-LED-4).
+# (laws/WrittenLedgerReadsBack.bend).
 def outcome.fit(fit: Bool) -> P.Outcome:
   match fit:
     case True{}:

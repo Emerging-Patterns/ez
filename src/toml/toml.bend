@@ -5,12 +5,22 @@
 # `parse` walks the document eztoml's `parse` reads into that list, and
 # `normal` writes a document through eztoml's `render`. Only eztoml's
 # interface, `main.bend`, is imported; that a document it renders reads back
-# as itself is its TOML-RT-1, trusted as EZ-TRUST-8.
+# as itself is trusted (below).
 #
 # The rest is ez's own and pure: finding a key's value, a header's segments,
 # and the text of a section in the form ez assembles a document in before
 # eztoml writes it (`render`). That form is the TOML ez wrote before eztoml
 # 0.4, so an old ledger or lock and a new one read to the same sections.
+#
+# Trusted, not proved: a document eztoml renders reads back as itself, and a
+# text it reads without error renders back as the same document: eztoml's
+# laws/RenderThenParse.bend, laws/ParseRenderParse.bend and
+# laws/ParsedIsWellFormed.bend, proved in eztoml v0.9.0, the rev ez.toml
+# pins. ez imports only its interface, `main.bend`, and its gate does not
+# re-check them. ez relies on them for the lock reading back (trusted in
+# lock/lock.bend) and for laws/WrittenLedgerReadsBack.bend. ez's step
+# between its sections and eztoml's document (this file) is ez code with no
+# law: `tests/toml.bend` checks it on an old and a new ledger and lock.
 import Base
 import 0xc5d9d3e28b79ea98be22eb42c7e37802/main.bend as E
 

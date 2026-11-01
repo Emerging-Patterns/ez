@@ -4,7 +4,7 @@
 # ez.toml or it does not parse, as cargo refuses a directory with no
 # Cargo.toml. The interpreter (`ez/cmd.bend`) reads ez.toml, puts the
 # project's BEND_LIB in front of the line (`Env.line`), runs it and exits;
-# that it does so faithfully is EZ-TRUST-2.
+# that it does so faithfully is trusted in ez/app.bend.
 import Base
 import ../ledger/manifest.bend as M
 import ../share/args.bend as Args
@@ -63,7 +63,7 @@ def build.out(+at: String, +name: String) -> String:
 
 # the line each command starts bend with, over a ledger that parsed: the
 # entry checked into `.ez/check.js` and never run, built to a native binary,
-# or run with every word after `run` (EZ-TOOL-9)
+# or run with every word after `run` (laws/RunPassesWords.bend)
 def line(ask: Ask, +ledger: M.Manifest) -> List<&2, String>:
   match ask:
     case Check{}:
@@ -90,9 +90,9 @@ def start(+ask: Ask, text: Maybe<&2, String>) -> Start:
       read(ask, M.parse(t))
 
 # the status `ez run` exits with, given the status of the program it started
-# (EZ-OUT-1): 1 for a refusal, which started none, and the program's own
-# status otherwise, as `cargo run` exits. `ez check` and `ez build` end on
-# what bend printed instead (`ez/ends.bend`).
+# (laws/ExitStatusSaysFailure.bend): 1 for a refusal, which started none,
+# and the program's own status otherwise, as `cargo run` exits. `ez check`
+# and `ez build` end on what bend printed instead (`ez/ends.bend`).
 def code(start: Start, program: U32) -> U32:
   match start:
     case Refused{_why}:

@@ -9,6 +9,11 @@
 # and exits 1 rather than passing with a note as 2.0.31 did. The gate reads
 # the line all the same: a status says nothing about what was checked, and
 # only that first line says every term was proved outright.
+#
+# Trusted, not proved: `ez prove` runs `bend` on every PROOF.bend in the
+# tree and passes only on an exact `ALL PROOFS CHECK` first line. It is ez
+# code run by `mkProofs`, not a law. CI builds from a clean tree, so nothing
+# is cached.
 import Base
 import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../share/args.bend as Args

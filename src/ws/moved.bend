@@ -1,13 +1,16 @@
 # ws/moved: a workspace member imported by its hash, once its hash moved
-# (EZ-WS-7). A member that publishes under no name is imported by its `0x`
-# hash, and editing it moves that hash, so an import line written before the
-# edit names the hash the lock being rewritten records for it. A plain lock
-# writes no source (EZ-DOC-5), so it refuses, before it asks anything, and
-# names the upgrade that rewrites the line. That upgrade rewrites every line
-# naming a moved member's recorded hash, the way an upgrade rewrites a moved
-# dependency's (EZ-VEN-2, EZ-VEN-3), and since a member whose files it
+# (laws/HashedMemberMovesCascade.bend). A member that publishes under no
+# name is imported by its `0x` hash, and editing it moves that hash, so an
+# import line written before the edit names the hash the lock being
+# rewritten records for it. A plain lock writes no source
+# (laws/PlainLockKeepsLedger.bend), so it refuses, before it asks anything,
+# and names the upgrade that rewrites the line. That upgrade rewrites every
+# line naming a moved member's recorded hash, the way an upgrade rewrites a
+# moved dependency's (laws/UpgradeRewritesImports.bend,
+# laws/RewriteKeepsOtherLines.bend), and since a member whose files it
 # rewrote has a new hash in turn, it goes round again until no member it
-# moves moves any further. Everything here is pure: ws/up.bend plans with it.
+# moves moves any further. Everything here is pure: ws/up.bend plans with
+# it.
 import Base
 import ../ledger/manifest.bend as M
 import ../ledger/upgrade.bend as U

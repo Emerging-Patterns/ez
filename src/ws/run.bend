@@ -4,7 +4,7 @@
 # ws/joint.bend can join them. It decides nothing: where the root is, whether
 # to run again there, which ledgers are members and what the lock is planned
 # from are the pure modules'. That it reads and runs faithfully is
-# EZ-TRUST-2. It runs programs, so no law imports it.
+# trusted in ez/app.bend. It runs programs, so no law imports it.
 import Base
 import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as Sn
 import ../io/file.bend as F
@@ -332,7 +332,7 @@ def add.searched(st: Searched, +home: String, +target: String, +ref: String) -> 
   Searched{+top, found} = st
   ref.found(top, found, home, target, ref)
 # the ref `ez add <target> [ref]` goes on with: in a workspace, the pin the
-# workspace already records for the source (EZ-WS-4)
+# workspace already records for the source (laws/WorkspaceOnePinPerSource.bend)
 def add.ref(+home: String, +target: String, +ref: String) -> IO(String):
   do IO<String>:
     st : Searched <- search()
@@ -399,7 +399,8 @@ def ws.searched(st: Searched) -> IO(Rel.Ws):
   ws.found(top, found)
 
 # where `ez add` or `ez remove` runs: in a project of its own, or in a
-# workspace, with what it reads of the root (EZ-WS-10)
+# workspace, with what it reads of the root
+# (laws/WorkspaceAddRemoveRelock.bend)
 def relock.ws() -> IO(Rel.Ws):
   do IO<Rel.Ws>:
     st : Searched <- search()

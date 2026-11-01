@@ -10,6 +10,25 @@
 # Bend refuses an import cycle, and this module both defines the file list the
 # walk hashes and runs it, so the walk lives here rather than in a module of
 # its own.
+#
+# Trusted, not proved: ez's 0x hash for an entry equals the hash `bend
+# --publish` assigns to it. bend is a separate program, but the walk's side
+# of it is stated in laws. bend 2.0.27 publishes every file named exactly
+# `LICENSE` beside a file of the package, at the same path, and refuses a
+# file under a directory named license in any case. The walk takes such a
+# LICENSE along beside a module (laws/LicenseGoesAlong.bend) and beside a
+# foreign body (laws/ForeignLicenseGoesAlong.bend), asks for one it was not
+# given rather than hashing without it (laws/LicenseAsked.bend), finds a
+# file whose directory holds none as it always did
+# (laws/NoLicenseAsBefore.bend), and refuses a package with a file under a
+# license directory, naming it (laws/LicensedNames.bend,
+# laws/LicenseDirRefused.bend, laws/LicenseDirPasses.bend). A ledger written
+# before names a git package without its LICENSE files, and the name
+# decides: `ez lock` judges a checkout whose walked manifest is not the one
+# its name is the digest of without them (laws/BareDropsLicense.bend,
+# laws/BareKeepsSources.bend, laws/GitNamedWithoutLicense.bend), and `ez
+# lock --upgrade` weighs a pinned commit the same way
+# (laws/UpgradeNamedWithoutLicense.bend).
 import Base
 import ../io/file.bend as F
 import ../share/sha.bend as Sha
@@ -416,8 +435,9 @@ def named.of(+spec: String) -> String:
   +first = word(String.split(n, '/'), 0n)
   named.pick(Bool.and(String.contains(n, "/"), String.contains(first, "@")), first)
 
-# an import of a named hub package, which is a dependency rather than a module
-# of this package, whether or not the hub rules its name in (EZ-HUB-3)
+# an import of a named hub package, which is a dependency rather than a
+# module of this package, whether or not the hub rules its name in
+# (laws/NamedImportIsHubDependency.bend)
 def is_named(+spec: String) -> Bool:
   Bool.not(String.is_empty(named.of(spec)))
 

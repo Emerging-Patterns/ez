@@ -1,9 +1,10 @@
-# ws/hop: where a whole-workspace command runs (EZ-WS-2). `ez lock`, `ez
-# fetch` and `ez doctor` act on the whole workspace from any member, so run in
-# a member they run again at the root, with the same words, and end as that
-# run ends. Run at the root, or in a project of its own, they run where they
-# are. Which of the three it is, and the line that runs again, are decided
-# here; ws/run.bend only reads what the search needs and runs what this says.
+# ws/hop: where a whole-workspace command runs
+# (laws/WorkspaceRootFound.bend). `ez lock`, `ez fetch` and `ez doctor` act
+# on the whole workspace from any member, so run in a member they run again
+# at the root, with the same words, and end as that run ends. Run at the
+# root, or in a project of its own, they run where they are. Which of the
+# three it is, and the line that runs again, are decided here; ws/run.bend
+# only reads what the search needs and runs what this says.
 import Base
 import ../pkg/path.bend as P
 import ./workspace.bend as W

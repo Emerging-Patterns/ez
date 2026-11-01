@@ -154,7 +154,7 @@ def url.of(place: Tgt.Place, +home: String) -> String:
     case Tgt.Remote{url, _slug}:
       url
 
-# the source the ledger records (EZ-LED-8)
+# the source the ledger records (laws/PathTargetRecordedAsGiven.bend)
 def url(+world: World) -> String:
   url.of(place(world), home(world))
 

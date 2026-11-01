@@ -2,8 +2,24 @@
 # the program, `command` names what a matched path runs, and `line` decides
 # how a parse ends: a command runs, help is shown, or the line is misused.
 # All of it is pure, so the status a line exits with before any command runs
-# is a law (EZ-OUT-1); ez/app.bend prints and exits as `line` and `status`
-# say, and runs the command a line names, whose own end decides the rest.
+# is a law (laws/ExitStatusSaysFailure.bend); ez/app.bend prints and exits
+# as `line` and `status` say, and runs the command a line names, whose own
+# end decides the rest.
+#
+# Trusted, not proved: command-line parsing is correct: `parse` binds a line
+# as shake's spec says, `help_path` names a request for help and only one,
+# `path_of` and `at` follow the selected path, and `get`, `on` and `help`
+# read and render it. Proved in shake v0.6.0, the rev ez.toml pins (shake's
+# laws/BindingsComeFromWords.bend, PositionalsBindInOrder,
+# RestTakesRemainingWords, SubcommandSelects, ChoicesRestrictValues,
+# DefaultsFillUnbound, RequiredMustBind, HelpWordAsksForHelp,
+# FailureIsFinal, RepeatsRefusedManyCollects, GetReadsOwnBindings,
+# SubcommandResultsNavigate, HelpFollowsPath, ErrTextEmptyForRequests and
+# ErrTextShowsUsage); ez imports only its interface, `main.bend`, and its
+# gate does not re-check it. In particular `ez help <path>` with a word that
+# names no command there fails as `Unexpected`, not as a request for help,
+# and a bare `--help` before any positional of the command is a request for
+# help as `help` is (shake's laws/HelpWordAsksForHelp.bend).
 import Base
 import 0xa383b26a5a0ef35663b3615d7aedf9e3/main.bend as Shake
 
@@ -136,8 +152,9 @@ def path(matched: Shake.Matched) -> String:
   String.join(Shake.path_of(matched), "/")
 
 # the Matched of the command the path names, whose bindings are the ones the
-# line made for that command (SHAKE-GET-2: `at(m, path_of(m))` follows the
-# selected path). A None here would be a Matched `parse` never answers.
+# line made for that command (shake's laws/SubcommandResultsNavigate.bend:
+# `at(m, path_of(m))` follows the selected path). A None here would be a
+# Matched `parse` never answers.
 def leaf(+matched: Shake.Matched) -> Shake.Matched:
   Maybe.default(&2, Shake.Matched, Shake.at(matched, Shake.path_of(matched)), matched)
 
@@ -156,8 +173,8 @@ type Line is Data:
   Misuse{text: String}
 
 # a line Shake would not parse: a request for help, whose path Shake has
-# already checked word by word (SHAKE-PARSE-8: `help bogus` fails as
-# `Unexpected`, not as a request for help), or a usage error
+# already checked word by word (shake's laws/HelpWordAsksForHelp.bend: `help
+# bogus` fails as `Unexpected`, not as a request for help), or a usage error
 def line.err(help: Maybe<&2, List<&2, String>>, +app: Shake.Cli, err: Shake.ParseErr) -> Line:
   match help:
     case Some{path}:
@@ -197,7 +214,7 @@ def line(+app: Shake.Cli, parsed: Result<&2, &2, Shake.ParseErr, Shake.Matched>)
 # the status
 
 # the status a line exits with, when it is decided here, or the command's
-# own end (EZ-OUT-1)
+# own end (laws/ExitStatusSaysFailure.bend)
 type Status is Data:
   Exits{code: U32}
   Ends{}

@@ -11,16 +11,39 @@
 # Everything here is pure. Deciding the lock is lock/plan.bend's, over the
 # World lock/world.bend describes, and reading and writing are
 # lock/run.bend's. `ez fetch` reads a lock back in fetch/plan.bend.
+#
+# Trusted, not proved: a `<name>@<version>` the hub answered once names the
+# same hash forever. The hub never moves a name once it is taken, so a name
+# is resolved once and pinned in the lock. The package it names is still
+# checked against its hash (laws/FetchLaysTheLock.bend).
+#
+# Trusted, not proved: parsing a rendered lock yields the packages, hub,
+# names and tools that were rendered. The lock is written as eztoml's
+# `render` of the document ez assembles (`T.normal`, toml/toml.bend) and
+# read through eztoml's `parse`, so it reads back when eztoml's round trip
+# holds (trusted in toml/toml.bend). ez still writes no lock that
+# `lockable.named` refuses: `lockable` refuses a hash, key or value holding
+# `"`, `\` or a newline, a hash written twice, and a file path holding `=`.
+# eztoml escapes strings and reads a quoted key whole, so these refusals are
+# no longer needed for eztoml; they are kept for `bootstrap.sh`, whose awk
+# cuts a pair at its first `=` and reads no escape. What the lock records is
+# the packages in hash order with each one's files in path order and each
+# once, each tool pin without `vendor`, and the names in name order and each
+# once. Until ez moved to eztoml 0.4 this was proved against the v0.1.0
+# reader (`lock_reads_back` and its tools, names and hub laws); the
+# maintainer chose to move ahead of eztoml's proofs, and those laws went
+# with the reader they unfolded.
 import Base
 import ../toml/toml.bend as T
 import ../ledger/manifest.bend as M
 import ../pkg/pkg.bend as K
 
 # where a package's bytes come from. A hub package needs nothing else; a git
-# one pins a commit, the entry its hash was computed from, the directory inside
-# the checkout its paths are written from, and the NAR hash nix rebuilds it by.
-# A workspace member's (EZ-WS-5) is the committed tree: the directory, from
-# the workspace root, its paths are written from, and its entry there.
+# one pins a commit, the entry its hash was computed from, the directory
+# inside the checkout its paths are written from, and the NAR hash nix
+# rebuilds it by. A workspace member's (laws/WorkspaceMemberDependency.bend)
+# is the committed tree: the directory, from the workspace root, its paths
+# are written from, and its entry there.
 type Src is Data:
   Hub{}
   Git{url: String, rev: String, entry: String, root: String, nar: String, tag: String}
@@ -35,7 +58,7 @@ type Origin is Data:
   Origin{hash: String, src: Src}
 
 # a `<name>@<version>` and the `0x` name it names. The hub rules that a
-# version never moves (EZ-TRUST-6), so once a name has named a hash the pair
+# version never moves (trusted above), so once a name has named a hash the pair
 # is a fact, and the lock records it under `[names]` beside the package it
 # names, which is recorded under its hash like any hub package.
 type Name is Data:
@@ -67,7 +90,8 @@ def kids(srcs: List<&2, String>) -> List<&2, String>:
 
 # an import's `<name>@<version>`, or nothing when it names no package by
 # name. A named import is a dependency, never a module of this project
-# (EZ-HUB-3), whether or not the hub rules its name in.
+# (laws/NamedImportIsHubDependency.bend), whether or not the hub rules its
+# name in.
 def named.put(+spec: String) -> List<&2, String>:
   +nv = K.named.of(spec)
   Bool.pick(List<&2, String>, String.is_empty(nv), [], [nv])
@@ -513,7 +537,7 @@ def lock.sect(hub: String) -> T.Sect:
 
 # the lock as a document: what resolved it, then every package it resolved,
 # in hash order. `render` writes its text a block at a time; that the two
-# agree is lock/LAWS.bend's `render_is_doc`.
+# agree is stated by no law.
 def doc(hub: String, ps: List<&2, Pack>) -> List<&2, T.Sect>:
   List.append(&2, T.Sect, [lock.sect(hub)], pack.all(pack.sort(ps)))
 
@@ -543,10 +567,11 @@ def block.texts(bs: List<&2, K.Item>) -> List<&2, String>:
     case K.Item{_hash, text} <> t:
       text <> block.texts(t)
 
-# the lock's text: the `[lock]` table, each block in the order given, then the
-# rest, assembled as ez's document text (`T.render`) and written as eztoml
-# writes it (`T.normal`). Every part of it is fixed by the blocks' order, so
-# the order the walk found packages in does not reach the file (EZ-DOC-2).
+# the lock's text: the `[lock]` table, each block in the order given, then
+# the rest, assembled as ez's document text (`T.render`) and written as
+# eztoml writes it (`T.normal`). Every part of it is fixed by the blocks'
+# order, so the order the walk found packages in does not reach the file
+# (laws/LockIgnoresWalkOrder.bend).
 def text.of(hub: String, bs: List<&2, K.Item>, rest: List<&2, String>) -> String:
   T.normal(String.join(T.render.sect(lock.sect(hub)) <>
     List.append(&2, String, block.texts(bs), rest), "\n"))

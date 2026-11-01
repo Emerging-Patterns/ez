@@ -12,7 +12,7 @@
 # under `BEND_LIB/names` is read as it is. So nothing is
 # written while the questions are answered, and a refused fetch leaves
 # BEND_LIB as it found it. It decides nothing; that it reads and executes
-# faithfully is EZ-TRUST-2.
+# faithfully is trusted in ez/app.bend.
 import Base
 import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../io/file.bend as F

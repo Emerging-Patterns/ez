@@ -118,7 +118,7 @@ def run.started(start: S.Start, +at: String) -> IO(U32):
       Pass.run(Env.line(at, line))
 
 # a run, and how it ends: exit 1 with the reason for a refusal, and the
-# program's own status otherwise (`S.code`, EZ-OUT-1)
+# program's own status otherwise (`S.code`, laws/ExitStatusSaysFailure.bend)
 def run.go(+start: S.Start) -> IO(Unit):
   do IO<Unit>:
     at : String <- Env.lib()

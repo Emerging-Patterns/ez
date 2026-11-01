@@ -1,4 +1,5 @@
-# `ez add` then an offline nix build, with no `ez lock` between (EZ-DOC-6).
+# `ez add` then an offline nix build, with no `ez lock` between
+# (laws/AddRemoveRelock.bend).
 #
 # A project whose staged main.bend already imports a git package by its hash
 # runs `ez add` on that package, a repository beside it, in the sandbox, with

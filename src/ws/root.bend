@@ -1,10 +1,10 @@
 # ws/root: which workspace a command run in a directory belongs to
-# (EZ-WS-2). ez reads ez.toml from the directory it runs in; in a workspace
-# that directory may be a member, so a command first finds its root: the
-# nearest directory at or above it, up to the top of the git checkout, whose
-# ledger is a workspace root that makes it a member. With none, the
-# directory is a project of its own, as it always was. The design is
-# docs/rfc/ez-workspaces.md.
+# (laws/WorkspaceRootFound.bend). ez reads ez.toml from the directory it
+# runs in; in a workspace that directory may be a member, so a command first
+# finds its root: the nearest directory at or above it, up to the top of the
+# git checkout, whose ledger is a workspace root that makes it a member.
+# With none, the directory is a project of its own, as it always was. The
+# design is docs/rfc/ez-workspaces.md.
 #
 # Both halves are pure. `asks` names the directories whose ez.toml the
 # interpreter reads, each with the path from it down to where ez runs, nearest

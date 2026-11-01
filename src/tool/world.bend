@@ -143,7 +143,7 @@ def bin.xdg(+xdg: String, +home: String) -> Maybe<&2, String>:
 
 # where an installed command is linked: `$EZ_TOOL_BIN` when it is set,
 # otherwise `$XDG_BIN_HOME`, otherwise `$HOME/.local/bin`, an empty value
-# counting as unset; None when all three are empty (EZ-TOOL-1)
+# counting as unset; None when all three are empty (laws/ToolBinDirChosen.bend)
 def bin.dir(+ez: String, +xdg: String, +home: String) -> Maybe<&2, String>:
   Bool.pick(Maybe<&2, String>, String.is_empty(ez), bin.xdg(xdg, home), Some{ez})
 

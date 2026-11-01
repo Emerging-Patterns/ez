@@ -212,9 +212,9 @@ def model(+name: String, +at: String) -> M.Manifest:
 def fresh(+name: String, +at: String) -> String:
   Rend.show(model(name, at))
 
-# whether a new project can be written: its ledger reads back (EZ-LED-4),
-# and the line its entry opens with is one line, so the description cannot
-# spill into the program
+# whether a new project can be written: its ledger reads back
+# (laws/WrittenLedgerReadsBack.bend), and the line its entry opens with is
+# one line, so the description cannot spill into the program
 def fits(+name: String, +at: String, +desc: String) -> Bool:
   Bool.and(Rend.renderable(model(name, at)), Bool.not(B.has.nl(header(name, desc))))
 

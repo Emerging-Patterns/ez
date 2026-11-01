@@ -9,6 +9,16 @@
 # of a path is what nix's dumper takes: the owner's exec bit of the mode,
 # every name and link target as it is, and a file's bytes. The reading is
 # sha/dump's, since it runs `find` through foreign code a law may not import.
+#
+# Trusted, not proved: ez's narHash equals `nix hash path --type sha256
+# --sri` of the same tree. nix is a separate program. What ez trusts of its
+# own walk is GNU `find`'s listing of the tree, each path's type, `%M` mode,
+# name and link target, and the file effect's read of each file's bytes. The
+# walk takes the executable bit from the owner's exec bit of that mode, as
+# nix's dumper does, and reads names and targets as listed
+# (laws/NarReadsNamesVerbatim.bend). Submodules are not part of the tree: ez
+# weighs a checkout without them, and its nix side asks `fetchgit` for the
+# same.
 import Base
 import ../pkg/pkg.bend as K
 import ../share/sha.bend as Sha

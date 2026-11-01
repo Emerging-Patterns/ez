@@ -17,14 +17,15 @@ import ../toml/toml.bend as T
 # `vend` is the committed tree: the package is allowlisted under `.ez/lib` and
 # an upgrade that moves it lays the new hash there. Absent, it is not.
 #
-# A member of the same workspace is the third kind (EZ-WS-5): a section with
-# `workspace = true` names the member whose `[package] name` is its key, and
-# records no hash and no source, because the member's package is a fact about
-# the committed tree. A member's own ledger reads it with an empty `path` and
-# `named`; the workspace's joint ledger (ws/joint.bend) fills in the member's
-# directory from the root, written as `path`, its hash, and, when the member
-# publishes under a name, the `<name>@<version>` it is imported by, written as
-# `hub`. No command writes those to a ledger a person keeps.
+# A member of the same workspace is the third kind
+# (laws/WorkspaceMemberDependency.bend): a section with `workspace = true`
+# names the member whose `[package] name` is its key, and records no hash
+# and no source, because the member's package is a fact about the committed
+# tree. A member's own ledger reads it with an empty `path` and `named`; the
+# workspace's joint ledger (ws/joint.bend) fills in the member's directory
+# from the root, written as `path`, its hash, and, when the member publishes
+# under a name, the `<name>@<version>` it is imported by, written as `hub`.
+# No command writes those to a ledger a person keeps.
 type Source is Data:
   Hub{named: String}
   Git{url: String, rev: String, tag: String, root: String, nar: String, vend: Bool}

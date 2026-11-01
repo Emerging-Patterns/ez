@@ -1,8 +1,8 @@
 # ws/workspace: which directories a workspace's root ledger makes members
-# (EZ-WS-1). A root ledger's `[workspace]` table lists `members`, each a
-# directory relative to the root or `<dir>/*`, every directory directly under
-# `<dir>`, and `exclude`, directories taken back out. The design is
-# docs/rfc/ez-workspaces.md.
+# (laws/WorkspaceMembersChosen.bend). A root ledger's `[workspace]` table
+# lists `members`, each a directory relative to the root or `<dir>/*`, every
+# directory directly under `<dir>`, and `exclude`, directories taken back
+# out. The design is docs/rfc/ez-workspaces.md.
 #
 # Everything here is pure. A path is read as its segments, the pieces
 # between its `/`s, so a member, an entry and an exclusion are compared

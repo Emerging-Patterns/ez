@@ -4,7 +4,7 @@
 # here is stated for all strings, so a proof about a reader or a writer can
 # lean on it for the text it is about. They were first proved in the lock
 # planner spike (docs/rfc/ez-lock-planner.md); they belong here, beside
-# check/eq.bend, so every proof can use them. check/PROOF.bend puts them
+# check/eq.bend, so every proof can use them. The root PROOF.bend puts them
 # through the gate whether or not a proof uses them yet.
 import Base
 import ./eq.bend as Eq
@@ -759,7 +759,7 @@ def split_join(p, ps, c, e):
     Eq.and.right(clear(p, c), clear.all(ps, c), e))
 
 # Orders, lists of any data, and more string facts, for the lock's proofs
-# (lock/PROOF.bend); none is about the lock.
+# (proofs/lemmas/LockPlannerFacts.bend); none is about the lock.
 
 # the type that is empty exactly where a comparison answered LT
 def cmp.lt_emp(ans: Cmp) -> Type:

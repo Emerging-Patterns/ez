@@ -1,6 +1,11 @@
 # hub/hub: a file fetched from the hub, and checked against the hash that names
 # it. bend accepts any prefix of the sha256, and a package's `0x` name is the
 # first 32 characters of its manifest's digest, so the check is a prefix test.
+#
+# Trusted, not proved: the hub serves, for a hash, what was published under
+# it. ez checks every hub body against the hash it asked for
+# (laws/FetchLaysTheLock.bend), so this comes down to the hub being there
+# and to `Sha.hex` being SHA-256 (trusted in share/sha.bend).
 import Base
 import ../share/sha.bend as Sha
 

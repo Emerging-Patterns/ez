@@ -1,15 +1,16 @@
 # relock: what `ez add` and `ez remove` share to leave the lock in step with
-# the ledger they write (EZ-DOC-6). Each command plans its edit as before;
-# then the plain `ez lock` planner (lock/plan.bend) is run over the World the
-# edit leaves: the ledger the edit writes to ez.toml, the `.bend` files git
-# lists, and the answers to the lock's questions. The two plans become one:
-# the edit's effects, then the lines a person is told about the lock, then the
-# lock's effects, which write ez.lock.toml last. A lock that refuses refuses
-# the whole command, with no effect at all, so neither file changes.
+# the ledger they write (laws/AddRemoveRelock.bend). Each command plans its
+# edit as before; then the plain `ez lock` planner (lock/plan.bend) is run
+# over the World the edit leaves: the ledger the edit writes to ez.toml, the
+# `.bend` files git lists, and the answers to the lock's questions. The two
+# plans become one: the edit's effects, then the lines a person is told
+# about the lock, then the lock's effects, which write ez.lock.toml last. A
+# lock that refuses refuses the whole command, with no effect at all, so
+# neither file changes.
 #
-# A plain lock moves no pin (EZ-DOC-5), so every dependency and tool the edit
-# did not touch keeps the pin it had, and only what the edit changed is read
-# anew.
+# A plain lock moves no pin (laws/PlainLockKeepsLedger.bend), so every
+# dependency and tool the edit did not touch keeps the pin it had, and only
+# what the edit changed is read anew.
 import Base
 import ../lock/plan.bend as P
 import ../lock/world.bend as W

@@ -8,15 +8,17 @@
 #
 # Publishing is irreversible and public, so every check that can be made
 # before the upload is made first, in this order: there is a ledger that
-# parses, and it names the entry, and the name it publishes under, if any, is
-# one bend takes (EZ-PUB-3); git answers `git status --porcelain
-# --untracked-files=normal` about the project and names no path (EZ-PUB-1);
-# the walk from the entry makes a package; git tracks every file of that
-# package; and the hub the ledger names has every hub package the package
-# imports (EZ-PUB-5). Only then is the upload asked for, and its answer is checked
-# against ez's hash (EZ-PUB-2). bend cannot report a package's hash without
-# uploading it, so that check comes after the upload, and a disagreement
-# exits 1 with no import line rather than taking the upload back.
+# parses, and it names the entry, and the name it publishes under, if any,
+# is one bend takes (laws/PublishUnderName.bend); git answers `git status
+# --porcelain --untracked-files=normal` about the project and names no path
+# (laws/PublishNeedsCleanTree.bend); the walk from the entry makes a
+# package; git tracks every file of that package; and the hub the ledger
+# names has every hub package the package imports
+# (laws/PublishNeedsDepsOnHub.bend). Only then is the upload asked for, and
+# its answer is checked against ez's hash (laws/PublishAgreesWithBend.bend).
+# bend cannot report a package's hash without uploading it, so that check
+# comes after the upload, and a disagreement exits 1 with no import line
+# rather than taking the upload back.
 #
 # Each stage of `decide` reads what it needs from the World itself rather
 # than from the stage before, so a law about one stage holds of every World
@@ -47,7 +49,7 @@ def name.length() -> Nat:
 # a lowercase hex digest may hold. `git/git.bend` already walks a hex string
 # for `is_rev`, and its walk stops at the first character that is not hex.
 #
-# The lines bend prints around its answer fail this, and `pub/LAWS.bend` says
+# The lines bend prints around its answer fail this, and laws/PublishAgreesWithBend.bend says
 # so for the two that hold the name, rather than leaving it to a reading of
 # bend's source: `publishing N files, ... as 0x... (mining its proof of work)`
 # and `import 0x.../entry.bend as Name` each start with something that is not
@@ -137,7 +139,8 @@ def blanks.step(blank: Bool, rest: Unit -> Bool) -> Bool:
       False{}
 
 # whether the status named nothing. Stated as its own walk rather than as the
-# negation of the one above, so `pub/LAWS.bend` can hold the two to each other:
+# negation of the one above, so laws/PublishNeedsCleanTree.bend can hold the two to
+# each other:
 # a tree is clean exactly when git named no path at all.
 def blanks(ls: List<&2, String>) -> Bool:
   match ls:
@@ -673,8 +676,9 @@ def why.upload(+world: PW.World) -> String:
 # fetch every hub package it imports in turn. So a package that imports one
 # the hub does not have is one no one can build, and `ez publish` asks the
 # hub about each before it sends anything, as `cargo publish` refuses a
-# dependency that is not on crates.io (EZ-PUB-5). It asks the hub the ledger
-# names, the one `ez lock` resolved the imports against.
+# dependency that is not on crates.io (laws/PublishNeedsDepsOnHub.bend). It
+# asks the hub the ledger names, the one `ez lock` resolved the imports
+# against.
 
 # a hub package the package imports, as the hub is asked about it: by its
 # `0x` name, whose manifest the hub serves at `<hub>/<hash>/manifest`; or by
@@ -1111,7 +1115,8 @@ def decide.upload(got: PW.Heard, +world: PW.World) -> Verdict:
       decide.agreed(agreed(world), world)
 
 # the hub imports: every one on the hub goes on to the upload, one still to
-# ask about is asked, and any other refuses, sending nothing (EZ-PUB-5)
+# ask about is asked, and any other refuses, sending nothing
+# (laws/PublishNeedsDepsOnHub.bend)
 def decide.hub(on: Hubbed, +world: PW.World) -> Verdict:
   match on:
     case OnHub{}:

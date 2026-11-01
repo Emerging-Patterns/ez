@@ -9,7 +9,7 @@
 # file is written by its `Run.write`, and the command exits with the status
 # the planner gives the plan's end and the program's (`TP.code`), through
 # `Run.end.at`. It decides nothing; that it reads and executes faithfully is
-# EZ-TRUST-2.
+# trusted in ez/app.bend.
 #
 # What it asks and builds on the way is captured, and a build's output is
 # shown on stderr only when the build fails. The program alone is started on
@@ -251,7 +251,7 @@ def exec.finish(fin: TP.Finish) -> IO(U32):
         return 0
 
 # a plan, executed, and how it ends: with the status the planner gives its
-# end and the program's status (`TP.code`, EZ-OUT-1)
+# end and the program's status (`TP.code`, laws/ExitStatusSaysFailure.bend)
 def exec.plan(+pl: TP.Plan) -> IO(Unit):
   TP.Plan{l, m, f, o} = pl
   do IO<Unit>:

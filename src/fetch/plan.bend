@@ -9,34 +9,37 @@
 # `uv sync --frozen` does: a fetch never writes a lock, so it has nothing to
 # fill BEND_LIB from.
 #
-# For every package the lock records it asks first for the tree already under
-# BEND_LIB. A tree there that the lock's checks pass is kept as it is. Any
-# other is fetched: a git package as a shallow checkout at the pinned rev,
-# from its source anchored at the project (`P.anchor(here, url)`), and a hub
-# package from the lock's hub. Each file is then taken from what arrived by
-# its path, from the package's root inside the checkout for a git package,
-# and the package is checked before anything is laid (`good`): every file's
-# digest equals the sum the lock records for it (EZ-FETCH-1), no path leaves
-# the package, and the files hash to the name the lock records them under
-# (EZ-HASH-3). A git package's checkout must also weigh to the narHash the
-# lock records (`weighed`), so the files laid come from the tree the lock
-# pins, the tree nix rebuilds from the same pin. Only then is the tree laid
-# under BEND_LIB, the files the lock names and their manifest last.
+# For every package the lock records it asks first for the tree already
+# under BEND_LIB. A tree there that the lock's checks pass is kept as it is.
+# Any other is fetched: a git package as a shallow checkout at the pinned
+# rev, from its source anchored at the project (`P.anchor(here, url)`), and
+# a hub package from the lock's hub. Each file is then taken from what
+# arrived by its path, from the package's root inside the checkout for a git
+# package, and the package is checked before anything is laid (`good`):
+# every file's digest equals the sum the lock records for it
+# (laws/FetchLaysTheLock.bend), no path leaves the package, and the files
+# hash to the name the lock records them under
+# (laws/LaidTreeNamedByManifest.bend). A git package's checkout must also
+# weigh to the narHash the lock records (`weighed`), so the files laid come
+# from the tree the lock pins, the tree nix rebuilds from the same pin. Only
+# then is the tree laid under BEND_LIB, the files the lock names and their
+# manifest last.
 #
 # Every name the lock records is laid too, as the file bend reads the name's
 # hash from, `$BEND_LIB/names/<nv>` holding the hash and a newline, so bend
-# never asks the hub for it (EZ-HUB-4). A names file that already holds the
-# lock's hash is kept; any other is written, and one that held another hash
-# is said to have been rewritten, since the lock wins over it as it wins over
-# a tree that fails its checks. A name the lock records that bend would not
-# read back, one the hub rules out or a hash that is not a `0x` name, refuses
-# the fetch, since its file would not be the one bend reads.
+# never asks the hub for it (laws/NameFilesLaid.bend). A names file that
+# already holds the lock's hash is kept; any other is written, and one that
+# held another hash is said to have been rewritten, since the lock wins over
+# it as it wins over a tree that fails its checks. A name the lock records
+# that bend would not read back, one the hub rules out or a hash that is not
+# a `0x` name, refuses the fetch, since its file would not be the one bend
+# reads.
 #
 # The plan of a fetch that succeeds lays every tree that was fetched and every
 # names file that is not already right, and nothing else: no ledger, no lock. A fetch that refuses, for any package,
 # has no effect at all, so a package fetched before the one that failed is
 # not laid either, and a tree already under BEND_LIB is never removed
-# (EZ-OUT-2).
+# (laws/RefusalWritesNothing.bend).
 #
 # The Effect, Plan and Outcome types are the lock's (lock/plan.bend), as for
 # `ez add`, `ez remove` and `ez init`.
@@ -323,8 +326,9 @@ def member.answer(answer: F.Answer, fs: List<&2, K.Item>, +path: String, +entry:
     case _:
       No{"ez: workspace member " ++ path ++ " was not read from the workspace"}
 
-# a workspace member's package (EZ-WS-8): laid from the committed files only
-# when its walk from its entry hashes to the hash the lock records for it
+# a workspace member's package (laws/WorkspaceFetchChecksMembers.bend): laid
+# from the committed files only when its walk from its entry hashes to the
+# hash the lock records for it
 def part.member(got: F.Heard, fs: List<&2, K.Item>, +path: String, +entry: String, +hash: String) -> Part:
   match got:
     case F.Open{}:

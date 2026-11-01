@@ -1,9 +1,10 @@
 # The ez guide
 
 This is the reference for ez's commands. The [README](../README.md) has the
-install steps and a quickstart; [SPEC.md](../SPEC.md) lists what ez
-guarantees, each requirement with the laws that prove it. Requirement IDs
-such as (EZ-VEN-1) below point at its rows.
+install steps and a quickstart; [LAWS.bend](../LAWS.bend) lists what ez
+guarantees, one file under `laws/` for each. Requirement IDs such as
+(EZ-VEN-1) below point at the rows of [SPEC.md](SPEC.md), the table those
+files replaced.
 
 Every subcommand needs `bend` and `git` on PATH. `ez help` or `ez --help`
 prints the command list, and `ez help test` or `ez test --help` the flags of
