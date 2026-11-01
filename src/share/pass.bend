@@ -4,7 +4,7 @@
 # and answers both at once; that is what a command that reads the answer
 # wants. `ez run` and `ez tool run` read nothing back: the program talks to
 # the person, and ez only waits for it and exits with its status (`S.code`
-# and `TP.code`, EZ-OUT-1).
+# and `TP.code`, laws/ExitStatusSaysFailure.bend).
 import Base
 import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 

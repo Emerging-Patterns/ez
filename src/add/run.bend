@@ -10,7 +10,7 @@
 # is left to ask. Then it runs the planner's plan with the lock's effect
 # runner (`Run.exec.plan`), which exits 1 with the reason when the plan
 # refuses. It decides nothing; that it reads and executes faithfully is
-# EZ-TRUST-2.
+# trusted in ez/app.bend.
 import Base
 import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../io/file.bend as F

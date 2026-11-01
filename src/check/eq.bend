@@ -129,7 +129,7 @@ def char_eq_self(c):
 # A bit is one thing or the other, never both, so an equation between the two
 # holds anything at all. Every proof that lifts a computed condition into a
 # parameter reaches an arm the hypothesis has ruled out, and this is how that
-# arm is closed. It was written out in pkg/PROOF.bend first; it belongs here,
+# arm is closed. It was written out in the package walk's proofs first; it belongs here,
 # beside the other Base facts Base does not state.
 
 # the type that is empty exactly where a bit is True

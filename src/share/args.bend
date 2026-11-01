@@ -5,9 +5,23 @@
 # bracket: `+RTS`, `-RTS` and the words between them (`+RTS --threads 4
 # -RTS`), and the first `--RTS`, after which every word reaches the program
 # untouched. Every other word is the program's, `--`, `--threads`, `--gpu`,
-# `--gpu-build` and `--bend-help` included (EZ-TRUST-2, shake's
-# SHAKE-TRUST-2). `--help` is the program's since 2.0.29, and ez reads it as
+# `--gpu-build` and `--bend-help` included (trusted below). `--help` is the program's since 2.0.29, and ez reads it as
 # a request for help (ez/line.bend).
+#
+# Trusted, not proved: the words `IO.args` hands ez are the process's words
+# as a program compiled by bend 2.0.38 receives them: every word after the
+# program's own name, in order and unchanged, except the runtime's. The
+# runtime's words are `+RTS`, `-RTS` and every word between them (a bracket
+# left open runs to the end), and the first `--RTS`, after which every word
+# reaches ez unchanged. Every other word reaches ez, `--`, `--help`,
+# `--threads`, `--gpu`, `--gpu-build` and `--bend-help` included. What the
+# runtime hands `IO.args` is trusted in shake's src/args.bend, at the rev
+# ez.toml pins, and it was confirmed for ez by running ez compiled by bend
+# 2.0.38: `ez +RTS --threads 2 -RTS --help` prints ez's help, `ez --threads
+# 2` and `ez --gpu-build` are refused by Shake and exit 1, and `ez tool run
+# <target> --RTS +RTS --threads 2 -RTS a` starts the program with `+RTS
+# --threads 2 -RTS a`, whose own runtime takes the bracket. It changes when
+# bend does, so every bend bump rechecks it.
 import Base
 
 # the non-empty strings
@@ -71,7 +85,7 @@ def all() -> IO(List<&2, String>):
     return rest(copy(xs))
 
 # the command `ez run` starts: bend on the entry, with every word after
-# `run` (EZ-TOOL-9)
+# `run` (laws/RunPassesWords.bend)
 def run.line(+entry: String, as: List<&2, String>) -> List<&2, String>:
   "bend" <> (entry <> rest(as))
 

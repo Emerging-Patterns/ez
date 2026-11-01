@@ -1,9 +1,9 @@
 # remove/relock: `ez remove` as it runs, the remove and the lock in one plan
-# (EZ-DOC-6). The remove is planned as before (`RP.plan`, remove/plan.bend);
-# once it is known to succeed, the plain `ez lock` planner is run over the
-# World it leaves (`R.world`, relock/relock.bend): the ledger the remove
-# writes, the `.bend` files git lists, and the lock's answers, which the
-# lock's interpreter gives as `ez lock` gives them.
+# (laws/AddRemoveRelock.bend). The remove is planned as before (`RP.plan`,
+# remove/plan.bend); once it is known to succeed, the plain `ez lock`
+# planner is run over the World it leaves (`R.world`, relock/relock.bend):
+# the ledger the remove writes, the `.bend` files git lists, and the lock's
+# answers, which the lock's interpreter gives as `ez lock` gives them.
 #
 # The plan, when both succeed: the remove's effects, then the lock's, the
 # lock last. When either refuses, a refusal with no effect at all. A `.bend`

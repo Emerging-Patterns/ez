@@ -107,7 +107,7 @@ def rows(+world: A.World, question: Q) -> List<&2, Git.Row>:
 
 # the ref `ez add` pins when none was asked for: the tag `Git.choose` takes
 # from every tag on the remote, the greatest release, else the greatest
-# pre-release; else the branch HEAD's symref names (EZ-RES-1)
+# pre-release; else the branch HEAD's symref names (laws/AddPinsChosenRef.bend)
 def default.ref(+world: A.World) -> String:
   +chosen = Git.choose(Git.tag.names(rows(world, QTags{})))
   Bool.pick(String, String.is_empty(chosen), Git.tip.branch(rows(world, QHead{})), chosen)
@@ -288,7 +288,8 @@ def pkg(+world: A.World) -> String:
   Git.called.maybe(tree.toml(world))
 
 # the entry the package is walked from: the one given, else the checkout's
-# `[package] entry`, else its `bin`, else `main.bend` (EZ-RES-2)
+# `[package] entry`, else its `bin`, else `main.bend`
+# (laws/AddEntryChosen.bend)
 def entry(+world: A.World) -> String:
   Bool.pick(String, String.is_empty(A.entry.arg(world)),
     Git.entry.maybe(tree.toml(world)), A.entry.arg(world))
@@ -309,7 +310,7 @@ def fuel(fs: List<&2, K.Source>) -> Nat:
 def walked(+world: A.World) -> K.Walked:
   K.of.fuel(fuel(files(world)), Path.norm(entry(world)), files(world))
 
-# the name the dependency is recorded under (EZ-LED-7)
+# the name the dependency is recorded under (laws/DependencyNameChosen.bend)
 def name(+world: A.World) -> String:
   Named.as(A.deps(world), A.url(world), A.rename(world), pkg(world), A.fresh(world))
 
@@ -407,7 +408,7 @@ def dep.of(+hash: String, +root: String, +world: A.World) -> M.Dep:
 
 # the ledger with the package added, once it is known to read back. A
 # ledger that could not be written so that it reads back, such as one whose
-# source or entry holds a quote, is refused (EZ-LED-4).
+# source or entry holds a quote, is refused (laws/WrittenLedgerReadsBack.bend).
 def outcome.fit(fit: Bool) -> P.Outcome:
   match fit:
     case True{}:

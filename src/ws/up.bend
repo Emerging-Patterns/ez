@@ -1,12 +1,13 @@
-# ws/up: `ez lock --upgrade` at a workspace root (EZ-WS-4). The upgrade is
-# planned, as the lock is, on the joint ledger (ws/joint.bend), so a source a
-# name declares moves once for the whole workspace. What it writes back is
-# not the joint ledger, which no file holds: the one write of ez.toml the
-# upgrade plans is replaced by a write of every ledger that declares a moved
-# name, the root's and each member's, each dependency and tool taking its new
-# pin from the joint ledger the upgrade leaves while keeping the source as
-# that ledger records it, relative to its own directory. Every other effect of
-# the plan is kept as it was.
+# ws/up: `ez lock --upgrade` at a workspace root
+# (laws/WorkspaceOnePinPerSource.bend). The upgrade is planned, as the lock
+# is, on the joint ledger (ws/joint.bend), so a source a name declares moves
+# once for the whole workspace. What it writes back is not the joint ledger,
+# which no file holds: the one write of ez.toml the upgrade plans is
+# replaced by a write of every ledger that declares a moved name, the root's
+# and each member's, each dependency and tool taking its new pin from the
+# joint ledger the upgrade leaves while keeping the source as that ledger
+# records it, relative to its own directory. Every other effect of the plan
+# is kept as it was.
 import Base
 import ../ledger/manifest.bend as M
 import ../ledger/render.bend as Rend
@@ -18,10 +19,11 @@ import ./workspace.bend as W
 import ./joint.bend as J
 import ./moved.bend as Mv
 
-# what the write-back needs: nothing, for a project of its own, or the root's
-# ledger text, what its `[workspace]` table says, every other ez.toml git
-# lists under the root, and the text of the lock being rewritten, "" for
-# none, which records each member's hash before it moved (EZ-WS-7)
+# what the write-back needs: nothing, for a project of its own, or the
+# root's ledger text, what its `[workspace]` table says, every other ez.toml
+# git lists under the root, and the text of the lock being rewritten, "" for
+# none, which records each member's hash before it moved
+# (laws/HashedMemberMovesCascade.bend)
 type Back is Data:
   Alone{}
   Back{text: String, spec: W.Spec, found: List<&2, J.Found>, lock: String}
@@ -277,7 +279,7 @@ def plan.back(pl: LP.Plan, +ws: List<&2, LP.Effect>) -> LP.Plan:
   LP.Plan{effects.back(es, ws), outcome}
 
 # ---------------------------------------------------------------------------
-# members imported by their hash (EZ-WS-7)
+# members imported by their hash (laws/HashedMemberMovesCascade.bend)
 
 # the World an upgrade plans on, and the files it rewrites
 type Up is Data:

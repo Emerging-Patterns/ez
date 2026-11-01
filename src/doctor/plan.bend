@@ -12,10 +12,10 @@
 # build, though doctor goes on to say everything it found.
 #
 # The plan is lines said and an outcome, and nothing else: doctor writes no
-# file, lays no tree and removes nothing (EZ-VEN-4). The questions it asks
-# write nothing either: a program asked for its version, `ls` of the library,
-# git's listing of the tracked sources, and a package's files read from under
-# BEND_LIB.
+# file, lays no tree and removes nothing (laws/DoctorWritesNothing.bend).
+# The questions it asks write nothing either: a program asked for its
+# version, `ls` of the library, git's listing of the tracked sources, and a
+# package's files read from under BEND_LIB.
 #
 # A named import, `import <name>@<version>/...`, is read the same way: its
 # name is what the import line names, reported when no dependency of the
@@ -27,25 +27,26 @@
 #
 # The drift report is the ledger against the import lines. A package's `0x`
 # hash is written in two places, the `[deps.<name>]` section of ez.toml and
-# the `import 0x...` line that uses it, so the two can disagree. ez treats the
-# ledger as the record and the import lines as the truth, and reports the
-# disagreement both ways rather than rewriting anyone's source (EZ-VEN-5). An
-# import line is one the lock reads as one: in the header of a `.bend` file
-# git tracks outside `.ez/`, found by the package walk's own scan (`P.roots`),
-# so doctor and `ez lock` never disagree about what the source imports. A
-# ledger's `[tools.*]` pins are not dependencies, and the report never reads
-# them (EZ-LED-5).
+# the `import 0x...` line that uses it, so the two can disagree. ez treats
+# the ledger as the record and the import lines as the truth, and reports
+# the disagreement both ways rather than rewriting anyone's source
+# (laws/DoctorReportsDrift.bend). An import line is one the lock reads as
+# one: in the header of a `.bend` file git tracks outside `.ez/`, found by
+# the package walk's own scan (`P.roots`), so doctor and `ez lock` never
+# disagree about what the source imports. A ledger's `[tools.*]` pins are
+# not dependencies, and the report never reads them
+# (laws/ToolSectionIsNoDependency.bend).
 #
 # The lock is checked the way `cargo --locked` and `uv lock --check` check
 # one, without the network: doctor puts a plain `ez lock` to the lock's own
 # planner (lock/plan.bend), over the ledger as it is, tools and all, the
 # sources git lists, and the trees BEND_LIB holds, and compares the text it
-# would write with ez.lock.toml byte for byte (EZ-VEN-6). So every hash,
-# source, file sum and tool pin the lock records is checked, by the code that
-# writes them. A package the lock would read and BEND_LIB lacks is one doctor
-# cannot see, and the lock is then said to be unchecked rather than guessed
-# at; that, a lock ez lock would refuse to write, and a lock it would write
-# otherwise, each fail the command.
+# would write with ez.lock.toml byte for byte (laws/DoctorJudgesLock.bend).
+# So every hash, source, file sum and tool pin the lock records is checked,
+# by the code that writes them. A package the lock would read and BEND_LIB
+# lacks is one doctor cannot see, and the lock is then said to be unchecked
+# rather than guessed at; that, a lock ez lock would refuse to write, and a
+# lock it would write otherwise, each fail the command.
 #
 # The Effect, Plan and Outcome types are the lock's (lock/plan.bend), as for
 # the other commands.
@@ -792,8 +793,9 @@ def trees.of(
 
 # the ledger as doctor sees it: its package, its entry and its dependencies.
 # Its `[tools.*]` pins are not dependencies, so they are dropped before
-# anything but the lock check is decided (EZ-LED-5). The lock check reads the
-# ledger's text as `ez lock` does, since the lock records the pins.
+# anything but the lock check is decided
+# (laws/ToolSectionIsNoDependency.bend). The lock check reads the ledger's
+# text as `ez lock` does, since the lock records the pins.
 def ledger.seen(ledger: M.Read) -> M.Read:
   match ledger:
     case M.Bad{why}:

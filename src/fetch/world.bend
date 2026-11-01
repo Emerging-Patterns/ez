@@ -19,9 +19,10 @@
 # A name the lock records is asked about too: the file bend reads its hash
 # from, `$BEND_LIB/names/<nv>` (`Named`), as it is, or that there is none.
 #
-# A workspace member's package (EZ-WS-8) is asked about as the committed
-# `.bend` files (`Tree`), answered the way `ez lock` lists them, and the
-# planner walks the member from its entry over them itself.
+# A workspace member's package (laws/WorkspaceFetchChecksMembers.bend) is
+# asked about as the committed `.bend` files (`Tree`), answered the way `ez
+# lock` lists them, and the planner walks the member from its entry over
+# them itself.
 import Base
 import ../toml/toml.bend as T
 import ../lock/lock.bend as L

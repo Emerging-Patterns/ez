@@ -3,7 +3,7 @@
 # (init/plan.bend) for the plan, and runs it with the lock's effect runner
 # (`Run.exec.plan`), which makes a file's directory before writing it and
 # exits 1 with the reason when the plan refuses. It decides nothing; that it
-# reads and executes faithfully is EZ-TRUST-2.
+# reads and executes faithfully is trusted in ez/app.bend.
 import Base
 import ../io/file.bend as F
 import ../lock/run.bend as Run

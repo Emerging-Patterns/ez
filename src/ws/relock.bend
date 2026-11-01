@@ -1,6 +1,7 @@
-# ws/relock: `ez add` and `ez remove` in a workspace (EZ-WS-10). Outside a
-# workspace each runs its command's plan joined to a plain lock over the
-# ledger it writes (add/relock.bend, remove/relock.bend, EZ-DOC-6). In a
+# ws/relock: `ez add` and `ez remove` in a workspace
+# (laws/WorkspaceAddRemoveRelock.bend). Outside a workspace each runs its
+# command's plan joined to a plain lock over the ledger it writes
+# (add/relock.bend, remove/relock.bend, laws/AddRemoveRelock.bend). In a
 # workspace the lock that ledger belongs to is the root's, so the command's
 # own plan is joined instead to the plan a plain `ez lock` at the root makes
 # (`U.plan`, ws/up.bend) over the workspace the command leaves: the root's
@@ -320,7 +321,7 @@ def add.lock(+root: Rooted, world: AR.World) -> Lock:
   lock.of(ledgers(root, add.edit(root, aw), A.ledger(aw)), root,
     List.append(&2, LW.Reply, AR.seeds(aw), locks))
 
-# the note (EZ-DOC-7), over the root's lock
+# the note (laws/AddNotesUnlockedPackage.bend), over the root's lock
 def add.notes(+lk: Lock, +aw: A.World) -> List<&2, LP.Effect>:
   AR.notes.of(AR.held(lock.packs(lk), AR.added(aw)), AR.added(aw))
 

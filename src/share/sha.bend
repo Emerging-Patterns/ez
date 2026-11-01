@@ -3,6 +3,13 @@
 # 180-4 specification; this file is only the string-in, hex-out shape ez uses.
 # The dependency hashes packed big-endian words and returns eight of them, or
 # nothing when the declared length does not fit the array.
+#
+# Trusted, not proved: `Sha.raw` computes the SHA-256 digest of its bytes,
+# and `Sha.hex` the SHA-256 of the UTF-8 bytes of its text. For a file's
+# text that is the SHA-256 of the file's bytes, which is what `bend
+# --publish` and the hub compute. Proved in noah-emp/bend-sha256 against an
+# executable FIPS 180-4 specification, at the hash ez vendors; ez's gate
+# does not re-check it. Collision resistance is also assumed.
 import Base
 import 0x3bdc0c9f5265bb49f7fc76b61f529f24/sha256.bend as S
 

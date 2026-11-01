@@ -16,11 +16,12 @@
 # package's is. The lock has to be a file of that workspace, so pass it as a
 # path into the source tree (`./ez.lock.toml`), not as a copy of its text.
 #
-# Every name the lock's `[names]` table records is laid as `ez fetch` lays it:
-# `names/<name>@<version>` holding the `0x` hash and a newline, the file bend
-# reads a named import's hash from, so a package that imports another by its
-# hub name resolves here too (EZ-HUB-4). A name or hash bend would not read
-# back fails the evaluation, as `ez fetch` refuses it.
+# Every name the lock's `[names]` table records is laid as `ez fetch` lays
+# it: `names/<name>@<version>` holding the `0x` hash and a newline, the file
+# bend reads a named import's hash from, so a package that imports another
+# by its hub name resolves here too (laws/NameFilesLaid.bend). A name or
+# hash bend would not read back fails the evaluation, as `ez fetch` refuses
+# it.
 { lib, fetchurl, fetchgit, runCommand, python3 }:
 
 lockFile:

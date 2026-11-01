@@ -10,6 +10,10 @@
 # Nothing here reimplements git. Bend links no TLS and Base has no readdir, so
 # the programs that already speak the protocol are run instead, through the one
 # process effect the rest of ez uses: arguments execvp'd, no shell between.
+#
+# Trusted, not proved: git reports refs, tags and ancestry accurately. The
+# World model takes git's answers as given; what ez decides from them is
+# pure, and the laws are about that.
 import Base
 import ../io/file.bend as F
 import ../toml/toml.bend as T

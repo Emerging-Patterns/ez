@@ -1,10 +1,11 @@
-# ws/joint: the one ledger a workspace is locked from (EZ-WS-3). `ez lock` in
-# a workspace writes one ez.lock.toml at the root, so it reads every member's
-# ledger; rather than teach the lock planner a second kind of World, the
-# members' ledgers are joined into one, and the lock planner runs on a World
-# whose ledger is that one. Every law the lock planner has is about every
-# World, so it holds of a workspace's lock as it does of a project's. The
-# design is docs/rfc/ez-workspaces.md.
+# ws/joint: the one ledger a workspace is locked from
+# (laws/WorkspaceLocksOnce.bend). `ez lock` in a workspace writes one
+# ez.lock.toml at the root, so it reads every member's ledger; rather than
+# teach the lock planner a second kind of World, the members' ledgers are
+# joined into one, and the lock planner runs on a World whose ledger is that
+# one. Every law the lock planner has is about every World, so it holds of a
+# workspace's lock as it does of a project's. The design is
+# docs/rfc/ez-workspaces.md.
 #
 # The joint ledger is the root's `[package]` table with the dependencies and
 # tools of the root and of every member, a member's relative path sources
@@ -13,11 +14,12 @@
 # is the one the joint ledger holds, and every other must agree with it.
 #
 # A dependency section with `workspace = true` names another member by its
-# `[package] name` (EZ-WS-5). Before the ledgers are joined, each such section
-# is given the member's package: its hash, the `0x` name of the walk from the
-# member's entry over the committed files, its entry as a path from the root,
-# and the directory the walk writes its paths from. No ledger a person keeps
-# records any of that; only the joint ledger the lock reads does.
+# `[package] name` (laws/WorkspaceMemberDependency.bend). Before the ledgers
+# are joined, each such section is given the member's package: its hash, the
+# `0x` name of the walk from the member's entry over the committed files,
+# its entry as a path from the root, and the directory the walk writes its
+# paths from. No ledger a person keeps records any of that; only the joint
+# ledger the lock reads does.
 import Base
 import ../ledger/manifest.bend as M
 import ../ledger/render.bend as Rend
@@ -49,7 +51,8 @@ type Joint is Data:
 # a member's sources, as the root reads them
 
 # a source read from a member's directory: a relative path joined to it, and
-# a URL or an absolute path as it is (`P.anchor`, EZ-LED-8)
+# a URL or an absolute path as it is (`P.anchor`,
+# laws/PathTargetRecordedAsGiven.bend)
 def source.at(+dir: String, src: M.Source) -> M.Source:
   match src:
     case M.Hub{nv}:
@@ -248,7 +251,7 @@ def tools.clash.go(ts: List<&2, M.Tool>, +all: List<&2, M.Tool>) -> String:
       Bool.pick(String, tool.eq(hd, M.tool.find(all, M.tool.name(hd))), rest, M.tool.name(hd))
 
 # ---------------------------------------------------------------------------
-# one pin per git source (EZ-WS-4)
+# one pin per git source (laws/WorkspaceOnePinPerSource.bend)
 
 # the pin a source is recorded at, once it is known whether it is the url
 def pin.at(hit: Bool, src: M.Source, rest: M.Source) -> M.Source:
@@ -390,7 +393,7 @@ type Read is Data:
   Read{ms: List<&2, Member>}
 
 # ---------------------------------------------------------------------------
-# a member as a dependency (EZ-WS-5)
+# a member as a dependency (laws/WorkspaceMemberDependency.bend)
 
 # what a member's section resolves to: the dependency on the member's
 # package, or why there is none
@@ -442,9 +445,9 @@ def walked(got: K.Walked, +name: String, +entry: String, +nv: String) -> Res:
       Bad{why}
 
 # a member's package, by the name `ez publish` would publish it under
-# (EZ-WS-6): imported by that name when it has one, by its hash when its
-# ledger gives neither `publish-as` nor `version`, and refused when it gives
-# a name publish refuses
+# (laws/PublishedMemberImportedByName.bend): imported by that name when it
+# has one, by its hash when its ledger gives neither `publish-as` nor
+# `version`, and refused when it gives a name publish refuses
 def by.name(named: PP.Named, got: K.Walked, +name: String, +entry: String) -> Res:
   match named:
     case PP.ByHash{}:
@@ -626,11 +629,11 @@ def named.one(named: PP.Named, mb: Member, +files: List<&2, K.Source>, rest: Dep
       Member{+dir, +mm} = mb
       deps.cons(member.dep(mm, dir, member.name(Member{dir, mm}), files), rest)
 
-# every member imported by name, as a dependency of the joint ledger, whether
-# or not a section names it, so that the lock resolves its name from the
-# ledger and never puts it to the hub or to the lock being rewritten
-# (EZ-WS-6). A member whose name publish refuses is imported by none, and
-# adds none.
+# every member imported by name, as a dependency of the joint ledger,
+# whether or not a section names it, so that the lock resolves its name from
+# the ledger and never puts it to the hub or to the lock being rewritten
+# (laws/PublishedMemberImportedByName.bend). A member whose name publish
+# refuses is imported by none, and adds none.
 def names.deps(xs: List<&2, Member>, +files: List<&2, K.Source>) -> Deps:
   match xs:
     case []:
@@ -862,7 +865,7 @@ def joint.spec(rd: W.Read, +text: String, +fs: List<&2, Found>, +files: List<&2,
       joint.members(W.members(spec, W.root.of(text), ledgers(fs)), text, fs, files)
 
 # ---------------------------------------------------------------------------
-# the members, resolved, for `ez doctor` (EZ-WS-9)
+# the members, resolved, for `ez doctor` (laws/WorkspaceDoctorPerMember.bend)
 
 # the members resolved, once each was read: the root first, as the member at
 # its own directory

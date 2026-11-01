@@ -12,7 +12,8 @@
 # from under BEND_LIB as `ez lock` reads one there (`Run.disk.all`), and
 # never fetched, and a name's file under `BEND_LIB/names` is read as it
 # is. None of these writes anything, and the plan writes nothing either. It
-# decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
+# decides nothing; that it reads and executes faithfully is trusted in
+# ez/app.bend.
 import Base
 import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../run/bend.bend as Bend

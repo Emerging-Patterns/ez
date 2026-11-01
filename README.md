@@ -202,7 +202,9 @@ inputs.ez.inputs.bend.follows = "bend";
   doctor, nix, and prove and test.
 - [docs/formats.md](docs/formats.md): every key of `ez.toml` and
   `ez.lock.toml`, and what a tool that rewrites them must keep.
-- [SPEC.md](SPEC.md): what ez guarantees, each requirement with the laws that
-  prove it.
+- [LAWS.bend](LAWS.bend): what ez guarantees, one file under [laws/](laws/)
+  for each guarantee, proved by the file of the same name under
+  [proofs/](proofs/). What ez trusts rather than proves is said on the code
+  that assumes it.
 - [docs/rfc/ez-spec.md](docs/rfc/ez-spec.md): the design, and how ez got
   here.

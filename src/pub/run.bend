@@ -17,7 +17,8 @@
 # Before that, the lock is read as a file, and a url under the hub is asked
 # for with the lock's own GET (`Web.get`), whose answer is a status line and
 # the text: whether the hub answered 200, and the body or why not.
-# It decides nothing; that it reads and executes faithfully is EZ-TRUST-2.
+# It decides nothing; that it reads and executes faithfully is trusted in
+# ez/app.bend.
 import Base
 import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../io/file.bend as F

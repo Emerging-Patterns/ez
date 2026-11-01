@@ -2,11 +2,20 @@
 # command and its flags, and `get` / `on` read the bindings. How a line ends
 # is decided in ez/line.bend (`L.line`, `L.status`): a command runs, help is
 # shown and the line exits 0, or the line is misused and exits 1. This file
-# prints and exits as they say and runs the command, which is trusted under
-# EZ-TRUST-2. `IO.args()` is copied so each word can be read more than once.
+# prints and exits as they say and runs the command, which is trusted
+# (below). `IO.args()` is copied so each word can be read more than once.
 # The repo's top-level main.bend calls this `main`, and is the file that gets
 # built. Build it native (`bend main.bend -o bin/ez.bin`); interpreted, bend's
 # own CLI would take the flags meant for ez.
+#
+# Trusted, not proved: the interpreters (this file, ez/cmd.bend and each
+# command's run.bend) read the World and execute plans faithfully, and exit
+# with the status the planners' ends give. They make no decisions and are
+# kept small enough to review line by line; every decision is a planner's,
+# where the laws reach it. A failure an interpreter meets itself, a write
+# the system rejects, a build or link that fails, a fetch inside `ez tool`,
+# or a loop that runs out of fuel, exits 1. The words they are handed are
+# trusted in share/args.bend.
 import Base
 import 0xa383b26a5a0ef35663b3615d7aedf9e3/main.bend as Shake
 import ../share/args.bend as Args

@@ -1161,9 +1161,9 @@ def model.next(moved: Bool, next: M.Manifest, old: M.Manifest) -> M.Read:
       M.Good{old}
 
 # why an upgrade that moved a pin stops, "" when it does not: the ledger it
-# would write cannot be written so that it reads back as the model it renders
-# (EZ-LED-4), so it is refused, with no effect, rather than written as
-# something else
+# would write cannot be written so that it reads back as the model it
+# renders (laws/WrittenLedgerReadsBack.bend), so it is refused, with no
+# effect, rather than written as something else
 def fit.why(moved: Bool, next: M.Manifest) -> String:
   match moved:
     case True{}:

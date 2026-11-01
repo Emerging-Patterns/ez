@@ -230,11 +230,12 @@ def tools.ok(ts: List<&2, M.Tool>) -> Bool:
       rest = tools.ok(t)
       Bool.and(tool.ok(h), rest)
 
-# whether a ledger can be written so that it reads back as itself (EZ-LED-4):
-# every name and value is clean, `publish-as` and `version` among them, every
-# dependency has a hash, and every git source names its repo and its root.
-# Every command that writes ez.toml refuses a ledger that is not, so every
-# ledger ez writes is one of these.
+# whether a ledger can be written so that it reads back as itself
+# (laws/WrittenLedgerReadsBack.bend): every name and value is clean,
+# `publish-as` and `version` among them, every dependency has a hash, and
+# every git source names its repo and its root. Every command that writes
+# ez.toml refuses a ledger that is not, so every ledger ez writes is one of
+# these.
 def renderable(manifest: M.Manifest) -> Bool:
   M.Manifest{+n, +e, +b, +h, +pa, +pv, ds, ts} = manifest
   Bool.and(Bool.and(Bool.and(clean(n), clean(e)), Bool.and(clean(b), clean(h))),

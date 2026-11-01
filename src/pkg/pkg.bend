@@ -1,8 +1,9 @@
 # pkg/pkg: the package a `bend <entry> --publish` would upload, computed
-# without publishing: the file set, their sha256s, and the `0x<hash>` that names
-# them. This mirrors `pkg_files` and the hash in bend's `cli_publish`.
-# `tests/publish.sh` pins it against the real thing by running `bend --publish`
-# at a local hub, so drift fails the gate rather than the ecosystem.
+# without publishing: the file set, their sha256s, and the `0x<hash>` that
+# names them. This mirrors `pkg_files` and the hash in bend's `cli_publish`.
+# `tests/publish.sh` pins it against the real thing by running `bend
+# --publish` at a local hub, so drift fails the gate rather than the
+# ecosystem.
 #
 # The walk is pure: `of` computes the package from a checkout's files alone,
 # which is what `ez add` in planner form will run, and `pkg_of` and `pkg_in`
@@ -10,6 +11,25 @@
 # Bend refuses an import cycle, and this module both defines the file list the
 # walk hashes and runs it, so the walk lives here rather than in a module of
 # its own.
+#
+# Trusted, not proved: ez's 0x hash for an entry equals the hash `bend
+# --publish` assigns to it. bend is a separate program, but the walk's side
+# of it is stated in laws. bend 2.0.27 publishes every file named exactly
+# `LICENSE` beside a file of the package, at the same path, and refuses a
+# file under a directory named license in any case. The walk takes such a
+# LICENSE along beside a module (laws/LicenseGoesAlong.bend) and beside a
+# foreign body (laws/ForeignLicenseGoesAlong.bend), asks for one it was not
+# given rather than hashing without it (laws/LicenseAsked.bend), finds a
+# file whose directory holds none as it always did
+# (laws/NoLicenseAsBefore.bend), and refuses a package with a file under a
+# license directory, naming it (laws/LicenseDirNamed.bend,
+# laws/LicenseDirRefused.bend, laws/NoLicenseDirPasses.bend). A ledger written
+# before names a git package without its LICENSE files, and the name
+# decides: `ez lock` judges a checkout whose walked manifest is not the one
+# its name is the digest of without them (laws/OldNameLeavesLicenseOut.bend,
+# laws/OldNameKeepsOtherFiles.bend, laws/GitNamedWithoutLicense.bend), and `ez
+# lock --upgrade` weighs a pinned commit the same way
+# (laws/UpgradeNamedWithoutLicense.bend).
 import Base
 import ../io/file.bend as F
 import ../share/sha.bend as Sha
@@ -154,8 +174,9 @@ def cut.all(sofar: Cut) -> List<&2, String>:
 def fields(line: String) -> List<&2, String>:
   cut.all(cut(line))
 
-# the nth word, or "" when the line is shorter than that. Both the list and the
-# count are scrutinised together, so the walk needs no helper to branch through.
+# the nth word, or "" when the line is shorter than that. Both the list and
+# the count are scrutinised together, so the walk needs no helper to branch
+# through.
 def word(ws: List<&2, String>, index: Nat) -> String:
   match ws index:
     case Nil{} _m:
@@ -416,8 +437,9 @@ def named.of(+spec: String) -> String:
   +first = word(String.split(n, '/'), 0n)
   named.pick(Bool.and(String.contains(n, "/"), String.contains(first, "@")), first)
 
-# an import of a named hub package, which is a dependency rather than a module
-# of this package, whether or not the hub rules its name in (EZ-HUB-3)
+# an import of a named hub package, which is a dependency rather than a
+# module of this package, whether or not the hub rules its name in
+# (laws/NamedImportIsHubDependency.bend)
 def is_named(+spec: String) -> Bool:
   Bool.not(String.is_empty(named.of(spec)))
 
@@ -866,10 +888,11 @@ def foreign.check(+tree: Tree, +dir: String, +nd: String, ats: List<&2, String>)
       foreign.judge(outside(at), tree, at, P.join(nd, h),
         _u => foreign.check(tree, dir, nd, t))
 
-# a file whose LICENSE and foreign bodies are all settled: itself, the LICENSE
-# beside it and its foreign bodies found, and the modules it imports put at
-# the front of the queue, so the walk goes depth first the way bend's does. A foreign body that stops the walk
-# leaves the file queued, so an answered question visits it again.
+# a file whose LICENSE and foreign bodies are all settled: itself, the
+# LICENSE beside it and its foreign bodies found, and the modules it imports
+# put at the front of the queue, so the walk goes depth first the way bend's
+# does. A foreign body that stops the walk leaves the file queued, so an
+# answered question visits it again.
 def visit.put(
   fstop: Stop,
   +tree: Tree,
@@ -1350,8 +1373,8 @@ def pkg.next(
       made.io(top, made(entry, st))
 
 # fuel enough for a walk taken up again over the files read so far: a step
-# for every file still queued, and `walk.fuel`'s step for every import those files
-# can queue
+# for every file still queued, and `walk.fuel`'s step for every import those
+# files can queue
 def resumed.fuel(+tree: Tree, +st: State) -> Nat:
   Tree{_whole, fs, _gone} = tree
   State{_seen, _out, _stop, queue} = st

@@ -18,12 +18,13 @@
 # refuses it.
 #
 # A named import, `import <name>@<version>/...`, is a hub package too
-# (EZ-HUB-3). One the project's own sources import must be a dependency
-# ez.toml records by that name, and resolves to the hash ez.toml records
-# beside it; one a package imports resolves the same way when ez.toml names
-# it, then by the lock being rewritten, and only then by asking the hub, once
-# (EZ-HUB-2). The package it resolves to is walked and checked like any hub
-# package, and the lock records every name it resolved under `[names]`.
+# (laws/NamedImportIsHubDependency.bend). One the project's own sources
+# import must be a dependency ez.toml records by that name, and resolves to
+# the hash ez.toml records beside it; one a package imports resolves the
+# same way when ez.toml names it, then by the lock being rewritten, and only
+# then by asking the hub, once (laws/ResolvedNotAsked.bend). The package it
+# resolves to is walked and checked like any hub package, and the lock
+# records every name it resolved under `[names]`.
 #
 # What a lock decides depends on a World only through `W.inputs`: the ledger
 # it is made from, the upgrade's refusal if any, the committed sources, and
@@ -720,7 +721,7 @@ type Place is Data:
 # is a tree that finished. A `Drop` removes `.ez/lib/<hash>`, a committed tree
 # an upgrade moved off. A `Name` writes `$BEND_LIB/names/<nv>` holding the
 # hash and a newline, the file bend reads a name's hash from before it would
-# ask the hub (EZ-HUB-4). A `Say` is a line a person is told.
+# ask the hub (laws/NameFilesLaid.bend). A `Say` is a line a person is told.
 type Effect is Data:
   Write{path: String, text: String}
   Lay{place: Place, hash: String, files: List<&2, W.Source>}
@@ -737,10 +738,10 @@ type Outcome is Data:
 type Plan is Data:
   Plan{effects: List<&2, Effect>, outcome: Outcome}
 
-# the status a command exits with (EZ-OUT-1): 0 when it succeeds, 1 when it
-# refuses. Every planner's plan ends with an Outcome, and the interpreter
-# exits with this status of it (`Run.end`), so this is the one place the
-# mapping lives.
+# the status a command exits with (laws/ExitStatusSaysFailure.bend): 0 when
+# it succeeds, 1 when it refuses. Every planner's plan ends with an Outcome,
+# and the interpreter exits with this status of it (`Run.end`), so this is
+# the one place the mapping lives.
 def status(outcome: Outcome) -> U32:
   match outcome:
     case Success{}:
@@ -970,9 +971,11 @@ def packs(world: W.World) -> List<&2, L.Pack>:
   packs.of(W.next(args, ledger, ups), listing, replies)
 
 # the ledger model an upgrade renders into ez.toml; ez.toml as it was when
-# the upgrade refuses, still asks, or moves nothing, and for a plain lock. The
-# upgrade's decisions (EZ-RES-4 to 6 and 8) are stated over it, and hold of
-# ez.toml's bytes, which read back as it (EZ-LED-4).
+# the upgrade refuses, still asks, or moves nothing, and for a plain lock.
+# The upgrade's decisions (laws/UpgradeHoldsHub.bend,
+# laws/UpgradeRevMovesForward.bend, laws/UpgradeOnlyNamedPackage.bend and
+# laws/UpgradeTagFollows.bend) are stated over it, and hold of ez.toml's
+# bytes, which read back as it (laws/WrittenLedgerReadsBack.bend).
 def ledger.next(world: W.World) -> M.Read:
   W.World{args, +ledger, _listing, _replies, ups} = world
   Up.next.model(W.next(args, ledger, ups))
@@ -1046,8 +1049,9 @@ def writes(pl: Plan) -> Bool:
   writes.in(es)
 
 # ---------------------------------------------------------------------------
-# the trees a plan lays, named (EZ-HASH-3). Law vocabulary for `ez lock`,
-# `ez add` and `ez fetch`, which lay trees through the same effect.
+# the trees a plan lays, named (laws/LaidTreeNamedByManifest.bend). Law
+# vocabulary for `ez lock`, `ez add` and `ez fetch`, which lay trees through
+# the same effect.
 
 # every file of a tree but the last, which a `Lay` writes as the manifest
 def front(fs: List<&2, W.Source>) -> List<&2, W.Source>:
@@ -1293,7 +1297,8 @@ def names.asked(+hub: String, nvs: List<&2, String>) -> List<&2, W.Ask>:
 
 # the questions for the names still open: none when there are none; the lock
 # being rewritten first, since a name it records is not put to the hub
-# (EZ-HUB-2); and then each name the lock does not record, once
+# (laws/ResolvedNotAsked.bend); and then each name the lock does not record,
+# once
 def names.ask.lock(read: Bool, +hub: String, nvs: List<&2, String>) -> List<&2, W.Ask>:
   match read:
     case True{}:

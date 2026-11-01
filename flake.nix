@@ -99,14 +99,14 @@
           # packages.
           lib = ez;
           apps.default = { type = "app"; program = "${ezBin}/bin/ez"; };
-          # `lint` is bolt at the lock's `[tools.bolt]` pin, run with
-          # `+RTS --gpu off -RTS` over a copy of the tree, graded by ./bolt.bend.
-          # `fresh` is EZ-DOC-3 checked directly: a clone's `ez lock` gives back
-          # the committed lock. `named` builds ./nix/tests/named with mkPackage
-          # and no network. `added` runs `ez add` and builds from the lock it
-          # wrote, with no `ez lock` between.
-          # `fresh` waits for `ez`: each compile of ez peaks near 3.3 GB, and the
-          # two side by side ran a CI runner out of memory.
+          # `lint` is bolt at the lock's `[tools.bolt]` pin, run with `+RTS
+          # --gpu off -RTS` over a copy of the tree, graded by ./bolt.bend.
+          # `fresh` is laws/LockReproducible.bend checked directly: a
+          # clone's `ez lock` gives back the committed lock. `named` builds
+          # ./nix/tests/named with mkPackage and no network. `added` runs
+          # `ez add` and builds from the lock it wrote, with no `ez lock`
+          # between. `fresh` waits for `ez`: each compile of ez peaks near
+          # 3.3 GB, and the two side by side ran a CI runner out of memory.
           checks = {
             inherit proofs;
             lint = ez.mkLint { src = self; };
@@ -118,8 +118,9 @@
               inherit pkgs bend;
               nativeBuildInputs = [ ez.cc ];
             };
-            # `ez add` writes the lock (EZ-DOC-6): an add on a project that already
-            # imports the package, then mkPackage from that lock with no network
+            # `ez add` writes the lock (laws/AddRemoveRelock.bend): an add
+            # on a project that already imports the package, then mkPackage
+            # from that lock with no network
             added = import ./nix/tests/added.nix {
               inherit pkgs bend;
               ez = ezBin;
