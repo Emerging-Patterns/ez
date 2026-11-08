@@ -51,12 +51,12 @@ def deps(ds: List<&2, M.Dep>) -> String:
       dep(h) ++ deps(t)
 
 # one `[tools.<name>]` section. No hash: a tool is not a package.
-def tool(pin: M.Tool) -> String:
-  M.Tool{n, e, b, s} = pin
+def tool(pin: M.Cli) -> String:
+  M.Cli{n, e, b, s} = pin
   "\n[tools." ++ n ++ "]\n" ++ source(s) ++ line("entry", e) ++ line("bin", b)
 
 # every pinned CLI, in the order the ledger holds them
-def tools(ts: List<&2, M.Tool>) -> String:
+def tools(ts: List<&2, M.Cli>) -> String:
   match ts:
     case []:
       ""
@@ -217,12 +217,12 @@ def tool.src.ok(src: M.Source) -> Bool:
       False{}
 
 # whether a pinned CLI does
-def tool.ok(pin: M.Tool) -> Bool:
-  M.Tool{+n, +e, +b, s} = pin
+def tool.ok(pin: M.Cli) -> Bool:
+  M.Cli{+n, +e, +b, s} = pin
   Bool.and(clean(n), Bool.and(Bool.and(clean(e), clean(b)), tool.src.ok(s)))
 
 # whether every pinned CLI does
-def tools.ok(ts: List<&2, M.Tool>) -> Bool:
+def tools.ok(ts: List<&2, M.Cli>) -> Bool:
   match ts:
     case []:
       True{}

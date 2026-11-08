@@ -368,7 +368,7 @@ def find_walk(rs, only, hub, ds, m, pre):
 # is one def of the pipeline, with the value it branches on as a parameter.
 
 # the tools a walk leaves
-def tools.of(tt: Up.Tools) -> List<&2, M.Tool>:
+def tools.of(tt: Up.Tools) -> List<&2, M.Cli>:
   Up.Tools{ts, _m, _sy, _asks, _bad} = tt
   ts
 
@@ -399,7 +399,7 @@ law done_kept:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for dd: Up.Deps
   for tt: Up.Tools
   for +ignore: String
@@ -428,7 +428,7 @@ law srcs_kept:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for dd: Up.Deps
   for tt: Up.Tools
   for +ignore: String
@@ -458,7 +458,7 @@ law ignore_kept:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for dd: Up.Deps
   for tt: Up.Tools
   for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
@@ -487,7 +487,7 @@ law asks_kept:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +dd: Up.Deps
   for tt: Up.Tools
   for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
@@ -518,7 +518,7 @@ law bad_kept:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +dd: Up.Deps
   for tt: Up.Tools
   for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
@@ -546,7 +546,7 @@ law pins_kept:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, deps.of(dd), tools.of(tt)}})
     == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
   {f(Up.next.model(Up.pins(dd, tt, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots})))
@@ -575,7 +575,7 @@ law next_kept.known:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv,
     deps.of(Up.deps.walk(rs, only, M.hub.or(hb), ods)), tools.of(Up.tools.walk(rs, only, ots))}})
     == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}
@@ -605,7 +605,7 @@ law next_kept:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for pre: {f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv,
     deps.of(Up.deps.walk(rs, only, M.hub.or(hb), ods)), tools.of(Up.tools.walk(rs, only, ots))}})
     == f(M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}) : A}

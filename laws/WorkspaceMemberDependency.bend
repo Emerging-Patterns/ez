@@ -43,7 +43,7 @@ law member_dep_walked:
   for pa: String
   for pv: String
   for ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +hash: String
   for +root: String
   for fs: List<&2, K.Source>
@@ -67,7 +67,7 @@ law named_finds:
   for +pa: String
   for +pv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +ms: List<&2, J.Member>
   {J.named(J.Member{dir, M.Manifest{name, ee, bb, hh, pa, pv, ds, ts}} <> ms, name)
     == Some{J.Member{dir, M.Manifest{name, ee, bb, hh, pa, pv, ds, ts}}} : Maybe<&2, J.Member>}

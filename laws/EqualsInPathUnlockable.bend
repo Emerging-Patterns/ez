@@ -19,7 +19,7 @@ law path_eq_unlockable:
   for +sum: String
   for +fs: List<&2, K.Item>
   for +rest: List<&2, L.Pack>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +hub: String
   for e: {False{} == P.path.eqless(at) : Bool}
   {P.lockable(L.Pack{hash, src, K.Item{at, sum} <> fs} <> rest, ts, hub) == False{}

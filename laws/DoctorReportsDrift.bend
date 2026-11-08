@@ -39,7 +39,7 @@ law doctor_reports_unrecorded:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +fs: List<&2, W.Source>
   for +h: String
   for g: {M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, ts}} == DW.read(w) : M.Read}
@@ -62,7 +62,7 @@ law doctor_reports_unused:
   for +pre: List<&2, M.Dep>
   for +d: M.Dep
   for +post: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +fs: List<&2, W.Source>
   for g: {M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, List.append(&2, M.Dep, pre, d <> post), ts}}
     == DW.read(w) : M.Read}
@@ -80,7 +80,7 @@ law doctor_drift_fails:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +fs: List<&2, W.Source>
   for +x: String
   for +xs: List<&2, String>

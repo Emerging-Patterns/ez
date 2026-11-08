@@ -594,12 +594,12 @@ def tool.pairs(+entry: String, +binary: String, source: M.Source) -> List<&2, T.
       List.concat(&2, T.Kv, [kv("entry", entry), kv("bin", binary)])
 
 # one `[tools.<name>]` table
-def tool.sect(pin: M.Tool) -> T.Sect:
-  M.Tool{n, e, b, s} = pin
+def tool.sect(pin: M.Cli) -> T.Sect:
+  M.Cli{n, e, b, s} = pin
   T.Sect{"tools." ++ n, tool.pairs(e, b, s)}
 
 # every pinned CLI, in the order the ledger holds them
-def tool.sects(ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
+def tool.sects(ts: List<&2, M.Cli>) -> List<&2, T.Sect>:
   match ts:
     case []:
       []
@@ -608,7 +608,7 @@ def tool.sects(ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
 
 # the lock with its tools after the packages. An empty tool list adds no
 # table, so a ledger with no tools writes the lock `render` writes.
-def render.tools(ts: List<&2, M.Tool>, hub: String, ps: List<&2, Pack>) -> String:
+def render.tools(ts: List<&2, M.Cli>, hub: String, ps: List<&2, Pack>) -> String:
   text.of(hub, K.file.sort(pack.blocks(ps)), T.render.all(tool.sects(ts)))
 
 # a name as the pair the `[names]` table writes it as, which is the shape a
@@ -638,12 +638,12 @@ def names.sects(ns: List<&2, Name>) -> List<&2, T.Sect>:
       [T.Sect{"names", file.pairs(K.files_of(name.files(h <> t)))}]
 
 # the lock with its names and then its tools after the packages
-def render.names(ns: List<&2, Name>, ts: List<&2, M.Tool>, hub: String, ps: List<&2, Pack>) -> String:
+def render.names(ns: List<&2, Name>, ts: List<&2, M.Cli>, hub: String, ps: List<&2, Pack>) -> String:
   text.of(hub, K.file.sort(pack.blocks(ps)),
     T.render.all(List.append(&2, T.Sect, names.sects(ns), tool.sects(ts))))
 
 # the same, told whether the tool list is empty
-def render.pick(empty: Bool, hub: String, ps: List<&2, Pack>, ts: List<&2, M.Tool>) -> String:
+def render.pick(empty: Bool, hub: String, ps: List<&2, Pack>, ts: List<&2, M.Cli>) -> String:
   match empty:
     case True{}:
       render(hub, ps)

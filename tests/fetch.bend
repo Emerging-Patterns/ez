@@ -31,9 +31,12 @@ def fetch(+port: String) -> IO(Unit):
     +gone : String <- Net.get(at(port, "/gone"))
     Check.eq_str("a 404 is a status, never a body", show(gone),
       "22 the server answered 404")
+    # since ezhttp 0.18 the reason names the errno, and its number is the
+    # platform's, so only the name is compared
     +shut : String <- Net.get("http://127.0.0.1:1/plain")
     Check.eq_str("a port with nothing on it names the host it could not reach",
-      show(shut), "6 could not reach 127.0.0.1 port 1")
+      String.take(show(shut), String.length("6 could not reach 127.0.0.1 port 1: ECONNREFUSED")),
+      "6 could not reach 127.0.0.1 port 1: ECONNREFUSED")
     +bad : String <- Net.get("nonsense")
     Check.eq_str("a url that is not one never reaches a socket", show(bad),
       "22 nonsense: has no //")

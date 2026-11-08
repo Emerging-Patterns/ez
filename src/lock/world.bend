@@ -257,12 +257,30 @@ def git.body(empty: Bool, +hash: String, +manifest: String, +ss: List<&2, String
     case False{}:
       body(hash, manifest, ss)
 
+# a name taken before bend 2.0.40 is the checkout's package without its
+# README; one taken before 2.0.27 is that without its LICENSE files too, so
+# the package without either is judged when the one without its README is
+# not the one the name is the digest of
+def git.old(readmeless: Bool, +hash: String, +fs: List<&2, K.Item>, +ss: List<&2, String>) -> Verdict:
+  match readmeless:
+    case True{}:
+      +rs = K.readmeless(fs)
+      git.body(List.is_empty(&2, K.Item, rs), hash, K.manifest.lines(rs),
+        K.readmeless.srcs(fs, ss))
+    case False{}:
+      +rs = K.readmeless(fs)
+      +bs = K.bare(rs)
+      git.body(List.is_empty(&2, K.Item, bs), hash, K.manifest.lines(bs),
+        K.bare.srcs(rs, K.readmeless.srcs(fs, ss)))
+
 # a git package's bytes under the rule its name was taken by. Since bend
-# 2.0.27 a package holds the LICENSE files beside its sources, and the walk
-# takes them along. A ledger written before names the same checkout without
-# them, and that package is the checkout's too: when the walk's manifest does
-# not hash to the name, the package without its LICENSE files is judged
-# instead, and locked when that is the one the name is the digest of.
+# 2.0.27 a package holds the LICENSE files beside its sources, and since
+# 2.0.40 the README beside its entry, and the walk takes them along. A
+# ledger written before names the same checkout without them, and that
+# package is the checkout's too: when the walk's manifest does not hash to
+# the name, the package without its README is judged instead, or, when that
+# is not the one the name is the digest of either, the package without its
+# README and its LICENSE files.
 def git.rule(named: Bool, +hash: String, +manifest: String, +ss: List<&2, String>) -> Verdict:
   match named:
     case True{}:
@@ -270,9 +288,7 @@ def git.rule(named: Bool, +hash: String, +manifest: String, +ss: List<&2, String
         hash, manifest, ss)
     case False{}:
       +fs = L.manifest.files(String.lines(manifest))
-      +bs = K.bare(fs)
-      git.body(List.is_empty(&2, K.Item, bs), hash, K.manifest.lines(bs),
-        K.bare.srcs(fs, ss))
+      git.old(Web.matches(L.want(hash), K.manifest.lines(K.readmeless(fs))), hash, fs, ss)
 
 # a git package's bytes once its checkout was weighed. A tree read from
 # BEND_LIB is judged as a clone that weighed to the narHash the ledger

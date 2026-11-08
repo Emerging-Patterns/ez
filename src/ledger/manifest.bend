@@ -39,8 +39,8 @@ type Dep is Data:
 # it has no `0x` name, it is not imported, and it is not put on BEND_LIB.
 # `entry` and `bin` name the file to build when the tool's own ledger should
 # not be the one.
-type Tool is Data:
-  Tool{name: String, entry: String, bin: String, source: Source}
+type Cli is Data:
+  Cli{name: String, entry: String, bin: String, source: Source}
 
 # the ledger: this package, the file `ez build` and `ez run` take, the file
 # `ez tool run`, `install` and `upgrade` build when one is named, the hub its
@@ -50,7 +50,7 @@ type Tool is Data:
 type Manifest is Data:
   Manifest{name: String, entry: String, bin: String, hub: String,
     publish: String, version: String,
-    deps: List<&2, Dep>, tools: List<&2, Tool>}
+    deps: List<&2, Dep>, tools: List<&2, Cli>}
 
 # a manifest, or why it could not be read
 type Read is Data:
@@ -166,32 +166,32 @@ def deps(ss: List<&2, T.Sect>) -> List<&2, Dep>:
       []
 
 # a `[tools.<name>]` section as a pinned CLI. The prefix is `tools.`
-def tool_of(+full: String, +pairs: List<&2, T.Kv>) -> Tool:
-  Tool{String.drop(full, 6n), value(pairs, "entry"), value(pairs, "bin"),
+def tool_of(+full: String, +pairs: List<&2, T.Kv>) -> Cli:
+  Cli{String.drop(full, 6n), value(pairs, "entry"), value(pairs, "bin"),
     source_of(pairs)}
 
 # a tool's own name
-def tool.name(pin: Tool) -> String:
-  Tool{n, _e, _b, _s} = pin
+def tool.name(pin: Cli) -> String:
+  Cli{n, _e, _b, _s} = pin
   n
 
 # the file a pin names as its entry, or "" when the tool's ledger names it
-def tool.entry(pin: Tool) -> String:
-  Tool{_n, e, _b, _s} = pin
+def tool.entry(pin: Cli) -> String:
+  Cli{_n, e, _b, _s} = pin
   e
 
 # the file a pin names as its binary, or "" when the tool's ledger names it
-def tool.bin(pin: Tool) -> String:
-  Tool{_n, _e, b, _s} = pin
+def tool.bin(pin: Cli) -> String:
+  Cli{_n, _e, b, _s} = pin
   b
 
 # where a pinned CLI's bytes come from
-def tool.source(pin: Tool) -> Source:
-  Tool{_n, _e, _b, s} = pin
+def tool.source(pin: Cli) -> Source:
+  Cli{_n, _e, _b, s} = pin
   s
 
 # a section joins the tools only when it is a `[tools.<name>]`
-def tools.put(is_tool: Bool, sect: T.Sect, rest: List<&2, Tool>) -> List<&2, Tool>:
+def tools.put(is_tool: Bool, sect: T.Sect, rest: List<&2, Cli>) -> List<&2, Cli>:
   match is_tool:
     case True{}:
       T.Sect{n, ps} = sect
@@ -200,7 +200,7 @@ def tools.put(is_tool: Bool, sect: T.Sect, rest: List<&2, Tool>) -> List<&2, Too
       rest
 
 # every `[tools.<name>]` section, as pinned CLIs, in the order written
-def tools(ss: List<&2, T.Sect>) -> List<&2, Tool>:
+def tools(ss: List<&2, T.Sect>) -> List<&2, Cli>:
   match ss:
     case +h <> t:
       tools.put(String.starts_with(name_of(h), "tools."), h, tools(t))
@@ -446,7 +446,7 @@ def hub_of(ledger: Read) -> String:
       hub.or(h)
 
 # the pinned CLIs of a ledger that was read; one that would not parse has none
-def tools_of(ledger: Read) -> List<&2, Tool>:
+def tools_of(ledger: Read) -> List<&2, Cli>:
   match ledger:
     case Bad{_why}:
       []
@@ -455,7 +455,7 @@ def tools_of(ledger: Read) -> List<&2, Tool>:
       ts
 
 # this tool when its name matches, otherwise whatever the rest gave
-def tool.find.pick(hit: Bool, pin: Tool, rest: Tool) -> Tool:
+def tool.find.pick(hit: Bool, pin: Cli, rest: Cli) -> Cli:
   match hit:
     case True{}:
       pin
@@ -463,14 +463,14 @@ def tool.find.pick(hit: Bool, pin: Tool, rest: Tool) -> Tool:
       rest
 
 # the tool of this name, or a blank one
-def tool.find.at(+pin: Tool, rest: Tool, +name: String) -> Tool:
+def tool.find.at(+pin: Cli, rest: Cli, +name: String) -> Cli:
   tool.find.pick(String.eq(tool.name(pin), name), pin, rest)
 
 # the tool of this name, or one with empty fields
-def tool.find(ts: List<&2, Tool>, +name: String) -> Tool:
+def tool.find(ts: List<&2, Cli>, +name: String) -> Cli:
   match ts:
     case []:
-      Tool{"", "", "", Hub{""}}
+      Cli{"", "", "", Hub{""}}
     case h <> t:
       tool.find.at(h, tool.find(t, name), name)
 
@@ -483,7 +483,7 @@ def tool.step(hit: Bool, rest: Unit -> Bool) -> Bool:
       rest(Unit{})
 
 # whether the ledger pins a CLI of this name
-def tool.has(ts: List<&2, Tool>, +name: String) -> Bool:
+def tool.has(ts: List<&2, Cli>, +name: String) -> Bool:
   match ts:
     case []:
       False{}
@@ -491,7 +491,7 @@ def tool.has(ts: List<&2, Tool>, +name: String) -> Bool:
       tool.step(String.eq(tool.name(h), name), _u => tool.has(t, name))
 
 # an empty `--package` is every tool; a name is that one
-def tool.known.go(all: Bool, ts: List<&2, Tool>, +name: String) -> Bool:
+def tool.known.go(all: Bool, ts: List<&2, Cli>, +name: String) -> Bool:
   match all:
     case True{}:
       True{}
@@ -499,5 +499,5 @@ def tool.known.go(all: Bool, ts: List<&2, Tool>, +name: String) -> Bool:
       tool.has(ts, name)
 
 # whether `--package` names a pinned CLI, or names nothing and so names all
-def tool.known(+only: String, ts: List<&2, Tool>) -> Bool:
+def tool.known(+only: String, ts: List<&2, Cli>) -> Bool:
   tool.known.go(String.is_empty(only), ts, only)

@@ -19,7 +19,7 @@ import ../tool/world.bend as TW
 
 # a question the planner asks
 type Ask is Data:
-  Tool{ask: TW.Ask}         # a file's text, or what git says of a path
+  ToolAsk{ask: TW.Ask}         # a file's text, or what git says of a path
   Tracked{}                 # `git ls-files -v` in the project
   Upload{entry: String, named: String, says: String}  # `bend <entry> --publish [<named>]`
   Lock{}                    # ez.lock.toml's text
@@ -68,7 +68,7 @@ def replies(world: World) -> List<&2, Reply>:
 # whatever the ledger says.
 def key(ask: Ask) -> String:
   match ask:
-    case Tool{q}:
+    case ToolAsk{q}:
       TW.key(q)
     case Tracked{}:
       "tracked"

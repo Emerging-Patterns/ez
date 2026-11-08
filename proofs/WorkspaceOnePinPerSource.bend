@@ -54,9 +54,9 @@ def Laws.pin_back(nn, _hh, _ee, url, _rev, _tag, _root, _nar, vend, js, jn, jh, 
     M.find(js, nn), M.Dep{jn, jh, je, M.Git{ju, jr, jt, jo, jnar, jv}}, ev)
 
 def Laws.tool_pin_back(nn, ee, bb, url, _rev, _tag, _root, _nar, vend, ts, jn, je, jb, ju, jr, jt, jo, jnar, jv, ev):
-  Equal.cong(M.Tool, M.Tool,
-    dd => UUp.tool.back.at(M.Tool{nn, ee, bb, M.Git{url, _rev, _tag, _root, _nar, vend}}, dd),
-    M.tool.find(ts, nn), M.Tool{jn, je, jb, M.Git{ju, jr, jt, jo, jnar, jv}}, ev)
+  Equal.cong(M.Cli, M.Cli,
+    dd => UUp.tool.back.at(M.Cli{nn, ee, bb, M.Git{url, _rev, _tag, _root, _nar, vend}}, dd),
+    M.tool.find(ts, nn), M.Cli{jn, je, jb, M.Git{ju, jr, jt, jo, jnar, jv}}, ev)
 
 def Laws.ref_unpinned(_nv, _url, _ref):
   {==}

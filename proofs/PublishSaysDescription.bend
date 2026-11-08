@@ -13,6 +13,31 @@ def Laws.hub_license_named(_t):
 # A LICENSE is passed over by the first step of the scan.
 def Laws.hub_skips_license(p, t, fs, l):
   %Equal.sym(Bool, B.lic(K.Source{p, t}), True{}, l)
+    : {B.line.of(B.least(fs, B.least.pick(Bool.or(_, B.readme(K.Source{p, t})), None{},
+      K.Source{p, t}))) == B.blurb(fs) : String}
+  {==}
+
+def Laws.hub_readme_named(_t):
+  {==}
+
+# LAW: anything or true is true
+law or_true:
+  for a: Bool
+  {True{} == Bool.or(a, True{}) : Bool}
+
+def or_true(a):
+  match a:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+# The README is passed over by the first step of the scan too.
+def Laws.hub_skips_readme(p, t, fs, r):
+  %Equal.sym(Bool, B.readme(K.Source{p, t}), True{}, r)
+    : {B.line.of(B.least(fs, B.least.pick(Bool.or(B.lic(K.Source{p, t}), _), None{},
+      K.Source{p, t}))) == B.blurb(fs) : String}
+  %or_true(B.lic(K.Source{p, t}))
     : {B.line.of(B.least(fs, B.least.pick(_, None{}, K.Source{p, t}))) == B.blurb(fs) : String}
   {==}
 
@@ -26,7 +51,7 @@ law keeps_least:
   {B.least(fs, Some{K.Source{p, t}}) == Some{K.Source{p, t}} : Maybe<&2, K.Source>}
 
 # LAW: one file of the scan, with whether its path comes no earlier and
-# whether it is a LICENSE in hand
+# whether the hub passes it over in hand
 law keeps_least.arm:
   for +h: K.Source
   for r: List<&2, K.Source>
@@ -60,12 +85,15 @@ def keeps_least(fs, p, t, af):
     case []:
       {==}
     case +h <> +r:
-      keeps_least.arm(h, r, p, t, String.is_le(p, B.at(h)), {==}, B.lic(h), af, x => keeps_least(r, p, t, x))
+      keeps_least.arm(h, r, p, t, String.is_le(p, B.at(h)), {==}, B.passed(h), af, x => keeps_least(r, p, t, x))
 
 # A file that is not a LICENSE starts the scan, and nothing after it comes
 # earlier.
-def Laws.hub_first_by_path(p, t, fs, nl, af):
+def Laws.hub_first_by_path(p, t, fs, nl, nr, af):
   %Equal.sym(Bool, B.lic(K.Source{p, t}), False{}, nl)
+    : {B.line.of(B.least(fs, B.least.pick(Bool.or(_, B.readme(K.Source{p, t})), None{},
+      K.Source{p, t}))) == B.line.first(t) : String}
+  %Equal.sym(Bool, B.readme(K.Source{p, t}), False{}, nr)
     : {B.line.of(B.least(fs, B.least.pick(_, None{}, K.Source{p, t}))) == B.line.first(t) : String}
   Equal.cong(Maybe<&2, K.Source>, String, m => B.line.of(m), B.least(fs, Some{K.Source{p, t}}),
     Some{K.Source{p, t}}, keeps_least(fs, p, t, af))

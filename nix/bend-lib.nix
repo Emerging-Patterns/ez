@@ -5,7 +5,8 @@
 #   ... buildPhase = "BEND_LIB=${bendLib} bend main.bend -o app";
 #
 # A hub package is one fixed-output fetchurl per file, keyed by the sha256 its
-# manifest already records. A git package is one fetchgit of the pinned rev, and
+# manifest already records, with that manifest beside them as `ez fetch` lays
+# it. A git package is one fetchgit of the pinned rev, and
 # its files are taken from the checkout at the paths the manifest names, which
 # are relative to the package's own root: the entry file's directory, unless a
 # module of it was reached through `..` and re-rooted the package above that.
@@ -82,6 +83,7 @@ let
         mkdir -p "$out/${hash}/$(dirname ${lib.escapeShellArg at})"
         cp ${hubFile hash at sha256} "$out/${hash}/${at}"
       '') files)}
+      printf '%s' ${lib.escapeShellArg (manifest files)} > "$out/${hash}/manifest"
     '';
   # bend's NAMED rule and a `0x` name, the pair `ez fetch` lays (src/pkg/pkg.bend
   # `name.ok`, src/lock/lock.bend `hash.ok`)

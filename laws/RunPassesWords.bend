@@ -19,7 +19,7 @@ law run_starts_entry:
   for +hpa: String
   for +hpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +a: String
   for +ws: List<&2, String>
   for good: {M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} == M.parse(t) : M.Read}
@@ -35,7 +35,7 @@ law run_starts_main:
   for +hpa: String
   for +hpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +a: String
   for +ws: List<&2, String>
   for good: {M.Good{M.Manifest{n, "", b, h, hpa, hpv, ds, ts}} == M.parse(t) : M.Read}

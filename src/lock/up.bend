@@ -557,18 +557,30 @@ def hash.kept.or(same: Bool, +bare: String, +full: String) -> String:
     case False{}:
       full
 
+# the checkout's hash without its README when it is the pin's, and otherwise
+# the one without its README and its LICENSE files, when that is
+def hash.kept.old(same: Bool, +pin: String, +plain: String, +full: String, +fs: List<&2, K.Item>) -> String:
+  match same:
+    case True{}:
+      plain
+    case False{}:
+      +bare = hash.of(K.manifest.lines(K.bare(K.readmeless(fs))))
+      hash.kept.or(String.eq(bare, pin), bare, full)
+
 def hash.kept.pick(same: Bool, +pin: String, +full: String, +manifest: String) -> String:
   match same:
     case True{}:
       full
     case False{}:
-      +bare = hash.of(K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))))
-      hash.kept.or(String.eq(bare, pin), bare, full)
+      +fs = L.manifest.files(String.lines(manifest))
+      +plain = hash.of(K.manifest.lines(K.readmeless(fs)))
+      hash.kept.old(String.eq(plain, pin), pin, plain, full, fs)
 
 # the hash a pinned commit's checkout has, by the rule the pin was taken by:
-# the walk's, or, for a pin written before bend 2.0.27 took the LICENSE files
-# along, the same checkout's without them. A pin that is neither is a drift,
-# and names the walk's hash.
+# the walk's; for a pin written before bend 2.0.40 took the README along,
+# the same checkout's without it; or, for one written before 2.0.27 took the
+# LICENSE files along, the checkout's without its README and those. A pin
+# that is none of them is a drift, and names the walk's hash.
 def hash.kept(+pin: String, +manifest: String) -> String:
   +full = hash.of(manifest)
   hash.kept.pick(String.eq(full, pin), pin, full, manifest)
@@ -835,7 +847,7 @@ def deps.walk(+rs: List<&2, Reply>, +only: String, +hub: String, ds: List<&2, M.
 # one tool after it was asked about, or the questions still open, or why the
 # upgrade refuses
 type Pinned is Data:
-  Pinned{tool: M.Tool, moved: Bool, says: List<&2, String>}
+  Pinned{tool: M.Cli, moved: Bool, says: List<&2, String>}
   PinWait{asks: List<&2, Ask>}
   PinHalt{why: String}
 
@@ -850,26 +862,26 @@ def set.go(
   +rev: String,
   +tag: String,
   +nar: String
-) -> M.Tool:
+) -> M.Cli:
   match source:
     case M.Hub{named}:
-      M.Tool{name, entry, bin, M.Hub{named}}
+      M.Cli{name, entry, bin, M.Hub{named}}
     case M.Git{url, _rev, old, root, _nar, _vend}:
-      M.Tool{name, entry, bin, M.Git{url, rev,
+      M.Cli{name, entry, bin, M.Git{url, rev,
         Bool.pick(String, String.is_empty(tag), old, tag), M.root.or(root),
         nar, False{}}}
     case M.Member{path, named}:
-      M.Tool{name, entry, bin, M.Member{path, named}}
+      M.Cli{name, entry, bin, M.Member{path, named}}
 
 # a tool's pin with a commit, a tag and a NAR hash written in
-def set(tool: M.Tool, +rev: String, +tag: String, +nar: String) -> M.Tool:
-  M.Tool{n, e, b, s} = tool
+def set(tool: M.Cli, +rev: String, +tag: String, +nar: String) -> M.Cli:
+  M.Cli{n, e, b, s} = tool
   set.go(n, e, b, s, rev, tag, nar)
 
 # a commit and its NAR hash written into the pin. A pin with either one empty
 # is short, and an upgrade that wrote one would fill it again on the next run,
 # so a weighing that names no commit or no NAR hash pins nothing.
-def tool.pin(short: Bool, +tool: M.Tool, +rev: String, +tag: String, +nar: String, says: List<&2, String>) -> Pinned:
+def tool.pin(short: Bool, +tool: M.Cli, +rev: String, +tag: String, +nar: String, says: List<&2, String>) -> Pinned:
   match short:
     case True{}:
       PinHalt{"ez: tools." ++ M.tool.name(tool) ++ ": weighing " ++ rev ++ " gave no narHash"}
@@ -877,7 +889,7 @@ def tool.pin(short: Bool, +tool: M.Tool, +rev: String, +tag: String, +nar: Strin
       Pinned{set(tool, rev, tag, nar), True{}, says}
 
 # a commit weighed, then written into the pin
-def tool.weighed(wd: Wd, +tool: M.Tool, +rev: String, +tag: String, says: List<&2, String>) -> Pinned:
+def tool.weighed(wd: Wd, +tool: M.Cli, +rev: String, +tag: String, says: List<&2, String>) -> Pinned:
   match wd:
     case Wd{+nar}:
       tool.pin(Bool.or(String.is_empty(rev), String.is_empty(nar)), tool, rev, tag, nar, says)
@@ -888,7 +900,7 @@ def tool.weighed(wd: Wd, +tool: M.Tool, +rev: String, +tag: String, says: List<&
 
 # the commit a ref named, weighed. The pin records the ref as its tag, even
 # one that names a commit, so the next upgrade asks about the same ref.
-def tool.resolved(tip: Tip, +rs: List<&2, Reply>, +tool: M.Tool, +ref: String) -> Pinned:
+def tool.resolved(tip: Tip, +rs: List<&2, Reply>, +tool: M.Cli, +ref: String) -> Pinned:
   match tip:
     case At{+rev, _tag, _branch}:
       tool.weighed(weighed(rs, Weigh{M.source.url(M.tool.source(tool)), rev}), tool, rev, ref, [])
@@ -950,7 +962,7 @@ def tool.ref(no_tag: Bool, +rs: List<&2, Reply>, +url: String, +tag: String) -> 
     case True{}:
       tool.default(rs, url)
 
-def tool.named(named: Named, +rs: List<&2, Reply>, +tool: M.Tool, +url: String) -> Pinned:
+def tool.named(named: Named, +rs: List<&2, Reply>, +tool: M.Cli, +url: String) -> Pinned:
   match named:
     case Named{+ref}:
       tool.resolved(follow(rs, url, ref), rs, tool, ref)
@@ -962,7 +974,7 @@ def tool.named(named: Named, +rs: List<&2, Reply>, +tool: M.Tool, +url: String) 
 # the verdict on a full pin. A pin that moves keeps its own tag, as a
 # dependency does: the tip was named by that tag, or by the default branch
 # for a pin with none.
-def tool.verdict(verdict: U.Verdict, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +branch: String) -> Pinned:
+def tool.verdict(verdict: U.Verdict, +rs: List<&2, Reply>, +tool: M.Cli, +tip: String, +branch: String) -> Pinned:
   match verdict:
     case U.Keep{}:
       Pinned{tool, False{}, [M.tool.name(tool) ++ ": unchanged " ++
@@ -981,7 +993,7 @@ def tool.verdict(verdict: U.Verdict, +rs: List<&2, Reply>, +tool: M.Tool, +tip: 
 
 # the pinned commit weighed: its NAR hash written in when the pin has none,
 # else judged with whether it is the one the pin records
-def tool.kept.nar(fill: Bool, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +tag: String, +nar: String) -> Pinned:
+def tool.kept.nar(fill: Bool, +rs: List<&2, Reply>, +tool: M.Cli, +tip: String, +tag: String, +nar: String) -> Pinned:
   match fill:
     case True{}:
       tool.pin(Bool.or(String.is_empty(tip), String.is_empty(nar)), tool, tip, "", nar, [])
@@ -990,7 +1002,7 @@ def tool.kept.nar(fill: Bool, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String,
         String.eq(M.source.nar(M.tool.source(tool)), nar), tip, tag), rs, tool, tip, "")
 
 # the pinned commit weighed again
-def tool.kept(wd: Wd, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +tag: String) -> Pinned:
+def tool.kept(wd: Wd, +rs: List<&2, Reply>, +tool: M.Cli, +tip: String, +tag: String) -> Pinned:
   match wd:
     case Wd{+nar}:
       tool.kept.nar(String.is_empty(M.source.nar(M.tool.source(tool))), rs, tool, tip, tag, nar)
@@ -999,7 +1011,7 @@ def tool.kept(wd: Wd, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +tag: S
     case WdNo{why}:
       PinHalt{why}
 
-def tool.onward(asc: Asc, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +tag: String, +branch: String) -> Pinned:
+def tool.onward(asc: Asc, +rs: List<&2, Reply>, +tool: M.Cli, +tip: String, +tag: String, +branch: String) -> Pinned:
   match asc:
     case Asc{yes}:
       tool.verdict(U.judge(False{}, yes, False{}, tip, tag), rs, tool, tip, branch)
@@ -1008,7 +1020,7 @@ def tool.onward(asc: Asc, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +ta
     case AscNo{why}:
       PinHalt{why}
 
-def tool.same(same: Bool, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +tag: String, +branch: String) -> Pinned:
+def tool.same(same: Bool, +rs: List<&2, Reply>, +tool: M.Cli, +tip: String, +tag: String, +branch: String) -> Pinned:
   match same:
     case True{}:
       +src = M.tool.source(tool)
@@ -1017,7 +1029,7 @@ def tool.same(same: Bool, +rs: List<&2, Reply>, +tool: M.Tool, +tip: String, +ta
       +src = M.tool.source(tool)
       tool.onward(onward(rs, Above{M.source.url(src), M.source.rev(src), tip}), rs, tool, tip, tag, branch)
 
-def tool.tip(tip: Tip, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
+def tool.tip(tip: Tip, +rs: List<&2, Reply>, +tool: M.Cli) -> Pinned:
   match tip:
     case At{+rev, tag, branch}:
       tool.same(String.eq(M.source.rev(M.tool.source(tool)), rev), rs, tool, rev,
@@ -1028,7 +1040,7 @@ def tool.tip(tip: Tip, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
       PinHalt{why}
 
 # a full pin, re-asked: its tag re-resolved, or the default branch followed
-def tool.aim(aim: U.Aim, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
+def tool.aim(aim: U.Aim, +rs: List<&2, Reply>, +tool: M.Cli) -> Pinned:
   match aim:
     case U.Hold{}:
       Pinned{tool, False{}, []}
@@ -1042,7 +1054,7 @@ def tool.aim(aim: U.Aim, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
 # and its NAR hash is written in wherever it lands: filled at its own commit
 # only, it would move on the next upgrade, which follows its tag or the
 # default branch.
-def tool.fill(no_rev: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
+def tool.fill(no_rev: Bool, +rs: List<&2, Reply>, +tool: M.Cli) -> Pinned:
   match no_rev:
     case True{}:
       +src = M.tool.source(tool)
@@ -1054,7 +1066,7 @@ def tool.fill(no_rev: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
 
 # a selected pin with no commit or no NAR hash is filled; a full one is asked
 # whether it moved
-def tool.short(short: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
+def tool.short(short: Bool, +rs: List<&2, Reply>, +tool: M.Cli) -> Pinned:
   match short:
     case True{}:
       tool.fill(String.is_empty(M.source.rev(M.tool.source(tool))), rs, tool)
@@ -1062,7 +1074,7 @@ def tool.short(short: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
       tool.aim(U.aim(True{}, M.tool.source(tool)), rs, tool)
 
 # a selected tool names a repo, or it cannot be pinned
-def tool.git(git: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
+def tool.git(git: Bool, +rs: List<&2, Reply>, +tool: M.Cli) -> Pinned:
   match git:
     case False{}:
       PinHalt{"ez: tools." ++ M.tool.name(tool) ++ " has no git"}
@@ -1072,7 +1084,7 @@ def tool.git(git: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
         String.is_empty(M.source.nar(src))), rs, tool)
 
 # a selected tool is asked; the others are left
-def tool.sel(sel: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
+def tool.sel(sel: Bool, +rs: List<&2, Reply>, +tool: M.Cli) -> Pinned:
   match sel:
     case False{}:
       Pinned{tool, False{}, []}
@@ -1081,7 +1093,7 @@ def tool.sel(sel: Bool, +rs: List<&2, Reply>, +tool: M.Tool) -> Pinned:
 
 # every tool after the upgrade, as `Deps` is for dependencies
 type Tools is Data:
-  Tools{tools: List<&2, M.Tool>, moved: Bool, says: List<&2, String>,
+  Tools{tools: List<&2, M.Cli>, moved: Bool, says: List<&2, String>,
     asks: List<&2, Ask>, bad: String}
 
 def tools.join(pinned: Pinned, rest: Tools) -> Tools:
@@ -1097,7 +1109,7 @@ def tools.join(pinned: Pinned, rest: Tools) -> Tools:
       Tools{ts, any, sy, asks, halt.why(why)}
 
 # every tool, in the order the ledger wrote them
-def tools.walk(+rs: List<&2, Reply>, +only: String, ts: List<&2, M.Tool>) -> Tools:
+def tools.walk(+rs: List<&2, Reply>, +only: String, ts: List<&2, M.Cli>) -> Tools:
   match ts:
     case []:
       Tools{[], False{}, [], [], ""}

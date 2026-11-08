@@ -34,7 +34,7 @@ law member_dep_named:
   for pa: String
   for pv: String
   for ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +hash: String
   for +root: String
   for fs: List<&2, K.Source>
@@ -63,7 +63,7 @@ law member_dep_unnamed:
   for pa: String
   for pv: String
   for ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for ef: {J.named(ms, name) == Some{J.Member{dir, M.Manifest{nn, ee, bb, hh, pa, pv, ds, ts}}}
     : Maybe<&2, J.Member>}
   for eo: {WWorkspace.segs.eq(dir, self) == False{} : Bool}

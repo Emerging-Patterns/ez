@@ -257,7 +257,7 @@ def left.at(wrote: P.Wrote, +before: String) -> String:
 
 # the tables a lock renders after its packages: the `[names]` table, when it
 # resolved a name, then every tool's table. Law vocabulary.
-def tail(nms: List<&2, L.Name>, ts: List<&2, M.Tool>) -> List<&2, T.Sect>:
+def tail(nms: List<&2, L.Name>, ts: List<&2, M.Cli>) -> List<&2, T.Sect>:
   List.append(&2, T.Sect, L.names.sects(nms), L.tool.sects(ts))
 
 # a tool's source as the lock gives it back: the lock does not write
@@ -274,12 +274,12 @@ def source.canon(source: M.Source) -> M.Source:
       M.Hub{""}
 
 # a tool pin as the lock gives it back
-def tool.canon(pin: M.Tool) -> M.Tool:
-  M.Tool{n, e, b, s} = pin
-  M.Tool{n, e, b, source.canon(s)}
+def tool.canon(pin: M.Cli) -> M.Cli:
+  M.Cli{n, e, b, s} = pin
+  M.Cli{n, e, b, source.canon(s)}
 
 # every tool pin, so
-def tools.canon(ts: List<&2, M.Tool>) -> List<&2, M.Tool>:
+def tools.canon(ts: List<&2, M.Cli>) -> List<&2, M.Cli>:
   match ts:
     case []:
       []

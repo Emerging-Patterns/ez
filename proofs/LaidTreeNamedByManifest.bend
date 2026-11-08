@@ -141,6 +141,23 @@ def nv.git.body(empty, hash, manifest, ss):
     case False{}:
       nv.body(hash, manifest, ss)
 
+law nv.old:
+  for readmeless: Bool
+  for +hash: String
+  for +fs: List<&2, K.Item>
+  for +ss: List<&2, String>
+  {M1.nv(hash, W.git.old(readmeless, hash, fs, ss)) == True{} : Bool}
+
+def nv.old(readmeless, hash, fs, ss):
+  match readmeless:
+    case True{}:
+      nv.git.body(List.is_empty(&2, K.Item, K.readmeless(fs)), hash,
+        K.manifest.lines(K.readmeless(fs)), K.readmeless.srcs(fs, ss))
+    case False{}:
+      nv.git.body(List.is_empty(&2, K.Item, K.bare(K.readmeless(fs))), hash,
+        K.manifest.lines(K.bare(K.readmeless(fs))),
+        K.bare.srcs(K.readmeless(fs), K.readmeless.srcs(fs, ss)))
+
 law nv.rule:
   for named: Bool
   for +hash: String
@@ -154,9 +171,9 @@ def nv.rule(named, hash, manifest, ss):
       nv.git.body(List.is_empty(&2, K.Item, L.manifest.files(String.lines(manifest))),
         hash, manifest, ss)
     case False{}:
-      nv.git.body(List.is_empty(&2, K.Item, K.bare(L.manifest.files(String.lines(manifest)))),
-        hash, K.manifest.lines(K.bare(L.manifest.files(String.lines(manifest)))),
-        K.bare.srcs(L.manifest.files(String.lines(manifest)), ss))
+      nv.old(Web.matches(L.want(hash),
+          K.manifest.lines(K.readmeless(L.manifest.files(String.lines(manifest))))),
+        hash, L.manifest.files(String.lines(manifest)), ss)
 
 law nv.weighed:
   for same: Bool
@@ -662,13 +679,91 @@ def fixed_made(entry, st):
     case K.State{_seen, out, stop, _queue}:
       fixed_go(stop, entry, out)
 
+# LAW: a README the walk took along, or one that refused the package, leaves
+# the package its texts' own
+law fixed_sized:
+  for over: Bool
+  for +at: String
+  for +entry: String
+  for text: String
+  for seen: List<&2, String>
+  for out: List<&2, K.Hit>
+  for queue: List<&2, K.Task>
+  {M1.fix(K.readme.sized(over, at, entry, text, seen, out, queue))
+    == K.readme.sized(over, at, entry, text, seen, out, queue) : K.Walked}
+
+def fixed_sized(over, _at, entry, text, seen, out, queue):
+  match over:
+    case True{}:
+      {==}
+    case False{}:
+      fixed_made(entry, K.State{seen, K.Hit{"README.md", text} <> out, K.Going{}, queue})
+
+# LAW: and so does the README settled, whatever the tree said of it
+law fixed_put:
+  for got: K.Look
+  for +at: String
+  for +entry: String
+  for seen: List<&2, String>
+  for out: List<&2, K.Hit>
+  for queue: List<&2, K.Task>
+  {M1.fix(K.readme.put(got, at, entry, seen, out, queue))
+    == K.readme.put(got, at, entry, seen, out, queue) : K.Walked}
+
+def fixed_put(got, at, entry, seen, out, queue):
+  match got:
+    case K.Here{+text}:
+      fixed_sized(K.readme.over(text), at, entry, text, seen, out, queue)
+    case K.Absent{}:
+      fixed_made(entry, K.State{seen, out, K.Going{}, queue})
+    case K.Unasked{}:
+      {==}
+
+# LAW: a walk's end judged with its README is its texts' own, however the
+# walk ended
+law fixed_all_go:
+  for stop: K.Stop
+  for +tree: K.Tree
+  for +entry: String
+  for seen: List<&2, String>
+  for out: List<&2, K.Hit>
+  for queue: List<&2, K.Task>
+  {M1.fix(K.made.all.go(stop, tree, entry, seen, out, queue))
+    == K.made.all.go(stop, tree, entry, seen, out, queue) : K.Walked}
+
+def fixed_all_go(stop, tree, entry, seen, out, queue):
+  match stop:
+    case K.Going{}:
+      fixed_put(K.find(tree, K.readme(entry)), K.readme(entry), entry, seen, out, queue)
+    case K.Missing{at}:
+      fixed_made(entry, K.State{seen, out, K.Missing{at}, queue})
+    case K.Climbs{at}:
+      fixed_made(entry, K.State{seen, out, K.Climbs{at}, queue})
+    case K.Asking{at}:
+      fixed_made(entry, K.State{seen, out, K.Asking{at}, queue})
+    case K.Spent{}:
+      fixed_made(entry, K.State{seen, out, K.Spent{}, queue})
+    case K.Unnamed{nv}:
+      fixed_made(entry, K.State{seen, out, K.Unnamed{nv}, queue})
+
+law fixed_all:
+  for +tree: K.Tree
+  for +entry: String
+  for st: K.State
+  {M1.fix(K.made.all(tree, entry, st)) == K.made.all(tree, entry, st) : K.Walked}
+
+def fixed_all(tree, entry, st):
+  match st:
+    case K.State{seen, out, stop, queue}:
+      fixed_all_go(stop, tree, entry, seen, out, queue)
+
 # LAW: the walk of an add is its texts' own
 law fixed_walked:
   for +w: A.World
   {M1.fix(AP.walked(w)) == AP.walked(w) : K.Walked}
 
 def fixed_walked(w):
-  fixed_made(Path.norm(AP.entry(w)), K.walk(AP.fuel(AP.files(w)),
+  fixed_all(K.Tree{True{}, AP.files(w), []}, Path.norm(AP.entry(w)), K.walk(AP.fuel(AP.files(w)),
     K.Tree{True{}, AP.files(w), []}, Path.base(Path.norm(AP.entry(w))),
     K.start(Path.norm(AP.entry(w)))))
 

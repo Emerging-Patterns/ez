@@ -390,7 +390,7 @@ def st.walk(rs, only, hub, ods):
         st.walk(rs, only, hub, tl))
 
 # what one tool pin's fate keeps of it: its source
-def st.pin(p: Up.Pinned, +h: M.Tool) -> Type:
+def st.pin(p: Up.Pinned, +h: M.Cli) -> Type:
   match p:
     case Up.Pinned{t, _m, _s}:
       {L2.tool.url(t) == L2.tool.url(h) : String}
@@ -401,7 +401,7 @@ def st.pin(p: Up.Pinned, +h: M.Tool) -> Type:
 
 # LAW: a commit and a NAR hash written into a pin keep its source
 law st.set:
-  for t: M.Tool
+  for t: M.Cli
   for +rev: String
   for +tag: String
   for +nar: String
@@ -409,7 +409,7 @@ law st.set:
 
 def st.set(t, _rev, _tag, _nar):
   match t:
-    case M.Tool{_n, _e, _b, s}:
+    case M.Cli{_n, _e, _b, s}:
       match s:
         case M.Hub{hv}:
           {==}
@@ -420,7 +420,7 @@ def st.set(t, _rev, _tag, _nar):
 
 law st.tpin:
   for short: Bool
-  for +t: M.Tool
+  for +t: M.Cli
   for +rev: String
   for +tag: String
   for +nar: String
@@ -436,7 +436,7 @@ def st.tpin(short, t, rev, tag, nar, _says):
 
 law st.tweighed:
   for wd: Up.Wd
-  for +t: M.Tool
+  for +t: M.Cli
   for +rev: String
   for +tag: String
   for says: List<&2, String>
@@ -454,7 +454,7 @@ def st.tweighed(wd, t, rev, tag, says):
 law st.tresolved:
   for tip: Up.Tip
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   for +ref: String
   st.pin(Up.tool.resolved(tip, rs, t, ref), t)
 
@@ -470,7 +470,7 @@ def st.tresolved(tip, rs, t, ref):
 law st.tnamed:
   for named: Up.Named
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   for +url: String
   st.pin(Up.tool.named(named, rs, t, url), t)
 
@@ -486,7 +486,7 @@ def st.tnamed(named, rs, t, url):
 law st.tverdict:
   for v: U.Verdict
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   for +tip: String
   for +branch: String
   st.pin(Up.tool.verdict(v, rs, t, tip, branch), t)
@@ -506,7 +506,7 @@ def st.tverdict(v, rs, t, _tip, branch):
 law st.tnar:
   for fill: Bool
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   for +tip: String
   for +tag: String
   for +nar: String
@@ -523,7 +523,7 @@ def st.tnar(fill, rs, t, tip, tag, nar):
 law st.tkept:
   for wd: Up.Wd
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   for +tip: String
   for +tag: String
   st.pin(Up.tool.kept(wd, rs, t, tip, tag), t)
@@ -540,7 +540,7 @@ def st.tkept(wd, rs, t, tip, tag):
 law st.tonward:
   for asc: Up.Asc
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   for +tip: String
   for +tag: String
   for +branch: String
@@ -558,7 +558,7 @@ def st.tonward(asc, rs, t, tip, tag, branch):
 law st.tsame:
   for same: Bool
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   for +tip: String
   for +tag: String
   for +branch: String
@@ -576,7 +576,7 @@ def st.tsame(same, rs, t, tip, tag, branch):
 law st.ttip:
   for tip: Up.Tip
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   st.pin(Up.tool.tip(tip, rs, t), t)
 
 def st.ttip(tip, rs, t):
@@ -591,7 +591,7 @@ def st.ttip(tip, rs, t):
 law st.taim:
   for aim: U.Aim
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   st.pin(Up.tool.aim(aim, rs, t), t)
 
 def st.taim(aim, rs, t):
@@ -606,7 +606,7 @@ def st.taim(aim, rs, t):
 law st.tfill:
   for noRev: Bool
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   st.pin(Up.tool.fill(noRev, rs, t), t)
 
 def st.tfill(noRev, rs, t):
@@ -621,7 +621,7 @@ def st.tfill(noRev, rs, t):
 law st.tshort:
   for short: Bool
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   st.pin(Up.tool.short(short, rs, t), t)
 
 def st.tshort(short, rs, t):
@@ -634,7 +634,7 @@ def st.tshort(short, rs, t):
 law st.tgit:
   for g: Bool
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   st.pin(Up.tool.git(g, rs, t), t)
 
 def st.tgit(g, rs, t):
@@ -648,7 +648,7 @@ def st.tgit(g, rs, t):
 law st.tsel:
   for sel: Bool
   for +rs: List<&2, Up.Reply>
-  for +t: M.Tool
+  for +t: M.Cli
   st.pin(Up.tool.sel(sel, rs, t), t)
 
 def st.tsel(sel, rs, t):
@@ -660,10 +660,10 @@ def st.tsel(sel, rs, t):
 
 # what a walk over tool pins keeps of the pins it was given, when it neither
 # refuses nor waits: their sources, in order
-def st.tconc(+ts: List<&2, M.Tool>, +ots: List<&2, M.Tool>) -> Type:
+def st.tconc(+ts: List<&2, M.Cli>, +ots: List<&2, M.Cli>) -> Type:
   {L2.tool.urls(ts) == L2.tool.urls(ots) : List<&2, String>}
 
-def st.tools(tt: Up.Tools, +ots: List<&2, M.Tool>) -> Type:
+def st.tools(tt: Up.Tools, +ots: List<&2, M.Cli>) -> Type:
   Up.Tools{+ts, _m, _sy, asks, bad} = tt
   {asks == [] : List<&2, Up.Ask>} -> {String.is_empty(bad) == True{} : Bool} ->
     st.tconc(ts, ots)
@@ -672,8 +672,8 @@ law st.tjoin.waits:
   for more: List<&2, Up.Ask>
   for +asks: List<&2, Up.Ask>
   for +bad: String
-  for +ts: List<&2, M.Tool>
-  for +ots: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
+  for +ots: List<&2, M.Cli>
   for sw: st.waits(more)
   {List.append(&2, Up.Ask, more, asks) == [] : List<&2, Up.Ask>} ->
     {String.is_empty(bad) == True{} : Bool} -> st.tconc(ts, ots)
@@ -691,8 +691,8 @@ def st.tjoin.waits(more, asks, bad, ts, ots, sw):
 law st.tjoin:
   for p: Up.Pinned
   for rest: Up.Tools
-  for +h: M.Tool
-  for +tl: List<&2, M.Tool>
+  for +h: M.Cli
+  for +tl: List<&2, M.Cli>
   for sp: st.pin(p, h)
   for ih: st.tools(rest, tl)
   st.tools(Up.tools.join(p, rest), h <> tl)
@@ -716,7 +716,7 @@ def st.tjoin(p, rest, h, tl, sp, ih):
 law st.twalk:
   for +rs: List<&2, Up.Reply>
   for +only: String
-  for ots: List<&2, M.Tool>
+  for ots: List<&2, M.Cli>
   st.tools(Up.tools.walk(rs, only, ots), ots)
 
 def st.twalk(rs, only, ots):
@@ -778,10 +778,10 @@ def kp.next(+nx: Up.Next, +old: M.Read, +ig: String, +R: List<&2, P.Effect>) -> 
 # the dependencies themselves when none moved
 def kp.facts(
   +ds: List<&2, M.Dep>,
-  +ts: List<&2, M.Tool>,
+  +ts: List<&2, M.Cli>,
   dm: Bool,
   +ods: List<&2, M.Dep>,
-  +ots: List<&2, M.Tool>
+  +ots: List<&2, M.Cli>
 ) -> Type:
   ({L2.dep.urls(ds) == L2.dep.urls(ods) : List<&2, String>} &
     {L2.tool.urls(ts) == L2.tool.urls(ots) : List<&2, String>}) &
@@ -796,7 +796,7 @@ law kp_stop:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +why: String
   for asks: List<&2, Up.Ask>
   for +ig: String
@@ -884,9 +884,9 @@ law kp_done.arm:
   for +hbpa: String
   for +hbpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +ig: String
   for +R: List<&2, P.Effect>
   for +eb: {String.eq(I.sync(ds, ig), ig) == b : Bool}
@@ -962,14 +962,14 @@ law kp_done:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +ds: List<&2, M.Dep>
   for ss: List<&2, U.Swap>
   for es: List<&2, U.Swap>
   for +dm: Bool
   for dsy: List<&2, String>
   for dtr: List<&2, Up.Laid>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +tm: Bool
   for tsy: List<&2, String>
   for +ig: String
@@ -992,14 +992,14 @@ law kp_srcs:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +ds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dm: Bool
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +tm: Bool
   for +tsy: List<&2, String>
   for +ig: String
@@ -1029,14 +1029,14 @@ law kp_ignore:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +ds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dm: Bool
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +tm: Bool
   for +tsy: List<&2, String>
   for +rs: List<&2, Up.Reply>
@@ -1072,14 +1072,14 @@ law kp_asks:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +ds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dm: Bool
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +tm: Bool
   for +tsy: List<&2, String>
   for +R: List<&2, P.Effect>
@@ -1111,14 +1111,14 @@ law kp_bad:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +ds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dm: Bool
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +tm: Bool
   for +tsy: List<&2, String>
   for +R: List<&2, P.Effect>
@@ -1202,10 +1202,10 @@ def app_nil_r(xs, ys, e):
 # LAW: what both walks keep, together
 law kp.mk:
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for dm: Bool
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for cd: st.conc(ds, ods, dm)
   for ct: st.tconc(ts, ots)
   kp.facts(ds, ts, dm, ods, ots)
@@ -1225,7 +1225,7 @@ law kp_pins:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +R: List<&2, P.Effect>
   for sd: st.deps(dd, ods)
   for stt: st.tools(tt, ots)
@@ -1253,7 +1253,7 @@ law kp_known:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +R: List<&2, P.Effect>
   kp.next(Up.known(ok, only, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}),
     M.Good{M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}}, D2.ignore.said(Up.text.said(rs, Up.Ignore{})), R)

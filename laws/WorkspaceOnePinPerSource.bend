@@ -89,7 +89,7 @@ law tool_pin_back:
   for root: String
   for nar: String
   for +vend: Bool
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for jn: String
   for je: String
   for jb: String
@@ -99,9 +99,9 @@ law tool_pin_back:
   for +jo: String
   for +jnar: String
   for jv: Bool
-  for ev: {M.tool.find(ts, nn) == M.Tool{jn, je, jb, M.Git{ju, jr, jt, jo, jnar, jv}} : M.Tool}
-  {UUp.tool.back(M.Tool{nn, ee, bb, M.Git{url, rev, tag, root, nar, vend}}, ts)
-    == M.Tool{nn, ee, bb, M.Git{url, jr, jt, jo, jnar, vend}} : M.Tool}
+  for ev: {M.tool.find(ts, nn) == M.Cli{jn, je, jb, M.Git{ju, jr, jt, jo, jnar, jv}} : M.Cli}
+  {UUp.tool.back(M.Cli{nn, ee, bb, M.Git{url, rev, tag, root, nar, vend}}, ts)
+    == M.Cli{nn, ee, bb, M.Git{url, jr, jt, jo, jnar, vend}} : M.Cli}
 
 # LAW: `ez add` of a source no member records goes on with the ref it was
 # given

@@ -150,7 +150,7 @@ law pub_misnamed_stops:
   for +pa: String
   for +pv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +why: String
   for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
   for u: {PP.naming(pa, pv) == PP.Unnamed{why} : PP.Named}
@@ -169,7 +169,7 @@ law pub_named_uploads_named:
   for +pa: String
   for +pv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +nv: String
   for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
   for u: {PP.naming(pa, pv) == PP.ByName{nv} : PP.Named}
@@ -188,7 +188,7 @@ law pub_unnamed_uploads_by_hash:
   for +pa: String
   for +pv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
   for u: {PP.naming(pa, pv) == PP.ByHash{} : PP.Named}
   {PP.upload(PW.World{here, Some{text}, rs}) == PW.Upload{PP.entry(PW.World{here, Some{text}, rs}), "",
@@ -207,7 +207,7 @@ law pub_reports_name:
   for +pa: String
   for +pv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +nv: String
   for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
   for u: {PP.naming(pa, pv) == PP.ByName{nv} : PP.Named}

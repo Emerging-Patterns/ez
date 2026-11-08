@@ -61,10 +61,13 @@ def ez(+repo: String, +app: String, vars: List<&2, String>, args: List<&2, Strin
 
 # the project being published: the nested layout `tests/publish.bend` uses, so
 # that what goes to the hub is a package with an import across it and not a
-# single file
+# single file, with a README beside the entry, which bend 2.0.40 sends with
+# it. Its path sorts before `lib.bend`, and the hub passes it over all the
+# same when it picks the line it describes the package by.
 def project(+app: String) -> IO(Unit):
   do IO<Unit>:
     W.mkdir(app ++ "/src/util")
+    _r : Bool <- F.write(app ++ "/src/README.md", "# myapp: four times a number\n")
     _m : Bool <- F.write(app ++ "/src/util/math.bend",
       "import Base\n\n# double the number\ndef double(+x: U32) -> U32:\n" ++
       "  (x * 2 : U32)\n")
@@ -126,7 +129,8 @@ def consumer(+root: String, +hub: String, +hash: String) -> IO(Unit):
 # the tree clean, the hub up, and the package sent. Two lines come back: the
 # name ez computed, and the import line a consumer would write. Before the
 # upload the line the hub will describe the package by goes to stderr: the
-# package is `lib.bend` and `util/math.bend`, and `lib.bend` comes first.
+# package is `README.md`, `lib.bend` and `util/math.bend`, the hub passes the
+# README over, and `lib.bend` comes first.
 def publishes(+repo: String, +app: String, +root: String, +hub: String) -> IO(String):
   do IO<String>:
     +out : String <- R.exec(ez(repo, app, ["BEND_HUB=" ++ hub], ["publish"]))
@@ -143,6 +147,9 @@ def publishes(+repo: String, +app: String, +root: String, +hub: String) -> IO(St
     m : Maybe<&2, String> <- F.read(root ++ "/hub/" ++ hash ++ "/manifest")
     yes("the hub holds the package under the name publish reported",
       Bool.not(String.is_empty(F.text_of(m))))
+    r : Maybe<&2, String> <- F.read(root ++ "/hub/" ++ hash ++ "/README.md")
+    Check.eq_str("and the README beside the entry with it",
+      F.text_of(r), "# myapp: four times a number\n")
     consumer(root, hub, hash)
     return hash
 
@@ -235,6 +242,7 @@ def main() -> IO(Unit):
 #|ok and then the import line a consumer would write
 #|ok and says, on stderr, the line the hub describes it by
 #|ok the hub holds the package under the name publish reported
+#|ok and the README beside the entry with it
 #|ok a consumer's import of that name resolves and runs
 #|ok publish stops on an untracked file
 #|ok and names it

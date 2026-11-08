@@ -79,6 +79,7 @@ import ./laws/ForeignLicenseGoesAlong.bend as ForeignLicenseGoesAlong
 import ./laws/FoundFileIsPublished.bend as FoundFileIsPublished
 import ./laws/FullToolPinCopied.bend as FullToolPinCopied
 import ./laws/GitNamedWithoutLicense.bend as GitNamedWithoutLicense
+import ./laws/GitNamedWithoutReadme.bend as GitNamedWithoutReadme
 import ./laws/GitignoreAllowlistIsLedger.bend as GitignoreAllowlistIsLedger
 import ./laws/HashIgnoresFileOrder.bend as HashIgnoresFileOrder
 import ./laws/HashIsDigestPrefix.bend as HashIsDigestPrefix
@@ -130,12 +131,14 @@ import ./laws/NarReadsNamesVerbatim.bend as NarReadsNamesVerbatim
 import ./laws/NarlessToolPinRefused.bend as NarlessToolPinRefused
 import ./laws/NoLicenseAsBefore.bend as NoLicenseAsBefore
 import ./laws/NoLicenseDirPasses.bend as NoLicenseDirPasses
+import ./laws/NoReadmeAsBefore.bend as NoReadmeAsBefore
 import ./laws/NonTrailerLineSkipped.bend as NonTrailerLineSkipped
 import ./laws/NormDropsLeadingDot.bend as NormDropsLeadingDot
 import ./laws/NormKeepsAbsolute.bend as NormKeepsAbsolute
 import ./laws/NormKeepsRootFlag.bend as NormKeepsRootFlag
 import ./laws/OldNameKeepsOtherFiles.bend as OldNameKeepsOtherFiles
 import ./laws/OldNameLeavesLicenseOut.bend as OldNameLeavesLicenseOut
+import ./laws/OldNameLeavesReadmeOut.bend as OldNameLeavesReadmeOut
 import ./laws/OtherCommandsMakeNoDir.bend as OtherCommandsMakeNoDir
 import ./laws/OtherGitSourceLendsNoName.bend as OtherGitSourceLendsNoName
 import ./laws/OtherNameIsNoClash.bend as OtherNameIsNoClash
@@ -162,6 +165,10 @@ import ./laws/PublishedMemberImportedByName.bend as PublishedMemberImportedByNam
 import ./laws/ReadTextIsBytes.bend as ReadTextIsBytes
 import ./laws/ReaddKeepsVendor.bend as ReaddKeepsVendor
 import ./laws/ReaddedSourceKeepsName.bend as ReaddedSourceKeepsName
+import ./laws/ReadmeAsked.bend as ReadmeAsked
+import ./laws/ReadmeGoesAlong.bend as ReadmeGoesAlong
+import ./laws/ReadmeOverRefused.bend as ReadmeOverRefused
+import ./laws/ReadmelessKeepsOtherFiles.bend as ReadmelessKeepsOtherFiles
 import ./laws/RecordedPackageIsNamed.bend as RecordedPackageIsNamed
 import ./laws/RefusalWritesNothing.bend as RefusalWritesNothing
 import ./laws/RefusedWalkRefusesAdd.bend as RefusedWalkRefusesAdd
@@ -191,6 +198,7 @@ import ./laws/SlashlessTailIsWholePath.bend as SlashlessTailIsWholePath
 import ./laws/SortIgnoresFileOrder.bend as SortIgnoresFileOrder
 import ./laws/SoundDocumentBuilds.bend as SoundDocumentBuilds
 import ./laws/SourceOmitsAbsentTag.bend as SourceOmitsAbsentTag
+import ./laws/StoppedWalkTakesNoReadme.bend as StoppedWalkTakesNoReadme
 import ./laws/SyntaxErrorReportedFirst.bend as SyntaxErrorReportedFirst
 import ./laws/TagOfNamesTheTag.bend as TagOfNamesTheTag
 import ./laws/TailOfOneIsBase.bend as TailOfOneIsBase
@@ -220,6 +228,7 @@ import ./laws/UnreadRecordReusesNothing.bend as UnreadRecordReusesNothing
 import ./laws/UpdateNagAnchoredAtFront.bend as UpdateNagAnchoredAtFront
 import ./laws/UpgradeHoldsHub.bend as UpgradeHoldsHub
 import ./laws/UpgradeNamedWithoutLicense.bend as UpgradeNamedWithoutLicense
+import ./laws/UpgradeNamedWithoutReadme.bend as UpgradeNamedWithoutReadme
 import ./laws/UpgradeOnlyNamedPackage.bend as UpgradeOnlyNamedPackage
 import ./laws/UpgradeRevMovesForward.bend as UpgradeRevMovesForward
 import ./laws/UpgradeRewritesImports.bend as UpgradeRewritesImports

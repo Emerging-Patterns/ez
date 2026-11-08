@@ -76,12 +76,12 @@ def deps.at(+dir: String, ds: List<&2, M.Dep>) -> List<&2, M.Dep>:
       dep.at(dir, hd) <> deps.at(dir, tl)
 
 # a tool read from a member's directory
-def tool.at(+dir: String, pin: M.Tool) -> M.Tool:
-  M.Tool{nn, ee, bb, ss} = pin
-  M.Tool{nn, ee, bb, source.at(dir, ss)}
+def tool.at(+dir: String, pin: M.Cli) -> M.Cli:
+  M.Cli{nn, ee, bb, ss} = pin
+  M.Cli{nn, ee, bb, source.at(dir, ss)}
 
 # every tool read from a member's directory
-def tools.at(+dir: String, ts: List<&2, M.Tool>) -> List<&2, M.Tool>:
+def tools.at(+dir: String, ts: List<&2, M.Cli>) -> List<&2, M.Cli>:
   match ts:
     case []:
       []
@@ -98,13 +98,13 @@ def members.deps(ms: List<&2, Member>) -> List<&2, M.Dep>:
       List.append(&2, M.Dep, deps.at(W.segs.text(ds), xs), members.deps(tl))
 
 # every member's tools, in member order, each as the root reads it
-def members.tools(ms: List<&2, Member>) -> List<&2, M.Tool>:
+def members.tools(ms: List<&2, Member>) -> List<&2, M.Cli>:
   match ms:
     case []:
       []
     case Member{ds, mm} <> tl:
       M.Manifest{_n, _e, _b, _h, _pa, _pv, _xs, ts} = mm
-      List.append(&2, M.Tool, tools.at(W.segs.text(ds), ts), members.tools(tl))
+      List.append(&2, M.Cli, tools.at(W.segs.text(ds), ts), members.tools(tl))
 
 # the root's dependencies, then every member's
 def all.deps(root: M.Manifest, ms: List<&2, Member>) -> List<&2, M.Dep>:
@@ -112,9 +112,9 @@ def all.deps(root: M.Manifest, ms: List<&2, Member>) -> List<&2, M.Dep>:
   List.append(&2, M.Dep, ds, members.deps(ms))
 
 # the root's tools, then every member's
-def all.tools(root: M.Manifest, ms: List<&2, Member>) -> List<&2, M.Tool>:
+def all.tools(root: M.Manifest, ms: List<&2, Member>) -> List<&2, M.Cli>:
   M.Manifest{_n, _e, _b, _h, _pa, _pv, _ds, ts} = root
-  List.append(&2, M.Tool, ts, members.tools(ms))
+  List.append(&2, M.Cli, ts, members.tools(ms))
 
 # ---------------------------------------------------------------------------
 # one declaration per name
@@ -128,7 +128,7 @@ def firsts(ds: List<&2, M.Dep>) -> List<&2, M.Dep>:
       hd <> Rend.without(firsts(tl), M.dep.name(hd))
 
 # a tool kept or dropped
-def tools.without.put(hit: Bool, pin: M.Tool, rest: List<&2, M.Tool>) -> List<&2, M.Tool>:
+def tools.without.put(hit: Bool, pin: M.Cli, rest: List<&2, M.Cli>) -> List<&2, M.Cli>:
   match hit:
     case True{}:
       rest
@@ -136,7 +136,7 @@ def tools.without.put(hit: Bool, pin: M.Tool, rest: List<&2, M.Tool>) -> List<&2
       pin <> rest
 
 # every tool but the one named
-def tools.without(ts: List<&2, M.Tool>, +name: String) -> List<&2, M.Tool>:
+def tools.without(ts: List<&2, M.Cli>, +name: String) -> List<&2, M.Cli>:
   match ts:
     case []:
       []
@@ -144,7 +144,7 @@ def tools.without(ts: List<&2, M.Tool>, +name: String) -> List<&2, M.Tool>:
       tools.without.put(String.eq(M.tool.name(hd), name), hd, tools.without(tl, name))
 
 # every tool, each name once, at its first declaration
-def tools.firsts(ts: List<&2, M.Tool>) -> List<&2, M.Tool>:
+def tools.firsts(ts: List<&2, M.Cli>) -> List<&2, M.Cli>:
   match ts:
     case []:
       []
@@ -197,9 +197,9 @@ def dep.eq(aa: M.Dep, bb: M.Dep) -> Bool:
     Bool.and(String.eq(ae, be), source.eq(asrc, bsrc)))
 
 # whether two tools are one
-def tool.eq(aa: M.Tool, bb: M.Tool) -> Bool:
-  M.Tool{an, ae, ab, asrc} = aa
-  M.Tool{bn, be, bb2, bsrc} = bb
+def tool.eq(aa: M.Cli, bb: M.Cli) -> Bool:
+  M.Cli{an, ae, ab, asrc} = aa
+  M.Cli{bn, be, bb2, bsrc} = bb
   Bool.and(Bool.and(String.eq(an, bn), String.eq(ae, be)),
     Bool.and(String.eq(ab, bb2), source.eq(asrc, bsrc)))
 
@@ -228,7 +228,7 @@ def clash.go(ds: List<&2, M.Dep>, +all: List<&2, M.Dep>) -> String:
       Bool.pick(String, dep.eq(hd, M.find(all, M.dep.name(hd))), rest, M.dep.name(hd))
 
 # whether every declaration of a tool agrees with the first
-def tools.agree.go(ts: List<&2, M.Tool>, +all: List<&2, M.Tool>) -> Bool:
+def tools.agree.go(ts: List<&2, M.Cli>, +all: List<&2, M.Cli>) -> Bool:
   match ts:
     case []:
       True{}
@@ -237,12 +237,12 @@ def tools.agree.go(ts: List<&2, M.Tool>, +all: List<&2, M.Tool>) -> Bool:
       Bool.and(tool.eq(hd, M.tool.find(all, M.tool.name(hd))), rest)
 
 # whether every declaration of a tool agrees with the first
-def tools.agree(+ts: List<&2, M.Tool>) -> Bool:
+def tools.agree(+ts: List<&2, M.Cli>) -> Bool:
   tools.agree.go(ts, ts)
 
 # the first tool that does not agree with the first declaration of its name,
 # "" for none
-def tools.clash.go(ts: List<&2, M.Tool>, +all: List<&2, M.Tool>) -> String:
+def tools.clash.go(ts: List<&2, M.Cli>, +all: List<&2, M.Cli>) -> String:
   match ts:
     case []:
       ""
@@ -373,7 +373,7 @@ def joined(root: M.Manifest, +ms: List<&2, Member>) -> M.Manifest:
   M.Manifest{nn, ee, bb, hh, pa, pv, ds, ts} = root
   M.Manifest{nn, ee, bb, hh, pa, pv,
     firsts(List.append(&2, M.Dep, ds, members.deps(ms))),
-    tools.firsts(List.append(&2, M.Tool, ts, members.tools(ms)))}
+    tools.firsts(List.append(&2, M.Cli, ts, members.tools(ms)))}
 
 # the members joined, once it is known whether they can be
 def combine.go(fine: Bool, +root: M.Manifest, +ms: List<&2, Member>) -> Joint:

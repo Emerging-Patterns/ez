@@ -30,6 +30,30 @@
 # laws/OldNameKeepsOtherFiles.bend, laws/GitNamedWithoutLicense.bend), and `ez
 # lock --upgrade` weighs a pinned commit the same way
 # (laws/UpgradeNamedWithoutLicense.bend).
+#
+# bend 2.0.40 also publishes the file named exactly `README.md` in the
+# entry's directory, at `README.md` in the package, and no README beside any
+# other file; it refuses one over 65536 bytes, the most the hub takes, before
+# it mines. The walk, once it went to its end, takes that README along
+# (laws/ReadmeGoesAlong.bend), asks for it when it was not given
+# (laws/ReadmeAsked.bend), names a package without one as it always did
+# (laws/NoReadmeAsBefore.bend), refuses one over 65536 UTF-8 bytes, naming it
+# (laws/ReadmeOverRefused.bend), and leaves a walk that stopped as it stopped
+# (laws/StoppedWalkTakesNoReadme.bend); visiting any other file takes along
+# only the file, its LICENSE and its foreign bodies
+# (laws/LicenseGoesAlong.bend). A ledger written before 2.0.40 names a git
+# package without its README, and the name decides here too: `ez lock`
+# judges a checkout whose walked manifest is not the one its name is the
+# digest of without its README (laws/OldNameLeavesReadmeOut.bend,
+# laws/ReadmelessKeepsOtherFiles.bend, laws/GitNamedWithoutReadme.bend), and
+# without its LICENSE files as well when that is not the name either
+# (laws/GitNamedWithoutLicense.bend); `ez lock --upgrade` weighs a pinned
+# commit the same way (laws/UpgradeNamedWithoutReadme.bend). Trusted with the
+# rest of the walk's agreement with bend: that bend counts the README's size
+# in the UTF-8 bytes ez hashes, after dropping a leading byte order mark,
+# which ez does not drop from any file; and that the disk ez reads tells case
+# apart, as bend's directory listing does, since ez asks for `README.md` by
+# name and a disk that does not tell case apart answers for `readme.md` too.
 import Base
 import ../io/file.bend as F
 import ../share/sha.bend as Sha
@@ -693,6 +717,47 @@ def bare.srcs(fs: List<&2, Item>, ss: List<&2, String>) -> List<&2, String>:
     case Con{+h, t} Con{s, u}:
       bare.srcs.pick(file.lic(h), s, bare.srcs(t, u))
 
+# whether a file of a package is the README bend took along. No module,
+# foreign body or LICENSE is named `README.md`, so a file named so is the one
+# the walk took along beside the entry.
+def file.readme(item: Item) -> Bool:
+  Item{at, _sum} = item
+  String.eq(P.base(at), "README.md")
+
+def readmeless.pick(readme: Bool, head: Item, rest: List<&2, Item>) -> List<&2, Item>:
+  match readme:
+    case True{}:
+      rest
+    case False{}:
+      head <> rest
+
+# a package's files as bend named them before 2.0.40: without the README it
+# now takes along, in the order they were given
+def readmeless(fs: List<&2, Item>) -> List<&2, Item>:
+  match fs:
+    case []:
+      []
+    case +h <> t:
+      readmeless.pick(file.readme(h), h, readmeless(t))
+
+def readmeless.srcs.pick(readme: Bool, text: String, rest: List<&2, String>) -> List<&2, String>:
+  match readme:
+    case True{}:
+      rest
+    case False{}:
+      text <> rest
+
+# the texts that go with those files: the texts of a file list, one per file
+# in the same order, with the README's text left out
+def readmeless.srcs(fs: List<&2, Item>, ss: List<&2, String>) -> List<&2, String>:
+  match fs ss:
+    case Nil{} _:
+      ss
+    case Con{_h, _t} Nil{}:
+      []
+    case Con{+h, t} Con{s, u}:
+      readmeless.srcs.pick(file.readme(h), s, readmeless.srcs(t, u))
+
 # ---------------------------------------------------------------------------
 # the walk
 
@@ -811,6 +876,12 @@ def outside(+at: String) -> Bool:
 # with it.
 def beside(+path: String) -> String:
   P.join(P.dir(path), "LICENSE")
+
+# the README bend takes along since 2.0.40: the file named exactly
+# `README.md` beside the entry, and beside no other file. It goes at the top
+# of the package, beside the entry's own name.
+def readme(+entry: String) -> String:
+  P.join(P.dir(entry), "README.md")
 
 # the LICENSE beside a published file, when the tree holds one, named beside
 # the file's own name in the package
@@ -1281,10 +1352,94 @@ def made(+entry: String, st: State) -> Walked:
   State{_seen, out, stop, _queue} = st
   made.go(stop, entry, out)
 
+# how many characters a string holds, as a U32. A Nat is unary, and a proof
+# that met the Nat 65536 would have to build it.
+def count(text: String) -> U32:
+  match text:
+    case SNil{}:
+      0
+    case SCon{_h, t}:
+      (1 + count(t) : U32)
+
+# whether a README's text is more than 65536 bytes, counted in the UTF-8
+# bytes its sha256 is taken over: the hub takes no more, and bend 2.0.40
+# refuses a bigger one before it mines
+def readme.over(+text: String) -> Bool:
+  U32.is_gt(count(Sha.utf8(text)), 65536)
+
+# why a README too big for the hub stops a package, in bend's own words
+def readme.why(+at: String) -> String:
+  "ez: " ++ at ++ " cannot be published: it is over 65536 bytes, the most BendHub takes"
+
+# a README the hub takes goes along, at the top of the package; one it would
+# refuse refuses the package
+def readme.sized(
+  over: Bool,
+  +at: String,
+  +entry: String,
+  text: String,
+  seen: List<&2, String>,
+  out: List<&2, Hit>,
+  queue: List<&2, Task>
+) -> Walked:
+  match over:
+    case True{}:
+      Refused{readme.why(at)}
+    case False{}:
+      made(entry, State{seen, Hit{"README.md", text} <> out, Going{}, queue})
+
+# a walk that is over with the README beside its entry settled: one that is
+# there goes along, one that is not there leaves the package as it was, and
+# one the walk was not given is asked for
+def readme.put(
+  got: Look,
+  +at: String,
+  +entry: String,
+  seen: List<&2, String>,
+  out: List<&2, Hit>,
+  queue: List<&2, Task>
+) -> Walked:
+  match got:
+    case Here{+text}:
+      readme.sized(readme.over(text), at, entry, text, seen, out, queue)
+    case Absent{}:
+      made(entry, State{seen, out, Going{}, queue})
+    case Unasked{}:
+      Asks{at}
+
+# a walk that went to its end takes the README beside its entry along; one
+# that stopped is judged as it stopped
+def made.all.go(
+  stop: Stop,
+  +tree: Tree,
+  +entry: String,
+  seen: List<&2, String>,
+  out: List<&2, Hit>,
+  queue: List<&2, Task>
+) -> Walked:
+  match stop:
+    case Going{}:
+      readme.put(find(tree, readme(entry)), readme(entry), entry, seen, out, queue)
+    case Missing{at}:
+      made(entry, State{seen, out, Missing{at}, queue})
+    case Climbs{at}:
+      made(entry, State{seen, out, Climbs{at}, queue})
+    case Asking{at}:
+      made(entry, State{seen, out, Asking{at}, queue})
+    case Spent{}:
+      made(entry, State{seen, out, Spent{}, queue})
+    case Unnamed{nv}:
+      made(entry, State{seen, out, Unnamed{nv}, queue})
+
+# the walk's end, judged, with the README beside the entry taken along
+def made.all(+tree: Tree, +entry: String, st: State) -> Walked:
+  State{seen, out, stop, queue} = st
+  made.all.go(stop, tree, entry, seen, out, queue)
+
 # the package an entry of a tree would be published as, from the tree's
 # files alone, with this much fuel
 def of.tree(fuel: Nat, +entry: String, +tree: Tree) -> Walked:
-  made(entry, walk(fuel, tree, P.base(entry), start(entry)))
+  made.all(tree, entry, walk(fuel, tree, P.base(entry), start(entry)))
 
 # the same over a whole checkout
 def of.fuel(fuel: Nat, +entry: String, +fs: List<&2, Source>) -> Walked:
@@ -1347,6 +1502,26 @@ def made.io(+top: String, got: Walked) -> IO(Pkg):
     case Refused{why}:
       IO.die(Pkg, 1, why)
 
+# a walk that went to its end, with the README beside its entry read from
+# disk when it was not yet, then judged
+def readme.io(
+  got: Look,
+  +top: String,
+  +entry: String,
+  +tree: Tree,
+  +st: State,
+  go: Tree -> State -> IO(Pkg)
+) -> IO(Pkg):
+  match got:
+    case Unasked{}:
+      do IO<Pkg>:
+        m : Maybe<&2, String> <- F.read(P.join(top, readme(entry)))
+        go(tree.add(m, tree, readme(entry)), st)
+    case Here{_text}:
+      made.io(top, made.all(tree, entry, st))
+    case Absent{}:
+      made.io(top, made.all(tree, entry, st))
+
 # a question read from disk and the walk carried on, or the walk's end judged
 def pkg.next(
   stop: Stop,
@@ -1362,7 +1537,7 @@ def pkg.next(
         m : Maybe<&2, String> <- F.read(P.join(top, at))
         go(tree.add(m, tree, at), resume(st))
     case Going{}:
-      made.io(top, made(entry, st))
+      readme.io(find(tree, readme(entry)), top, entry, tree, st, go)
     case Missing{_at}:
       made.io(top, made(entry, st))
     case Climbs{_at}:

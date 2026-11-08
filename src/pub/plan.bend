@@ -338,7 +338,7 @@ type Status is Data:
 
 # the question: what git says of the directory the project is in
 def locate(world: PW.World) -> PW.Ask:
-  PW.Tool{TW.Locate{PW.here(world)}}
+  PW.ToolAsk{TW.Locate{PW.here(world)}}
 
 # a status that git answered, or the command stopped with what git said. A
 # directory that is not in a git repository has no commit for what goes to
@@ -405,7 +405,7 @@ def tree.tool(ask: TW.Ask, got: PW.Answer, rest: K.Tree) -> K.Tree:
 
 def tree.one(ask: PW.Ask, got: PW.Answer, rest: K.Tree) -> K.Tree:
   match ask:
-    case PW.Tool{q}:
+    case PW.ToolAsk{q}:
       tree.tool(q, got, rest)
     case _:
       rest
@@ -1157,7 +1157,7 @@ def decide.walk(got: K.Walked, +world: PW.World) -> Verdict:
     case K.Walked{_h, _root, _fs, _sums}:
       decide.kept(stray(world), world)
     case K.Asks{at}:
-      Pending{[PW.Tool{TW.Read{at}}]}
+      Pending{[PW.ToolAsk{TW.Read{at}}]}
     case K.Refused{why}:
       Stop{why}
 
@@ -1291,7 +1291,7 @@ def is.upload(ask: PW.Ask) -> Bool:
   match ask:
     case PW.Upload{_entry, _named, _says}:
       True{}
-    case PW.Tool{_q}:
+    case PW.ToolAsk{_q}:
       False{}
     case PW.Tracked{}:
       False{}

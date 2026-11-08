@@ -12,6 +12,6 @@ law hub_of_names_the_hub:
   for +hbpa: String
   for +hbpv: String
   for ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for f: {False{} == String.is_empty(hb) : Bool}
   {M.hub_of(M.Good{M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}}) == hb : String}

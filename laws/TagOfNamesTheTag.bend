@@ -19,7 +19,7 @@ law tag_of_names_the_tag:
   for nar: String
   for vend: Bool
   for t: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   {M.tag_of(M.Good{M.Manifest{mn, me, mb, mh, mhpa, mhpv,
     M.Dep{n, h, en, M.Git{url, rev, tag, root, nar, vend}} <> t, ts}}, n) == tag
     : String}

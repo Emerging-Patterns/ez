@@ -19,10 +19,19 @@ import ../src/check/world.bend as W
 # cut to its low byte, agrees with bend on ASCII and nowhere else. Since bend
 # 2.0.27 a file named LICENSE beside a published file goes along: the one in
 # `src/util` sits beside `math.bend` and is published, and the one at the
-# top sits beside no published file and is not.
+# top sits beside no published file and is not. Since bend 2.0.40 the
+# README.md beside the entry goes along too, at the top of the package, and a
+# README beside any other file does not: `src/README.md` is published, and
+# the ones at the top and in `src/util` are not. The published one holds the
+# characters a JSON body escapes (a quote, a backslash, a tab) and ones that
+# are not ASCII, since the oracle reads the README back out of bend's upload.
 def repo(+at: String) -> IO(Unit):
   do IO<Unit>:
     W.mkdir(at ++ "/src/util")
+    _r : Bool <- F.write(at ++ "/src/README.md",
+      "# lib: four times a number\n\nSay \"quad\" \\ tab\there: x → 4·x — naïve 🙂\n")
+    _o : Bool <- F.write(at ++ "/README.md", "# the repo, beside no entry\n")
+    _u2 : Bool <- F.write(at ++ "/src/util/README.md", "# beside math.bend, not the entry\n")
     _u : Bool <- F.write(at ++ "/src/util/LICENSE",
       "SPDX-License-Identifier: MIT\n\nPermission is hereby granted.\n")
     _t : Bool <- F.write(at ++ "/LICENSE", "SPDX-License-Identifier: Apache-2.0\n")
@@ -70,6 +79,12 @@ def compare(+here: String, +root: String, +port: String) -> IO(Unit):
     Check.eq_str("ez computes the manifest bend publishes",
       Q.chomp(String.join(List.drop(&2, String, said, 2n), "\n")),
       Q.chomp(F.text_of(man)))
+    +readme : Maybe<&2, String> <- F.read(root ++ "/hub/" ++ got ++ "/README.md")
+    +sent : Maybe<&2, String> <- F.read(root ++ "/repo/src/README.md")
+    Check.eq_str("the README beside the entry goes along, as it was written",
+      F.text_of(readme), F.text_of(sent))
+    Check.eq_str("and no README beside another file does",
+      Bool.pick(String, String.contains(F.text_of(man), "util/README.md"), "yes", "no"), "no")
 
 # everything, once the scratch directory and the port are known
 def go(+here: String, +root: String, +port: String) -> IO(Unit):
@@ -96,3 +111,5 @@ def main() -> IO(Unit):
 #|ok the oracle answers
 #|ok ez computes the hash bend publishes
 #|ok ez computes the manifest bend publishes
+#|ok the README beside the entry goes along, as it was written
+#|ok and no README beside another file does

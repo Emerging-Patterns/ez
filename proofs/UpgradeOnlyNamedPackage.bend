@@ -147,23 +147,23 @@ def Laws.upgrade_one_frames_deps(w, n, m, e, ne, d):
 
 # LAW: a tool of another name, in front of the rest, is passed over
 law tskip_find:
-  for t: M.Tool
-  for +ts: List<&2, M.Tool>
+  for t: M.Cli
+  for +ts: List<&2, M.Cli>
   for +x: String
   for +m: String
   for nf: {M.tool.name(t) == x : String}
   for ne: {String.eq(x, m) == False{} : Bool}
-  {M.tool.find(t <> ts, m) == M.tool.find(ts, m) : M.Tool}
+  {M.tool.find(t <> ts, m) == M.tool.find(ts, m) : M.Cli}
 
 def tskip_find(t, ts, x, m, nf, ne):
   match t:
-    case M.Tool{+tn, +te, +tb, +tsrc}:
+    case M.Cli{+tn, +te, +tb, +tsrc}:
       nfs = Equal.sym(String, tn, x, nf)
-      %nfs : {M.tool.find.pick(String.eq(_, m), M.Tool{tn, te, tb, tsrc}, M.tool.find(ts, m))
-        == M.tool.find(ts, m) : M.Tool}
+      %nfs : {M.tool.find.pick(String.eq(_, m), M.Cli{tn, te, tb, tsrc}, M.tool.find(ts, m))
+        == M.tool.find(ts, m) : M.Cli}
       nes = Equal.sym(Bool, String.eq(x, m), False{}, ne)
-      %nes : {M.tool.find.pick(_, M.Tool{tn, te, tb, tsrc}, M.tool.find(ts, m))
-        == M.tool.find(ts, m) : M.Tool}
+      %nes : {M.tool.find.pick(_, M.Cli{tn, te, tb, tsrc}, M.tool.find(ts, m))
+        == M.tool.find(ts, m) : M.Cli}
       {==}
 
 # LAW: a pin of another name, joined in front of the rest, is passed over by
@@ -175,7 +175,7 @@ law tjoin_skip:
   for +m: String
   for nf: {M1.pinned.name(p, x) == x : String}
   for ne: {String.eq(x, m) == False{} : Bool}
-  {M.tool.find(M2.tools.of(Up.tools.join(p, r)), m) == M.tool.find(M2.tools.of(r), m) : M.Tool}
+  {M.tool.find(M2.tools.of(Up.tools.join(p, r)), m) == M.tool.find(M2.tools.of(r), m) : M.Cli}
 
 def tjoin_skip(p, r, x, m, nf, ne):
   match p:
@@ -205,18 +205,18 @@ law left_find:
   for +m: String
   for e: {String.eq(tn, m) == True{} : Bool}
   for h: {sel == False{} : Bool}
-  {M.tool.find(M2.tools.of(Up.tools.join(Up.tool.sel(sel, rs, M.Tool{tn, te, tb, tsrc}), r)), m)
-    == M.Tool{tn, te, tb, tsrc} : M.Tool}
+  {M.tool.find(M2.tools.of(Up.tools.join(Up.tool.sel(sel, rs, M.Cli{tn, te, tb, tsrc}), r)), m)
+    == M.Cli{tn, te, tb, tsrc} : M.Cli}
 
 def left_find(sel, rs, tn, te, tb, tsrc, r, m, e, h):
   match r:
     case Up.Tools{+ts, +any, +sy, +asks, +bad}:
       hsym = Equal.sym(Bool, sel, False{}, h)
-      %hsym : {M.tool.find(M2.tools.of(Up.tools.join(Up.tool.sel(_, rs, M.Tool{tn, te, tb, tsrc}),
-        Up.Tools{ts, any, sy, asks, bad})), m) == M.Tool{tn, te, tb, tsrc} : M.Tool}
+      %hsym : {M.tool.find(M2.tools.of(Up.tools.join(Up.tool.sel(_, rs, M.Cli{tn, te, tb, tsrc}),
+        Up.Tools{ts, any, sy, asks, bad})), m) == M.Cli{tn, te, tb, tsrc} : M.Cli}
       es2 = Equal.sym(Bool, String.eq(tn, m), True{}, e)
-      %es2 : {M.tool.find.pick(_, M.Tool{tn, te, tb, tsrc}, M.tool.find(ts, m))
-        == M.Tool{tn, te, tb, tsrc} : M.Tool}
+      %es2 : {M.tool.find.pick(_, M.Cli{tn, te, tb, tsrc}, M.tool.find(ts, m))
+        == M.Cli{tn, te, tb, tsrc} : M.Cli}
       {==}
 
 law tfind_walk.hit:
@@ -227,14 +227,14 @@ law tfind_walk.hit:
   for +te: String
   for +tb: String
   for +tsrc: M.Source
-  for +t: List<&2, M.Tool>
+  for +t: List<&2, M.Cli>
   for +m: String
   for +e: {String.eq(tn, m) == hit : Bool}
   for pre: {U.chosen(only, m) == False{} : Bool}
-  for ih: {M.tool.find(M2.tools.of(Up.tools.walk(rs, only, t)), m) == M.tool.find(t, m) : M.Tool}
-  {M.tool.find(M2.tools.of(Up.tools.join(Up.tool.sel(U.chosen(only, tn), rs, M.Tool{tn, te, tb, tsrc}),
+  for ih: {M.tool.find(M2.tools.of(Up.tools.walk(rs, only, t)), m) == M.tool.find(t, m) : M.Cli}
+  {M.tool.find(M2.tools.of(Up.tools.join(Up.tool.sel(U.chosen(only, tn), rs, M.Cli{tn, te, tb, tsrc}),
     Up.tools.walk(rs, only, t))), m)
-    == M.tool.find.pick(hit, M.Tool{tn, te, tb, tsrc}, M.tool.find(t, m)) : M.Tool}
+    == M.tool.find.pick(hit, M.Cli{tn, te, tb, tsrc}, M.tool.find(t, m)) : M.Cli}
 
 def tfind_walk.hit(hit, rs, only, tn, te, tb, tsrc, t, m, e, pre, ih):
   match hit:
@@ -244,14 +244,14 @@ def tfind_walk.hit(hit, rs, only, tn, te, tb, tsrc, t, m, e, pre, ih):
           Equal.cong(String, Bool, x => U.chosen(only, x), tn, m, Str.string_eq_true(tn, m, e)),
           pre))
     case False{}:
-      Equal.trans(M.Tool,
+      Equal.trans(M.Cli,
         M.tool.find(M2.tools.of(Up.tools.join(Up.tool.sel(U.chosen(only, tn), rs,
-          M.Tool{tn, te, tb, tsrc}), Up.tools.walk(rs, only, t))), m),
+          M.Cli{tn, te, tb, tsrc}), Up.tools.walk(rs, only, t))), m),
         M.tool.find(M2.tools.of(Up.tools.walk(rs, only, t)), m),
         M.tool.find(t, m),
-        tjoin_skip(Up.tool.sel(U.chosen(only, tn), rs, M.Tool{tn, te, tb, tsrc}),
+        tjoin_skip(Up.tool.sel(U.chosen(only, tn), rs, M.Cli{tn, te, tb, tsrc}),
           Up.tools.walk(rs, only, t), tn, m,
-          M1.sel_name(U.chosen(only, tn), rs, M.Tool{tn, te, tb, tsrc}), e),
+          M1.sel_name(U.chosen(only, tn), rs, M.Cli{tn, te, tb, tsrc}), e),
         ih)
 
 # LAW: the walk leaves every tool of a name `--package` does not choose as it
@@ -259,10 +259,10 @@ def tfind_walk.hit(hit, rs, only, tn, te, tb, tsrc, t, m, e, pre, ih):
 law tfind_walk:
   for +rs: List<&2, Up.Reply>
   for +only: String
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +m: String
   for +pre: {U.chosen(only, m) == False{} : Bool}
-  {M.tool.find(M2.tools.of(Up.tools.walk(rs, only, ts)), m) == M.tool.find(ts, m) : M.Tool}
+  {M.tool.find(M2.tools.of(Up.tools.walk(rs, only, ts)), m) == M.tool.find(ts, m) : M.Cli}
 
 def tfind_walk(rs, only, ts, m, pre):
   match ts:
@@ -270,7 +270,7 @@ def tfind_walk(rs, only, ts, m, pre):
       {==}
     case h <> +t:
       match h:
-        case M.Tool{+tn, +te, +tb, +tsrc}:
+        case M.Cli{+tn, +te, +tb, +tsrc}:
           tfind_walk.hit(String.eq(tn, m), rs, only, tn, te, tb, tsrc, t, m, {==}, pre,
             tfind_walk(rs, only, t, m, pre))
 
@@ -281,7 +281,7 @@ law tframe_read:
   for +rs: List<&2, Up.Reply>
   for ne: {String.is_empty(n) == False{} : Bool}
   for d: {String.eq(n, m) == False{} : Bool}
-  {Laws.tool.at(Up.next.model(Up.next(n, r, rs)), m) == Laws.tool.at(r, m) : M.Tool}
+  {Laws.tool.at(Up.next.model(Up.next(n, r, rs)), m) == Laws.tool.at(r, m) : M.Cli}
 
 def tframe_read(n, m, r, rs, ne, d):
   match r:
@@ -290,7 +290,7 @@ def tframe_read(n, m, r, rs, ne, d):
     case M.Good{mm}:
       match mm:
         case M.Manifest{+pn, +pe, +pb, +hb, +hbpa, +hbpv, +ods, +ots}:
-          M2.next_kept(M.Tool, x => Laws.tool.at(x, m), n, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots,
+          M2.next_kept(M.Cli, x => Laws.tool.at(x, m), n, rs, pn, pe, pb, hb, hbpa, hbpv, ods, ots,
             tfind_walk(rs, n, ots, m, unchosen(n, m, ne, d)))
 
 def Laws.upgrade_one_frames_tools(w, n, m, e, ne, d):
@@ -304,7 +304,7 @@ def Laws.upgrade_one_frames_tools(w, n, m, e, ne, d):
             case True{}:
               es = Equal.sym(String, only, n, e)
               %es : {Laws.tool.at(Up.next.model(Up.next(_, W.parsed(ledger), ups)), m)
-                == Laws.tool.at(W.parsed(ledger), m) : M.Tool}
+                == Laws.tool.at(W.parsed(ledger), m) : M.Cli}
               tframe_read(n, m, W.parsed(ledger), ups, ne, d)
 
 # laws/UpgradeOnlyNamedPackage.bend, the questions. What the upgrade asks is
@@ -470,7 +470,7 @@ def tjoin_cong(p, r1, r2, ih):
 
 law tdrop:
   for +rs: List<&2, Up.Reply>
-  for +h: M.Tool
+  for +h: M.Cli
   for r: Up.Tools
   {tkey(Up.tools.join(Up.tool.sel(False{}, rs, h), r)) == tkey(r) : Up.Tools}
 
@@ -483,8 +483,8 @@ law talone_walk.hit:
   for b: Bool
   for +rs: List<&2, Up.Reply>
   for +n: String
-  for +h: M.Tool
-  for +t: List<&2, M.Tool>
+  for +h: M.Cli
+  for +t: List<&2, M.Cli>
   for e: {b == U.chosen(n, M.tool.name(h)) : Bool}
   for ih: {tkey(Up.tools.walk(rs, n, t)) == tkey(Up.tools.walk(rs, n, D1.tools.named(t, n)))
     : Up.Tools}
@@ -509,7 +509,7 @@ def talone_walk.hit(b, rs, n, h, t, e, ih):
 law talone_walk:
   for +rs: List<&2, Up.Reply>
   for +n: String
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +ne: {String.is_empty(n) == False{} : Bool}
   {tkey(Up.tools.walk(rs, n, ts)) == tkey(Up.tools.walk(rs, n, D1.tools.named(ts, n)))
     : Up.Tools}
@@ -572,8 +572,8 @@ def dknown(n, ds, ne):
 
 law tkin.hit:
   for b: Bool
-  for +h: M.Tool
-  for +t: List<&2, M.Tool>
+  for +h: M.Cli
+  for +t: List<&2, M.Cli>
   for +n: String
   for e: {b == String.eq(M.tool.name(h), n) : Bool}
   for ih: {M.tool.has(t, n) == M.tool.has(D1.tools.named(t, n), n) : Bool}
@@ -589,7 +589,7 @@ def tkin.hit(b, _h, t, n, e, ih):
       ih
 
 law tkin:
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +n: String
   {M.tool.has(ts, n) == M.tool.has(D1.tools.named(ts, n), n) : Bool}
 
@@ -602,7 +602,7 @@ def tkin(ts, n):
 
 law tknown:
   for +n: String
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for ne: {String.is_empty(n) == False{} : Bool}
   {M.tool.known(n, ts) == M.tool.known(n, D1.tools.named(ts, n)) : Bool}
 
@@ -827,7 +827,7 @@ law asks_known:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +ne: {String.is_empty(n) == False{} : Bool}
   {Up.next.asks(Up.known(ok, n, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}))
     == Up.next.asks(Up.known(ok, n, rs,

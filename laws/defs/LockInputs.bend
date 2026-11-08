@@ -116,7 +116,7 @@ def deps.named(ds: List<&2, M.Dep>, +name: String) -> List<&2, M.Dep>:
       deps.put(String.eq(M.dep.name(h), name), h, deps.named(t, name))
 
 # a tool kept in front of the rest when it is named, else the rest
-def tools.put(hit: Bool, pin: M.Tool, rest: List<&2, M.Tool>) -> List<&2, M.Tool>:
+def tools.put(hit: Bool, pin: M.Cli, rest: List<&2, M.Cli>) -> List<&2, M.Cli>:
   match hit:
     case True{}:
       pin <> rest
@@ -124,7 +124,7 @@ def tools.put(hit: Bool, pin: M.Tool, rest: List<&2, M.Tool>) -> List<&2, M.Tool
       rest
 
 # every tool a ledger names `name`, in its order
-def tools.named(ts: List<&2, M.Tool>, +name: String) -> List<&2, M.Tool>:
+def tools.named(ts: List<&2, M.Cli>, +name: String) -> List<&2, M.Cli>:
   match ts:
     case []:
       []

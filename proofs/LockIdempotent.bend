@@ -425,13 +425,13 @@ law g.done:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tsy: List<&2, String>
   for +ig: String
   for +fs: List<&2, Up.Found>
@@ -468,13 +468,13 @@ law g.srcs:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tsy: List<&2, String>
   for +ig: String
   for hq: {Bool.pick(List<&2, M.Dep>, dm, ds, dds) == ds : List<&2, M.Dep>}
@@ -522,13 +522,13 @@ law g.ignore:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tsy: List<&2, String>
   for hq: {Bool.pick(List<&2, M.Dep>, dm, ds, dds) == ds : List<&2, M.Dep>}
   for se: {String.is_empty(Up.next.stop(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
@@ -574,7 +574,7 @@ law g.pins:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for hq: {M2.dstay(dd, ds) == ds : List<&2, M.Dep>}
   for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
       ts}))) == True{} : Bool}
@@ -625,7 +625,7 @@ law g.known:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
       ts}))) == True{} : Bool}
   {gi.ok(Up.next.model(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})),

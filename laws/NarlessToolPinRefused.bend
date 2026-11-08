@@ -13,6 +13,6 @@ law gap_of_narless_pin:
   for root: String
   for vend: Bool
   for fr: {False{} == String.is_empty(rev) : Bool}
-  {PinPin.gap(M.Tool{n, e, b, M.Git{url, rev, tag, root, "", vend}})
+  {PinPin.gap(M.Cli{n, e, b, M.Git{url, rev, tag, root, "", vend}})
     == "ez: tools." ++ n ++ " has no narHash; run `ez lock --upgrade --package " ++
       n ++ "` to pin it" : String}

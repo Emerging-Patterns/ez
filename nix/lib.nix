@@ -346,14 +346,22 @@ rec {
         # the README's build
         mkdir -p bin
         BEND_LIB=$PWD/.ez/lib bend ${lib.escapeShellArg file} -o ${lib.escapeShellArg bin}
-        # the lock again, from the committed inputs alone. Every dependency is
-        # a git pin whose tree is already under BEND_LIB, so nothing is fetched.
-        rm ez.lock.toml
-        BEND_LIB=$PWD/.ez/lib ${lib.escapeShellArg "./${bin}"} lock
-        cmp ${src}/ez.lock.toml ez.lock.toml || {
-          diff -u ${src}/ez.lock.toml ez.lock.toml
-          exit 1
-        }
+        # the lock again, from the committed inputs alone. Every git pin's
+        # tree is already under BEND_LIB, so nothing is fetched for it. A hub
+        # package is content `ez lock` takes from the hub, verified by its
+        # hash, and the sandbox has no network, so a lock that records one is
+        # not rewritten here: its reproduction is left to `ez lock` run where
+        # the hub answers.
+        if grep -q '^kind = "hub"$' ez.lock.toml; then
+          echo "fresh: the lock records hub packages; not relocked offline"
+        else
+          rm ez.lock.toml
+          BEND_LIB=$PWD/.ez/lib ${lib.escapeShellArg "./${bin}"} lock
+          cmp ${src}/ez.lock.toml ez.lock.toml || {
+            diff -u ${src}/ez.lock.toml ez.lock.toml
+            exit 1
+          }
+        fi
         echo ok > $out
       '';
 

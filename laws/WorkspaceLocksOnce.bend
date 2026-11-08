@@ -93,9 +93,9 @@ law firsts_find:
 
 # LAW: and so is its tool of a name
 law tools_firsts_find:
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +name: String
-  {M.tool.find(J.tools.firsts(ts), name) == M.tool.find(ts, name) : M.Tool}
+  {M.tool.find(J.tools.firsts(ts), name) == M.tool.find(ts, name) : M.Cli}
 
 # LAW: joined members name the root's hub
 law combine_needs_hub:
