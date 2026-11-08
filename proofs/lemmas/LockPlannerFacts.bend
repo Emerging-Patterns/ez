@@ -1151,7 +1151,7 @@ def pinned.name(p: Up.Pinned, x: String) -> String:
 
 # LAW: a pin with a commit written in keeps its name
 law set_name:
-  for tool: M.Tool
+  for tool: M.Cli
   for rev: String
   for tag: String
   for nar: String
@@ -1159,7 +1159,7 @@ law set_name:
 
 def set_name(tool, _rev, _tag, _nar):
   match tool:
-    case M.Tool{n, e, b, s}:
+    case M.Cli{n, e, b, s}:
       match s:
         case M.Hub{hv}:
           {==}
@@ -1170,7 +1170,7 @@ def set_name(tool, _rev, _tag, _nar):
 
 law tpin_name:
   for short: Bool
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +rev: String
   for +tag: String
   for +nar: String
@@ -1187,7 +1187,7 @@ def tpin_name(short, tool, rev, tag, nar, _says):
 
 law weighed_name:
   for wd: Up.Wd
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +rev: String
   for +tag: String
   for says: List<&2, String>
@@ -1206,7 +1206,7 @@ def weighed_name(wd, tool, rev, tag, says):
 law resolved_name:
   for tip: Up.Tip
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +ref: String
   {pinned.name(Up.tool.resolved(tip, rs, tool, ref), M.tool.name(tool)) == M.tool.name(tool) : String}
 
@@ -1222,7 +1222,7 @@ def resolved_name(tip, rs, tool, ref):
 law named_name:
   for named: Up.Named
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +url: String
   {pinned.name(Up.tool.named(named, rs, tool, url), M.tool.name(tool)) == M.tool.name(tool) : String}
 
@@ -1238,7 +1238,7 @@ def named_name(named, rs, tool, url):
 law tverdict_name:
   for verdict: U.Verdict
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +branch: String
   {pinned.name(Up.tool.verdict(verdict, rs, tool, tip, branch), M.tool.name(tool))
@@ -1259,7 +1259,7 @@ def tverdict_name(verdict, rs, tool, _tip, branch):
 law tkept_nar_name:
   for fill: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   for +nar: String
@@ -1277,7 +1277,7 @@ def tkept_nar_name(fill, rs, tool, tip, tag, nar):
 law tkept_name:
   for wd: Up.Wd
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   {pinned.name(Up.tool.kept(wd, rs, tool, tip, tag), M.tool.name(tool)) == M.tool.name(tool) : String}
@@ -1294,7 +1294,7 @@ def tkept_name(wd, rs, tool, tip, tag):
 law tonward_name:
   for asc: Up.Asc
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   for +branch: String
@@ -1313,7 +1313,7 @@ def tonward_name(asc, rs, tool, tip, tag, branch):
 law tsame_name:
   for same: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   for +branch: String
@@ -1332,7 +1332,7 @@ def tsame_name(same, rs, tool, tip, tag, branch):
 law ttip_name:
   for tip: Up.Tip
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pinned.name(Up.tool.tip(tip, rs, tool), M.tool.name(tool)) == M.tool.name(tool) : String}
 
 def ttip_name(tip, rs, tool):
@@ -1347,7 +1347,7 @@ def ttip_name(tip, rs, tool):
 law taim_name:
   for aim: U.Aim
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pinned.name(Up.tool.aim(aim, rs, tool), M.tool.name(tool)) == M.tool.name(tool) : String}
 
 def taim_name(aim, rs, tool):
@@ -1362,7 +1362,7 @@ def taim_name(aim, rs, tool):
 law fill_name:
   for no_rev: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pinned.name(Up.tool.fill(no_rev, rs, tool), M.tool.name(tool)) == M.tool.name(tool) : String}
 
 def fill_name(no_rev, rs, tool):
@@ -1377,7 +1377,7 @@ def fill_name(no_rev, rs, tool):
 law short_name:
   for short: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pinned.name(Up.tool.short(short, rs, tool), M.tool.name(tool)) == M.tool.name(tool) : String}
 
 def short_name(short, rs, tool):
@@ -1390,7 +1390,7 @@ def short_name(short, rs, tool):
 law git_name:
   for git: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pinned.name(Up.tool.git(git, rs, tool), M.tool.name(tool)) == M.tool.name(tool) : String}
 
 def git_name(git, rs, tool):
@@ -1406,7 +1406,7 @@ def git_name(git, rs, tool):
 law sel_name:
   for sel: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pinned.name(Up.tool.sel(sel, rs, tool), M.tool.name(tool)) == M.tool.name(tool) : String}
 
 def sel_name(sel, rs, tool):
@@ -2833,10 +2833,10 @@ def one_back(aim, rs, _only, hub, dep):
       tip_back(Up.forward(rs, M.source.url(M.source.dep(dep))), rs, hub, dep)
 
 # the tool pin a pin leaves when it says it did not move, else the one it had
-def tback(p: Up.Pinned, +t: M.Tool) -> M.Tool:
+def tback(p: Up.Pinned, +t: M.Cli) -> M.Cli:
   match p:
     case Up.Pinned{t2, m, _s}:
-      Bool.pick(M.Tool, m, t, t2)
+      Bool.pick(M.Cli, m, t, t2)
     case Up.PinWait{_a}:
       t
     case Up.PinHalt{_w}:
@@ -2844,12 +2844,12 @@ def tback(p: Up.Pinned, +t: M.Tool) -> M.Tool:
 
 law tpin_tback:
   for short: Bool
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +rev: String
   for +tag: String
   for +nar: String
   for says: List<&2, String>
-  {tback(Up.tool.pin(short, tool, rev, tag, nar, says), tool) == tool : M.Tool}
+  {tback(Up.tool.pin(short, tool, rev, tag, nar, says), tool) == tool : M.Cli}
 
 def tpin_tback(short, _tool, _rev, _tag, _nar, _says):
   match short:
@@ -2860,11 +2860,11 @@ def tpin_tback(short, _tool, _rev, _tag, _nar, _says):
 
 law weighed_tback:
   for wd: Up.Wd
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +rev: String
   for +tag: String
   for says: List<&2, String>
-  {tback(Up.tool.weighed(wd, tool, rev, tag, says), tool) == tool : M.Tool}
+  {tback(Up.tool.weighed(wd, tool, rev, tag, says), tool) == tool : M.Cli}
 
 def weighed_tback(wd, tool, rev, tag, says):
   match wd:
@@ -2878,9 +2878,9 @@ def weighed_tback(wd, tool, rev, tag, says):
 law resolved_tback:
   for tip: Up.Tip
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +ref: String
-  {tback(Up.tool.resolved(tip, rs, tool, ref), tool) == tool : M.Tool}
+  {tback(Up.tool.resolved(tip, rs, tool, ref), tool) == tool : M.Cli}
 
 def resolved_tback(tip, rs, tool, ref):
   match tip:
@@ -2894,9 +2894,9 @@ def resolved_tback(tip, rs, tool, ref):
 law named_tback:
   for named: Up.Named
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +url: String
-  {tback(Up.tool.named(named, rs, tool, url), tool) == tool : M.Tool}
+  {tback(Up.tool.named(named, rs, tool, url), tool) == tool : M.Cli}
 
 def named_tback(named, rs, tool, url):
   match named:
@@ -2910,10 +2910,10 @@ def named_tback(named, rs, tool, url):
 law tverdict_tback:
   for verdict: U.Verdict
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +branch: String
-  {tback(Up.tool.verdict(verdict, rs, tool, tip, branch), tool) == tool : M.Tool}
+  {tback(Up.tool.verdict(verdict, rs, tool, tip, branch), tool) == tool : M.Cli}
 
 def tverdict_tback(verdict, rs, tool, _tip, branch):
   match verdict:
@@ -2930,11 +2930,11 @@ def tverdict_tback(verdict, rs, tool, _tip, branch):
 law tkept_nar_tback:
   for fill: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   for +nar: String
-  {tback(Up.tool.kept.nar(fill, rs, tool, tip, tag, nar), tool) == tool : M.Tool}
+  {tback(Up.tool.kept.nar(fill, rs, tool, tip, tag, nar), tool) == tool : M.Cli}
 
 def tkept_nar_tback(fill, rs, tool, tip, tag, nar):
   match fill:
@@ -2947,10 +2947,10 @@ def tkept_nar_tback(fill, rs, tool, tip, tag, nar):
 law tkept_tback:
   for wd: Up.Wd
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
-  {tback(Up.tool.kept(wd, rs, tool, tip, tag), tool) == tool : M.Tool}
+  {tback(Up.tool.kept(wd, rs, tool, tip, tag), tool) == tool : M.Cli}
 
 def tkept_tback(wd, rs, tool, tip, tag):
   match wd:
@@ -2964,11 +2964,11 @@ def tkept_tback(wd, rs, tool, tip, tag):
 law tonward_tback:
   for asc: Up.Asc
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   for +branch: String
-  {tback(Up.tool.onward(asc, rs, tool, tip, tag, branch), tool) == tool : M.Tool}
+  {tback(Up.tool.onward(asc, rs, tool, tip, tag, branch), tool) == tool : M.Cli}
 
 def tonward_tback(asc, rs, tool, tip, tag, branch):
   match asc:
@@ -2982,11 +2982,11 @@ def tonward_tback(asc, rs, tool, tip, tag, branch):
 law tsame_tback:
   for same: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   for +branch: String
-  {tback(Up.tool.same(same, rs, tool, tip, tag, branch), tool) == tool : M.Tool}
+  {tback(Up.tool.same(same, rs, tool, tip, tag, branch), tool) == tool : M.Cli}
 
 def tsame_tback(same, rs, tool, tip, tag, branch):
   match same:
@@ -3000,8 +3000,8 @@ def tsame_tback(same, rs, tool, tip, tag, branch):
 law ttip_tback:
   for tip: Up.Tip
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
-  {tback(Up.tool.tip(tip, rs, tool), tool) == tool : M.Tool}
+  for +tool: M.Cli
+  {tback(Up.tool.tip(tip, rs, tool), tool) == tool : M.Cli}
 
 def ttip_tback(tip, rs, tool):
   match tip:
@@ -3015,8 +3015,8 @@ def ttip_tback(tip, rs, tool):
 law taim_tback:
   for aim: U.Aim
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
-  {tback(Up.tool.aim(aim, rs, tool), tool) == tool : M.Tool}
+  for +tool: M.Cli
+  {tback(Up.tool.aim(aim, rs, tool), tool) == tool : M.Cli}
 
 def taim_tback(aim, rs, tool):
   match aim:
@@ -3030,8 +3030,8 @@ def taim_tback(aim, rs, tool):
 law fill_tback:
   for no_rev: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
-  {tback(Up.tool.fill(no_rev, rs, tool), tool) == tool : M.Tool}
+  for +tool: M.Cli
+  {tback(Up.tool.fill(no_rev, rs, tool), tool) == tool : M.Cli}
 
 def fill_tback(no_rev, rs, tool):
   match no_rev:
@@ -3045,8 +3045,8 @@ def fill_tback(no_rev, rs, tool):
 law short_tback:
   for short: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
-  {tback(Up.tool.short(short, rs, tool), tool) == tool : M.Tool}
+  for +tool: M.Cli
+  {tback(Up.tool.short(short, rs, tool), tool) == tool : M.Cli}
 
 def short_tback(short, rs, tool):
   match short:
@@ -3058,8 +3058,8 @@ def short_tback(short, rs, tool):
 law git_tback:
   for git: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
-  {tback(Up.tool.git(git, rs, tool), tool) == tool : M.Tool}
+  for +tool: M.Cli
+  {tback(Up.tool.git(git, rs, tool), tool) == tool : M.Cli}
 
 def git_tback(git, rs, tool):
   match git:
@@ -3074,8 +3074,8 @@ def git_tback(git, rs, tool):
 law sel_tback:
   for sel: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
-  {tback(Up.tool.sel(sel, rs, tool), tool) == tool : M.Tool}
+  for +tool: M.Cli
+  {tback(Up.tool.sel(sel, rs, tool), tool) == tool : M.Cli}
 
 def sel_tback(sel, rs, tool):
   match sel:
@@ -3088,7 +3088,7 @@ def sel_tback(sel, rs, tool):
 # one tool, upgraded again
 
 # a tool pin kept as it is, with the lines it says
-def pkept(t: M.Tool, s: List<&2, String>) -> Up.Pinned:
+def pkept(t: M.Cli, s: List<&2, String>) -> Up.Pinned:
   Up.Pinned{t, False{}, s}
 
 # the lines a tool's fate says
@@ -3102,7 +3102,7 @@ def psays(p: Up.Pinned) -> List<&2, String>:
       []
 
 # what the next upgrade makes of a tool pin this one left
-def again_t.t(+t: M.Tool, +g: String, +rs: List<&2, Up.Reply>, +only: String) -> Up.Pinned:
+def again_t.t(+t: M.Cli, +g: String, +rs: List<&2, Up.Reply>, +only: String) -> Up.Pinned:
   Up.tool.sel(U.chosen(only, M.tool.name(t)), re(g, rs), t)
 
 def again_t(p: Up.Pinned, +g: String, +rs: List<&2, Up.Reply>, +only: String) -> Up.Pinned:
@@ -3166,8 +3166,8 @@ law short_aim:
   for +nr: String
   for +vd: Bool
   for hr: {String.is_empty(r) == False{} : Bool}
-  {Up.tool.short(x, rs, M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
-    == Up.tool.aim(U.aim(True{}, M.Git{url, r, tg, rt, nr, vd}), rs, M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
+  {Up.tool.short(x, rs, M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
+    == Up.tool.aim(U.aim(True{}, M.Git{url, r, tg, rt, nr, vd}), rs, M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
     : Up.Pinned}
 
 def short_aim(x, rs, n, e, b, url, r, tg, rt, nr, vd, hr):
@@ -3176,9 +3176,9 @@ def short_aim(x, rs, n, e, b, url, r, tg, rt, nr, vd, hr):
       {==}
     case True{}:
       nhr = Equal.sym(Bool, String.is_empty(r), False{}, hr)
-      %nhr : {Up.tool.fill(_, rs, M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
+      %nhr : {Up.tool.fill(_, rs, M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
         == Up.tool.aim(U.aim(True{}, M.Git{url, r, tg, rt, nr, vd}), rs,
-          M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}) : Up.Pinned}
+          M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}) : Up.Pinned}
       {==}
 
 # LAW: a tool pin at its own tip, weighed there to its own NAR hash, is kept
@@ -3202,35 +3202,35 @@ law tk.same:
   for es: {String.eq(r, tip) == True{} : Bool}
   for ewd: {Up.weighed(rs, Up.Weigh{url, r}) == Up.Wd{nw} : Up.Wd}
   for eqn: {String.eq(nr, nw) == True{} : Bool}
-  {Up.tool.same(String.eq(r, tip), re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, br)
-    == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-      psays(Up.tool.same(String.eq(r, tip), re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+  {Up.tool.same(String.eq(r, tip), re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, br)
+    == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+      psays(Up.tool.same(String.eq(r, tip), re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
         tip, tag, br))) : Up.Pinned}
 
 def tk.same(g, rs, n, e, b, url, r, tg, rt, nr, vd, tip, tag, br, nw, hn, es, ewd, eqn):
   nes = Equal.sym(Bool, String.eq(r, tip), True{}, es)
-  %nes : {Up.tool.same(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, br)
-    == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-      psays(Up.tool.same(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, br)))
+  %nes : {Up.tool.same(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, br)
+    == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+      psays(Up.tool.same(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, br)))
     : Up.Pinned}
   ew = Equal.sym(Up.Wd, Up.weighed(re(g, rs), Up.Weigh{url, r}), Up.Wd{nw},
     Equal.trans(Up.Wd, Up.weighed(re(g, rs), Up.Weigh{url, r}), Up.weighed(rs, Up.Weigh{url, r}),
       Up.Wd{nw}, re.weighed(g, rs, url, r), ewd))
-  %ew : {Up.tool.kept(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag)
-    == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-      psays(Up.tool.kept(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag)))
+  %ew : {Up.tool.kept(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag)
+    == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+      psays(Up.tool.kept(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag)))
     : Up.Pinned}
   nhn = Equal.sym(Bool, String.is_empty(nr), False{}, hn)
-  %nhn : {Up.tool.kept.nar(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, nw)
-    == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-      psays(Up.tool.kept.nar(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, nw)))
+  %nhn : {Up.tool.kept.nar(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, nw)
+    == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+      psays(Up.tool.kept.nar(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, tag, nw)))
     : Up.Pinned}
   neq = Equal.sym(Bool, String.eq(nr, nw), True{}, eqn)
   %neq : {Up.tool.verdict(U.judge(True{}, True{}, _, tip, tag), re(g, rs),
-      M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, "")
-    == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+      M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, "")
+    == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
       psays(Up.tool.verdict(U.judge(True{}, True{}, _, tip, tag), re(g, rs),
-        M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, ""))) : Up.Pinned}
+        M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, tip, ""))) : Up.Pinned}
   {==}
 
 # LAW: the same, once the aim is known
@@ -3256,32 +3256,32 @@ law tk.aim:
   for es: {String.eq(r, tip) == True{} : Bool}
   for ewd: {Up.weighed(rs, Up.Weigh{url, r}) == Up.Wd{nw} : Up.Wd}
   for eqn: {String.eq(nr, nw) == True{} : Bool}
-  {Up.tool.aim(am, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
-    == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-      psays(Up.tool.aim(am, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
+  {Up.tool.aim(am, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
+    == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+      psays(Up.tool.aim(am, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
 
 def tk.aim(am, g, rs, n, e, b, url, r, tg, rt, nr, vd, tip, tag, br, nw, hn, et, es, ewd, eqn):
   match am:
     case U.Hold{}:
-      Eq.bit.absurd(&2, {Up.tool.aim(U.Hold{}, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
-        == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-          psays(Up.tool.aim(U.Hold{}, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})))
+      Eq.bit.absurd(&2, {Up.tool.aim(U.Hold{}, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
+        == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+          psays(Up.tool.aim(U.Hold{}, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})))
         : Up.Pinned}, tip.clash(Up.At{tip, tag, br}, "", et, {==}))
     case U.Follow{+ref}:
       e3 = Equal.sym(Up.Tip, Up.follow(re(g, rs), url, ref), Up.At{tip, tag, br},
         Equal.trans(Up.Tip, Up.follow(re(g, rs), url, ref), Up.follow(rs, url, ref),
           Up.At{tip, tag, br}, re.follow(g, rs, url, ref), et))
-      %e3 : {Up.tool.tip(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
-        == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-          psays(Up.tool.tip(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
+      %e3 : {Up.tool.tip(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
+        == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+          psays(Up.tool.tip(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
       tk.same(g, rs, n, e, b, url, r, tg, rt, nr, vd, tip, tag, br, nw, hn, es, ewd, eqn)
     case U.Forward{}:
       e3 = Equal.sym(Up.Tip, Up.forward(re(g, rs), url), Up.At{tip, tag, br},
         Equal.trans(Up.Tip, Up.forward(re(g, rs), url), Up.forward(rs, url),
           Up.At{tip, tag, br}, re.forward(g, rs, url), et))
-      %e3 : {Up.tool.tip(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
-        == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-          psays(Up.tool.tip(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
+      %e3 : {Up.tool.tip(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
+        == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+          psays(Up.tool.tip(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
       tk.same(g, rs, n, e, b, url, r, tg, rt, nr, vd, tip, tag, br, nw, hn, es, ewd, eqn)
 
 # LAW: the next upgrade keeps a tool pin that is at the tip its remote names,
@@ -3312,27 +3312,27 @@ law tk.again:
   for es: {String.eq(r, tip) == True{} : Bool}
   for ewd: {Up.weighed(rs, Up.Weigh{url, r}) == Up.Wd{nw} : Up.Wd}
   for eqn: {String.eq(nr, nw) == True{} : Bool}
-  {again_t.t(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, g, rs, only)
-    == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-      psays(again_t.t(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, g, rs, only))) : Up.Pinned}
+  {again_t.t(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, g, rs, only)
+    == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+      psays(again_t.t(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, g, rs, only))) : Up.Pinned}
 
 def tk.again(am, g, rs, only, n, e, b, url, r, tg, rt, nr, vd, tip, tag, br, nw, ec, hr, hn, ea, et, es, ewd, eqn):
   nec = Equal.sym(Bool, U.chosen(only, n), True{}, ec)
-  %nec : {Up.tool.sel(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
-    == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-      psays(Up.tool.sel(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
+  %nec : {Up.tool.sel(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
+    == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+      psays(Up.tool.sel(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
   sa = Equal.sym(Up.Pinned,
     Up.tool.short(Bool.or(String.is_empty(r), String.is_empty(nr)), re(g, rs),
-      M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}),
+      M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}),
     Up.tool.aim(U.aim(True{}, M.Git{url, r, tg, rt, nr, vd}), re(g, rs),
-      M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}),
+      M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}),
     short_aim(Bool.or(String.is_empty(r), String.is_empty(nr)), re(g, rs), n, e, b, url, r, tg, rt,
       nr, vd, hr))
-  %sa : {_ == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, psays(_)) : Up.Pinned}
+  %sa : {_ == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}, psays(_)) : Up.Pinned}
   nea = Equal.sym(U.Aim, U.aim(True{}, M.Git{url, r, tg, rt, nr, vd}), am, ea)
-  %nea : {Up.tool.aim(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
-    == pkept(M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
-      psays(Up.tool.aim(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
+  %nea : {Up.tool.aim(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}})
+    == pkept(M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}},
+      psays(Up.tool.aim(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r, tg, rt, nr, vd}}))) : Up.Pinned}
   tk.aim(am, g, rs, n, e, b, url, r, tg, rt, nr, vd, tip, tag, br, nw, hn, et, es, ewd, eqn)
 
 # LAW: a commit weighed and written into the pin is kept by the next run
@@ -3363,9 +3363,9 @@ law t.pin:
   for et: {up.tip(am, rs, url) == Up.At{tip, tag, br} : Up.Tip}
   for ewd: {Up.weighed(rs, Up.Weigh{url, tip}) == Up.Wd{nw} : Up.Wd}
   for +egd: {Bool.or(String.is_empty(tip), String.is_empty(nw)) == gd : Bool}
-  {again_t(Up.tool.pin(gd, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, nw, says), g, rs, only)
-    == still_t(Up.tool.pin(gd, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, nw, says),
-      psays(again_t(Up.tool.pin(gd, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, nw, says), g, rs,
+  {again_t(Up.tool.pin(gd, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, nw, says), g, rs, only)
+    == still_t(Up.tool.pin(gd, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, nw, says),
+      psays(again_t(Up.tool.pin(gd, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, nw, says), g, rs,
         only))) : Up.Pinned}
 
 def t.pin(
@@ -3431,9 +3431,9 @@ law t.weighed:
       vd}) == am : U.Aim}
   for et: {up.tip(am, rs, url) == Up.At{tip, tag, br} : Up.Tip}
   for ewd: {Up.weighed(rs, Up.Weigh{url, tip}) == wd : Up.Wd}
-  {again_t(Up.tool.weighed(wd, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, says), g, rs, only)
-    == still_t(Up.tool.weighed(wd, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, says),
-      psays(again_t(Up.tool.weighed(wd, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, says), g, rs,
+  {again_t(Up.tool.weighed(wd, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, says), g, rs, only)
+    == still_t(Up.tool.weighed(wd, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, says),
+      psays(again_t(Up.tool.weighed(wd, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tagarg, says), g, rs,
         only))) : Up.Pinned}
 
 def t.weighed(wd, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, tagarg, says, am, tip, tag, br, ec, ea, et, ewd):
@@ -3475,11 +3475,11 @@ law t.tagree:
   for es: {String.eq(r0, tip) == True{} : Bool}
   for ewd: {Up.weighed(rs, Up.Weigh{url, r0}) == Up.Wd{nw} : Up.Wd}
   for eag: {String.eq(nr0, nw) == ag : Bool}
-  {again_t(Up.tool.verdict(U.judge(True{}, True{}, ag, tip, tag), rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0,
+  {again_t(Up.tool.verdict(U.judge(True{}, True{}, ag, tip, tag), rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0,
     vd}}, tip, ""), g, rs, only)
-    == still_t(Up.tool.verdict(U.judge(True{}, True{}, ag, tip, tag), rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0,
+    == still_t(Up.tool.verdict(U.judge(True{}, True{}, ag, tip, tag), rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0,
       vd}}, tip, ""),
-      psays(again_t(Up.tool.verdict(U.judge(True{}, True{}, ag, tip, tag), rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0,
+      psays(again_t(Up.tool.verdict(U.judge(True{}, True{}, ag, tip, tag), rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0,
         nr0, vd}}, tip, ""), g, rs, only))) : Up.Pinned}
 
 def t.tagree(
@@ -3545,9 +3545,9 @@ law t.knar:
   for +es: {String.eq(r0, tip) == True{} : Bool}
   for ewd: {Up.weighed(rs, Up.Weigh{url, r0}) == Up.Wd{nw} : Up.Wd}
   for ef: {String.is_empty(nr0) == f : Bool}
-  {again_t(Up.tool.kept.nar(f, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, nw), g, rs, only)
-    == still_t(Up.tool.kept.nar(f, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, nw),
-      psays(again_t(Up.tool.kept.nar(f, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, nw), g, rs,
+  {again_t(Up.tool.kept.nar(f, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, nw), g, rs, only)
+    == still_t(Up.tool.kept.nar(f, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, nw),
+      psays(again_t(Up.tool.kept.nar(f, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, nw), g, rs,
         only))) : Up.Pinned}
 
 def t.knar(f, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, nw, am, tip, tag, br, ec, hr0, ea, et, es, ewd, ef):
@@ -3591,9 +3591,9 @@ law t.kept:
   for et: {up.tip(am, rs, url) == Up.At{tip, tag, br} : Up.Tip}
   for +es: {String.eq(r0, tip) == True{} : Bool}
   for ewd: {Up.weighed(rs, Up.Weigh{url, r0}) == wd : Up.Wd}
-  {again_t(Up.tool.kept(wd, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag), g, rs, only)
-    == still_t(Up.tool.kept(wd, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag),
-      psays(again_t(Up.tool.kept(wd, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag), g, rs,
+  {again_t(Up.tool.kept(wd, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag), g, rs, only)
+    == still_t(Up.tool.kept(wd, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag),
+      psays(again_t(Up.tool.kept(wd, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag), g, rs,
         only))) : Up.Pinned}
 
 def t.kept(wd, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, am, tip, tag, br, ec, hr0, ea, et, es, ewd):
@@ -3628,9 +3628,9 @@ law t.onward:
   for ec: {U.chosen(only, n) == True{} : Bool}
   for ea: {U.aim(True{}, M.Git{url, r0, tg, rt0, nr0, vd}) == am : U.Aim}
   for et: {up.tip(am, rs, url) == Up.At{tip, tag, br} : Up.Tip}
-  {again_t(Up.tool.onward(asc, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br), g, rs, only)
-    == still_t(Up.tool.onward(asc, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br),
-      psays(again_t(Up.tool.onward(asc, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br), g, rs,
+  {again_t(Up.tool.onward(asc, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br), g, rs, only)
+    == still_t(Up.tool.onward(asc, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br),
+      psays(again_t(Up.tool.onward(asc, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br), g, rs,
         only))) : Up.Pinned}
 
 def t.onward(asc, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, am, tip, tag, br, ec, ea, et):
@@ -3672,9 +3672,9 @@ law t.same:
   for ea: {U.aim(True{}, M.Git{url, r0, tg, rt0, nr0, vd}) == am : U.Aim}
   for et: {up.tip(am, rs, url) == Up.At{tip, tag, br} : Up.Tip}
   for es: {String.eq(r0, tip) == s : Bool}
-  {again_t(Up.tool.same(s, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br), g, rs, only)
-    == still_t(Up.tool.same(s, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br),
-      psays(again_t(Up.tool.same(s, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br), g, rs,
+  {again_t(Up.tool.same(s, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br), g, rs, only)
+    == still_t(Up.tool.same(s, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br),
+      psays(again_t(Up.tool.same(s, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, tip, tag, br), g, rs,
         only))) : Up.Pinned}
 
 def t.same(s, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, am, tip, tag, br, ec, hr0, ea, et, es):
@@ -3706,9 +3706,9 @@ law t.tip:
   for hr0: {String.is_empty(r0) == False{} : Bool}
   for ea: {U.aim(True{}, M.Git{url, r0, tg, rt0, nr0, vd}) == am : U.Aim}
   for et: {up.tip(am, rs, url) == t : Up.Tip}
-  {again_t(Up.tool.tip(t, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only)
-    == still_t(Up.tool.tip(t, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}),
-      psays(again_t(Up.tool.tip(t, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only))) : Up.Pinned}
+  {again_t(Up.tool.tip(t, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only)
+    == still_t(Up.tool.tip(t, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}),
+      psays(again_t(Up.tool.tip(t, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only))) : Up.Pinned}
 
 def t.tip(t, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, am, ec, hr0, ea, et):
   match t:
@@ -3738,28 +3738,28 @@ law t.aim:
   for ec: {U.chosen(only, n) == True{} : Bool}
   for hr0: {String.is_empty(r0) == False{} : Bool}
   for ea: {U.aim(True{}, M.Git{url, r0, tg, rt0, nr0, vd}) == am : U.Aim}
-  {again_t(Up.tool.aim(am, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only)
-    == still_t(Up.tool.aim(am, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}),
-      psays(again_t(Up.tool.aim(am, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only))) : Up.Pinned}
+  {again_t(Up.tool.aim(am, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only)
+    == still_t(Up.tool.aim(am, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}),
+      psays(again_t(Up.tool.aim(am, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only))) : Up.Pinned}
 
 def t.aim(am, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, ec, hr0, ea):
   match am:
     case U.Hold{}:
       nec = Equal.sym(Bool, U.chosen(only, n), True{}, ec)
-      %nec : {Up.tool.sel(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}})
-        == pkept(M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, psays(Up.tool.sel(_, re(g, rs), M.Tool{n, e, b,
+      %nec : {Up.tool.sel(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}})
+        == pkept(M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, psays(Up.tool.sel(_, re(g, rs), M.Cli{n, e, b,
           M.Git{url, r0, tg, rt0, nr0, vd}}))) : Up.Pinned}
       sa = Equal.sym(Up.Pinned,
-        Up.tool.short(Bool.or(String.is_empty(r0), String.is_empty(nr0)), re(g, rs), M.Tool{n, e, b, M.Git{url, r0,
+        Up.tool.short(Bool.or(String.is_empty(r0), String.is_empty(nr0)), re(g, rs), M.Cli{n, e, b, M.Git{url, r0,
           tg, rt0, nr0, vd}}),
-        Up.tool.aim(U.aim(True{}, M.Git{url, r0, tg, rt0, nr0, vd}), re(g, rs), M.Tool{n, e, b, M.Git{url, r0, tg,
+        Up.tool.aim(U.aim(True{}, M.Git{url, r0, tg, rt0, nr0, vd}), re(g, rs), M.Cli{n, e, b, M.Git{url, r0, tg,
           rt0, nr0, vd}}),
         short_aim(Bool.or(String.is_empty(r0), String.is_empty(nr0)), re(g, rs), n, e, b, url, r0, tg,
           rt0, nr0, vd, hr0))
-      %sa : {_ == pkept(M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, psays(_)) : Up.Pinned}
+      %sa : {_ == pkept(M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, psays(_)) : Up.Pinned}
       nea = Equal.sym(U.Aim, U.aim(True{}, M.Git{url, r0, tg, rt0, nr0, vd}), U.Hold{}, ea)
-      %nea : {Up.tool.aim(_, re(g, rs), M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}})
-        == pkept(M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, psays(Up.tool.aim(_, re(g, rs), M.Tool{n, e, b,
+      %nea : {Up.tool.aim(_, re(g, rs), M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}})
+        == pkept(M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, psays(Up.tool.aim(_, re(g, rs), M.Cli{n, e, b,
           M.Git{url, r0, tg, rt0, nr0, vd}}))) : Up.Pinned}
       {==}
     case U.Follow{+ref}:
@@ -3888,9 +3888,9 @@ law t.resolved:
   for ec: {U.chosen(only, n) == True{} : Bool}
   for +ne: {String.is_empty(ref) == False{} : Bool}
   for et: {Up.follow(rs, url, ref) == tp : Up.Tip}
-  {again_t(Up.tool.resolved(tp, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, ref), g, rs, only)
-    == still_t(Up.tool.resolved(tp, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, ref),
-      psays(again_t(Up.tool.resolved(tp, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, ref), g, rs,
+  {again_t(Up.tool.resolved(tp, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, ref), g, rs, only)
+    == still_t(Up.tool.resolved(tp, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, ref),
+      psays(again_t(Up.tool.resolved(tp, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, ref), g, rs,
         only))) : Up.Pinned}
 
 def t.resolved(tp, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, ref, ec, ne, et):
@@ -3921,9 +3921,9 @@ law t.named:
   for +vd: Bool
   for ec: {U.chosen(only, n) == True{} : Bool}
   for eok: {named.ok(nm) == True{} : Bool}
-  {again_t(Up.tool.named(nm, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, url), g, rs, only)
-    == still_t(Up.tool.named(nm, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, url),
-      psays(again_t(Up.tool.named(nm, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, url), g, rs,
+  {again_t(Up.tool.named(nm, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, url), g, rs, only)
+    == still_t(Up.tool.named(nm, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, url),
+      psays(again_t(Up.tool.named(nm, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}, url), g, rs,
         only))) : Up.Pinned}
 
 def t.named(nm, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, ec, eok):
@@ -3953,9 +3953,9 @@ law t.fill:
   for +vd: Bool
   for ec: {U.chosen(only, n) == True{} : Bool}
   for enf: {String.is_empty(r0) == nf : Bool}
-  {again_t(Up.tool.fill(nf, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only)
-    == still_t(Up.tool.fill(nf, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}),
-      psays(again_t(Up.tool.fill(nf, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only))) : Up.Pinned}
+  {again_t(Up.tool.fill(nf, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only)
+    == still_t(Up.tool.fill(nf, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}),
+      psays(again_t(Up.tool.fill(nf, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only))) : Up.Pinned}
 
 def t.fill(nf, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, ec, enf):
   match nf:
@@ -3983,9 +3983,9 @@ law t.short:
   for +vd: Bool
   for ec: {U.chosen(only, n) == True{} : Bool}
   for esh: {Bool.or(String.is_empty(r0), String.is_empty(nr0)) == sh : Bool}
-  {again_t(Up.tool.short(sh, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only)
-    == still_t(Up.tool.short(sh, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}),
-      psays(again_t(Up.tool.short(sh, rs, M.Tool{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs,
+  {again_t(Up.tool.short(sh, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs, only)
+    == still_t(Up.tool.short(sh, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}),
+      psays(again_t(Up.tool.short(sh, rs, M.Cli{n, e, b, M.Git{url, r0, tg, rt0, nr0, vd}}), g, rs,
         only))) : Up.Pinned}
 
 def t.short(sh, g, rs, only, n, e, b, url, r0, tg, rt0, nr0, vd, ec, esh):
@@ -4008,16 +4008,16 @@ law t.sel:
   for +b: String
   for s: M.Source
   for ec: {U.chosen(only, n) == sel : Bool}
-  {again_t(Up.tool.sel(sel, rs, M.Tool{n, e, b, s}), g, rs, only)
-    == still_t(Up.tool.sel(sel, rs, M.Tool{n, e, b, s}),
-      psays(again_t(Up.tool.sel(sel, rs, M.Tool{n, e, b, s}), g, rs, only))) : Up.Pinned}
+  {again_t(Up.tool.sel(sel, rs, M.Cli{n, e, b, s}), g, rs, only)
+    == still_t(Up.tool.sel(sel, rs, M.Cli{n, e, b, s}),
+      psays(again_t(Up.tool.sel(sel, rs, M.Cli{n, e, b, s}), g, rs, only))) : Up.Pinned}
 
 def t.sel(sel, g, rs, only, n, e, b, s, ec):
   match sel:
     case False{}:
       nec = Equal.sym(Bool, U.chosen(only, n), False{}, ec)
-      %nec : {Up.tool.sel(_, re(g, rs), M.Tool{n, e, b, s})
-        == pkept(M.Tool{n, e, b, s}, psays(Up.tool.sel(_, re(g, rs), M.Tool{n, e, b, s}))) : Up.Pinned}
+      %nec : {Up.tool.sel(_, re(g, rs), M.Cli{n, e, b, s})
+        == pkept(M.Cli{n, e, b, s}, psays(Up.tool.sel(_, re(g, rs), M.Cli{n, e, b, s}))) : Up.Pinned}
       {==}
     case True{}:
       match s:
@@ -4033,14 +4033,14 @@ law t.one:
   for +g: String
   for +rs: List<&2, Up.Reply>
   for +only: String
-  for +t: M.Tool
+  for +t: M.Cli
   {again_t(Up.tool.sel(U.chosen(only, M.tool.name(t)), rs, t), g, rs, only)
     == still_t(Up.tool.sel(U.chosen(only, M.tool.name(t)), rs, t),
       psays(again_t(Up.tool.sel(U.chosen(only, M.tool.name(t)), rs, t), g, rs, only))) : Up.Pinned}
 
 def t.one(g, rs, only, t):
   match t:
-    case M.Tool{+n, +e, +b, s}:
+    case M.Cli{+n, +e, +b, s}:
       t.sel(U.chosen(only, n), g, rs, only, n, e, b, s, {==})
 
 # whether a tool's fate that waits waits on a question
@@ -4055,7 +4055,7 @@ def pwok(p: Up.Pinned) -> Bool:
 
 law tpin_pwok:
   for short: Bool
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +rev: String
   for +tag: String
   for +nar: String
@@ -4071,7 +4071,7 @@ def tpin_pwok(short, _tool, _rev, _tag, _nar, _says):
 
 law weighed_pwok:
   for wd: Up.Wd
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +rev: String
   for +tag: String
   for says: List<&2, String>
@@ -4089,7 +4089,7 @@ def weighed_pwok(wd, tool, rev, tag, says):
 law resolved_pwok:
   for tip: Up.Tip
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +ref: String
   {pwok(Up.tool.resolved(tip, rs, tool, ref)) == True{} : Bool}
 
@@ -4105,7 +4105,7 @@ def resolved_pwok(tip, rs, tool, ref):
 law named_pwok:
   for named: Up.Named
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +url: String
   {pwok(Up.tool.named(named, rs, tool, url)) == True{} : Bool}
 
@@ -4121,7 +4121,7 @@ def named_pwok(named, rs, tool, url):
 law tverdict_pwok:
   for verdict: U.Verdict
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +branch: String
   {pwok(Up.tool.verdict(verdict, rs, tool, tip, branch)) == True{} : Bool}
@@ -4141,7 +4141,7 @@ def tverdict_pwok(verdict, rs, tool, _tip, branch):
 law tkept_nar_pwok:
   for fill: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   for +nar: String
@@ -4158,7 +4158,7 @@ def tkept_nar_pwok(fill, rs, tool, tip, tag, nar):
 law tkept_pwok:
   for wd: Up.Wd
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   {pwok(Up.tool.kept(wd, rs, tool, tip, tag)) == True{} : Bool}
@@ -4175,7 +4175,7 @@ def tkept_pwok(wd, rs, tool, tip, tag):
 law tonward_pwok:
   for asc: Up.Asc
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   for +branch: String
@@ -4193,7 +4193,7 @@ def tonward_pwok(asc, rs, tool, tip, tag, branch):
 law tsame_pwok:
   for same: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   for +tip: String
   for +tag: String
   for +branch: String
@@ -4211,7 +4211,7 @@ def tsame_pwok(same, rs, tool, tip, tag, branch):
 law ttip_pwok:
   for tip: Up.Tip
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pwok(Up.tool.tip(tip, rs, tool)) == True{} : Bool}
 
 def ttip_pwok(tip, rs, tool):
@@ -4226,7 +4226,7 @@ def ttip_pwok(tip, rs, tool):
 law taim_pwok:
   for aim: U.Aim
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pwok(Up.tool.aim(aim, rs, tool)) == True{} : Bool}
 
 def taim_pwok(aim, rs, tool):
@@ -4241,7 +4241,7 @@ def taim_pwok(aim, rs, tool):
 law fill_pwok:
   for no_rev: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pwok(Up.tool.fill(no_rev, rs, tool)) == True{} : Bool}
 
 def fill_pwok(no_rev, rs, tool):
@@ -4256,7 +4256,7 @@ def fill_pwok(no_rev, rs, tool):
 law short_pwok:
   for short: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pwok(Up.tool.short(short, rs, tool)) == True{} : Bool}
 
 def short_pwok(short, rs, tool):
@@ -4269,7 +4269,7 @@ def short_pwok(short, rs, tool):
 law git_pwok:
   for git: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pwok(Up.tool.git(git, rs, tool)) == True{} : Bool}
 
 def git_pwok(git, rs, tool):
@@ -4285,7 +4285,7 @@ def git_pwok(git, rs, tool):
 law sel_pwok:
   for sel: Bool
   for +rs: List<&2, Up.Reply>
-  for +tool: M.Tool
+  for +tool: M.Cli
   {pwok(Up.tool.sel(sel, rs, tool)) == True{} : Bool}
 
 def sel_pwok(sel, rs, tool):
@@ -4645,7 +4645,7 @@ def dq.all(rs, only, hub, ds):
         dq.all(rs, only, hub, t))
 
 # the tool pins a walk leaves
-def tt.ts(tt: Up.Tools) -> List<&2, M.Tool>:
+def tt.ts(tt: Up.Tools) -> List<&2, M.Cli>:
   Up.Tools{ts, _m, _sy, _asks, _bad} = tt
   ts
 
@@ -4655,7 +4655,7 @@ def tt.says(tt: Up.Tools) -> List<&2, String>:
   sy
 
 # a walk that keeps every tool pin and asks nothing
-def tsettle(ts: List<&2, M.Tool>, s: List<&2, String>) -> Up.Tools:
+def tsettle(ts: List<&2, M.Cli>, s: List<&2, String>) -> Up.Tools:
   Up.Tools{ts, False{}, s, [], ""}
 
 # whether a walk over tools refuses or still asks
@@ -4665,9 +4665,9 @@ def tunc(tt: Up.Tools) -> Bool:
 
 # the tool pins a walk leaves when it neither refuses, asks, nor moves a pin,
 # else the ones it was given
-def tstay(tt: Up.Tools, +ts: List<&2, M.Tool>) -> List<&2, M.Tool>:
+def tstay(tt: Up.Tools, +ts: List<&2, M.Cli>) -> List<&2, M.Cli>:
   Up.Tools{tts, tm, _sy, asks, bad} = tt
-  Bool.pick(List<&2, M.Tool>,
+  Bool.pick(List<&2, M.Cli>,
     Bool.or(Bool.or(Bool.not(String.is_empty(bad)), Bool.not(List.is_empty(&2, Up.Ask, asks))), tm),
     ts, tts)
 
@@ -4716,7 +4716,7 @@ law tw.all:
   for +g: String
   for +rs: List<&2, Up.Reply>
   for +only: String
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   {Up.tools.walk(re(g, rs), only, tt.ts(Up.tools.walk(rs, only, ts)))
     == tsettle(tt.ts(Up.tools.walk(rs, only, ts)), tt.says(Up.tools.walk(re(g, rs), only,
       tt.ts(Up.tools.walk(rs, only, ts))))) : Up.Tools}
@@ -4750,8 +4750,8 @@ def tool.step_cong(c, _u, _k1, _k2, ih):
 law tkd.step:
   for p: Up.Pinned
   for r: Up.Tools
-  for +h: M.Tool
-  for +t: List<&2, M.Tool>
+  for +h: M.Cli
+  for +t: List<&2, M.Cli>
   for +x: String
   for nm: {pinned.name(p, M.tool.name(h)) == M.tool.name(h) : String}
   for ok: {pwok(p) == True{} : Bool}
@@ -4790,7 +4790,7 @@ def tkd.step(p, r, h, t, x, nm, ok, ih):
 law tkd.all:
   for +rs: List<&2, Up.Reply>
   for +only: String
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +x: String
   {Bool.or(tunc(Up.tools.walk(rs, only, ts)), M.tool.has(tt.ts(Up.tools.walk(rs, only, ts)), x))
     == Bool.or(tunc(Up.tools.walk(rs, only, ts)), M.tool.has(ts, x)) : Bool}
@@ -4808,7 +4808,7 @@ law tkd.known.go:
   for b: Bool
   for +rs: List<&2, Up.Reply>
   for +only: String
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   {Bool.or(tunc(Up.tools.walk(rs, only, ts)), M.tool.known.go(b, tt.ts(Up.tools.walk(rs, only, ts)), only))
     == Bool.or(tunc(Up.tools.walk(rs, only, ts)), M.tool.known.go(b, ts, only)) : Bool}
 
@@ -4822,7 +4822,7 @@ def tkd.known.go(b, rs, only, ts):
 law tkd.known:
   for +rs: List<&2, Up.Reply>
   for +only: String
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   {Bool.or(tunc(Up.tools.walk(rs, only, ts)), M.tool.known(only, tt.ts(Up.tools.walk(rs, only, ts))))
     == Bool.or(tunc(Up.tools.walk(rs, only, ts)), M.tool.known(only, ts)) : Bool}
 
@@ -4832,50 +4832,50 @@ def tkd.known(rs, only, ts):
 # LAW: a list of tool pins kept in front of a list kept
 law tpick_cons:
   for c: Bool
-  for +h: M.Tool
-  for +t: List<&2, M.Tool>
-  for +d: M.Tool
-  for +ds: List<&2, M.Tool>
-  for hd: {d == h : M.Tool}
-  for ih: {Bool.pick(List<&2, M.Tool>, c, t, ds) == t : List<&2, M.Tool>}
-  {Bool.pick(List<&2, M.Tool>, c, h <> t, d <> ds) == h <> t : List<&2, M.Tool>}
+  for +h: M.Cli
+  for +t: List<&2, M.Cli>
+  for +d: M.Cli
+  for +ds: List<&2, M.Cli>
+  for hd: {d == h : M.Cli}
+  for ih: {Bool.pick(List<&2, M.Cli>, c, t, ds) == t : List<&2, M.Cli>}
+  {Bool.pick(List<&2, M.Cli>, c, h <> t, d <> ds) == h <> t : List<&2, M.Cli>}
 
 def tpick_cons(c, h, t, d, ds, hd, ih):
   match c:
     case True{}:
       {==}
     case False{}:
-      Equal.trans(List<&2, M.Tool>, d <> ds, h <> ds, h <> t,
-        Equal.cong(M.Tool, List<&2, M.Tool>, y => y <> ds, d, h, hd),
-        Equal.cong(List<&2, M.Tool>, List<&2, M.Tool>, y => h <> y, ds, t, ih))
+      Equal.trans(List<&2, M.Cli>, d <> ds, h <> ds, h <> t,
+        Equal.cong(M.Cli, List<&2, M.Cli>, y => y <> ds, d, h, hd),
+        Equal.cong(List<&2, M.Cli>, List<&2, M.Cli>, y => h <> y, ds, t, ih))
 
 law tpick_true:
   for c: Bool
-  for +a: List<&2, M.Tool>
-  for +b: List<&2, M.Tool>
+  for +a: List<&2, M.Cli>
+  for +b: List<&2, M.Cli>
   for e: {c == True{} : Bool}
-  {Bool.pick(List<&2, M.Tool>, c, a, b) == a : List<&2, M.Tool>}
+  {Bool.pick(List<&2, M.Cli>, c, a, b) == a : List<&2, M.Cli>}
 
 def tpick_true(c, a, b, e):
   ne = Equal.sym(Bool, c, True{}, e)
-  %ne : {Bool.pick(List<&2, M.Tool>, _, a, b) == a : List<&2, M.Tool>}
+  %ne : {Bool.pick(List<&2, M.Cli>, _, a, b) == a : List<&2, M.Cli>}
   {==}
 
 law tq.moved:
   for m: Bool
-  for +h: M.Tool
-  for +t: List<&2, M.Tool>
-  for +d: M.Tool
-  for +ds: List<&2, M.Tool>
+  for +h: M.Cli
+  for +t: List<&2, M.Cli>
+  for +d: M.Cli
+  for +ds: List<&2, M.Cli>
   for +any: Bool
   for +asks: List<&2, Up.Ask>
   for +bad: String
-  for hb: {Bool.pick(M.Tool, m, h, d) == h : M.Tool}
-  for ih: {Bool.pick(List<&2, M.Tool>, Bool.or(Bool.or(Bool.not(String.is_empty(bad)),
-    Bool.not(List.is_empty(&2, Up.Ask, asks))), any), t, ds) == t : List<&2, M.Tool>}
-  {Bool.pick(List<&2, M.Tool>, Bool.or(Bool.or(Bool.not(String.is_empty(bad)),
+  for hb: {Bool.pick(M.Cli, m, h, d) == h : M.Cli}
+  for ih: {Bool.pick(List<&2, M.Cli>, Bool.or(Bool.or(Bool.not(String.is_empty(bad)),
+    Bool.not(List.is_empty(&2, Up.Ask, asks))), any), t, ds) == t : List<&2, M.Cli>}
+  {Bool.pick(List<&2, M.Cli>, Bool.or(Bool.or(Bool.not(String.is_empty(bad)),
     Bool.not(List.is_empty(&2, Up.Ask, asks))), Bool.or(m, any)), h <> t, d <> ds) == h <> t
-    : List<&2, M.Tool>}
+    : List<&2, M.Cli>}
 
 def tq.moved(m, h, t, d, ds, any, asks, bad, hb, ih):
   match m:
@@ -4891,12 +4891,12 @@ def tq.moved(m, h, t, d, ds, any, asks, bad, hb, ih):
 law tq.step:
   for p: Up.Pinned
   for r: Up.Tools
-  for +h: M.Tool
-  for +t: List<&2, M.Tool>
-  for hb: {tback(p, h) == h : M.Tool}
+  for +h: M.Cli
+  for +t: List<&2, M.Cli>
+  for hb: {tback(p, h) == h : M.Cli}
   for ok: {pwok(p) == True{} : Bool}
-  for ih: {tstay(r, t) == t : List<&2, M.Tool>}
-  {tstay(Up.tools.join(p, r), h <> t) == h <> t : List<&2, M.Tool>}
+  for ih: {tstay(r, t) == t : List<&2, M.Cli>}
+  {tstay(Up.tools.join(p, r), h <> t) == h <> t : List<&2, M.Cli>}
 
 def tq.step(p, r, h, t, hb, ok, ih):
   match p:
@@ -4925,8 +4925,8 @@ def tq.step(p, r, h, t, hb, ok, ih):
 law tq.all:
   for +rs: List<&2, Up.Reply>
   for +only: String
-  for +ts: List<&2, M.Tool>
-  {tstay(Up.tools.walk(rs, only, ts), ts) == ts : List<&2, M.Tool>}
+  for +ts: List<&2, M.Cli>
+  {tstay(Up.tools.walk(rs, only, ts), ts) == ts : List<&2, M.Cli>}
 
 def tq.all(rs, only, ts):
   match ts:
@@ -4996,7 +4996,7 @@ law c.second:
   for +hubpa: String
   for +hubpv: String
   for +dds: List<&2, M.Dep>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for hw: {Up.deps.walk(re(g, rs), only, M.hub.or(hub), dds) == dsettle(dds, dd.says(Up.deps.walk(re(g, rs), only,
       M.hub.or(hub), dds))) : Up.Deps}
   for tw: {Up.tools.walk(re(g, rs), only, tts) == tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only, tts))) : Up.Tools}
@@ -5032,15 +5032,15 @@ law c.same:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for hw: {Up.deps.walk(re(g, rs), only, M.hub.or(hub), dds) == dsettle(dds, dd.says(Up.deps.walk(re(g, rs), only,
       M.hub.or(hub), dds))) : Up.Deps}
   for tw: {Up.tools.walk(re(g, rs), only, tts) == tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only, tts))) : Up.Tools}
   for kn: {Bool.or(U.known(only, dds), M.tool.known(only, tts)) == True{} : Bool}
   for hq: {dds == ds : List<&2, M.Dep>}
-  for tq: {tts == ts : List<&2, M.Tool>}
+  for tq: {tts == ts : List<&2, M.Cli>}
   {view(Up.next(only, M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}}, re(g,
     rs))) == M1.target(M.Good{M.Manifest{name,
     entry, bin, hub, hubpa, hubpv, ds, ts}}, g) : Up.Next}
@@ -5056,9 +5056,9 @@ def c.same(g, rs, only, name, entry, bin, hub, hubpa, hubpv, _ds, ts, dds, tts, 
 law c.kn:
   for +only: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for ek: {Bool.or(U.known(only, ds), M.tool.known(only, ts)) == True{} : Bool}
   for hk: {U.known(only, dds) == U.known(only, ds) : Bool}
   for tk: {M.tool.known(only, tts) == M.tool.known(only, ts) : Bool}
@@ -5090,13 +5090,13 @@ law c.done:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tsy: List<&2, String>
   for +ig: String
   for +fs: List<&2, Up.Found>
@@ -5108,7 +5108,7 @@ law c.done:
   for hq: {Bool.pick(List<&2, M.Dep>, dm, ds, dds) == ds : List<&2, M.Dep>}
   for tw: {Up.tools.walk(re(g, rs), only, tts) == tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only, tts))) : Up.Tools}
   for tk: {M.tool.known(only, tts) == M.tool.known(only, ts) : Bool}
-  for tq: {Bool.pick(List<&2, M.Tool>, tm, ts, tts) == ts : List<&2, M.Tool>}
+  for tq: {Bool.pick(List<&2, M.Cli>, tm, ts, tts) == ts : List<&2, M.Cli>}
   {core.lhs(Up.done(M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}, Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""},
     Up.Tools{tts, tm, tsy, [], ""}, ig, fs), only, g, rs) == core.rhs(Up.done(M.Manifest{name, entry, bin, hub, hubpa,
       hubpv, ds,
@@ -5203,13 +5203,13 @@ law c.srcs:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tsy: List<&2, String>
   for +ig: String
   for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}} : M.Read}
@@ -5220,7 +5220,7 @@ law c.srcs:
   for hq: {Bool.pick(List<&2, M.Dep>, dm, ds, dds) == ds : List<&2, M.Dep>}
   for tw: {Up.tools.walk(re(g, rs), only, tts) == tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only, tts))) : Up.Tools}
   for tk: {M.tool.known(only, tts) == M.tool.known(only, ts) : Bool}
-  for tq: {Bool.pick(List<&2, M.Tool>, tm, ts, tts) == ts : List<&2, M.Tool>}
+  for tq: {Bool.pick(List<&2, M.Cli>, tm, ts, tts) == ts : List<&2, M.Cli>}
   for se: {String.is_empty(Up.next.stop(Up.got.srcs(srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts},
     Up.Deps{dds, ss,
       es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}, ig))) == True{} : Bool}
@@ -5302,13 +5302,13 @@ law c.ignore:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tsy: List<&2, String>
   for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}} : M.Read}
   for ek: {Bool.or(U.known(only, ds), M.tool.known(only, ts)) == True{} : Bool}
@@ -5318,7 +5318,7 @@ law c.ignore:
   for hq: {Bool.pick(List<&2, M.Dep>, dm, ds, dds) == ds : List<&2, M.Dep>}
   for tw: {Up.tools.walk(re(g, rs), only, tts) == tsettle(tts, tt.says(Up.tools.walk(re(g, rs), only, tts))) : Up.Tools}
   for tk: {M.tool.known(only, tts) == M.tool.known(only, ts) : Bool}
-  for tq: {Bool.pick(List<&2, M.Tool>, tm, ts, tts) == ts : List<&2, M.Tool>}
+  for tq: {Bool.pick(List<&2, M.Cli>, tm, ts, tts) == ts : List<&2, M.Cli>}
   for se: {String.is_empty(Up.next.stop(Up.got.ignore(said, srcs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
     ts},
       Up.Deps{dds, ss, es, dm, dsy, dtr, [], ""}, Up.Tools{tts, tm, tsy, [], ""}))) == True{} : Bool}
@@ -5399,7 +5399,7 @@ law c.pins:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}} : M.Read}
   for ek: {Bool.or(U.known(only, ds), M.tool.known(only, ts)) == True{} : Bool}
   for hw: {Up.deps.walk(re(g, rs), only, M.hub.or(hub), dd.ds(dd)) == dsettle(dd.ds(dd), dd.says(Up.deps.walk(re(g,
@@ -5409,7 +5409,7 @@ law c.pins:
   for tw: {Up.tools.walk(re(g, rs), only, tt.ts(tt)) == tsettle(tt.ts(tt), tt.says(Up.tools.walk(re(g, rs), only,
       tt.ts(tt)))) : Up.Tools}
   for tk: {Bool.or(tunc(tt), M.tool.known(only, tt.ts(tt))) == Bool.or(tunc(tt), M.tool.known(only, ts)) : Bool}
-  for tq: {tstay(tt, ts) == ts : List<&2, M.Tool>}
+  for tq: {tstay(tt, ts) == ts : List<&2, M.Cli>}
   for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,
       ts}))) == True{} : Bool}
   {core.lhs(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}), only, g,
@@ -5489,7 +5489,7 @@ law c.known:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for eq: {W.parsed(ledger) == M.Good{M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts}} : M.Read}
   for ek: {Bool.or(U.known(only, ds), M.tool.known(only, ts)) == k : Bool}
   for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds,

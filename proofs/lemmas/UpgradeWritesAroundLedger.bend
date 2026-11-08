@@ -412,9 +412,9 @@ law ok_done.arm:
   for +hbpa: String
   for +hbpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +ig: String
   ok.edits(Up.edit.toml(moved, Rend.show(M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ds, ts}),
       Up.edit.if(b, ".gitignore", I.sync(ds, ig), [])),
@@ -444,7 +444,7 @@ law ok_done:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for dd: Up.Deps
   for tt: Up.Tools
   for +ig: String
@@ -468,7 +468,7 @@ law ok_srcs:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for dd: Up.Deps
   for tt: Up.Tools
   for +ig: String
@@ -493,7 +493,7 @@ law ok_ignore:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +dd: Up.Deps
   for +tt: Up.Tools
   for +rs: List<&2, Up.Reply>
@@ -523,7 +523,7 @@ law ok_asks:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +dd: Up.Deps
   for +tt: Up.Tools
   ok.next(Up.pins.asks(asks, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt),
@@ -550,7 +550,7 @@ law ok_bad:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   for +dd: Up.Deps
   for +tt: Up.Tools
   ok.next(Up.pins.bad(clean, bad, asks, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}, dd, tt),
@@ -574,7 +574,7 @@ law ok_pins:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   ok.next(Up.pins(dd, tt, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}),
     D2.ignore.said(Up.text.said(rs, Up.Ignore{})))
 
@@ -599,7 +599,7 @@ law ok_known:
   for +hbpa: String
   for +hbpv: String
   for +ods: List<&2, M.Dep>
-  for +ots: List<&2, M.Tool>
+  for +ots: List<&2, M.Cli>
   ok.next(Up.known(ok, only, rs, M.Manifest{pn, pe, pb, hb, hbpa, hbpv, ods, ots}),
     D2.ignore.said(Up.text.said(rs, Up.Ignore{})))
 

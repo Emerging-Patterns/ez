@@ -200,11 +200,21 @@ files laid under `BEND_LIB` and their manifest all come from one reading of
 it. Like `bend --publish` in 2.0.27, the walk takes along every file named
 exactly `LICENSE` beside a file of the package, and the hash covers it.
 
-A dependency pinned before bend 2.0.27 has a hash that does not cover its
-`LICENSE` files. ez keeps that recorded name, as cargo and uv keep a checksum
-they recorded: `ez lock` and `ez lock --upgrade` judge such a checkout
-without its `LICENSE` files when the full manifest does not match the name.
-Only a new `ez add` takes the new rule.
+Like `bend --publish` in 2.0.40, it also takes along the file named exactly
+`README.md` beside the entry, at `README.md` in the package, and no README
+beside any other file; a README over 65536 bytes, the most the hub takes, is
+refused, as bend refuses it before it mines.
+
+A dependency pinned before bend 2.0.40 has a hash that does not cover its
+README, and one pinned before 2.0.27 a hash that covers neither its README
+nor its `LICENSE` files. ez keeps that recorded name, as cargo and uv keep a
+checksum they recorded: when the full manifest does not match the name,
+`ez lock` and `ez lock --upgrade` judge such a checkout without its README,
+and, when that does not match either, without its README and its `LICENSE`
+files. Only a new `ez add` takes the new rule. A package published to the
+hub by a bend before 2.0.40 is named without its README, so to depend on it
+by the name the hub serves, write that hash into ez.toml after `ez add` and
+run `ez lock`, which judges the checkout by the older rule.
 
 ### Naming
 
@@ -671,8 +681,9 @@ hub description: # demo: a demo
 
 The hub takes the first line of the package's first file by path, in plain
 string order, so an uppercase letter comes before every lowercase one, and
-passes over every file named `LICENSE`. The package's files are the entry,
-the files it imports, and the `LICENSE` beside each, so the line is the
+passes over every file named `LICENSE` and the `README.md`. The package's
+files are the entry, the files it imports, the `LICENSE` beside each and the
+README beside the entry, so the line is the
 entry's first line unless a file it imports sorts before it: an entry
 `main.bend` importing `lib/util.bend` is described by the first line of
 `lib/util.bend`. The line comes as bend starts, not as a question: to change

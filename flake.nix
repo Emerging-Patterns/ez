@@ -5,9 +5,10 @@
   description = "ez: dependency tracking, lockfile and vendoring tool for Bend 2, written in Bend";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  # the commit that packages bend 2.0.38 (the v2.0.38 tag packages 2.0.37)
+  # the commit that packages bend 2.0.40 ("The flake names 2.0.40"; the
+  # v2.0.40 tag may package the release before it)
   inputs.bend = {
-    url = "github:bendlang/bend/042e797ebd1cfc060603e2682879909fe86fa8c2";
+    url = "github:bendlang/bend/222de9901d4e3551c2b347da02e02a10098a28b2";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -41,7 +42,7 @@
             nativeBuildInputs = [ ez.cc ];
             extraPath = [ pkgs.git pkgs.findutils pkgs.coreutils ];
             wrapEnv = {
-              EZ_LIBSSL = libssl;
+              BEND_LIBSSL = libssl;
             };
             defaultWrapEnv = {
               SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
@@ -88,7 +89,8 @@
           # bendLib, else from lock (or src/ez.lock.toml), else set none.
           # mkFresh is ez's own fresh-clone check: bootstrap.sh over the lock's
           # BEND_LIB fetches nothing, the README's build builds, and `ez lock`
-          # writes the committed ez.lock.toml back byte for byte, all offline.
+          # writes the committed ez.lock.toml back byte for byte, all offline,
+          # for a lock of git pins only (a hub package's content is the hub's).
           # A check, which runs `ez prove`:
           #   checks.${system}.proofs = inputs.ez.lib.${system}.mkProofs {
           #     ez = inputs.ez.packages.${system}.default;
@@ -132,11 +134,11 @@
           devShells.default = ez.mkShell {
             src = self;
             packages = [ ezBin bend bend-cc pkgs.git pkgs.openssl pkgs.cacert ];
-            # EZ_LIBSSL and SSL_CERT_FILE are what ezhttp's client needs: it
+            # BEND_LIBSSL and SSL_CERT_FILE are what ezhttp's client needs: it
             # opens libssl by name at run time, and OpenSSL takes its trust store
             # from SSL_CERT_FILE.
             extraHook = ''
-              export EZ_LIBSSL=${libssl}
+              export BEND_LIBSSL=${libssl}
               export SSL_CERT_FILE=''${SSL_CERT_FILE:-${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt}
             '';
           };

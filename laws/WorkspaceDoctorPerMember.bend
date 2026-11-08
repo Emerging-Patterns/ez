@@ -141,7 +141,7 @@ law doc_member_walks:
   for pa: String
   for pv: String
   for ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for +files: List<&2, K.Source>
   for +locked: List<&2, Mv.Held>
   {Doc.member.moved(J.Member{dir, M.Manifest{nn, ee, bb, hh, pa, pv, ds, ts}}, files, locked)

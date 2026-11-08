@@ -73,12 +73,12 @@ def links.act(act: TW.Act) -> Bool:
       True{}
 
 # the tools of a ledger that was read
-def tools.of(manifest: M.Manifest) -> List<&2, M.Tool>:
+def tools.of(manifest: M.Manifest) -> List<&2, M.Cli>:
   M.Manifest{_n, _e, _b, _h, _pa, _pv, _ds, ts} = manifest
   ts
 
 # the pins a lock's text records
-def locked(+body: String) -> List<&2, M.Tool>:
+def locked(+body: String) -> List<&2, M.Cli>:
   M.tools(T.sects(T.parse(body)))
 
 # ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ def over.of(+binary: String, +entry: String) -> String:
   Bool.pick(String, String.is_empty(binary), entry, binary)
 
 # a pin the lock has, or a refusal when it has none by that name
-def pin.go(empty: Bool, +tool: M.Tool, +name: String) -> Src:
+def pin.go(empty: Bool, +tool: M.Cli, +name: String) -> Src:
   match empty:
     case True{}:
       NoSrc{"ez: " ++ name ++ " is not pinned in ez.lock.toml"}
@@ -107,11 +107,11 @@ def pin.go(empty: Bool, +tool: M.Tool, +name: String) -> Src:
         over.of(M.tool.bin(tool), M.tool.entry(tool))}
 
 # the pin the lock has for a name, or a refusal
-def pin.of(+tool: M.Tool, +name: String) -> Src:
+def pin.of(+tool: M.Cli, +name: String) -> Src:
   pin.go(String.is_empty(M.tool.name(tool)), tool, name)
 
 # the pin the lock records under a name, one with empty fields for none
-def pin.in(+body: String, +name: String) -> M.Tool:
+def pin.in(+body: String, +name: String) -> M.Cli:
   M.tool.find(locked(body), name)
 
 # a name the ledger pins is built as the lock pins it
@@ -1114,13 +1114,13 @@ def sync.step(bad: Bool, +name: String, rest: Unit -> String) -> String:
       rest(Unit{})
 
 # whether the lock pins a tool at a commit
-def sync.pinned(+tool: M.Tool) -> Bool:
+def sync.pinned(+tool: M.Cli) -> Bool:
   Bool.and(Bool.not(String.is_empty(M.tool.name(tool))),
     Git.is_rev(M.source.rev(M.tool.source(tool))))
 
 # every tool the ledger names has to be pinned at a commit in the lock; why
 # the first that is not is refused, "" when every one is
-def sync.check(ts: List<&2, M.Tool>, +body: String) -> String:
+def sync.check(ts: List<&2, M.Cli>, +body: String) -> String:
   match ts:
     case []:
       ""
@@ -1129,7 +1129,7 @@ def sync.check(ts: List<&2, M.Tool>, +body: String) -> String:
         _u => sync.check(t, body))
 
 # the names of the tools a ledger pins
-def names.of(ts: List<&2, M.Tool>) -> List<&2, String>:
+def names.of(ts: List<&2, M.Cli>) -> List<&2, String>:
   match ts:
     case []:
       []
@@ -1137,7 +1137,7 @@ def names.of(ts: List<&2, M.Tool>) -> List<&2, String>:
       M.tool.name(h) <> names.of(t)
 
 # every name installed, or the refusal the scan found
-def sync.why(ok: Bool, +why: String, ts: List<&2, M.Tool>) -> Sync:
+def sync.why(ok: Bool, +why: String, ts: List<&2, M.Cli>) -> Sync:
   match ok:
     case True{}:
       Sync{names.of(ts)}
@@ -1145,10 +1145,10 @@ def sync.why(ok: Bool, +why: String, ts: List<&2, M.Tool>) -> Sync:
       SyncNo{why}
 
 # a ledger with pins needs a lock that pins each at a commit
-def sync.lock(got: Maybe<&2, String>, +ts: List<&2, M.Tool>) -> Sync:
+def sync.lock(got: Maybe<&2, String>, +ts: List<&2, M.Cli>) -> Sync:
   match got:
     case None{}:
-      Bool.pick(Sync, List.is_empty(&2, M.Tool, ts), Sync{[]},
+      Bool.pick(Sync, List.is_empty(&2, M.Cli, ts), Sync{[]},
         SyncNo{"ez: ez.lock.toml is not there"})
     case Some{body}:
       +why = sync.check(ts, body)

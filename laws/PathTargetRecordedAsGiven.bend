@@ -134,11 +134,11 @@ def dep.urls(ds: List<&2, M.Dep>) -> List<&2, String>:
       dep.url(h) <> dep.urls(t)
 
 # the source a tool pin records
-def tool.url(pin: M.Tool) -> String:
+def tool.url(pin: M.Cli) -> String:
   M.source.url(M.tool.source(pin))
 
 # the sources tool pins record, in order
-def tool.urls(ts: List<&2, M.Tool>) -> List<&2, String>:
+def tool.urls(ts: List<&2, M.Cli>) -> List<&2, String>:
   match ts:
     case []:
       []
@@ -146,7 +146,7 @@ def tool.urls(ts: List<&2, M.Tool>) -> List<&2, String>:
       tool.url(h) <> tool.urls(t)
 
 # the tool pins of a ledger model, none when it did not parse
-def ledger.tools(read: M.Read) -> List<&2, M.Tool>:
+def ledger.tools(read: M.Read) -> List<&2, M.Cli>:
   match read:
     case M.Bad{_why}:
       []

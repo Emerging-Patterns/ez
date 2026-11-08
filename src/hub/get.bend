@@ -17,9 +17,9 @@
 # two types whose constructors this file matches, which `main.bend` names
 # but does not define.
 import Base
-import 0xa4d47e5f0f6044ac1a983d1b051fa47a/main.bend as Http
-import 0xa4d47e5f0f6044ac1a983d1b051fa47a/src/client.bend as Client
-import 0xa4d47e5f0f6044ac1a983d1b051fa47a/src/url.bend as Url
+import 0x7367809738fddd234b8d2bed772ad2cf/main.bend as Http
+import 0x7367809738fddd234b8d2bed772ad2cf/src/client.bend as Client
+import 0x7367809738fddd234b8d2bed772ad2cf/src/url.bend as Url
 import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
 import ../io/file.bend as F
 import ./hub.bend as Hub
@@ -30,8 +30,8 @@ def get.reply(response: Client.Response) -> String:
   match response:
     case Client.Err{why}:
       "6\n" ++ why
-    case Client.Response{+status, _headers, body}:
-      Hub.get.status(U32.is_eq(status, 200), status, body)
+    case Client.Response{+status, _headers, _reason, bytes}:
+      Hub.get.status(U32.is_eq(status, 200), status, Http.body_text(bytes))
 
 # a url fetched over a socket
 def get.http(url: String) -> IO(String):

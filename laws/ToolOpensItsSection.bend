@@ -8,5 +8,5 @@ law tool_opens_its_section:
   for e: String
   for b: String
   for s: M.Source
-  {String.starts_with(Rend.tool(M.Tool{n, e, b, s}), "\n[tools." ++ n) == True{}
+  {String.starts_with(Rend.tool(M.Cli{n, e, b, s}), "\n[tools." ++ n) == True{}
     : Bool}

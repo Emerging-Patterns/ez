@@ -2,7 +2,9 @@
 # hub takes the first line of the package's first file by path, in plain
 # string order (so an uppercase letter comes before every lowercase one), and
 # passes over a file named LICENSE, which bend 2.0.27 sends beside the files
-# it publishes. `ez publish` says this line before it uploads (pub/plan.bend),
+# it publishes, and the README.md bend 2.0.40 sends beside the entry. The hub's
+# own listing says so: a package whose files are LICENSE, README.md and
+# main.bend is described by main.bend's first line. `ez publish` says this line before it uploads (pub/plan.bend),
 # and `ez init` opens the entry it writes with a line of its own for it
 # (init/plan.bend), so the line a project is shown by on the hub is one its
 # author wrote.
@@ -55,6 +57,15 @@ def lic(file: K.Source) -> Bool:
   K.Source{at, _text} = file
   String.eq(Path.base(at), "LICENSE")
 
+# whether a file of a package is the README, which the hub passes over too
+def readme(file: K.Source) -> Bool:
+  K.Source{at, _text} = file
+  String.eq(Path.base(at), "README.md")
+
+# whether the hub passes a file over: a LICENSE or the README
+def passed(+file: K.Source) -> Bool:
+  Bool.or(lic(file), readme(file))
+
 # where a file stands in the hub's order
 def at(file: K.Source) -> String:
   K.Source{a, _text} = file
@@ -69,8 +80,8 @@ def least.vs(cur: Maybe<&2, K.Source>, +next: K.Source) -> Maybe<&2, K.Source>:
     case Some{+c}:
       Bool.pick(Maybe<&2, K.Source>, String.is_le(at(c), at(next)), Some{c}, Some{next})
 
-# the next file weighed: a LICENSE is passed over, and any other file is the
-# earlier of itself and the one found so far
+# the next file weighed: a LICENSE or the README is passed over, and any
+# other file is the earlier of itself and the one found so far
 def least.pick(skip: Bool, cur: Maybe<&2, K.Source>, +next: K.Source) -> Maybe<&2, K.Source>:
   match skip:
     case True{}:
@@ -79,13 +90,13 @@ def least.pick(skip: Bool, cur: Maybe<&2, K.Source>, +next: K.Source) -> Maybe<&
       least.vs(cur, next)
 
 # the first file by path among these and the one found so far, LICENSE files
-# passed over
+# and the README passed over
 def least(fs: List<&2, K.Source>, cur: Maybe<&2, K.Source>) -> Maybe<&2, K.Source>:
   match fs:
     case []:
       cur
     case +h <> t:
-      least(t, least.pick(lic(h), cur, h))
+      least(t, least.pick(passed(h), cur, h))
 
 # a file's first line
 def line.file(file: K.Source) -> String:
@@ -101,7 +112,7 @@ def line.of(got: Maybe<&2, K.Source>) -> String:
       line.file(f)
 
 # the line the hub describes a package by: the first line of its first file
-# by path that is not a LICENSE
+# by path that is neither a LICENSE nor the README
 def blurb(fs: List<&2, K.Source>) -> String:
   line.of(least(fs, None{}))
 

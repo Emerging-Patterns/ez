@@ -36,10 +36,10 @@ def Laws.tool_section_not_dep(ss1, n, ps, ss2):
 law tools_put_append:
   for b: Bool
   for +h: T.Sect
-  for xs: List<&2, M.Tool>
-  for +ys: List<&2, M.Tool>
-  {M.tools.put(b, h, List.append(&2, M.Tool, xs, ys))
-    == List.append(&2, M.Tool, M.tools.put(b, h, xs), ys) : List<&2, M.Tool>}
+  for xs: List<&2, M.Cli>
+  for +ys: List<&2, M.Cli>
+  {M.tools.put(b, h, List.append(&2, M.Cli, xs, ys))
+    == List.append(&2, M.Cli, M.tools.put(b, h, xs), ys) : List<&2, M.Cli>}
 
 def tools_put_append(b, h, _xs, _ys):
   match b:
@@ -55,21 +55,21 @@ def Laws.tool_section_is_tool(ss1, n, ps, ss2):
     case []:
       %Equal.sym(Bool, String.starts_with(n, ""), True{}, Eq.starts_nil(n))
         : {M.tools.put(_, T.Sect{"tools." ++ n, ps}, M.tools(ss2))
-          == M.tool_of("tools." ++ n, ps) <> M.tools(ss2) : List<&2, M.Tool>}
+          == M.tool_of("tools." ++ n, ps) <> M.tools(ss2) : List<&2, M.Cli>}
       {==}
     case +h <> +t:
-      Equal.trans(List<&2, M.Tool>,
+      Equal.trans(List<&2, M.Cli>,
         M.tools.put(String.starts_with(M.name_of(h), "tools."), h,
           M.tools(List.append(&2, T.Sect, t, T.Sect{"tools." ++ n, ps} <> ss2))),
         M.tools.put(String.starts_with(M.name_of(h), "tools."), h,
-          List.append(&2, M.Tool, M.tools(t), M.tool_of("tools." ++ n, ps) <> M.tools(ss2))),
-        List.append(&2, M.Tool,
+          List.append(&2, M.Cli, M.tools(t), M.tool_of("tools." ++ n, ps) <> M.tools(ss2))),
+        List.append(&2, M.Cli,
           M.tools.put(String.starts_with(M.name_of(h), "tools."), h, M.tools(t)),
           M.tool_of("tools." ++ n, ps) <> M.tools(ss2)),
-        Equal.cong(List<&2, M.Tool>, List<&2, M.Tool>,
+        Equal.cong(List<&2, M.Cli>, List<&2, M.Cli>,
           x => M.tools.put(String.starts_with(M.name_of(h), "tools."), h, x),
           M.tools(List.append(&2, T.Sect, t, T.Sect{"tools." ++ n, ps} <> ss2)),
-          List.append(&2, M.Tool, M.tools(t), M.tool_of("tools." ++ n, ps) <> M.tools(ss2)),
+          List.append(&2, M.Cli, M.tools(t), M.tool_of("tools." ++ n, ps) <> M.tools(ss2)),
           Laws.tool_section_is_tool(t, n, ps, ss2)),
         tools_put_append(String.starts_with(M.name_of(h), "tools."), h, M.tools(t),
           M.tool_of("tools." ++ n, ps) <> M.tools(ss2)))

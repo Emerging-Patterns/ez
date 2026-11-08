@@ -80,17 +80,17 @@ def deps.back(ds: List<&2, M.Dep>, +js: List<&2, M.Dep>) -> List<&2, M.Dep>:
       dep.back(hd, js) <> deps.back(tl, js)
 
 # a tool with the pin the joint ledger gives its name
-def tool.back.at(own: M.Tool, joint: M.Tool) -> M.Tool:
-  M.Tool{nn, ee, bb, os} = own
-  M.Tool{_jn, _je, _jb, js} = joint
-  M.Tool{nn, ee, bb, source.back(os, js)}
+def tool.back.at(own: M.Cli, joint: M.Cli) -> M.Cli:
+  M.Cli{nn, ee, bb, os} = own
+  M.Cli{_jn, _je, _jb, js} = joint
+  M.Cli{nn, ee, bb, source.back(os, js)}
 
 # a tool of a ledger, after the upgrade
-def tool.back(+own: M.Tool, +ts: List<&2, M.Tool>) -> M.Tool:
+def tool.back(+own: M.Cli, +ts: List<&2, M.Cli>) -> M.Cli:
   tool.back.at(own, M.tool.find(ts, M.tool.name(own)))
 
 # every tool of a ledger, after the upgrade
-def tools.back(ts: List<&2, M.Tool>, +js: List<&2, M.Tool>) -> List<&2, M.Tool>:
+def tools.back(ts: List<&2, M.Cli>, +js: List<&2, M.Cli>) -> List<&2, M.Cli>:
   match ts:
     case []:
       []

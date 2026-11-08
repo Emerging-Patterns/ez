@@ -49,8 +49,8 @@ law tool_section_is_tool:
   for +ps: List<&2, T.Kv>
   for +ss2: List<&2, T.Sect>
   {M.tools(List.append(&2, T.Sect, ss1, T.Sect{"tools." ++ n, ps} <> ss2))
-    == List.append(&2, M.Tool, M.tools(ss1), M.tool_of("tools." ++ n, ps) <> M.tools(ss2))
-    : List<&2, M.Tool>}
+    == List.append(&2, M.Cli, M.tools(ss1), M.tool_of("tools." ++ n, ps) <> M.tools(ss2))
+    : List<&2, M.Cli>}
 
 # LAW: and it is never the section a ledger is refused for lacking a `hash`
 law tool_needs_no_hash:
@@ -82,8 +82,8 @@ law doctor_ignores_tools:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for ts1: List<&2, M.Tool>
-  for ts2: List<&2, M.Tool>
+  for ts1: List<&2, M.Cli>
+  for ts2: List<&2, M.Cli>
   for g1: {M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, ts1}} == M.parse(t1) : M.Read}
   for g2: {M.Good{M.Manifest{n, e, b, hub, hubpa, hubpv, ds, ts2}} == M.parse(t2) : M.Read}
   {DP.plan.of(DP.ledger.seen(M.parse(t1)), cc, lib, lock, rs, cs)
@@ -102,7 +102,7 @@ law lock_origins_skip_tools:
   for +hpa: String
   for +hpv: String
   for +ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for g: {M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} == M.parse(s) : M.Read}
   {W.origins(Some{s}) == L.ledger.origins(ds) : List<&2, L.Origin>}
 
@@ -117,7 +117,7 @@ law upgrade_origins_skip_tools:
   for +hpa: String
   for +hpv: String
   for +ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   for g: {M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} == Up.next.read(nx) : M.Read}
   {W.next.origins(nx) == L.ledger.origins(ds) : List<&2, L.Origin>}
 
@@ -133,7 +133,7 @@ law add_keeps_tools:
   for +hpa: String
   for +hpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for good: {A.read(w) == M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} : M.Read}
   for +ok: {AP.refuses(w) == False{} : Bool}
   {P.put.plan(AP.plan(w), "ez.toml")
@@ -154,7 +154,7 @@ law remove_keeps_tools:
   for +hpa: String
   for +hpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +good: {M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} == M.parse(s) : M.Read}
   for ok: {RP.refuses(RP.World{name, Some{s}, ignore}) == False{} : Bool}
   {P.put.plan(RP.plan(RP.World{name, Some{s}, ignore}), "ez.toml")
@@ -173,7 +173,7 @@ law remove_refuses_tool:
   for +hpa: String
   for +hpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for good: {M.Good{M.Manifest{n, e, b, h, hpa, hpv, ds, ts}} == M.parse(s) : M.Read}
   for tool: {M.tool.has(ts, name) == True{} : Bool}
   for no: {False{} == RP.named(ds, name) : Bool}

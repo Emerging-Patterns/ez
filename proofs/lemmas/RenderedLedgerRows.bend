@@ -114,11 +114,11 @@ def dep.sect(d: M.Dep) -> RSect:
   M.Dep{n, h, e, s} = d
   RSect{"deps." ++ n, dep.rows(h, e, s)}
 
-def tool.sect(pin: M.Tool) -> RSect:
-  M.Tool{n, e, b, s} = pin
+def tool.sect(pin: M.Cli) -> RSect:
+  M.Cli{n, e, b, s} = pin
   RSect{"tools." ++ n, tool.rows(e, b, s)}
 
-def tsects(ts: List<&2, M.Tool>) -> List<&2, RSect>:
+def tsects(ts: List<&2, M.Cli>) -> List<&2, RSect>:
   match ts:
     case []:
       []
@@ -546,8 +546,8 @@ law tool_read:
   for +en: String
   for +b: String
   for +s: M.Source
-  for ok: {Rend.tool.ok(M.Tool{n, en, b, s}) == True{} : Bool}
-  {M.tool_of("tools." ++ n, rows.kvs(keep(tool.rows(en, b, s)))) == M.Tool{n, en, b, s} : M.Tool}
+  for ok: {Rend.tool.ok(M.Cli{n, en, b, s}) == True{} : Bool}
+  {M.tool_of("tools." ++ n, rows.kvs(keep(tool.rows(en, b, s)))) == M.Cli{n, en, b, s} : M.Cli}
 
 def tool_read(n, en, b, s, ok):
   match s:
@@ -557,20 +557,20 @@ def tool_read(n, en, b, s, ok):
           Eq.and.right(Rend.clean(n), Bool.and(Bool.and(Rend.clean(en), Rend.clean(b)),
             String.is_empty(named)), ok))))
         : {M.tool_of("tools." ++ n, rows.kvs(keep(tool.rows(en, b, M.Hub{_}))))
-          == M.Tool{n, en, b, M.Hub{_}} : M.Tool}
+          == M.Cli{n, en, b, M.Hub{_}} : M.Cli}
       +rs = tool.rows(en, b, M.Hub{""})
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "entry"), M.value(rows.kvs(rs), "entry"),
         value_keep(rs, "entry", {==}))
-        : {M.Tool{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "bin"), M.source_of(rows.kvs(keep(rs)))}
-          == M.Tool{n, en, b, M.Hub{""}} : M.Tool}
+        : {M.Cli{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "bin"), M.source_of(rows.kvs(keep(rs)))}
+          == M.Cli{n, en, b, M.Hub{""}} : M.Cli}
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "bin"), M.value(rows.kvs(rs), "bin"),
         value_keep(rs, "bin", {==}))
-        : {M.Tool{String.drop(n, 0n), en, _, M.source_of(rows.kvs(keep(rs)))} == M.Tool{n, en, b, M.Hub{""}} : M.Tool}
+        : {M.Cli{String.drop(n, 0n), en, _, M.source_of(rows.kvs(keep(rs)))} == M.Cli{n, en, b, M.Hub{""}} : M.Cli}
       %Equal.sym(M.Source, M.source_of(rows.kvs(keep(rs))), M.Hub{""},
         src_keep(rs, M.Hub{""}, {==}, {==}, {==}, {==}, {==}, {==}, {==}))
-        : {M.Tool{String.drop(n, 0n), en, b, _} == M.Tool{n, en, b, M.Hub{""}} : M.Tool}
+        : {M.Cli{String.drop(n, 0n), en, b, _} == M.Cli{n, en, b, M.Hub{""}} : M.Cli}
       %Equal.sym(String, String.drop(n, 0n), n, M1.drop_zero_ledger(n))
-        : {M.Tool{_, en, b, M.Hub{""}} == M.Tool{n, en, b, M.Hub{""}} : M.Tool}
+        : {M.Cli{_, en, b, M.Hub{""}} == M.Cli{n, en, b, M.Hub{""}} : M.Cli}
       {==}
     case M.Git{+url, +rev, +tag, +root, +nar, +vend}:
       +rs = tool.rows(en, b, M.Git{url, rev, tag, root, nar, vend})
@@ -583,12 +583,12 @@ def tool_read(n, en, b, s, ok):
           Bool.and(Rend.clean(tag), Bool.and(Rend.clean(root), Rend.clean(nar)))), es)
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "entry"), M.value(rows.kvs(rs), "entry"),
         value_keep(rs, "entry", {==}))
-        : {M.Tool{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "bin"), M.source_of(rows.kvs(keep(rs)))}
-          == M.Tool{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Tool}
+        : {M.Cli{String.drop(n, 0n), _, M.value(rows.kvs(keep(rs)), "bin"), M.source_of(rows.kvs(keep(rs)))}
+          == M.Cli{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Cli}
       %Equal.sym(String, M.value(rows.kvs(keep(rs)), "bin"), M.value(rows.kvs(rs), "bin"),
         value_keep(rs, "bin", {==}))
-        : {M.Tool{String.drop(n, 0n), en, _, M.source_of(rows.kvs(keep(rs)))}
-          == M.Tool{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Tool}
+        : {M.Cli{String.drop(n, 0n), en, _, M.source_of(rows.kvs(keep(rs)))}
+          == M.Cli{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Cli}
       %Equal.sym(M.Source, M.source_of(rows.kvs(keep(rs))), M.Git{url, rev, tag, root, nar, vend},
         src_keep(rs, M.Git{url, rev, tag, root, nar, vend}, {==}, {==}, {==}, {==}, {==}, {==},
           git_source(url, rev, tag, root, nar, vend,
@@ -596,37 +596,37 @@ def tool_read(n, en, b, s, ok):
               Eq.and.left(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root)), ne)),
             Eq.not.true(String.is_empty(root),
               Eq.and.right(Bool.not(String.is_empty(url)), Bool.not(String.is_empty(root)), ne)))))
-        : {M.Tool{String.drop(n, 0n), en, b, _} == M.Tool{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Tool}
+        : {M.Cli{String.drop(n, 0n), en, b, _} == M.Cli{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Cli}
       %Equal.sym(String, String.drop(n, 0n), n, M1.drop_zero_ledger(n))
-        : {M.Tool{_, en, b, M.Git{url, rev, tag, root, nar, vend}}
-          == M.Tool{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Tool}
+        : {M.Cli{_, en, b, M.Git{url, rev, tag, root, nar, vend}}
+          == M.Cli{n, en, b, M.Git{url, rev, tag, root, nar, vend}} : M.Cli}
       {==}
 
     case M.Member{path, named}:
       Eq.bit.absurd(&2,
         {M.tool_of("tools." ++ n, rows.kvs(keep(tool.rows(en, b, M.Member{path, named}))))
-          == M.Tool{n, en, b, M.Member{path, named}} : M.Tool},
+          == M.Cli{n, en, b, M.Member{path, named}} : M.Cli},
         Eq.and.right(Bool.and(Rend.clean(en), Rend.clean(b)), Rend.tool.src.ok(M.Member{path, named}),
           Eq.and.right(Rend.clean(n), Bool.and(Bool.and(Rend.clean(en), Rend.clean(b)),
             Rend.tool.src.ok(M.Member{path, named})), ok)))
 
 # LAW: pinned CLIs' tables hold no dependency
 law tdeps_none:
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   {M.deps(sects.of(tsects(ts))) == [] : List<&2, M.Dep>}
 
 def tdeps_none(ts):
   match ts:
     case []:
       {==}
-    case M.Tool{_n, _e, _b, _s} <> +t:
+    case M.Cli{_n, _e, _b, _s} <> +t:
       tdeps_none(t)
 
 # LAW: the dependencies' tables, ahead of the pinned CLIs', are read as the
 # dependencies
 law deps_read:
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +e: {Rend.deps.ok(ds) == True{} : Bool}
   {M.deps(sects.of(dsects(ds, tsects(ts)))) == ds : List<&2, M.Dep>}
 
@@ -652,7 +652,7 @@ def deps_read(ds, ts, e):
 law dtools_skip:
   for +ds: List<&2, M.Dep>
   for +rest: List<&2, RSect>
-  {M.tools(sects.of(dsects(ds, rest))) == M.tools(sects.of(rest)) : List<&2, M.Tool>}
+  {M.tools(sects.of(dsects(ds, rest))) == M.tools(sects.of(rest)) : List<&2, M.Cli>}
 
 def dtools_skip(ds, rest):
   match ds:
@@ -663,37 +663,37 @@ def dtools_skip(ds, rest):
 
 # LAW: the pinned CLIs' tables are read as the pins
 law tsects_read:
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +e: {Rend.tools.ok(ts) == True{} : Bool}
-  {M.tools(sects.of(tsects(ts))) == ts : List<&2, M.Tool>}
+  {M.tools(sects.of(tsects(ts))) == ts : List<&2, M.Cli>}
 
 def tsects_read(ts, e):
   match ts:
     case []:
       {==}
-    case M.Tool{+n, +en, +b, +s} <> +t:
+    case M.Cli{+n, +en, +b, +s} <> +t:
       +ps = rows.kvs(keep(tool.rows(en, b, s)))
       %Equal.sym(Bool, String.starts_with(n, ""), True{}, Eq.starts_nil(n))
         : {M.tools.put(_, T.Sect{"tools." ++ n, ps}, M.tools(sects.of(tsects(t))))
-          == M.Tool{n, en, b, s} <> t : List<&2, M.Tool>}
-      %Equal.sym(M.Tool, M.tool_of("tools." ++ n, ps), M.Tool{n, en, b, s},
-        tool_read(n, en, b, s, Eq.and.left(Rend.tool.ok(M.Tool{n, en, b, s}), Rend.tools.ok(t), e)))
-        : {_ <> M.tools(sects.of(tsects(t))) == M.Tool{n, en, b, s} <> t : List<&2, M.Tool>}
-      %Equal.sym(List<&2, M.Tool>, M.tools(sects.of(tsects(t))), t,
-        tsects_read(t, Eq.and.right(Rend.tool.ok(M.Tool{n, en, b, s}), Rend.tools.ok(t), e)))
-        : {M.Tool{n, en, b, s} <> _ == M.Tool{n, en, b, s} <> t : List<&2, M.Tool>}
+          == M.Cli{n, en, b, s} <> t : List<&2, M.Cli>}
+      %Equal.sym(M.Cli, M.tool_of("tools." ++ n, ps), M.Cli{n, en, b, s},
+        tool_read(n, en, b, s, Eq.and.left(Rend.tool.ok(M.Cli{n, en, b, s}), Rend.tools.ok(t), e)))
+        : {_ <> M.tools(sects.of(tsects(t))) == M.Cli{n, en, b, s} <> t : List<&2, M.Cli>}
+      %Equal.sym(List<&2, M.Cli>, M.tools(sects.of(tsects(t))), t,
+        tsects_read(t, Eq.and.right(Rend.tool.ok(M.Cli{n, en, b, s}), Rend.tools.ok(t), e)))
+        : {M.Cli{n, en, b, s} <> _ == M.Cli{n, en, b, s} <> t : List<&2, M.Cli>}
       {==}
 
 # LAW: pinned CLIs' tables miss no hash
 law tmissing:
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   {M.missing(sects.of(tsects(ts))) == "" : String}
 
 def tmissing(ts):
   match ts:
     case []:
       {==}
-    case M.Tool{_n, _e, _b, _s} <> +t:
+    case M.Cli{_n, _e, _b, _s} <> +t:
       tmissing(t)
 
 # LAW: a dependency's table that can be written is not one missing its hash:
@@ -737,7 +737,7 @@ def dep_kept(h, en, s, e):
 # no hash
 law missing_read:
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +e: {Rend.deps.ok(ds) == True{} : Bool}
   {M.missing(sects.of(dsects(ds, tsects(ts)))) == "" : String}
 
@@ -770,7 +770,7 @@ law read_ledger:
   for +hpa: String
   for +hpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +edk: {Rend.deps.ok(ds) == True{} : Bool}
   for +etk: {Rend.tools.ok(ts) == True{} : Bool}
   {M.read("", sects.of(lsects(M.Manifest{n, en, b, h, hpa, hpv, ds, ts})))
@@ -810,8 +810,8 @@ def read_ledger(n, en, b, h, hpa, hpv, ds, ts, edk, etk):
     : {M.Good{M.Manifest{n, en, b, h, hpa, _, M.deps(sects.of(d)), M.tools(sects.of(d))}} == g : M.Read}
   %Equal.sym(List<&2, M.Dep>, M.deps(sects.of(d)), ds, deps_read(ds, ts, edk))
     : {M.Good{M.Manifest{n, en, b, h, hpa, hpv, _, M.tools(sects.of(d))}} == g : M.Read}
-  %Equal.sym(List<&2, M.Tool>, M.tools(sects.of(d)), ts,
-    Equal.trans(List<&2, M.Tool>, M.tools(sects.of(d)), M.tools(sects.of(tsects(ts))), ts,
+  %Equal.sym(List<&2, M.Cli>, M.tools(sects.of(d)), ts,
+    Equal.trans(List<&2, M.Cli>, M.tools(sects.of(d)), M.tools(sects.of(tsects(ts))), ts,
       dtools_skip(ds, tsects(ts)), tsects_read(ts, etk)))
     : {M.Good{M.Manifest{n, en, b, h, hpa, hpv, ds, _}} == g : M.Read}
   {==}

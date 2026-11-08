@@ -19,4 +19,4 @@ law gap_of_full_pin:
   for vend: Bool
   for fr: {False{} == String.is_empty(rev) : Bool}
   for fn: {False{} == String.is_empty(nar) : Bool}
-  {PinPin.gap(M.Tool{n, e, b, M.Git{url, rev, tag, root, nar, vend}}) == "" : String}
+  {PinPin.gap(M.Cli{n, e, b, M.Git{url, rev, tag, root, nar, vend}}) == "" : String}

@@ -3,7 +3,8 @@
 # build ez without nix. ez fetches its own dependencies with `ez fetch`, but
 # that needs ez built, and ez's build needs them first. This is the one
 # helper script in the repo, and it does only that: for every git package in
-# the lock, fetch the pinned rev, copy the package's files, check each file's
+# the lock (a hub package bend fetches itself when it builds), fetch the
+# pinned rev, copy the package's files, check each file's
 # sha256 and the package's 0x name, and write the manifest the way ez does.
 #
 #   sh bootstrap.sh [lock]        (lock defaults to ez.lock.toml)
@@ -62,6 +63,9 @@ while read -r h; do
     continue
   fi
   kind=$(src "$h" kind)
+  # a hub package is bend's to fetch: the build asks the hub for it by its
+  # name, and bend checks what arrives against that name
+  [ "$kind" = hub ] && continue
   [ "$kind" = git ] || die "$h is kind '$kind'; this script only fetches git pins (use ez fetch)"
   url=$(src "$h" url); rev=$(src "$h" rev); root=$(src "$h" root)
   printf 'bootstrap: %s from %s at %s\n' "$h" "$url" "$rev" >&2

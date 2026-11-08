@@ -39,7 +39,7 @@ def ran(+out: String) -> PW.Answer:
 # one question, answered
 def answer(+lib: String, ask: PW.Ask) -> IO(PW.Answer):
   match ask:
-    case PW.Tool{q}:
+    case PW.ToolAsk{q}:
       do IO<PW.Answer>:
         a : TW.Answer <- ToolRun.answer(q)
         return PW.Told{a}

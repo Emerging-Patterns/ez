@@ -79,7 +79,7 @@ def walk_stops(f, entry, fs, inside, miss):
     missing_stays(f, K.Tree{True{}, fs, []}, Path.base(entry), entry))
 
 def Laws.absent_entry_refused(f, entry, fs, inside, miss):
-  Equal.cong(K.State, K.Walked, s => K.made(entry, s),
+  Equal.cong(K.State, K.Walked, s => K.made.all(K.Tree{True{}, fs, []}, entry, s),
     K.walk((1n + f : Nat), K.Tree{True{}, fs, []}, Path.base(entry), K.start(entry)),
     K.State{[], [], K.Missing{entry}, []},
     walk_stops(f, entry, fs, inside, miss))

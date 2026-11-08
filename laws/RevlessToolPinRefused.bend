@@ -13,6 +13,6 @@ law gap_of_revless_pin:
   for root: String
   for nar: String
   for vend: Bool
-  {PinPin.gap(M.Tool{n, e, b, M.Git{url, "", tag, root, nar, vend}})
+  {PinPin.gap(M.Cli{n, e, b, M.Git{url, "", tag, root, nar, vend}})
     == "ez: tools." ++ n ++ " has no rev; run `ez lock --upgrade --package " ++
       n ++ "` to pin it" : String}

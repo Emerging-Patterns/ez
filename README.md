@@ -10,8 +10,9 @@ tools for a whole project.
 
 ## Install
 
-ez needs Bend 2.0.38 or later; it is built and checked on Bend 2.0.38, the
-version `flake.lock` pins. Building ez needs clang as well, since ez is one
+ez needs Bend 2.0.40 or later; it is built and checked on Bend 2.0.40, the
+version `flake.lock` pins. An older bend publishes a package without the
+README.md beside its entry, so its hash and ez's differ. Building ez needs clang as well, since ez is one
 native binary. Every subcommand runs the `bend` and `git` on your PATH.
 
 ### From the hub

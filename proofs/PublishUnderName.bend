@@ -160,7 +160,7 @@ law called_named:
   for +pa: String
   for +pv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +nv: String
   for g: {M.parse(text) == M.Good{M.Manifest{n, e, b, h, pa, pv, ds, ts}} : M.Read}
   for u: {PP.naming(pa, pv) == PP.ByName{nv} : PP.Named}

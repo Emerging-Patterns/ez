@@ -141,59 +141,59 @@ def tool_without_arm(
   +ye: String,
   +yb: String,
   +ys2: M.Source,
-  +yt: List<&2, M.Tool>,
+  +yt: List<&2, M.Cli>,
   +gone: String,
   +name: String,
   ec: {String.eq(yn, gone) == cc : Bool},
-  ih: {M.tool.find(J.tools.without(yt, gone), name) == M.tool.find(yt, name) : M.Tool},
+  ih: {M.tool.find(J.tools.without(yt, gone), name) == M.tool.find(yt, name) : M.Cli},
   en: {String.eq(gone, name) == False{} : Bool}
-) -> {M.tool.find(J.tools.without.put(cc, M.Tool{yn, ye, yb, ys2}, J.tools.without(yt, gone)), name)
-    == M.tool.find.pick(String.eq(yn, name), M.Tool{yn, ye, yb, ys2}, M.tool.find(yt, name)) : M.Tool}:
+) -> {M.tool.find(J.tools.without.put(cc, M.Cli{yn, ye, yb, ys2}, J.tools.without(yt, gone)), name)
+    == M.tool.find.pick(String.eq(yn, name), M.Cli{yn, ye, yb, ys2}, M.tool.find(yt, name)) : M.Cli}:
   match cc:
     case True{}:
-      Equal.trans(M.Tool, M.tool.find(J.tools.without(yt, gone), name), M.tool.find(yt, name),
-        M.tool.find.pick(String.eq(yn, name), M.Tool{yn, ye, yb, ys2}, M.tool.find(yt, name)), ih,
-        Equal.sym(M.Tool, M.tool.find.pick(String.eq(yn, name), M.Tool{yn, ye, yb, ys2}, M.tool.find(yt, name)),
+      Equal.trans(M.Cli, M.tool.find(J.tools.without(yt, gone), name), M.tool.find(yt, name),
+        M.tool.find.pick(String.eq(yn, name), M.Cli{yn, ye, yb, ys2}, M.tool.find(yt, name)), ih,
+        Equal.sym(M.Cli, M.tool.find.pick(String.eq(yn, name), M.Cli{yn, ye, yb, ys2}, M.tool.find(yt, name)),
           M.tool.find(yt, name),
-          Equal.cong(Bool, M.Tool, bb => M.tool.find.pick(bb, M.Tool{yn, ye, yb, ys2}, M.tool.find(yt, name)),
+          Equal.cong(Bool, M.Cli, bb => M.tool.find.pick(bb, M.Cli{yn, ye, yb, ys2}, M.tool.find(yt, name)),
             String.eq(yn, name), False{},
             Equal.trans(Bool, String.eq(yn, name), String.eq(gone, name), False{},
               Equal.cong(String, Bool, ss => String.eq(ss, name), yn, gone,
                 Str.string_eq_true(yn, gone, ec)), en))))
     case False{}:
-      Equal.cong(M.Tool, M.Tool, dd => M.tool.find.pick(String.eq(yn, name), M.Tool{yn, ye, yb, ys2}, dd),
+      Equal.cong(M.Cli, M.Cli, dd => M.tool.find.pick(String.eq(yn, name), M.Cli{yn, ye, yb, ys2}, dd),
         M.tool.find(J.tools.without(yt, gone), name), M.tool.find(yt, name), ih)
 
 # dropping another name leaves what a name finds among the tools as it was
 def tool_find_without(
-  ys: List<&2, M.Tool>,
+  ys: List<&2, M.Cli>,
   +gone: String,
   +name: String,
   +en: {String.eq(gone, name) == False{} : Bool}
-) -> {M.tool.find(J.tools.without(ys, gone), name) == M.tool.find(ys, name) : M.Tool}:
+) -> {M.tool.find(J.tools.without(ys, gone), name) == M.tool.find(ys, name) : M.Cli}:
   match ys:
     case []:
       {==}
-    case M.Tool{+yn, +ye, +yb, +ys2} <> +yt:
+    case M.Cli{+yn, +ye, +yb, +ys2} <> +yt:
       tool_without_arm(String.eq(yn, gone), yn, ye, yb, ys2, yt, gone, name, {==},
         tool_find_without(yt, gone, name, en), en)
 
 # the first tool in front, of the name or not
 def tools_firsts_arm(
   bb: Bool,
-  +hd: M.Tool,
+  +hd: M.Cli,
   +hn: String,
-  +tl: List<&2, M.Tool>,
+  +tl: List<&2, M.Cli>,
   +name: String,
   eb: {String.eq(hn, name) == bb : Bool},
-  ih: {M.tool.find(J.tools.firsts(tl), name) == M.tool.find(tl, name) : M.Tool}
+  ih: {M.tool.find(J.tools.firsts(tl), name) == M.tool.find(tl, name) : M.Cli}
 ) -> {M.tool.find.pick(bb, hd, M.tool.find(J.tools.without(J.tools.firsts(tl), hn), name))
-    == M.tool.find.pick(bb, hd, M.tool.find(tl, name)) : M.Tool}:
+    == M.tool.find.pick(bb, hd, M.tool.find(tl, name)) : M.Cli}:
   match bb:
     case True{}:
       {==}
     case False{}:
-      Equal.trans(M.Tool, M.tool.find(J.tools.without(J.tools.firsts(tl), hn), name),
+      Equal.trans(M.Cli, M.tool.find(J.tools.without(J.tools.firsts(tl), hn), name),
         M.tool.find(J.tools.firsts(tl), name), M.tool.find(tl, name),
         tool_find_without(J.tools.firsts(tl), hn, name, eb), ih)
 
@@ -201,8 +201,8 @@ def Laws.tools_firsts_find(ts, name):
   match ts:
     case []:
       {==}
-    case M.Tool{+hn, +he, +hb, +hs} <> +tl:
-      tools_firsts_arm(String.eq(hn, name), M.Tool{hn, he, hb, hs}, hn, tl, name, {==},
+    case M.Cli{+hn, +he, +hb, +hs} <> +tl:
+      tools_firsts_arm(String.eq(hn, name), M.Cli{hn, he, hb, hs}, hn, tl, name, {==},
         Laws.tools_firsts_find(tl, name))
 
 def Laws.combine_needs_hub(root, ms, ev):

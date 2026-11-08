@@ -45,7 +45,7 @@ law lock_order_free:
   for +ns: List<&2, Nat>
   for +nms: List<&2, L.Name>
   for +ps: List<&2, L.Pack>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +hub: String
   for dis: {D1.packs.distinct(ps) == True{} : Bool}
   {L.render.names(nms, ts, hub, packs.perm(ns, ps)) == L.render.names(nms, ts, hub, ps) : String}

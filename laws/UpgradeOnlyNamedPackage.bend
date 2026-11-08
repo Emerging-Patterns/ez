@@ -18,7 +18,7 @@ import ./defs/LockInputs.bend as D1
 
 # the tool a ledger pins under a name, as `M.tool.find` finds it. Law
 # vocabulary: ez never calls it.
-def tool.at(ledger: M.Read, name: String) -> M.Tool:
+def tool.at(ledger: M.Read, name: String) -> M.Cli:
   M.tool.find(M.tools_of(ledger), name)
 
 # the upgrade's answers a World holds
@@ -45,7 +45,7 @@ law upgrade_one_frames_tools:
   for e: {W.args.only(w) == n : String}
   for ne: {String.is_empty(n) == False{} : Bool}
   for d: {String.eq(n, m) == False{} : Bool}
-  {tool.at(P.ledger.next(w), m) == tool.at(W.parsed(W.ledger.of(w)), m) : M.Tool}
+  {tool.at(P.ledger.next(w), m) == tool.at(W.parsed(W.ledger.of(w)), m) : M.Cli}
 
 # LAW: and `ez lock --upgrade --package n` asks the remote exactly what it
 # asks of a ledger holding nothing but the entries named `n`, on every round

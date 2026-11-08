@@ -8,4 +8,4 @@ law tools_skips_other_sections:
   for ps: List<&2, T.Kv>
   for ss: List<&2, T.Sect>
   for e: {False{} == String.starts_with(n, "tools.") : Bool}
-  {M.tools(T.Sect{n, ps} <> ss) == M.tools(ss) : List<&2, M.Tool>}
+  {M.tools(T.Sect{n, ps} <> ss) == M.tools(ss) : List<&2, M.Cli>}

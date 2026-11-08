@@ -24,8 +24,8 @@ def gap.git(no_rev: Bool, no_nar: Bool, +name: String) -> String:
 
 # why a plain lock cannot copy a pin as it stands, or "" when it can. A pin
 # with no repo has nothing to pin, under a plain lock or an upgrade.
-def gap(pin: M.Tool) -> String:
-  M.Tool{n, _e, _b, s} = pin
+def gap(pin: M.Cli) -> String:
+  M.Cli{n, _e, _b, s} = pin
   match s:
     case M.Hub{_named}:
       "ez: tools." ++ n ++ " has no git"
@@ -46,7 +46,7 @@ def gaps.step(none: Bool, here: String, rest: Unit -> String) -> String:
 
 # the first pin, in ledger order, a plain lock cannot copy, or "" when it can
 # copy every one
-def gaps(ts: List<&2, M.Tool>) -> String:
+def gaps(ts: List<&2, M.Cli>) -> String:
   match ts:
     case []:
       ""

@@ -400,8 +400,8 @@ def packs.ok(ps: List<&2, L.Pack>) -> Bool:
         rest)
 
 # every name, key and value a tool pin writes
-def tool.values(pin: M.Tool) -> List<&2, String>:
-  M.Tool{n, e, b, s} = pin
+def tool.values(pin: M.Cli) -> List<&2, String>:
+  M.Cli{n, e, b, s} = pin
   match s:
     case M.Hub{_named}:
       [n, e, b]
@@ -411,7 +411,7 @@ def tool.values(pin: M.Tool) -> List<&2, String>:
       [n, e, b]
 
 # whether every tool pin can be written
-def tools.ok(ts: List<&2, M.Tool>) -> Bool:
+def tools.ok(ts: List<&2, M.Cli>) -> Bool:
   match ts:
     case []:
       True{}
@@ -423,7 +423,7 @@ def tools.ok(ts: List<&2, M.Tool>) -> Bool:
 # once, no hash, key or value holds `"`, `\` or a newline, and no file path
 # holds `=` (eztoml#24, above). The planner
 # refuses a lock that is not, so every lock ez writes is one of these.
-def lockable(ps: List<&2, L.Pack>, ts: List<&2, M.Tool>, hub: String) -> Bool:
+def lockable(ps: List<&2, L.Pack>, ts: List<&2, M.Cli>, hub: String) -> Bool:
   Bool.and(clean(hub), Bool.and(packs.ok(ps), tools.ok(ts)))
 
 # the first path among a package's files that holds `=`, or "" when none
@@ -487,7 +487,7 @@ def names.ok(ns: List<&2, L.Name>) -> Bool:
   Bool.and(paths.ok(fs), clean.all(file.values(fs)))
 
 # whether a lock with names can be written so that it reads back
-def lockable.named(ns: List<&2, L.Name>, ps: List<&2, L.Pack>, ts: List<&2, M.Tool>, hub: String) -> Bool:
+def lockable.named(ns: List<&2, L.Name>, ps: List<&2, L.Pack>, ts: List<&2, M.Cli>, hub: String) -> Bool:
   Bool.and(names.ok(ns), lockable(ps, ts, hub))
 
 # the reason a lock with names that is not lockable gives
@@ -601,7 +601,7 @@ def doc.lockable(
   +ns: List<&2, L.Name>,
   +hub: String,
   packs: List<&2, L.Pack>,
-  ts: List<&2, M.Tool>
+  ts: List<&2, M.Cli>
 ) -> Doc:
   match ok:
     case True{}:
@@ -617,7 +617,7 @@ def doc.asks(
   +ns: List<&2, L.Name>,
   +hub: String,
   +packs: List<&2, L.Pack>,
-  +ts: List<&2, M.Tool>
+  +ts: List<&2, M.Cli>
 ) -> Doc:
   match asks:
     case []:
@@ -635,7 +635,7 @@ def doc.named(
   +need: List<&2, String>,
   +hub: String,
   packs: List<&2, L.Pack>,
-  ts: List<&2, M.Tool>
+  ts: List<&2, M.Cli>
 ) -> Doc:
   match clean:
     case True{}:

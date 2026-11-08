@@ -10,4 +10,4 @@ law tools_takes_tool_sections:
   for +ps: List<&2, T.Kv>
   for ss: List<&2, T.Sect>
   {M.tools(T.Sect{"tools." ++ name, ps} <> ss)
-    == M.tool_of("tools." ++ name, ps) <> M.tools(ss) : List<&2, M.Tool>}
+    == M.tool_of("tools." ++ name, ps) <> M.tools(ss) : List<&2, M.Cli>}

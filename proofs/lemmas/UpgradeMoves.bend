@@ -606,9 +606,9 @@ law mv.model_moved:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for wk: {D1.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
   for self: {D1.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
   {D1.moved.ok(t, rs, M.find(ds, n), M.dep(Up.model.next(moved,
@@ -636,14 +636,14 @@ law mv.model_srcs:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dm: Bool
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tm: Bool
   for +tsy: List<&2, String>
   for +ig: String
@@ -701,14 +701,14 @@ law mv.model_ignore:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dm: Bool
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tm: Bool
   for +tsy: List<&2, String>
   for wk: {D1.moved.ok(t, rs, M.find(ds, n), M.find(dds, n)) == True{} : Bool}
@@ -767,7 +767,7 @@ law mv.model_pins:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for wk: {mv.walk(t, rs, dd, M.find(ds, n), n) == True{} : Bool}
   for self: {D1.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
   {D1.moved.ok(t, rs, M.find(ds, n), mv.dep(Up.pins(dd, tt, rs,
@@ -802,7 +802,7 @@ law mv.model_known:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for wk: {mv.walk(t, rs, Up.deps.walk(rs, only, M.hub.or(hub), ds), M.find(ds, n), n)
     == True{} : Bool}
   for self: {D1.moved.ok(t, rs, M.find(ds, n), M.find(ds, n)) == True{} : Bool}
@@ -1027,7 +1027,7 @@ law mv.pins_stop:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for wb: {String.is_empty(mv.bad(dd)) == False{} : Bool}
   {mv.stops(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})) == True{} : Bool}
 
@@ -1052,7 +1052,7 @@ law mv.known_stop:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for wb: {String.is_empty(mv.bad(Up.deps.walk(rs, only, M.hub.or(hub), ds))) == False{} : Bool}
   {mv.stops(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})) == True{} : Bool}
 
@@ -1649,9 +1649,9 @@ law mv.reach_moved:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for wk: {Bool.and(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
     Bool.or(dm, String.eq(M.source.rev(M.source.dep(M.find(ds, n))), tip))) == True{} : Bool}
   {String.eq(M.source.rev(M.source.dep(M.dep(Up.model.next(Bool.or(dm, tm),
@@ -1682,14 +1682,14 @@ law mv.reach_srcs:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dm: Bool
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tm: Bool
   for +tsy: List<&2, String>
   for +ig: String
@@ -1749,14 +1749,14 @@ law mv.reach_ignore:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for +dds: List<&2, M.Dep>
   for +ss: List<&2, U.Swap>
   for +es: List<&2, U.Swap>
   for +dm: Bool
   for +dsy: List<&2, String>
   for +dtr: List<&2, Up.Laid>
-  for +tts: List<&2, M.Tool>
+  for +tts: List<&2, M.Cli>
   for +tm: Bool
   for +tsy: List<&2, String>
   for wk: {Bool.and(String.eq(M.source.rev(M.source.dep(M.find(dds, n))), tip),
@@ -1819,7 +1819,7 @@ law mv.reach_pins:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for wk: {mv.walk_live(tip, dd, M.find(ds, n), n) == True{} : Bool}
   for se: {String.is_empty(Up.next.stop(Up.pins(dd, tt, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})))
     == True{} : Bool}
@@ -1855,7 +1855,7 @@ law mv.reach_known:
   for +hubpa: String
   for +hubpv: String
   for +ds: List<&2, M.Dep>
-  for +ts: List<&2, M.Tool>
+  for +ts: List<&2, M.Cli>
   for wk: {mv.walk_live(tip, Up.deps.walk(rs, only, M.hub.or(hub), ds), M.find(ds, n), n)
     == True{} : Bool}
   for se: {String.is_empty(Up.next.stop(Up.known(k, only, rs, M.Manifest{name, entry, bin, hub, hubpa, hubpv, ds, ts})))

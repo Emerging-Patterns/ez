@@ -12,6 +12,6 @@ law show_opens_with_package:
   for hbpa: String
   for hbpv: String
   for ds: List<&2, M.Dep>
-  for ts: List<&2, M.Tool>
+  for ts: List<&2, M.Cli>
   {String.starts_with(Rend.text(M.Manifest{n, e, b, hb, hbpa, hbpv, ds, ts}), "[package]\n") == True{}
     : Bool}

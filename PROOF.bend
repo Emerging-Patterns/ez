@@ -55,6 +55,7 @@ import ./proofs/ForeignLicenseGoesAlong.bend as PForeignLicenseGoesAlong
 import ./proofs/FoundFileIsPublished.bend as PFoundFileIsPublished
 import ./proofs/FullToolPinCopied.bend as PFullToolPinCopied
 import ./proofs/GitNamedWithoutLicense.bend as PGitNamedWithoutLicense
+import ./proofs/GitNamedWithoutReadme.bend as PGitNamedWithoutReadme
 import ./proofs/GitignoreAllowlistIsLedger.bend as PGitignoreAllowlistIsLedger
 import ./proofs/HashIgnoresFileOrder.bend as PHashIgnoresFileOrder
 import ./proofs/HashIsDigestPrefix.bend as PHashIsDigestPrefix
@@ -106,12 +107,14 @@ import ./proofs/NarReadsNamesVerbatim.bend as PNarReadsNamesVerbatim
 import ./proofs/NarlessToolPinRefused.bend as PNarlessToolPinRefused
 import ./proofs/NoLicenseAsBefore.bend as PNoLicenseAsBefore
 import ./proofs/NoLicenseDirPasses.bend as PNoLicenseDirPasses
+import ./proofs/NoReadmeAsBefore.bend as PNoReadmeAsBefore
 import ./proofs/NonTrailerLineSkipped.bend as PNonTrailerLineSkipped
 import ./proofs/NormDropsLeadingDot.bend as PNormDropsLeadingDot
 import ./proofs/NormKeepsAbsolute.bend as PNormKeepsAbsolute
 import ./proofs/NormKeepsRootFlag.bend as PNormKeepsRootFlag
 import ./proofs/OldNameKeepsOtherFiles.bend as POldNameKeepsOtherFiles
 import ./proofs/OldNameLeavesLicenseOut.bend as POldNameLeavesLicenseOut
+import ./proofs/OldNameLeavesReadmeOut.bend as POldNameLeavesReadmeOut
 import ./proofs/OtherCommandsMakeNoDir.bend as POtherCommandsMakeNoDir
 import ./proofs/OtherGitSourceLendsNoName.bend as POtherGitSourceLendsNoName
 import ./proofs/OtherNameIsNoClash.bend as POtherNameIsNoClash
@@ -138,6 +141,10 @@ import ./proofs/PublishedMemberImportedByName.bend as PPublishedMemberImportedBy
 import ./proofs/ReadTextIsBytes.bend as PReadTextIsBytes
 import ./proofs/ReaddKeepsVendor.bend as PReaddKeepsVendor
 import ./proofs/ReaddedSourceKeepsName.bend as PReaddedSourceKeepsName
+import ./proofs/ReadmeAsked.bend as PReadmeAsked
+import ./proofs/ReadmeGoesAlong.bend as PReadmeGoesAlong
+import ./proofs/ReadmeOverRefused.bend as PReadmeOverRefused
+import ./proofs/ReadmelessKeepsOtherFiles.bend as PReadmelessKeepsOtherFiles
 import ./proofs/RecordedPackageIsNamed.bend as PRecordedPackageIsNamed
 import ./proofs/RefusalWritesNothing.bend as PRefusalWritesNothing
 import ./proofs/RefusedWalkRefusesAdd.bend as PRefusedWalkRefusesAdd
@@ -167,6 +174,7 @@ import ./proofs/SlashlessTailIsWholePath.bend as PSlashlessTailIsWholePath
 import ./proofs/SortIgnoresFileOrder.bend as PSortIgnoresFileOrder
 import ./proofs/SoundDocumentBuilds.bend as PSoundDocumentBuilds
 import ./proofs/SourceOmitsAbsentTag.bend as PSourceOmitsAbsentTag
+import ./proofs/StoppedWalkTakesNoReadme.bend as PStoppedWalkTakesNoReadme
 import ./proofs/SyntaxErrorReportedFirst.bend as PSyntaxErrorReportedFirst
 import ./proofs/TagOfNamesTheTag.bend as PTagOfNamesTheTag
 import ./proofs/TailOfOneIsBase.bend as PTailOfOneIsBase
@@ -196,6 +204,7 @@ import ./proofs/UnreadRecordReusesNothing.bend as PUnreadRecordReusesNothing
 import ./proofs/UpdateNagAnchoredAtFront.bend as PUpdateNagAnchoredAtFront
 import ./proofs/UpgradeHoldsHub.bend as PUpgradeHoldsHub
 import ./proofs/UpgradeNamedWithoutLicense.bend as PUpgradeNamedWithoutLicense
+import ./proofs/UpgradeNamedWithoutReadme.bend as PUpgradeNamedWithoutReadme
 import ./proofs/UpgradeOnlyNamedPackage.bend as PUpgradeOnlyNamedPackage
 import ./proofs/UpgradeRevMovesForward.bend as PUpgradeRevMovesForward
 import ./proofs/UpgradeRewritesImports.bend as PUpgradeRewritesImports
