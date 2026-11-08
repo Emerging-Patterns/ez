@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.14.0](https://github.com/Emerging-Patterns/ez/compare/v1.13.0...v1.14.0) (2026-11-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* ez's 0x hash for a package with a README.md beside its entry now covers that README, as bend 2.0.40's `--publish` does, so `ez add` and `ez publish` name such a package differently than before. ez needs bend 2.0.40 or later. Ledgers written before keep their names.
+
+### Features
+
+* build, check and hash packages as bend 2.0.40 does ([#165](https://github.com/Emerging-Patterns/ez/issues/165)) ([35ace28](https://github.com/Emerging-Patterns/ez/commit/35ace28d9578d8809a55d16941b0633e8fa774f5))
+
 ## [1.13.0](https://github.com/Emerging-Patterns/ez/compare/v1.12.0...v1.13.0) (2026-10-25)
 
 
