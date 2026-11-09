@@ -12,7 +12,7 @@
 # whether it has a `[workspace]` table of its own. The interpreter of each
 # command that reads a workspace gathers those; it decides nothing.
 import Base
-import 0xc5d9d3e28b79ea98be22eb42c7e37802/main.bend as E
+import emerging-eztoml@0.9.0.0/main.bend as E
 import ../toml/toml.bend as T
 
 # a path, as the segments between its `/`s

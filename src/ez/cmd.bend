@@ -3,7 +3,7 @@
 # Base has neither mkdir nor readdir: snap's `exec` for a program whose answer
 # ez reads, and `share/pass.bend` for the one `ez run` hands the terminal to.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../lock/plan.bend as P

@@ -4,7 +4,7 @@
 # because bend 2.0.32 fails a proof whose imports reach foreign code, so a law
 # may import ez/clock but never this.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../share/env.bend as Env
 import ./clock.bend as Clock
 

@@ -9,7 +9,7 @@
 # report and the toolchain part of a cache key.
 # Asking both ways, current spelling first, is the whole of this module.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 
 # the older spelling, tried only when the current one was not understood
 def version.older(ok: Bool, out: String) -> IO(String):

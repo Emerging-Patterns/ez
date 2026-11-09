@@ -3,7 +3,7 @@
 # the whole point of ez: bend resolves a hub import during the check, and a nix
 # sandbox has no network to do it with.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../src/io/file.bend as F
 import ../src/share/sha.bend as Sha
 import ../src/doctor/plan.bend as DP

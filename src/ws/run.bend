@@ -6,7 +6,7 @@
 # from are the pure modules'. That it reads and runs faithfully is
 # trusted in ez/app.bend. It runs programs, so no law imports it.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as Sn
+import snap@1.4.0.0/main.bend as Sn
 import ../io/file.bend as F
 import ../share/args.bend as Args
 import ../share/pass.bend as Pass

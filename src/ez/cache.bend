@@ -3,7 +3,7 @@
 # name. `tests/fresh.bend` records it beside a built `bin/ez.bin` and holds the
 # binary to it.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../run/bend.bend as Bend
 import ../share/env.bend as Env
 

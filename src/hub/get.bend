@@ -17,10 +17,10 @@
 # two types whose constructors this file matches, which `main.bend` names
 # but does not define.
 import Base
-import 0x7367809738fddd234b8d2bed772ad2cf/main.bend as Http
-import 0x7367809738fddd234b8d2bed772ad2cf/src/client.bend as Client
-import 0x7367809738fddd234b8d2bed772ad2cf/src/url.bend as Url
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import ezhttp@0.23.0.0/main.bend as Http
+import ezhttp@0.23.0.0/src/client.bend as Client
+import ezhttp@0.23.0.0/src/url.bend as Url
+import snap@1.4.0.0/main.bend as R
 import ../io/file.bend as F
 import ./hub.bend as Hub
 

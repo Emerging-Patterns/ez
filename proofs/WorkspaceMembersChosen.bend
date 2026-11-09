@@ -9,7 +9,7 @@ import Base
 import ../src/check/eq.bend as Eq
 import ../src/check/str.bend as Str
 import ../src/ws/workspace.bend as WWorkspace
-import 0xc5d9d3e28b79ea98be22eb42c7e37802/main.bend as E
+import emerging-eztoml@0.9.0.0/main.bend as E
 import ../laws/WorkspaceMembersChosen.bend as Laws
 import ../laws/defs/PathPrefix.bend as D1
 

@@ -6,7 +6,7 @@
 # the person, and ez only waits for it and exits with its status (`S.code`
 # and `TP.code`, laws/ExitStatusSaysFailure.bend).
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 
 # the program and its arguments, newline separated, run with no shell between
 # and nothing captured. The answer is the status it exited with: 128 plus the
