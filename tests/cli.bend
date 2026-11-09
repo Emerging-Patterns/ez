@@ -3,7 +3,7 @@
 # checked, run, tested, and removed again. The remote is taken away before the
 # check, so nothing here can quietly be falling back to the network.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check

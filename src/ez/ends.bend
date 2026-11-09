@@ -25,7 +25,7 @@ import Base
 # main.bend itself reaches the foreign effects that run programs, which a
 # law may not import (bend 2.0.32). `R.ok` and `R.text` are the same defs
 # (trusted above).
-import 0x8e26a6f8c31689519e618374376ee3dd/src/answer.bend as R
+import snap@1.4.0.0/src/answer.bend as R
 import ../lock/plan.bend as P
 
 # a command that ends on whether it passed: success, or a refusal whose

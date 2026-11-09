@@ -15,7 +15,7 @@
 # code run by `mkProofs`, not a law. CI builds from a clean tree, so nothing
 # is cached.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../share/args.bend as Args
 import ../share/env.bend as Env
 import ../share/cap.bend as Cap

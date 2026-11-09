@@ -89,11 +89,11 @@ import ../src/init/plan.bend as IP
 import ../src/remove/plan.bend as RP
 import ../src/remove/relock.bend as RR
 import ../src/ws/relock.bend as Rel
-import 0xa383b26a5a0ef35663b3615d7aedf9e3/main.bend as Shake
+import shake@0.6.0.0/main.bend as Shake
 import ../src/ez/line.bend as LLine
 import ../src/ez/ends.bend as EEnds
 import ../src/ez/start.bend as S
-import 0x8e26a6f8c31689519e618374376ee3dd/src/answer.bend as RAnswer
+import snap@1.4.0.0/src/answer.bend as RAnswer
 import ../src/tool/world.bend as TW
 import ../src/tool/plan.bend as TP
 

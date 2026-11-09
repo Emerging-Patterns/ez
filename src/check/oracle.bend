@@ -20,7 +20,7 @@
 import Base
 import ../share/sha.bend as Sha
 import ../io/file.bend as F
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ./serve.bend as S
 
 # a list with its last element gone, the head held back one step so the walk can

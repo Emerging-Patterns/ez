@@ -7,7 +7,7 @@
 import Base
 import ../src/hub/hub.bend as Hub
 import ../src/hub/get.bend as Net
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
 

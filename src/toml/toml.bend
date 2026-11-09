@@ -22,7 +22,7 @@
 # between its sections and eztoml's document (this file) is ez code with no
 # law: `tests/toml.bend` checks it on an old and a new ledger and lock.
 import Base
-import 0xc5d9d3e28b79ea98be22eb42c7e37802/main.bend as E
+import emerging-eztoml@0.9.0.0/main.bend as E
 
 # a key and the string written for it
 type Kv is Data:

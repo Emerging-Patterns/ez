@@ -12,7 +12,7 @@
 # refuses. It decides nothing; that it reads and executes faithfully is
 # trusted in ez/app.bend.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../lock/up.bend as Up

@@ -13,7 +13,7 @@
 # from its entry here, by `K.pkg_of`, which is interpreter code trusted
 # in ez/app.bend until `ez add` is converted.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../io/file.bend as F
 import ../hub/hub.bend as Web
 import ../hub/get.bend as Net

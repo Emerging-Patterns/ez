@@ -2,7 +2,7 @@
 # checks and runs, and the library under `src/` it imports. A second run is
 # refused and leaves everything it found.
 import Base
-import 0x8e26a6f8c31689519e618374376ee3dd/main.bend as R
+import snap@1.4.0.0/main.bend as R
 import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check
