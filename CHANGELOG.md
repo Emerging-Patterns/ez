@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0](https://github.com/Emerging-Patterns/ez/compare/v1.14.0...v1.15.0) (2026-11-09)
+
+
+### Bug Fixes
+
+* **deps:** import eztoml, snap, shake and ezhttp by hub name ([#168](https://github.com/Emerging-Patterns/ez/issues/168)) ([6692731](https://github.com/Emerging-Patterns/ez/commit/669273130f454c399e61d57555f57227dee9a3c5))
+
 ## [1.14.0](https://github.com/Emerging-Patterns/ez/compare/v1.13.0...v1.14.0) (2026-11-08)
 
 
