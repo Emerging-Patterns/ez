@@ -265,10 +265,28 @@ rec {
     map (name: toolPackage { inherit name src; })
       (builtins.attrNames ((lockDoc src null).tools or { }));
 
-  # `bolt` in a writable copy of src. Pass `bolt` to use that derivation.
-  # Otherwise bolt is built from `[tools.bolt]` in the lock with `bend`, and
-  # wrapped to run with the GPU off: `+RTS --gpu off -RTS` on bend 2.0.38 and
-  # later, `--gpu off` on an older bend.
+  # The words after `bolt` that lint a tree, for a `[tools.bolt]` pin. bolt
+  # 1.64.0 took ruff's shape: `bolt check` lints and bare `bolt` prints its
+  # usage and exits 2. Before it, bare `bolt` linted and `bolt check` ran
+  # Bend's type checker on the files it was given. A pin whose `tag` names a
+  # version before 1.64.0 gets bare `bolt`; any other pin, one with no tag
+  # included, gets `bolt check`.
+  lintArgs = pin:
+    let
+      tag = if pin == null then "" else toString (pin.tag or "");
+      ver = lib.removePrefix "v" tag;
+      known = builtins.match "[0-9]+(\\.[0-9]+)*" ver != null;
+    in
+    if known && lib.versionOlder ver "1.64.0" then [ ] else [ "check" ];
+
+  # `bolt check` in a writable copy of src: bolt's lint over the tree. Pass
+  # `bolt` to use that derivation. Otherwise bolt is built from `[tools.bolt]`
+  # in the lock with `bend`, and wrapped to run with the GPU off: `+RTS --gpu
+  # off -RTS` on bend 2.0.38 and later, `--gpu off` on an older bend.
+  # `args` are the words after `bolt`. By default they come from the pin, as
+  # lintArgs says, so a lock that pins a bolt before 1.64.0 runs bare `bolt`;
+  # with an explicit `bolt` they are `check`, and a caller passing an older
+  # bolt passes `args = [ ]`.
   # `lock` and `bendLib` match mkProofs: an explicit `bendLib` is BEND_LIB,
   # else the lock's tree, else no BEND_LIB.
   mkLint = {
@@ -278,6 +296,7 @@ rec {
     name ? "lint",
     lock ? null,
     bendLib ? null,
+    args ? null,
   }:
     let
       boltPkg =
@@ -287,12 +306,16 @@ rec {
           inherit src bend lock;
           wrapFlags = rtsFlags bend [ "--gpu" "off" ];
         };
+      words =
+        if args != null then args
+        else if bolt != null then [ "check" ]
+        else lintArgs (toolPin src lock "bolt");
     in
     pkgs.runCommand name
       (withBendLib (bendLibFor bendLib src lock) {
         nativeBuildInputs = [ boltPkg ];
       })
-      (copyTree src "bolt");
+      (copyTree src (lib.escapeShellArgs ([ "bolt" ] ++ words)));
 
   # ez's own repo as a fresh clone would have it, with no network: the
   # tracked files of src in a new git repo, the lock's BEND_LIB copied into
