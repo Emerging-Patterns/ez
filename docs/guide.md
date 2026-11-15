@@ -476,7 +476,7 @@ it, so options for the program's runtime go after a `--RTS`:
 `+RTS --gpu off -RTS`.
 
 ```bash
-ezx Emerging-Patterns/bolt --RTS +RTS --gpu off -RTS   # an ez project, built from its lock
+ezx Emerging-Patterns/bolt check --RTS +RTS --gpu off -RTS   # an ez project, built from its lock
 ezx ./hello                               # a plain Bend repo: builds main.bend
 ezx --entry src/cli.bend ./hello          # another file of the same checkout
 ```
@@ -893,7 +893,11 @@ lint = ez.mkLint { src = self; };
   that imports another package by its hub name builds too.
 - `mkProofs` runs `ez prove` over a copy of `src`. This repo's own `proofs`
   check is that.
-- `mkLint` builds `bolt` from `[tools.bolt]` in the lock.
+- `mkLint` builds `bolt` from `[tools.bolt]` in the lock and runs `bolt
+  check` over a copy of `src`, or bare `bolt` when the pin's tag is a bolt
+  before 1.65.0, whose bare `bolt` linted (`ez.lintArgs pin` is that
+  choice). `args` overrides the words after `bolt`; with an explicit `bolt`
+  they default to `check`.
 - `toolPackage` builds one locked tool, and `devPackages src` builds every
   one.
 - `mkShell` puts those on `PATH` when `src` is set.
