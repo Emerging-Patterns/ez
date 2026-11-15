@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/Emerging-Patterns/ez/compare/v1.15.0...v1.16.0) (2026-11-15)
+
+
+### Bug Fixes
+
+* **nix:** mkLint runs `bolt check` for bolt 1.65.0 and later ([#170](https://github.com/Emerging-Patterns/ez/issues/170)) ([4bf4b46](https://github.com/Emerging-Patterns/ez/commit/4bf4b464c09b4621d8c14356bb63d28138c641a7))
+
 ## [1.15.0](https://github.com/Emerging-Patterns/ez/compare/v1.14.0...v1.15.0) (2026-11-09)
 
 
