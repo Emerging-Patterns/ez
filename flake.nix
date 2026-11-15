@@ -80,7 +80,7 @@
           #   mkProofs { ez, src, name?, lock?, bendLib? }
           #   mkLint { src, bolt?, bend?, name?, lock?, bendLib?, args? }
           #   lintArgs pin                    the words after `bolt` that
-          #                                   lint: `check` from bolt 1.64.0,
+          #                                   lint: `check` from bolt 1.65.0,
           #                                   none before
           #   mkFresh { src, bend?, name?, bendLib?, nativeBuildInputs? }
           #   toolPackage { name, src, bend?, lock?, wrapFlags?, ... }
@@ -106,8 +106,8 @@
           apps.default = { type = "app"; program = "${ezBin}/bin/ez"; };
           # `lint` is bolt at the lock's `[tools.bolt]` pin, run with `+RTS
           # --gpu off -RTS` over a copy of the tree, graded by ./bolt.bend:
-          # `bolt check` from bolt 1.64.0, bare `bolt` before it.
-          # `lint-args` checks that choice for tags on both sides of 1.64.0.
+          # `bolt check` from bolt 1.65.0, bare `bolt` before it.
+          # `lint-args` checks that choice for tags on both sides of 1.65.0.
           # `fresh` is laws/LockReproducible.bend checked directly: a
           # clone's `ez lock` gives back the committed lock. `named` builds
           # ./nix/tests/named with mkPackage and no network. `added` runs

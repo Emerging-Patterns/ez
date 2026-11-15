@@ -1,4 +1,4 @@
-# mkLint's choice of command, by the bolt the lock pins. bolt 1.64.0 moved
+# mkLint's choice of command, by the bolt the lock pins. bolt 1.65.0 moved
 # linting to `bolt check` and made bare `bolt` print its usage and exit 2;
 # before it, bare `bolt` linted and `bolt check` wanted files. Each case is a
 # `[tools.bolt]` pin and the words mkLint must run after `bolt`. Evaluation
@@ -9,7 +9,8 @@ let
   cases = [
     { pin = { tag = "v1.27.0"; }; want = [ ]; }
     { pin = { tag = "v1.63.0"; }; want = [ ]; }
-    { pin = { tag = "v1.64.0"; }; want = [ "check" ]; }
+    { pin = { tag = "v1.64.0"; }; want = [ ]; }
+    { pin = { tag = "v1.65.0"; }; want = [ "check" ]; }
     { pin = { tag = "v1.70.2"; }; want = [ "check" ]; }
     { pin = { tag = "v2.0.0"; }; want = [ "check" ]; }
     { pin = { tag = "1.10.0"; }; want = [ ]; }

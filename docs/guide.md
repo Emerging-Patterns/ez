@@ -895,7 +895,7 @@ lint = ez.mkLint { src = self; };
   check is that.
 - `mkLint` builds `bolt` from `[tools.bolt]` in the lock and runs `bolt
   check` over a copy of `src`, or bare `bolt` when the pin's tag is a bolt
-  before 1.64.0, whose bare `bolt` linted (`ez.lintArgs pin` is that
+  before 1.65.0, whose bare `bolt` linted (`ez.lintArgs pin` is that
   choice). `args` overrides the words after `bolt`; with an explicit `bolt`
   they default to `check`.
 - `toolPackage` builds one locked tool, and `devPackages src` builds every

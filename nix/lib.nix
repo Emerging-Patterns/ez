@@ -266,10 +266,10 @@ rec {
       (builtins.attrNames ((lockDoc src null).tools or { }));
 
   # The words after `bolt` that lint a tree, for a `[tools.bolt]` pin. bolt
-  # 1.64.0 took ruff's shape: `bolt check` lints and bare `bolt` prints its
+  # 1.65.0 took ruff's shape: `bolt check` lints and bare `bolt` prints its
   # usage and exits 2. Before it, bare `bolt` linted and `bolt check` ran
   # Bend's type checker on the files it was given. A pin whose `tag` names a
-  # version before 1.64.0 gets bare `bolt`; any other pin, one with no tag
+  # version before 1.65.0 gets bare `bolt`; any other pin, one with no tag
   # included, gets `bolt check`.
   lintArgs = pin:
     let
@@ -277,14 +277,14 @@ rec {
       ver = lib.removePrefix "v" tag;
       known = builtins.match "[0-9]+(\\.[0-9]+)*" ver != null;
     in
-    if known && lib.versionOlder ver "1.64.0" then [ ] else [ "check" ];
+    if known && lib.versionOlder ver "1.65.0" then [ ] else [ "check" ];
 
   # `bolt check` in a writable copy of src: bolt's lint over the tree. Pass
   # `bolt` to use that derivation. Otherwise bolt is built from `[tools.bolt]`
   # in the lock with `bend`, and wrapped to run with the GPU off: `+RTS --gpu
   # off -RTS` on bend 2.0.38 and later, `--gpu off` on an older bend.
   # `args` are the words after `bolt`. By default they come from the pin, as
-  # lintArgs says, so a lock that pins a bolt before 1.64.0 runs bare `bolt`;
+  # lintArgs says, so a lock that pins a bolt before 1.65.0 runs bare `bolt`;
   # with an explicit `bolt` they are `check`, and a caller passing an older
   # bolt passes `args = [ ]`.
   # `lock` and `bendLib` match mkProofs: an explicit `bendLib` is BEND_LIB,

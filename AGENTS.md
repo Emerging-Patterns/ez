@@ -15,11 +15,11 @@ sh bootstrap.sh
 mkdir -p bin
 BEND_LIB=$PWD/.ez/lib bend main.bend -o bin/ez.bin
 bin/ez.bin prove                     # the proof gate: PROOF.bend must pass
-bin/ez.bin tool run bolt --RTS +RTS --gpu off -RTS   # lint: 0 errors (`bolt check` once the pin is bolt 1.64.0 or later)
+bin/ez.bin tool run bolt --RTS +RTS --gpu off -RTS   # lint: 0 errors (`bolt check` once the pin is bolt 1.65.0 or later)
 bin/ez.bin lock                      # must leave ez.lock.toml unchanged unless you meant to change it
 ```
 
-CI runs `nix flake check`, which runs the proof gate and bolt's lint at the lock's `[tools.bolt]` pin (bare `bolt` before bolt 1.64.0, `bolt check` from it), and the `readme` job, which follows the README's install steps.
+CI runs `nix flake check`, which runs the proof gate and bolt's lint at the lock's `[tools.bolt]` pin (bare `bolt` before bolt 1.65.0, `bolt check` from it), and the `readme` job, which follows the README's install steps.
 
 ## Rules
 
