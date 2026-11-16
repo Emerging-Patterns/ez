@@ -5,7 +5,6 @@
 # It is under tests/ rather than hub/tests/ because it drives a socket, and the
 # unit tests beside the code are about what can be said without one.
 import Base
-import ../src/hub/hub.bend as Hub
 import ../src/hub/get.bend as Net
 import snap@1.4.0.0/main.bend as R
 import ../src/check/kit.bend as Check

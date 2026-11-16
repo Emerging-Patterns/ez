@@ -795,6 +795,11 @@ type Stop is Data:
   Spent{}
   Unnamed{nv: String}
 
+# a file the walk opened: its path, the name it was reached through, its
+# text and that text's scan
+type Opened is Data:
+  Opened{file: String, ns: String, text: String, sc: Scan}
+
 # the walk so far: the files already visited, what was found, whether it has
 # stopped, and the files still to visit
 type State is Data:
@@ -959,6 +964,38 @@ def foreign.check(+tree: Tree, +dir: String, +nd: String, ats: List<&2, String>)
       foreign.judge(outside(at), tree, at, P.join(nd, h),
         _u => foreign.check(tree, dir, nd, t))
 
+# a file kept: itself, the LICENSE beside it and its foreign bodies found,
+# and the modules it imports queued first
+def visit.keep(
+  +tree: Tree,
+  opened: Opened,
+  eb: String,
+  seen: List<&2, String>,
+  out: List<&2, Hit>,
+  rest: List<&2, Task>
+) -> State:
+  Opened{+file, +ns, text, +sc} = opened
+  +d = P.dir(file)
+  +nd = nsdir(ns)
+  +raw = raw_of(ns, eb)
+  State{file <> seen,
+    Hit{raw, text} <> List.append(&2, Hit,
+      license.put(find(tree, beside(file)), beside(raw)),
+      List.append(&2, Hit, foreigns(tree, d, nd, scan.foreign(sc)), out)),
+    Going{},
+    List.append(&2, Task, tasks(d, nd, scan.mods(sc)), rest)}
+
+# a file whose walk stopped stays queued, to be visited again
+def visit.halt(
+  stop: Stop,
+  opened: Opened,
+  seen: List<&2, String>,
+  out: List<&2, Hit>,
+  rest: List<&2, Task>
+) -> State:
+  Opened{file, ns, _text, _sc} = opened
+  State{seen, out, stop, Task{file, ns} <> rest}
+
 # a file whose LICENSE and foreign bodies are all settled: itself, the
 # LICENSE beside it and its foreign bodies found, and the modules it imports
 # put at the front of the queue, so the walk goes depth first the way bend's
@@ -967,10 +1004,7 @@ def foreign.check(+tree: Tree, +dir: String, +nd: String, ats: List<&2, String>)
 def visit.put(
   fstop: Stop,
   +tree: Tree,
-  +sc: Scan,
-  +text: String,
-  +file: String,
-  +ns: String,
+  opened: Opened,
   eb: String,
   seen: List<&2, String>,
   out: List<&2, Hit>,
@@ -978,25 +1012,17 @@ def visit.put(
 ) -> State:
   match fstop:
     case Going{}:
-      +d = P.dir(file)
-      +nd = nsdir(ns)
-      +raw = raw_of(ns, eb)
-      State{file <> seen,
-        Hit{raw, text} <> List.append(&2, Hit,
-          license.put(find(tree, beside(file)), beside(raw)),
-          List.append(&2, Hit, foreigns(tree, d, nd, scan.foreign(sc)), out)),
-        Going{},
-        List.append(&2, Task, tasks(d, nd, scan.mods(sc)), rest)}
+      visit.keep(tree, opened, eb, seen, out, rest)
     case Missing{at}:
-      State{seen, out, Missing{at}, Task{file, ns} <> rest}
+      visit.halt(Missing{at}, opened, seen, out, rest)
     case Climbs{at}:
-      State{seen, out, Climbs{at}, Task{file, ns} <> rest}
+      visit.halt(Climbs{at}, opened, seen, out, rest)
     case Asking{at}:
-      State{seen, out, Asking{at}, Task{file, ns} <> rest}
+      visit.halt(Asking{at}, opened, seen, out, rest)
     case Spent{}:
-      State{seen, out, Spent{}, Task{file, ns} <> rest}
+      visit.halt(Spent{}, opened, seen, out, rest)
     case Unnamed{nv}:
-      State{seen, out, Unnamed{nv}, Task{file, ns} <> rest}
+      visit.halt(Unnamed{nv}, opened, seen, out, rest)
 
 # a file that imports a name the hub rules out stops the walk, naming it, as
 # bend refuses to load it; any other goes on to its foreign bodies
@@ -1026,7 +1052,7 @@ def visit.found(
   visit.put(asked(find(tree, beside(file)), beside(file),
       _u => named.check(unnamed(scan.mods(sc)),
         _v => foreign.check(tree, P.dir(file), nsdir(ns), scan.foreign(sc)))),
-    tree, sc, text, file, ns, eb, seen, out, rest)
+    tree, Opened{file, ns, text, sc}, eb, seen, out, rest)
 
 # a module that is imported and not there stops the walk, since a package
 # missing a file is not the package bend would publish. One the walk was not
@@ -1560,7 +1586,7 @@ def resumed.fuel(+tree: Tree, +st: State) -> Nat:
 # is a guard against a walk that keeps asking, not a limit on a package: a
 # package of more files than this is refused, never hashed short.
 def asks() -> Nat:
-  U32.to_nat(100000)
+  100000n
 
 # the walk over what has been read so far, and each file it asks for read
 # and handed back, until it no longer asks

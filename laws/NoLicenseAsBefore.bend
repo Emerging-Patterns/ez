@@ -15,7 +15,7 @@ law no_license_as_before:
   for out: List<&2, K.Hit>
   for rest: List<&2, K.Task>
   for none: {K.Absent{} == K.find(tree, K.beside(file)) : K.Look}
-  {K.visit.put(K.Going{}, tree, sc, text, file, ns, eb, seen, out, rest)
+  {K.visit.put(K.Going{}, tree, K.Opened{file, ns, text, sc}, eb, seen, out, rest)
     == K.State{file <> seen,
       K.Hit{K.raw_of(ns, eb), text} <> List.append(&2, K.Hit,
         K.foreigns(tree, Path.dir(file), K.nsdir(ns), K.scan.foreign(sc)), out),

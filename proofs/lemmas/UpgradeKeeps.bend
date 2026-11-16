@@ -86,7 +86,7 @@ law st.hub:
   for +man: String
   for srcs: List<&2, String>
   for +br: String
-  st.fate(Up.dep.hub(hb, M.Dep{hn, hh, he, src}, hash, r, root2, nar2, man, srcs, br),
+  st.fate(Up.dep.hub(hb, M.Dep{hn, hh, he, src}, hash, Up.Moved{r, root2, nar2, man, srcs}, br),
     M.Dep{hn, hh, he, src})
 
 def st.hub(hb, _hn, _hh, _he, src, _hash, _r, _root2, _nar2, _man, _srcs, _br):

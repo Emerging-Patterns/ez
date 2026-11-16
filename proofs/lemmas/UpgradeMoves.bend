@@ -148,8 +148,9 @@ law mv.ok_hub:
   for +man: String
   for srcs: List<&2, String>
   for e: {Up.onward(rs, Up.Above{url, rev, r}) == Up.Asc{True{}} : Up.Asc}
-  {mv.ok(Up.dep.hub(hb, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), hash, r, root2,
-    nar2, man, srcs, br), Up.At{r, tg, br}, rs, mv.git(hn, hh, he, url, rev, tag, root, nar, vend))
+  {mv.ok(Up.dep.hub(hb, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), hash,
+      Up.Moved{r, root2, nar2, man, srcs}, br), Up.At{r, tg, br}, rs,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend))
     == True{} : Bool}
 
 def mv.ok_hub(
@@ -1192,8 +1193,9 @@ law mv.live_hub:
   for +nar2: String
   for +man: String
   for srcs: List<&2, String>
-  {mv.live(Up.dep.hub(hb, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), hash, tip, root2,
-    nar2, man, srcs, br), tip, mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
+  {mv.live(Up.dep.hub(hb, mv.git(hn, hh, he, url, rev, tag, root, nar, vend), hash,
+      Up.Moved{tip, root2, nar2, man, srcs}, br), tip,
+    mv.git(hn, hh, he, url, rev, tag, root, nar, vend)) == True{} : Bool}
 
 def mv.live_hub(
   hb,

@@ -160,7 +160,7 @@ def loop.on(state: Run, rest: Listener -> IO(Unit)) -> IO(Unit):
 # Bend has no unbounded loop, so "forever" is a count no test run will reach, a
 # thousand runs of a thousand connections; a server has no input to size it by.
 def thousand() -> Nat:
-  U32.to_nat(1000)
+  1000n
 
 # connections served for as long as the fuel lasts. Bend has no unbounded loop,
 # so "forever" is a count no test run will reach: a thousand runs of a thousand

@@ -13,7 +13,3 @@ def say(ok: Bool, name: String, got: String, want: String) -> IO(Unit):
 # passes when two strings are equal
 def eq_str(name: String, +got: String, +want: String) -> IO(Unit):
   say(String.eq(got, want), name, got, want)
-
-# passes when two U32 are equal
-def eq_u32(name: String, got: U32, want: U32) -> IO(Unit):
-  eq_str(name, U32.show(got), U32.show(want))

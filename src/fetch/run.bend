@@ -95,7 +95,7 @@ def loop.step(st: FP.Step, +lib: String, world: FW.World, go: FW.World -> IO(Uni
 # once, so this is only a guard against a planner that keeps asking, and
 # running out of it dies loudly.
 def rounds() -> Nat:
-  U32.to_nat(10)
+  10n
 
 # the loop, under fuel. A package asks at most twice, for its tree under
 # BEND_LIB and for its fetch, and every round answers what it asked, so the

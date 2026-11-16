@@ -301,14 +301,21 @@ def unnested(ls: List<&2, Ledger>) -> Bool:
       rest = unnested(tl)
       Bool.and(Bool.not(ledger.nested(hd)), rest)
 
+# the member whose ledger has a `[workspace]` table, or the search gone on
+def nested.hit(hit: Bool, hd: Ledger, rest: Unit -> String) -> String:
+  match hit:
+    case True{}:
+      segs.text(ledger.dir(hd))
+    case False{}:
+      rest(Unit{})
+
 # the first member whose ledger has a `[workspace]` table, "" for none
 def nested(ls: List<&2, Ledger>) -> String:
   match ls:
     case []:
       ""
     case +hd <> tl:
-      rest = nested(tl)
-      Bool.pick(String, ledger.nested(hd), segs.text(ledger.dir(hd)), rest)
+      nested.hit(ledger.nested(hd), hd, _u => nested(tl))
 
 # the package name of every ledger, in order
 def names.of(ls: List<&2, Ledger>) -> List<&2, String>:
@@ -344,14 +351,21 @@ def distinct(ns: List<&2, String>) -> Bool:
       rest = distinct(tl)
       Bool.and(Bool.not(named(tl, hd)), rest)
 
+# the name that is in the list again, or the search gone on
+def twice.hit(hit: Bool, hd: String, rest: Unit -> String) -> String:
+  match hit:
+    case True{}:
+      hd
+    case False{}:
+      rest(Unit{})
+
 # the first name in the list twice, "" for none
 def twice(ns: List<&2, String>) -> String:
   match ns:
     case []:
       ""
     case +hd <> +tl:
-      rest = twice(tl)
-      Bool.pick(String, named(tl, hd), hd, rest)
+      twice.hit(named(tl, hd), hd, _u => twice(tl))
 
 # whether the root is a member
 def root.member(root: Root) -> Bool:

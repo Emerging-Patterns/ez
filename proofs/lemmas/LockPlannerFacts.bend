@@ -987,9 +987,9 @@ law pick_pins:
   for asks: List<&2, String>
   for bad: String
   for e: {D1.pinned.all(orgs, packs) == packs : List<&2, L.Pack>}
-  {D1.pinned.all(orgs, P.walk.packs(P.step.pick(seen, orgs, ns, js, hash, rest,
-    packs, asks, bad)))
-    == P.walk.packs(P.step.pick(seen, orgs, ns, js, hash, rest, packs, asks, bad))
+  {D1.pinned.all(orgs, P.walk.packs(P.step.pick(seen, orgs, ns, js, hash,
+    P.Walk{rest, packs, asks, bad})))
+    == P.walk.packs(P.step.pick(seen, orgs, ns, js, hash, P.Walk{rest, packs, asks, bad}))
     : List<&2, L.Pack>}
 
 def pick_pins(ns, seen, orgs, js, hash, rest, packs, asks, bad, e):
@@ -1501,7 +1501,7 @@ law mv.fine_hub:
   for +man: String
   for srcs: List<&2, String>
   for +br: String
-  {mv.fine(Up.dep.hub(hb, M.Dep{hn, hh, he, src}, hash, r, root2, nar2, man, srcs, br), hn)
+  {mv.fine(Up.dep.hub(hb, M.Dep{hn, hh, he, src}, hash, Up.Moved{r, root2, nar2, man, srcs}, br), hn)
     == (hn, True{}) : String & Bool}
 
 def mv.fine_hub(hb, _hn, _hh, _he, src, _hash, _r, _root2, _nar2, _man, _srcs, _br):
@@ -2167,12 +2167,12 @@ law a.hub:
   for ea: {U.aim(True{}, M.Git{url, r0, tg, rt0, nr0, vd}) == am : U.Aim}
   for et: {up.tip(am, rs, url) == Up.At{tip, tag, br} : Up.Tip}
   for eco: {Up.checkout(rs, Up.Tree{url, tip, he}) == Up.Co{nar1, root1, man1, srcs1} : Up.Co}
-  {again(Up.dep.hub(hb, M.Dep{hn, hh, he, M.Git{url, r0, tg, rt0, nr0, vd}}, Up.hash.of(man1), tip, root1, nar1, man1,
-    srcs1, br), g, rs, only, hub)
-    == M1.still(Up.dep.hub(hb, M.Dep{hn, hh, he, M.Git{url, r0, tg, rt0, nr0, vd}}, Up.hash.of(man1), tip, root1, nar1,
-      man1, srcs1, br),
-      fsays(again(Up.dep.hub(hb, M.Dep{hn, hh, he, M.Git{url, r0, tg, rt0, nr0, vd}}, Up.hash.of(man1), tip, root1,
-        nar1, man1, srcs1, br), g, rs, only, hub))) : Up.Fate}
+  {again(Up.dep.hub(hb, M.Dep{hn, hh, he, M.Git{url, r0, tg, rt0, nr0, vd}}, Up.hash.of(man1),
+      Up.Moved{tip, root1, nar1, man1, srcs1}, br), g, rs, only, hub)
+    == M1.still(Up.dep.hub(hb, M.Dep{hn, hh, he, M.Git{url, r0, tg, rt0, nr0, vd}}, Up.hash.of(man1),
+        Up.Moved{tip, root1, nar1, man1, srcs1}, br),
+      fsays(again(Up.dep.hub(hb, M.Dep{hn, hh, he, M.Git{url, r0, tg, rt0, nr0, vd}}, Up.hash.of(man1),
+        Up.Moved{tip, root1, nar1, man1, srcs1}, br), g, rs, only, hub))) : Up.Fate}
 
 def a.hub(
   hb,
@@ -2684,7 +2684,7 @@ law hub_back:
   for manifest: String
   for srcs: List<&2, String>
   for +branch: String
-  {M1.back(Up.dep.hub(hubbed, dep, hash, rev, root, nar, manifest, srcs, branch), dep) == dep : M.Dep}
+  {M1.back(Up.dep.hub(hubbed, dep, hash, Up.Moved{rev, root, nar, manifest, srcs}, branch), dep) == dep : M.Dep}
 
 def hub_back(hubbed, dep, hash, rev, root, nar, manifest, srcs, branch):
   match hubbed:

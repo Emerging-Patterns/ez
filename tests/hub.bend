@@ -76,15 +76,15 @@ def go(+repo: String, +root: String, +port: String) -> IO(Unit):
   do IO<Unit>:
     W.mkdir(root ++ "/app")
     W.mkdir(root ++ "/empty")
-    +a : String <- publish(root ++ "/hub", "src/lib.bend",
+    +lib : String <- publish(root ++ "/hub", "src/lib.bend",
       "import Base\n\n# double the number\ndef double(+x: U32) -> U32:\n" ++
       "  (x * 2 : U32)\n")
-    +b : String <- publish(root ++ "/hub", "src/mid.bend",
-      "import Base\nimport " ++ a ++ "/src/lib.bend as A\n\n" ++
+    +mid : String <- publish(root ++ "/hub", "src/mid.bend",
+      "import Base\nimport " ++ lib ++ "/src/lib.bend as A\n\n" ++
       "# four times the number\ndef quad(+x: U32) -> U32:\n" ++
       "  A.double(A.double(x))\n")
     _w : Bool <- F.write(root ++ "/app/main.bend",
-      "import Base\nimport " ++ b ++ "/src/mid.bend as B\n\n" ++
+      "import Base\nimport " ++ mid ++ "/src/mid.bend as B\n\n" ++
       "def main() -> U32:\n  B.quad(11)\n")
     +pid : String <- W.spawn(W.inside(root ++ "/hub", ["python3", "-m",
       "http.server", port, "--bind", "127.0.0.1"]))
@@ -97,7 +97,7 @@ def go(+repo: String, +root: String, +port: String) -> IO(Unit):
     hs : List<&2, String> <- named(at)
     Check.eq_str("the lock names both packages, the direct one and its own " ++
       "dependency", String.join(hs, "\n"),
-      String.join(List.sort(~String, ~String.is_le, [a, b]), "\n"))
+      String.join(List.sort(~String, ~String.is_le, [lib, mid]), "\n"))
     restore(repo, root ++ "/app", "http://127.0.0.1:" ++ port)
     W.stop(pid)
     +good : String <- build(root ++ "/app", root ++ "/app/.ez/lib")

@@ -160,7 +160,7 @@ def at(xs: List<&2, String>, index: Nat) -> String:
 def start(as: List<&2, String>) -> IO(Unit):
   match as:
     case Nil{}:
-      IO.print(run("new", U32.to_nat(200000)))
+      IO.print(run("new", 200000n))
     case Con{h, t}:
       IO.print(run(h,
         U32.to_nat(Maybe.default(&2, U32, U32.read(at(t, 0n)), 200000))))

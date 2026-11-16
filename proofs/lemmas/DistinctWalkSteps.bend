@@ -119,8 +119,8 @@ law pick_distinct:
   for bad: String
   for e: {D1.packs.distinct(packs) == True{} : Bool}
   for hs: {Bool.or(L.has(packs, hash), L.seen.holds(asks, hash)) == seen : Bool}
-  {D1.packs.distinct(P.walk.packs(P.step.pick(seen, orgs, ns, js, hash, rest, packs,
-    asks, bad))) == True{} : Bool}
+  {D1.packs.distinct(P.walk.packs(P.step.pick(seen, orgs, ns, js, hash,
+    P.Walk{rest, packs, asks, bad}))) == True{} : Bool}
 
 def pick_distinct(ns, seen, orgs, js, hash, rest, packs, asks, bad, e, hs):
   match seen:

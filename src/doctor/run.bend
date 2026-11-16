@@ -112,7 +112,7 @@ def loop.step(st: DP.Step, +lib: String, world: DW.World, go: DW.World -> IO(Uni
 # has answered, so this is a guard against a planner that keeps asking, not
 # a limit on a project: running out of it dies loudly.
 def rounds() -> Nat:
-  U32.to_nat(100000)
+  100000n
 
 # the loop, under fuel. Every round adds at least one answer, since the
 # planner never asks what the World answers already, and the lock check asks

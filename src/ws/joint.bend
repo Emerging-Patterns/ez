@@ -160,10 +160,10 @@ def bit.eq(aa: Bool, bb: Bool) -> Bool:
       Bool.not(bb)
 
 # whether two sources are one
-def source.eq(aa: M.Source, bb: M.Source) -> Bool:
-  match aa:
+def source.eq(left: M.Source, right: M.Source) -> Bool:
+  match left:
     case M.Hub{an}:
-      match bb:
+      match right:
         case M.Hub{bn}:
           String.eq(an, bn)
         case M.Git{_u, _r, _t, _o, _n, _v}:
@@ -171,7 +171,7 @@ def source.eq(aa: M.Source, bb: M.Source) -> Bool:
         case M.Member{_p, _m}:
           False{}
     case M.Git{au, ar, at, ao, an, av}:
-      match bb:
+      match right:
         case M.Hub{_bn}:
           False{}
         case M.Git{bu, br, bt, bo, bn, bv}:
@@ -181,7 +181,7 @@ def source.eq(aa: M.Source, bb: M.Source) -> Bool:
         case M.Member{_p, _m}:
           False{}
     case M.Member{ap, am}:
-      match bb:
+      match right:
         case M.Hub{_bn}:
           False{}
         case M.Git{_u, _r, _t, _o, _n, _v}:
@@ -682,14 +682,21 @@ def resolve(+root: M.Manifest, ms: List<&2, Member>, +files: List<&2, K.Source>)
 # ---------------------------------------------------------------------------
 # the answers the lock reads a member's package from
 
+# the text of the file at the path, or the search gone on past it
+def text.at.hit(hit: Bool, ft: String, rest: Unit -> String) -> String:
+  match hit:
+    case True{}:
+      ft
+    case False{}:
+      rest(Unit{})
+
 # a file's text in a walk's files, "" when it holds none at that path
 def text.at(fs: List<&2, K.Source>, +at: String) -> String:
   match fs:
     case []:
       ""
     case K.Source{+fa, ft} <> tl:
-      rest = text.at(tl, at)
-      Bool.pick(String, String.eq(fa, at), ft, rest)
+      text.at.hit(String.eq(fa, at), ft, _u => text.at(tl, at))
 
 # the texts of a walk's files, in its manifest's order
 def texts(sums: List<&2, K.Item>, +fs: List<&2, K.Source>) -> List<&2, String>:

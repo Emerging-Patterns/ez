@@ -648,20 +648,16 @@ def dep.moved(
         line.if(Bool.not(String.is_empty(drop)), name ++ ": vendored .ez/lib/" ++ hash)),
     [Laid{hash, nar, manifest, srcs}]}
 
+# the checkout a moved pin lands on: the rev it advances to, and the root,
+# NAR hash, manifest and sources the checkout at that rev has
+type Moved is Data:
+  Moved{rev: String, root: String, nar: String, manifest: String, srcs: List<&2, String>}
+
 # the hub's word on the new hash
-def dep.hub(
-  hubbed: Hubbed,
-  +dep: M.Dep,
-  +hash: String,
-  +rev: String,
-  +root: String,
-  +nar: String,
-  manifest: String,
-  srcs: List<&2, String>,
-  +branch: String
-) -> Fate:
+def dep.hub(hubbed: Hubbed, +dep: M.Dep, +hash: String, moved: Moved, +branch: String) -> Fate:
   match hubbed:
     case Clear{}:
+      Moved{rev, root, nar, manifest, srcs} = moved
       dep.moved(dep, hash, rev, root, nar, manifest, srcs, branch)
     case Clash{}:
       Halts{"ez: " ++ M.dep.name(dep) ++ ": hub digest does not match " ++ hash}
@@ -676,7 +672,7 @@ def dep.advance(co: Co, +rs: List<&2, Reply>, +hub: String, +dep: M.Dep, +rev: S
   match co:
     case Co{nar, root, +manifest, srcs}:
       +hash = hash.of(manifest)
-      dep.hub(hubbed(rs, HubHas{hub, hash}), dep, hash, rev, root, nar, manifest, srcs,
+      dep.hub(hubbed(rs, HubHas{hub, hash}), dep, hash, Moved{rev, root, nar, manifest, srcs},
         branch)
     case CoWait{ask}:
       Waits{[ask]}

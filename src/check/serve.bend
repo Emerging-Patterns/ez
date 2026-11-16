@@ -111,19 +111,6 @@ def clen(hs: List<&2, String>) -> U32:
     case h <> t:
       clen.at(h, clen(t))
 
-# whether a request has arrived whole
-def complete.of(message: Msg) -> Bool:
-  match message:
-    case MPartial{}:
-      False{}
-    case MFull{head, body}:
-      U32.is_ge(size(body), clen(head))
-
-# whether what has been read so far is the whole request: its head has ended and
-# its body is as long as the head said it would be
-def complete(text: String) -> Bool:
-  complete.of(msg.of(text))
-
 # an answer's bytes, framed by its length. Every one of them states that length
 # and says the connection closes, because bend, curl and nix's fetcher all read
 # a body to the length they were promised and then expect the socket to shut.
@@ -187,85 +174,135 @@ def pieces(sock: Socket, width: Nat, +text: String) -> IO(Unit):
     sock2 : Socket <- piece.go(String.length(text), width, sock, text)
     Socket.close(sock2)
 
+# what has been read so far, the chunks newest first, put back in order
+def recv.text(parts: List<&2, String>) -> String:
+  String.concat(List.reverse(&2, String, parts))
+
 # an empty chunk means the client stopped writing, whole request or not
-def recv.chunk(
-  chunk: String,
-  sock: Socket,
-  acc: String,
-  rest: Socket -> String -> IO(Socket & String)
-) -> IO(Socket & String):
-  match chunk:
+def recv.chunk(text: String) -> Maybe<&1, String>:
+  match text:
     case SNil{}:
-      IO.pure(Socket & String, (sock, acc))
+      None{}
     case SCon{c, t}:
-      rest(sock, acc ++ SCon{c, t})
+      Some{SCon{c, t}}
 
-# None is the peer done sending. Some is the bytes, and an empty chunk is
-# the same end.
-def recv.taken(
-  chunk: Maybe<&1, String>,
-  sock: Socket,
-  acc: String,
-  rest: Socket -> String -> IO(Socket & String)
-) -> IO(Socket & String):
-  match chunk:
-    case None{}:
-      recv.chunk("", sock, acc, rest)
-    case Some{text}:
-      recv.chunk(text, sock, acc, rest)
-
-# a failed read ends the request as surely as a closed peer
-def recv.got(
-  received: Result<&1, &1, U32 & String, Maybe<&1, String>>,
-  sock: Socket,
-  acc: String,
-  rest: Socket -> String -> IO(Socket & String)
-) -> IO(Socket & String):
+# what one read gave: a chunk, or None when the peer is done sending, the
+# read failed or the chunk was empty, all of which end the request
+def recv.got(received: Result<&1, &1, U32 & String, Maybe<&1, String>>) -> Maybe<&1, String>:
   match received:
     case Fail{_e}:
-      IO.pure(Socket & String, (sock, acc))
+      None{}
     case Done{chunk}:
-      recv.taken(chunk, sock, acc, rest)
+      Maybe.bind(&1, String, String, chunk, recv.chunk)
 
 # the socket comes back paired with what it read
-def recv.next(
-  got: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>,
-  acc: String,
-  rest: Socket -> String -> IO(Socket & String)
-) -> IO(Socket & String):
+def recv.one.of(
+  got: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>
+) -> IO(Socket & Maybe<&1, String>):
   (sock, r) = got
-  recv.got(r, sock, acc, rest)
+  IO.pure(Socket & Maybe<&1, String>, (sock, recv.got(r)))
 
-# nothing more is asked for once the whole request is in hand
+# one read off the socket, and the socket back
+def recv.one(sock: Socket) -> IO(Socket & Maybe<&1, String>):
+  do IO<Socket & Maybe<&1, String>>:
+    got : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(sock, 65536)
+    recv.one.of(got)
+
+# a chunk taken into the parts and the walk gone on, or the request as it
+# stands once the reads have ended
+def recv.then(
+  read: Socket & Maybe<&1, String>,
+  parts: List<&2, String>,
+  rest: Socket -> String -> List<&2, String> -> IO(Socket & String)
+) -> IO(Socket & String):
+  (sock, chunk) = read
+  match chunk:
+    case None{}:
+      IO.pure(Socket & String, (sock, recv.text(parts)))
+    case Some{+text}:
+      rest(sock, text, text <> parts)
+
+# a request that is whole is done; one that is not reads one more chunk and
+# goes on with it
 def recv.more(
   done: Bool,
   sock: Socket,
-  acc: String,
-  rest: Socket -> String -> IO(Socket & String)
+  parts: List<&2, String>,
+  rest: Socket -> String -> List<&2, String> -> IO(Socket & String)
 ) -> IO(Socket & String):
   match done:
     case True{}:
-      IO.pure(Socket & String, (sock, acc))
+      IO.pure(Socket & String, (sock, recv.text(parts)))
     case False{}:
       do IO<Socket & String>:
-        got : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(sock, 65536)
-        recv.next(got, acc, rest)
+        read : Socket & Maybe<&1, String> <- recv.one(sock)
+        recv.then(read, parts, rest)
+
+# the body, once the head is settled: each chunk is counted as it comes, so
+# the request is put together once, when the body is as long as `need`
+def recv.body(
+  fuel: Nat,
+  sock: Socket,
+  parts: List<&2, String>,
+  +have: U32,
+  +need: U32
+) -> IO(Socket & String):
+  match fuel:
+    case 0n:
+      IO.pure(Socket & String, (sock, recv.text(parts)))
+    case 1n+f:
+      recv.more(U32.is_ge(have, need), sock, parts,
+        s => c => ps => recv.body(f, s, ps, U32.add(have, size(c)), need))
+
+# a head that has ended. While nothing of the body has come, the next chunk
+# may still move where the head ends, so the head is looked at again. Once a
+# byte of the body has come, the head is settled and every later chunk is
+# body, so the body goes on by count.
+def recv.head.full(
+  empty: Bool,
+  +have: U32,
+  +need: U32,
+  fuel: Nat,
+  sock: Socket,
+  parts: List<&2, String>,
+  again: Socket -> String -> List<&2, String> -> IO(Socket & String)
+) -> IO(Socket & String):
+  match empty:
+    case True{}:
+      recv.more(U32.is_ge(have, need), sock, parts, again)
+    case False{}:
+      recv.more(U32.is_ge(have, need), sock, parts,
+        s => c => ps => recv.body(fuel, s, ps, U32.add(have, size(c)), need))
+
+# the head not yet whole: one more chunk read. Whole: on to the body
+def recv.head.at(
+  message: Msg,
+  fuel: Nat,
+  sock: Socket,
+  parts: List<&2, String>,
+  again: Socket -> String -> List<&2, String> -> IO(Socket & String)
+) -> IO(Socket & String):
+  match message:
+    case MPartial{}:
+      recv.more(False{}, sock, parts, again)
+    case MFull{head, +body}:
+      recv.head.full(String.is_empty(body), size(body), clen(head), fuel, sock, parts, again)
 
 # a whole request read off a socket, one chunk at a time until the head has
 # ended and the body is as long as Content-Length promised
-def recv.go(fuel: Nat, sock: Socket, +acc: String) -> IO(Socket & String):
+def recv.head(fuel: Nat, sock: Socket, +parts: List<&2, String>) -> IO(Socket & String):
   match fuel:
     case 0n:
-      IO.pure(Socket & String, (sock, acc))
-    case 1n+f:
-      recv.more(complete(acc), sock, acc, s => a => recv.go(f, s, a))
+      IO.pure(Socket & String, (sock, recv.text(parts)))
+    case 1n+(+f):
+      recv.head.at(msg.of(recv.text(parts)), f, sock, parts, s => _c => ps => recv.head(f, s, ps))
 
 # the reads a request may take, 64 KiB at most each: 256 MiB, past any request
 # a test sends. How long a request is is not known until its head has arrived,
 # so the reads cannot be counted up front.
 def reads() -> Nat:
-  U32.to_nat(4096)
+  4096n
 
 # a whole request read off a socket, and the socket it came on
 def request(sock: Socket) -> IO(Socket & String):
-  recv.go(reads(), sock, "")
+  recv.head(reads(), sock, [])

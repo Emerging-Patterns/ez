@@ -149,11 +149,6 @@ def drift(+name: String, +tag: String, +rev: String, +old: String, +new: String)
     old ++ " on the pin, " ++ new ++
     " in the tree). `ez lock --upgrade` cannot fix a drifted pin. Update the dependency hash, re-add the package, or check the tag."
 
-# a drift judged before the tree was weighed, so there are not two hashes to show
-def stuck(+name: String) -> String:
-  "ez: " ++ name ++
-    ": the pin drifted. `ez lock --upgrade` cannot fix a drifted pin. Update the dependency hash, re-add the package, or check the tag."
-
 # a `[tools.` section in the ledger text. The parser is not asked: a ledger
 # that does not parse can still have named the command.
 def has.tools(+text: String) -> Bool:

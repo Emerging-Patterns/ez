@@ -30,6 +30,20 @@ import ../io/file.bend as F
 import ../ez/line.bend as L
 import ../ws/run.bend as WsRun
 
+# `ez add`: the target, ref, entry and rename the line bound, in the member
+def dispatch.add(+matched: Shake.Matched) -> IO(Unit):
+  +target = L.get(matched, "target")
+  +ref = L.get(matched, "ref")
+  +entry = L.get(matched, "entry")
+  +rename = L.get(matched, "rename")
+  WsRun.in.member(_u => Cmd.add(target, ref, entry, rename))
+
+# `ez lock`: `--upgrade` and the package it is limited to, at the root
+def dispatch.lock(+matched: Shake.Matched) -> IO(Unit):
+  +up = Shake.on(matched, "upgrade")
+  +only = L.get(matched, "package")
+  WsRun.at.root(_u => Cmd.lock(up, only))
+
 # what a subcommand runs. `L.line` never runs `CHelp`, which names no
 # command; it is here so the match is whole, and it writes the help a bare
 # `ez` would. The directories `ez check` and `ez build` write into are made
@@ -41,18 +55,12 @@ def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(U
       Cmd.init(L.get(matched, "name"), L.get(matched, "entry"),
         L.get(matched, "description"))
     case L.CAdd{}:
-      +target = L.get(matched, "target")
-      +ref = L.get(matched, "ref")
-      +entry = L.get(matched, "entry")
-      +rename = L.get(matched, "rename")
-      WsRun.in.member(_u => Cmd.add(target, ref, entry, rename))
+      dispatch.add(matched)
     case L.CRemove{}:
       +name = L.get(matched, "name")
       WsRun.in.member(_u => Cmd.remove(name))
     case L.CLock{}:
-      +up = Shake.on(matched, "upgrade")
-      +only = L.get(matched, "package")
-      WsRun.at.root(_u => Cmd.lock(up, only))
+      dispatch.lock(matched)
     case L.CFetch{}:
       WsRun.at.root(_u => Cmd.fetch())
     case L.CCheck{}:

@@ -22,7 +22,7 @@ law license_goes_along:
   for rest: List<&2, K.Task>
   for lic: String
   for here: {K.Here{lic} == K.find(tree, K.beside(file)) : K.Look}
-  {K.visit.put(K.Going{}, tree, sc, text, file, ns, eb, seen, out, rest)
+  {K.visit.put(K.Going{}, tree, K.Opened{file, ns, text, sc}, eb, seen, out, rest)
     == K.State{file <> seen,
       K.Hit{K.raw_of(ns, eb), text} <> K.Hit{K.beside(K.raw_of(ns, eb)), lic}
         <> List.append(&2, K.Hit,
