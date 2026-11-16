@@ -8,7 +8,7 @@ import ../run/bend.bend as Bend
 import ../share/env.bend as Env
 
 # the toolchain: bend's version and the C compiler it would hand its C to
-def tool() -> IO(String):
+def tool() -> IO(String):  # noqa: L001 IO driver
   do IO<String>:
     +out : String <- Bend.version()
     +cc : String <- Env.var("CC", "cc")

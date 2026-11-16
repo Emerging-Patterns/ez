@@ -591,3 +591,30 @@ def reclone(world: World) -> World:
   World{+args, +ledger, listing, replies, +ups} = world
   World{args, ledger, listing,
     reclone.all(next.origins(next(args, ledger, ups)), replies), ups}
+
+# the World with more answers in it
+def more(world: World, rs: List<&2, Reply>, us: List<&2, Up.Reply>) -> World:
+  World{args, ledger, listing, replies, ups} = world
+  World{args, ledger, listing, List.append(&2, Reply, replies, rs),
+    List.append(&2, Up.Reply, ups, us)}
+
+# what the hub says a name names, as it said it; the planner reads the hash
+# out of it
+def got.said(got: Web.Got) -> Answer:
+  match got:
+    case Web.Miss{why}:
+      Miss{"ez: " ++ why}
+    case Web.Have{body}:
+      Said{body}
+
+# every text a fetch answered, or the first miss
+def got.all(+how: How, +manifest: String, gs: List<&2, Web.Got>, acc: List<&2, String>) -> Answer:
+  match gs:
+    case []:
+      Got{how, manifest, List.reverse(&2, String, acc)}
+    case g <> t:
+      match g:
+        case Web.Miss{why}:
+          Miss{"ez: " ++ why}
+        case Web.Have{body}:
+          got.all(how, manifest, t, body <> acc)

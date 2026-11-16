@@ -144,3 +144,8 @@ def look(rs: List<&2, Reply>, +want: String) -> Heard:
 # the answer to a question, or none yet
 def heard(rs: List<&2, Reply>, ask: Ask) -> Heard:
   look(rs, key(ask))
+
+# the World with more answers in it
+def more(world: World, rs: List<&2, Reply>) -> World:
+  World{here, ledger, lock, replies} = world
+  World{here, ledger, lock, List.append(&2, Reply, replies, rs)}

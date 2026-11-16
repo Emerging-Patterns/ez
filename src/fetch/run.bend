@@ -33,14 +33,20 @@ def laid.seen(got: Maybe<&2, String>, +dir: String) -> IO(W.Answer):
 
 # the tree under BEND_LIB for a hash, as its manifest names it, or a miss
 # when there is none
-def laid(+lib: String, +hash: String) -> IO(W.Answer):
+def laid(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  +lib: String,
+  +hash: String
+) -> IO(W.Answer):
   +dir = lib ++ "/" ++ hash
   do IO<W.Answer>:
     m : Maybe<&2, String> <- F.read(dir ++ "/manifest")
     laid.seen(m, dir)
 
 # one question, answered
-def answer(+lib: String, ask: FW.Ask) -> IO(FW.Answer):
+def answer(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  +lib: String,
+  ask: FW.Ask
+) -> IO(FW.Answer):
   match ask:
     case FW.Laid{hash}:
       do IO<FW.Answer>:
@@ -74,11 +80,6 @@ def answer.all(+lib: String, asks: List<&2, FW.Ask>) -> IO(List<&2, FW.Reply>):
         rest : List<&2, FW.Reply> <- answer.all(lib, t)
         return FW.Reply{h, a} <> rest
 
-# the World with more answers in it
-def more(world: FW.World, rs: List<&2, FW.Reply>) -> FW.World:
-  FW.World{here, ledger, lock, replies} = world
-  FW.World{here, ledger, lock, List.append(&2, FW.Reply, replies, rs)}
-
 # the planner's step: its questions answered and the loop gone round again,
 # or its plan run
 def loop.step(st: FP.Step, +lib: String, world: FW.World, go: FW.World -> IO(Unit)) -> IO(Unit):
@@ -86,7 +87,7 @@ def loop.step(st: FP.Step, +lib: String, world: FW.World, go: FW.World -> IO(Uni
     case FP.Asking{asks}:
       do IO<Unit>:
         rs : List<&2, FW.Reply> <- answer.all(lib, asks)
-        go(more(world, rs))
+        go(FW.more(world, rs))
     case FP.Run{pl}:
       Run.exec.plan(lib, pl)
 
@@ -94,13 +95,13 @@ def loop.step(st: FP.Step, +lib: String, world: FW.World, go: FW.World -> IO(Uni
 # under BEND_LIB and for its fetch, and a round asks for every package at
 # once, so this is only a guard against a planner that keeps asking, and
 # running out of it dies loudly.
-def rounds() -> Nat:
+def rounds() -> Nat:  # noqa: L001 the IO loop's fuel
   10n
 
 # the loop, under fuel. A package asks at most twice, for its tree under
 # BEND_LIB and for its fetch, and every round answers what it asked, so the
 # fuel is only a guard.
-def loop(fuel: Nat, +lib: String, +world: FW.World) -> IO(Unit):
+def loop(fuel: Nat, +lib: String, +world: FW.World) -> IO(Unit):  # noqa: L001 IO driver: the interpreter's loop
   match fuel:
     case 0n:
       IO.die(Unit, 1, "ez: ez fetch kept asking questions")
@@ -108,20 +109,20 @@ def loop(fuel: Nat, +lib: String, +world: FW.World) -> IO(Unit):
       loop.step(FP.step(world), lib, world, w => loop(f, lib, w))
 
 # a file of the project, read
-def at(+here: String, +file: String) -> String:
+def at(+here: String, +file: String) -> String:  # noqa: L001 the IO driver's read path
   here ++ "/" ++ file
 
 # BEND_LIB `lib` filled from the lock of the project in `here`, which is
 # where every relative path in the lock is read from. `ez tool` fills a
 # tool's cache from its checkout's lock this way.
-def fill(+here: String, +lib: String) -> IO(Unit):
+def fill(+here: String, +lib: String) -> IO(Unit):  # noqa: L001 IO entry of the command
   do IO<Unit>:
     led : Maybe<&2, String> <- F.read(at(here, FW.toml()))
     lk : Maybe<&2, String> <- F.read(at(here, FW.lockfile()))
     loop(rounds(), lib, FW.World{here, Maybe.is_some(&2, String, led), lk, []})
 
 # `ez fetch`: BEND_LIB filled from the lock of the project ez runs in
-def run() -> IO(Unit):
+def run() -> IO(Unit):  # noqa: L001 IO entry of the command
   do IO<Unit>:
     lib : String <- Run.bend.lib()
     +pwd : String <- R.exec(["pwd"])

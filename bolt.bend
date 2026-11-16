@@ -17,16 +17,15 @@ def suspicious() -> String:
 def style() -> String:
   "error"
 
-# the law rules: `coverage` (a def no law names) and `closed`. The group is
-# advice because of `coverage`, which the RFC's later phases grow; it goes
-# back to an error as the laws land. A rule set by name wins over its group.
+# the law rules: `coverage` (a def no law reaches) and `closed`, both errors.
 def laws() -> String:
-  "warn"
+  "error"
 
-# a def no law names. Since bolt 1.26 the rule is off unless bolt.bend names
-# it, so it is named here to keep ez's coverage gate on, at the group's level.
+# a def no law reaches. Since bolt 1.26 the rule is off unless bolt.bend
+# names it, so it is named here to keep ez's coverage gate on. A def no law
+# can reach, an IO driver, says why on its def line (`# noqa: L001 <why>`).
 def coverage() -> String:
-  "warn"
+  "error"
 
 # a law in a law file with no `for`/`exs` binder, equality or not. A closed
 # law claims one computed case and no guarantee, and nothing exempts one.

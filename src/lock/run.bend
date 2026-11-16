@@ -21,6 +21,7 @@ import ../git/git.bend as Git
 import ../git/exec.bend as GX
 import ../pkg/pkg.bend as K
 import ../pkg/path.bend as P
+import ../share/args.bend as Args
 import ../share/say.bend as Say
 import ../share/spin.bend as Spin
 import ./lock.bend as L
@@ -52,15 +53,6 @@ def bend.lib() -> IO(String):
     r : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_LIB")
     return lib.or(String.trim(env.text(r)))
 
-# the non-empty lines
-def nonempty(ss: List<&2, String>) -> List<&2, String>:
-  match ss:
-    case []:
-      []
-    case +h <> t:
-      +more = nonempty(t)
-      Bool.pick(List<&2, String>, String.is_empty(h), more, h <> more)
-
 # the ledger's text, or None when there is no ez.toml
 def read.ledger() -> IO(Maybe<&2, String>):
   F.read("ez.toml")
@@ -77,11 +69,14 @@ def read.all(ps: List<&2, String>) -> IO(List<&2, W.Source>):
         return W.Source{h, F.text_of(m)} <> rest
 
 # what git listed, or why it could not
-def listed(ok: Bool, +text: String) -> IO(W.Listing):
+def listed(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  ok: Bool,
+  +text: String
+) -> IO(W.Listing):
   match ok:
     case True{}:
       do IO<W.Listing>:
-        fs : List<&2, W.Source> <- read.all(nonempty(String.lines(text)))
+        fs : List<&2, W.Source> <- read.all(Args.nonempty(String.lines(text)))
         return W.Listed{fs}
     case False{}:
       IO.pure(W.Listing, W.Unlisted{
@@ -98,18 +93,6 @@ def read.listing() -> IO(W.Listing):
 
 # ---------------------------------------------------------------------------
 # answering one question
-
-# every text a fetch answered, or the first miss
-def gots(+how: W.How, +manifest: String, gs: List<&2, Web.Got>, acc: List<&2, String>) -> W.Answer:
-  match gs:
-    case []:
-      W.Got{how, manifest, List.reverse(&2, String, acc)}
-    case g <> t:
-      match g:
-        case Web.Miss{why}:
-          W.Miss{"ez: " ++ why}
-        case Web.Have{body}:
-          gots(how, manifest, t, body <> acc)
 
 # every file of a hub package, fetched and checked against its sum
 def hub.all(+hub: String, +hash: String, fs: List<&2, K.Item>) -> IO(List<&2, Web.Got>):
@@ -130,7 +113,7 @@ def hub.got(got: Web.Got, +hub: String, +hash: String) -> IO(W.Answer):
     case Web.Have{+body}:
       do IO<W.Answer>:
         gs : List<&2, Web.Got> <- hub.all(hub, hash, L.manifest.files(String.lines(body)))
-        return gots(W.Served{}, body, gs, [])
+        return W.got.all(W.Served{}, body, gs, [])
 
 # a hub package: its manifest, then every file it names
 def answer.hub(+hub: String, +hash: String) -> IO(W.Answer):
@@ -256,22 +239,13 @@ def answer.pkg(+lib: String, +hash: String, src: L.Src, +hub: String) -> IO(W.An
     case L.Member{path, _entry}:
       IO.pure(W.Answer, W.Miss{"ez: the workspace member at " ++ path ++ " was not walked"})
 
-# what the hub says a name names, as it said it; the planner reads the hash
-# out of it
-def said(got: Web.Got) -> W.Answer:
-  match got:
-    case Web.Miss{why}:
-      W.Miss{"ez: " ++ why}
-    case Web.Have{body}:
-      W.Said{body}
-
 # a name, asked of the hub once: `GET <hub>/name/<nv>`
 def answer.name(+hub: String, +nv: String) -> IO(W.Answer):
   do IO<W.Answer>:
     +s : Say.Spin <- Spin.hold(Say.dep.hub(nv))
     g : Web.Got <- Net.fetch(hub ++ "/name/" ++ nv, "")
     Spin.done(s)
-    return said(g)
+    return W.got.said(g)
 
 # the lock being rewritten, "" when there is none
 def answer.lock() -> IO(W.Answer):
@@ -280,7 +254,10 @@ def answer.lock() -> IO(W.Answer):
     return W.Locked{F.text_of(m)}
 
 # one question, answered
-def answer(+lib: String, ask: W.Ask) -> IO(W.Answer):
+def answer(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  +lib: String,
+  ask: W.Ask
+) -> IO(W.Answer):
   match ask:
     case W.Pkg{+hash, src, +hub}:
       answer.pkg(lib, hash, src, hub)
@@ -418,7 +395,7 @@ def found.all(ps: List<&2, String>) -> IO(Up.Answer):
 def found.listed(ok: Bool, +text: String) -> IO(Up.Answer):
   match ok:
     case True{}:
-      found.all(nonempty(String.lines(text)))
+      found.all(Args.nonempty(String.lines(text)))
     case False{}:
       IO.pure(Up.Answer, Up.Miss{"ez: could not list sources: " ++ String.trim(text)})
 
@@ -483,7 +460,7 @@ def whole.listed(ok: Bool, +work: String, +nar: String, +text: String) -> IO(Up.
   match ok:
     case True{}:
       do IO<Up.Answer>:
-        fs : List<&2, K.Source> <- whole.read(work, nonempty(String.lines(text)))
+        fs : List<&2, K.Source> <- whole.read(work, Args.nonempty(String.lines(text)))
         _rm : String <- R.exec(["rm", "-rf", work])
         return Up.Cloned{nar, fs}
     case False{}:
@@ -572,17 +549,11 @@ def answer.queries(+lib: String, qs: List<&2, Plan.Query>) -> IO(List<&2, Up.Rep
         rest : List<&2, Up.Reply> <- answer.queries(lib, t)
         return Up.Reply{ask, a} <> rest
 
-# the World with more answers in it
-def more(world: W.World, rs: List<&2, W.Reply>, us: List<&2, Up.Reply>) -> W.World:
-  W.World{args, ledger, listing, replies, ups} = world
-  W.World{args, ledger, listing, List.append(&2, W.Reply, replies, rs),
-    List.append(&2, Up.Reply, ups, us)}
-
 # ---------------------------------------------------------------------------
 # executing a plan
 
 # a write that did not happen stops the command
-def wrote(ok: Bool, +at: String) -> IO(Unit):
+def wrote(ok: Bool, +at: String) -> IO(Unit):  # noqa: L001 IO: runs the plan (trusted in src/ez/app.bend)
   match ok:
     case True{}:
       IO.pure(Unit, Unit{})
@@ -590,7 +561,7 @@ def wrote(ok: Bool, +at: String) -> IO(Unit):
       IO.die(Unit, 1, "ez: " ++ at ++ " could not be written")
 
 # one file written, with the directory it goes in made first
-def write(+at: String, text: String) -> IO(Unit):
+def write(+at: String, text: String) -> IO(Unit):  # noqa: L001 IO: runs the plan (trusted in src/ez/app.bend)
   do IO<Unit>:
     _mk : String <- R.exec(["mkdir", "-p", P.dir(at)])
     ok : Bool <- F.write(at, text)
@@ -606,23 +577,13 @@ def lay.all(+dir: String, fs: List<&2, W.Source>) -> IO(Unit):
         write(dir ++ "/" ++ at, text)
         lay.all(dir, t)
 
-# where a place is
-def place(+lib: String, pl: Plan.Place) -> String:
-  match pl:
-    case Plan.Committed{}:
-      ".ez/lib"
-    case Plan.Cache{}:
-      lib
-    case Plan.Under{dir}:
-      dir ++ "/.ez/lib"
-
 # one effect
-def exec(+lib: String, effect: Plan.Effect) -> IO(Unit):
+def exec(+lib: String, effect: Plan.Effect) -> IO(Unit):  # noqa: L001 IO: runs the plan (trusted in src/ez/app.bend)
   match effect:
     case Plan.Write{at, text}:
       write(at, text)
     case Plan.Lay{pl, hash, fs}:
-      +dir = place(lib, pl) ++ "/" ++ hash
+      +dir = Plan.place.dir(lib, pl) ++ "/" ++ hash
       do IO<Unit>:
         _rm : String <- R.exec(["rm", "-rf", dir])
         lay.all(dir, fs)
@@ -657,7 +618,7 @@ def end.at(zero: Bool, +code: U32, +why: String) -> IO(Unit):
 # how the command ends: with the status the planner gave its outcome
 # (`Plan.status`, laws/ExitStatusSaysFailure.bend), and the reason when it
 # refused
-def end(+outcome: Plan.Outcome) -> IO(Unit):
+def end(+outcome: Plan.Outcome) -> IO(Unit):  # noqa: L001 IO: runs the plan (trusted in src/ez/app.bend)
   +code = Plan.status(outcome)
   end.at(U32.is_eq(code, 0), code, Plan.why(outcome))
 
@@ -680,7 +641,7 @@ def loop.step(st: Plan.Step, +lib: String, back: WsUp.Back, world: W.World, go: 
         rs : List<&2, W.Reply> <- answer.all(lib, asks)
         us : List<&2, Up.Reply> <- answer.queries(lib, ups)
         ns : List<&2, W.Reply> <- answer.all(lib, names)
-        go(more(world, List.append(&2, W.Reply, rs, ns), us))
+        go(W.more(world, List.append(&2, W.Reply, rs, ns), us))
     case Plan.Run{_pl}:
       exec.plan(lib, WsUp.plan(back, world))
 
@@ -690,12 +651,17 @@ def loop.step(st: Plan.Step, +lib: String, back: WsUp.Back, world: W.World, go: 
 # against a planner that keeps asking, not a limit on a lock: running out of
 # it dies loudly. The walk inside each round takes its fuel from its inputs
 # (`Plan.walk.fuel`).
-def rounds() -> Nat:
+def rounds() -> Nat:  # noqa: L001 the IO loop's fuel
   100000n
 
 # the loop, under fuel. Every round adds at least one answer, since the
 # planner never asks what the World answers already.
-def loop(fuel: Nat, +lib: String, +back: WsUp.Back, +world: W.World) -> IO(Unit):
+def loop(  # noqa: L001 IO driver: the interpreter's loop
+  fuel: Nat,
+  +lib: String,
+  +back: WsUp.Back,
+  +world: W.World
+) -> IO(Unit):
   match fuel:
     case 0n:
       IO.die(Unit, 1, "ez: the lock kept asking questions")
@@ -723,7 +689,10 @@ def settle.one(rp: W.Reply, +lib: String) -> IO(W.Reply):
     settle.seen(got, ask, answer, lib, hash)
 
 # every member's package, so
-def settle(rs: List<&2, W.Reply>, +lib: String) -> IO(List<&2, W.Reply>):
+def settle(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  rs: List<&2, W.Reply>,
+  +lib: String
+) -> IO(List<&2, W.Reply>):
   match rs:
     case []:
       IO.pure(List<&2, W.Reply>, [])
@@ -744,7 +713,7 @@ def run.planned(pd: WsRun.Planned, +lib: String, up: Bool, only: String, here: S
 # `ez lock` and `ez lock --upgrade [--package only]`: the directory it runs
 # in, the ledger and the listing read, every question answered, and the plan
 # run
-def run(up: Bool, +only: String) -> IO(Unit):
+def run(up: Bool, +only: String) -> IO(Unit):  # noqa: L001 IO entry of the command
   do IO<Unit>:
     IO.print_err(Say.resolving())
     lib : String <- bend.lib()

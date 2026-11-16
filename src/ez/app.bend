@@ -49,7 +49,7 @@ def dispatch.lock(+matched: Shake.Matched) -> IO(Unit):
 # `ez` would. The directories `ez check` and `ez build` write into are made
 # by those commands once they know they will start bend (`Env.dirs`), so a
 # refused one leaves the directory as it found it.
-def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Unit):
+def dispatch(sub: L.Sub, +matched: Shake.Matched, +as: List<&2, String>) -> IO(Unit):  # noqa: L001 IO driver
   match sub:
     case L.CInit{}:
       Cmd.init(L.get(matched, "name"), L.get(matched, "entry"),
@@ -138,10 +138,10 @@ def go.line(+how: L.Line, +as: List<&2, String>) -> IO(Unit):
     go.end(L.status(how))
 
 # the line taken apart
-def go(+app: Shake.Cli, +as: List<&2, String>) -> IO(Unit):
+def go(+app: Shake.Cli, +as: List<&2, String>) -> IO(Unit):  # noqa: L001 IO driver
   go.line(L.line(app, Shake.parse(app, Args.argv.of(as))), as)
 
-def main() -> IO(Unit):
+def main() -> IO(Unit):  # noqa: L001 IO entry point
   do IO<Unit>:
     as : List<&2, String> <- Args.all()
     go(L.spec(), as)

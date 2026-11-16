@@ -12,6 +12,7 @@ import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
+import ../src/check/out.bend as O
 
 # a check whose answer is a yes or a no
 def yes(name: String, ok: Bool) -> IO(Unit):
@@ -31,21 +32,21 @@ def upstream(+at: String) -> IO(String):
     _p : String <- R.exec(["git", "-C", at, "config",
       "uploadpack.allowAnySHA1InWant", "true"])
     +rev : String <- R.exec(["git", "-C", at, "rev-parse", "HEAD"])
-    return W.line(rev)
+    return O.line(rev)
 
 # a project that depends on that repo, locked once with everything in place
 def built(+repo: String, +app: String, +url: String, +rev: String) -> IO(String):
   do IO<String>:
-    _i : String <- R.exec(W.ez(repo, app, ["init", "myapp", "main.bend"]))
-    +out : String <- R.exec(W.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
+    _i : String <- R.exec(O.ez(repo, app, ["init", "myapp", "main.bend"]))
+    +out : String <- R.exec(O.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
     yes("add vendors a package from a repo", R.ok(out))
     +t : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
-    +hash : String <- IO.pure(String, W.value(F.text_of(t), "hash"))
+    +hash : String <- IO.pure(String, O.value(F.text_of(t), "hash"))
     _w : Bool <- F.write(app ++ "/main.bend",
       "import Base\nimport " ++ hash ++ "/lib.bend as L\n\n" ++
       "def main() -> U32:\n  L.double(21)\n")
     W.track(app)
-    +l : String <- R.exec(W.ez(repo, app, ["lock"]))
+    +l : String <- R.exec(O.ez(repo, app, ["lock"]))
     yes("lock writes a lock with the cache in place", R.ok(l))
     return hash
 
@@ -57,7 +58,7 @@ def again(+repo: String, +app: String, +was: String) -> IO(Unit):
     W.rm(app ++ "/.ez/lib")
     +gone : String <- R.exec(["test", "-e", app ++ "/.ez/origins.toml"])
     yes("the cache is gone", Bool.not(R.ok(gone)))
-    +l : String <- R.exec(W.ez(repo, app, ["lock"]))
+    +l : String <- R.exec(O.ez(repo, app, ["lock"]))
     yes("lock succeeds from the ledger alone", R.ok(l))
     +now : Maybe<&2, String> <- F.read(app ++ "/ez.lock.toml")
     Check.eq_str("and writes the same lock, to the byte",

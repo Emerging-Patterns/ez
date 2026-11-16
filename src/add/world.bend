@@ -179,3 +179,13 @@ def named(world: World) -> Bool:
 # the hub the ledger names, which a name and its package are asked of
 def hub(world: World) -> String:
   M.hub_of(read(world))
+
+# the World with more of git's answers in it
+def more(world: World, rs: List<&2, Up.Reply>) -> World:
+  World{args, here, home, ledger, ignore, replies, hubs} = world
+  World{args, here, home, ledger, ignore, List.append(&2, Up.Reply, replies, rs), hubs}
+
+# the World with more of the hub's answers in it
+def more.hub(world: World, rs: List<&2, W.Reply>) -> World:
+  World{args, here, home, ledger, ignore, replies, hubs} = world
+  World{args, here, home, ledger, ignore, replies, List.append(&2, W.Reply, hubs, rs)}

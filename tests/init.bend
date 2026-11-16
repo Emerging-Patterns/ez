@@ -7,6 +7,7 @@ import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
+import ../src/check/out.bend as O
 
 # a check whose answer is a yes or a no
 def yes(name: String, ok: Bool) -> IO(Unit):
@@ -30,7 +31,7 @@ def alone(+head: String) -> String:
 def fresh(+repo: String, +app: String) -> IO(Unit):
   do IO<Unit>:
     W.mkdir(app)
-    +out : String <- R.exec(W.ez(repo, app, ["init"]))
+    +out : String <- R.exec(O.ez(repo, app, ["init"]))
     yes("init succeeds with no arguments", R.ok(out))
     t : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
     Check.eq_str("and writes a ledger for app at main.bend",
@@ -46,7 +47,7 @@ def fresh(+repo: String, +app: String) -> IO(Unit):
     l : Maybe<&2, String> <- F.read(app ++ "/src/lib.bend")
     Check.eq_str("and the library under src/ it imports",
       Q.chomp(F.text_of(l)), lib())
-    +ck : String <- R.exec(W.ez(repo, app, ["check"]))
+    +ck : String <- R.exec(O.ez(repo, app, ["check"]))
     Check.eq_str("and that entry checks", Q.chomp(R.text(ck)), "ok main.bend")
 
 # a second init is refused, and leaves the ledger and the program it found
@@ -54,7 +55,7 @@ def kept(+repo: String, +app: String) -> IO(Unit):
   do IO<Unit>:
     _w : Bool <- F.write(app ++ "/main.bend",
       "import Base\n\ndef main() -> U32:\n  7\n")
-    +again : String <- R.exec(W.ez(repo, app, ["init", "other"]))
+    +again : String <- R.exec(O.ez(repo, app, ["init", "other"]))
     yes("a second init is refused", Bool.not(R.ok(again)))
     t : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
     Check.eq_str("and leaves the ledger it found",
@@ -72,7 +73,7 @@ def kept(+repo: String, +app: String) -> IO(Unit):
 def nested(+repo: String, +app: String) -> IO(Unit):
   do IO<Unit>:
     W.mkdir(app)
-    +out : String <- R.exec(W.ez(repo, app, ["init", "myapp", "src/main.bend"]))
+    +out : String <- R.exec(O.ez(repo, app, ["init", "myapp", "src/main.bend"]))
     yes("init succeeds with a nested entry", R.ok(out))
     e : Maybe<&2, String> <- F.read(app ++ "/src/main.bend")
     Check.eq_str("and writes the entry under the directories it needs",
@@ -81,7 +82,7 @@ def nested(+repo: String, +app: String) -> IO(Unit):
     Check.eq_str("and names that entry in the ledger",
       Q.chomp(F.text_of(t)),
       "[package]\nname = \"myapp\"\nentry = \"src/main.bend\"")
-    +ck : String <- R.exec(W.ez(repo, app, ["check"]))
+    +ck : String <- R.exec(O.ez(repo, app, ["check"]))
     Check.eq_str("and that nested entry checks", Q.chomp(R.text(ck)),
       "ok src/main.bend")
 
@@ -91,7 +92,7 @@ def existing(+repo: String, +app: String) -> IO(Unit):
     W.mkdir(app ++ "/src")
     _w : Bool <- F.write(app ++ "/src/lib.bend",
       "import Base\n\ndef double(+x: U32) -> U32:\n  (x * 2 : U32)\n")
-    _i : String <- R.exec(W.ez(repo, app, ["init", "myapp", "src/lib.bend"]))
+    _i : String <- R.exec(O.ez(repo, app, ["init", "myapp", "src/lib.bend"]))
     e : Maybe<&2, String> <- F.read(app ++ "/src/lib.bend")
     Check.eq_str("init does not overwrite an entry that is already there",
       Q.chomp(F.text_of(e)),
@@ -102,13 +103,13 @@ def existing(+repo: String, +app: String) -> IO(Unit):
 def described(+repo: String, +app: String) -> IO(Unit):
   do IO<Unit>:
     W.mkdir(app)
-    +out : String <- R.exec(W.ez(repo, app, ["init", "demo", "--description", "a demo"]))
+    +out : String <- R.exec(O.ez(repo, app, ["init", "demo", "--description", "a demo"]))
     yes("init takes a description", R.ok(out))
     e : Maybe<&2, String> <- F.read(app ++ "/main.bend")
     Check.eq_str("and opens the entry with it",
       Q.chomp(F.text_of(e)), stub("# demo: a demo"))
-    +run : String <- R.exec(W.ez(repo, app, ["run"]))
-    Check.eq_str("and the new project runs", W.last(String.lines(Q.filter(R.text(run)))), "hello")
+    +run : String <- R.exec(O.ez(repo, app, ["run"]))
+    Check.eq_str("and the new project runs", O.last(String.lines(Q.filter(R.text(run)))), "hello")
 
 # a library that is already there is left alone, and the stub then imports
 # nothing
@@ -116,7 +117,7 @@ def library(+repo: String, +app: String) -> IO(Unit):
   do IO<Unit>:
     W.mkdir(app ++ "/src")
     _w : Bool <- F.write(app ++ "/src/lib.bend", "import Base\n\ndef mine() -> U32:\n  1\n")
-    _i : String <- R.exec(W.ez(repo, app, ["init", "demo"]))
+    _i : String <- R.exec(O.ez(repo, app, ["init", "demo"]))
     l : Maybe<&2, String> <- F.read(app ++ "/src/lib.bend")
     Check.eq_str("init does not overwrite a src/lib.bend that is already there",
       Q.chomp(F.text_of(l)), "import Base\n\ndef mine() -> U32:\n  1")

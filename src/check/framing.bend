@@ -15,6 +15,7 @@
 # here is the routes, the chunking, and the accept loop that holds them.
 import Base
 import ./serve.bend as S
+import ./argv.bend as Argv
 
 # the body framed by its length
 def plain() -> String:
@@ -197,24 +198,6 @@ def begin(+port: U32) -> IO(Unit):
     r : Result<&1, &1, U32 & String, Listener> <- TCP.listen("127.0.0.1", port)
     begin.at(r, port)
 
-# a &1 list copied into a &2 one. `IO.args()` answers a `&1` list, which can be
-# read once, and the argument is read twice here.
-def copy(xs: List<&1, String>) -> List<&2, String>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{h, t}:
-      h <> copy(t)
-
-# the arguments after the program's own name. Since bend 2.0.32 `IO.args()`
-# starts with the program as it was invoked, as C's argv does.
-def args(xs: List<&1, String>) -> List<&2, String>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{_h, t}:
-      copy(t)
-
 # the command line: a port to serve on
 def start(as: List<&2, String>) -> IO(Unit):
   begin(Maybe.default(&2, U32, U32.read(S.at(as, 0n)), 0))
@@ -222,4 +205,4 @@ def start(as: List<&2, String>) -> IO(Unit):
 def main() -> IO(Unit):
   do IO<Unit>:
     xs : List<&1, String> <- IO.args()
-    start(args(xs))
+    start(Argv.args(xs))

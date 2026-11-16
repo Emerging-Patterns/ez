@@ -301,11 +301,6 @@ def packs.named(+js: List<&2, W.Judged>, ps: List<&2, L.Pack>) -> List<&2, Strin
       List.append(&2, String, L.kids.named(pack.srcs(look(js, L.pack.hash(h)))),
         packs.named(js, t))
 
-# every name a lock needs resolved: those the committed sources import, then
-# those the packages it reaches import
-def needed(listing: W.Listing, +js: List<&2, W.Judged>, ps: List<&2, L.Pack>) -> List<&2, String>:
-  List.append(&2, String, roots.named(listing.files(listing)), packs.named(js, ps))
-
 # why a plain lock cannot copy the ledger's tool pins, or "" when it can. A
 # ledger that does not parse is refused here too.
 def need.why(ledger: M.Read) -> String:
@@ -1220,10 +1215,6 @@ def wants.up(world: W.World) -> List<&2, Up.Ask>:
   W.World{args, +ledger, _listing, _replies, ups} = world
   Up.next.asks(W.next(args, ledger, ups))
 
-# whether the upgrade has every answer it needs
-def answered(world: W.World) -> Bool:
-  List.is_empty(&2, Up.Ask, wants.up(world))
-
 # each of the upgrade's questions, with the question git is asked for it
 def queries(+here: String, as: List<&2, Up.Ask>) -> List<&2, Query>:
   match as:
@@ -1411,3 +1402,13 @@ def step(world: W.World) -> Step:
   W.World{+args, +ledger, +listing, +replies, ups} = world
   +nx = W.next(args, ledger, ups)
   step.ups(Up.next.asks(nx), W.here.of(args), nx, listing, replies)
+
+# where a place is
+def place.dir(+lib: String, pl: Place) -> String:
+  match pl:
+    case Committed{}:
+      ".ez/lib"
+    case Cache{}:
+      lib
+    case Under{dir}:
+      dir ++ "/.ez/lib"

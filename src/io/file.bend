@@ -98,7 +98,7 @@ def read.opened(res: Result<&1, &1, U32 & String, File>) -> IO(Maybe<&2, String>
         return Some{text}
 
 # a file's text, or None when it cannot be opened
-def read(path: String) -> IO(Maybe<&2, String>):
+def read(path: String) -> IO(Maybe<&2, String>):  # noqa: L001 IO: the file effect
   do IO<Maybe<&2, String>>:
     r : Result<&1, &1, U32 & String, File> <- File.open(path, "r")
     read.opened(r)
@@ -129,7 +129,7 @@ def write.opened(res: Result<&1, &1, U32 & String, File>, text: String) -> IO(Bo
         write.done(w)
 
 # a file replaced with this text; False when it could not be written
-def write(path: String, text: String) -> IO(Bool):
+def write(path: String, text: String) -> IO(Bool):  # noqa: L001 IO: the file effect
   do IO<Bool>:
     r : Result<&1, &1, U32 & String, File> <- File.open(path, "w")
     write.opened(r, text)

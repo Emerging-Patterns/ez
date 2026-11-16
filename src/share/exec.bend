@@ -8,14 +8,14 @@ import snap@1.4.0.0/main.bend as R
 import ./env.bend as Env
 
 # a program run with this project's BEND_LIB set for it
-def exec(args: List<&2, String>) -> IO(String):
+def exec(args: List<&2, String>) -> IO(String):  # noqa: L001 IO: runs a program
   do IO<String>:
     at : String <- Env.lib()
     R.exec(Env.line(at, args))
 
 # those directories made. Base has no mkdir, so this is coreutils, and no
 # directory means no run at all.
-def make(ds: List<&2, String>) -> IO(Unit):
+def make(ds: List<&2, String>) -> IO(Unit):  # noqa: L001 IO: runs a program
   match ds:
     case []:
       IO.pure(Unit, Unit{})

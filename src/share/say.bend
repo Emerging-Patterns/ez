@@ -19,7 +19,7 @@ import ../pkg/path.bend as P
 # a spinner that is running, or none. An empty pid means the line was already
 # printed and nothing has to be stopped. `msg` is what the terminal is owed
 # when the mark is cleared.
-type Spin is Data:
+type Spin is Data:  # noqa: L001 the spinner share/spin's IO starts and stops
   Spin{dev: String, pid: String, msg: String}
 
 # the first twelve characters of a commit, which is enough to tell one from
@@ -58,11 +58,11 @@ def dep.hub(+name: String) -> String:
   "dep " ++ name ++ ": hub fetch"
 
 # a binary already built for this commit
-def reused(+name: String) -> String:
+def reused(+name: String) -> String:  # noqa: L001 a progress line an IO driver prints: wording, not behavior
   name ++ ": cached"
 
 # the lock resolving every dependency
-def resolving() -> String:
+def resolving() -> String:  # noqa: L001 a progress line an IO driver prints: wording, not behavior
   "resolving deps"
 
 def resolving.at(+name: String) -> String:
@@ -72,11 +72,11 @@ def git.fetch(+url: String) -> String:
   "git fetch (" ++ url ++ ")"
 
 # a binary being built
-def building(+name: String) -> String:
+def building(+name: String) -> String:  # noqa: L001 a progress line an IO driver prints: wording, not behavior
   "building " ++ name
 
 # a binary being linked into place
-def linking(+at: String) -> String:
+def linking(+at: String) -> String:  # noqa: L001 a progress line an IO driver prints: wording, not behavior
   "linking " ++ at
 
 # a binary built and linked
@@ -88,7 +88,7 @@ def linked(+name: String, +at: String) -> String:
   "linked " ++ name ++ " -> " ++ at
 
 # a commit's tree being weighed for its NAR hash
-def hashing(+rev: String) -> String:
+def hashing(+rev: String) -> String:  # noqa: L001 a progress line an IO driver prints: wording, not behavior
   "hashing " ++ brief(rev)
 
 # a device path that is a terminal. A pipe and `/dev/null` are not.
@@ -156,7 +156,7 @@ def has.tools(+text: String) -> Bool:
 
 # `ez sync` is not a command. A ledger that pins tools already has the one
 # that builds them; a ledger that does not is pointed at lock and install.
-def hint(tools: Bool) -> String:
+def hint(tools: Bool) -> String:  # noqa: L001 the hint ez/app's IO prints: wording, not behavior
   match tools:
     case True{}:
       "hint: `sync` is not a command; use `ez tool sync`"
@@ -165,15 +165,15 @@ def hint(tools: Bool) -> String:
 
 # the parent's fd, by number. The child cannot look at its own: that one was
 # replaced with a pipe before this ran. `$1` is the number.
-def probe() -> String:
+def probe() -> String:  # noqa: L001 a shell script share/spin runs
   "ppid=; while read -r k v; do case $k in PPid:) ppid=$v;; esac; done < /proc/self/status; readlink /proc/$ppid/fd/$1 2>/dev/null"
 
 # a mark on the terminal while the parent is alive. `$1` is the terminal,
 # `$2` the line. The mark walks ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏. An empty parent
 # id exits rather than spinning on `/proc`.
-def frames() -> String:
+def frames() -> String:  # noqa: L001 a shell script share/spin runs
   "ppid=; while read -r k v; do case $k in PPid:) ppid=$v;; esac; done < /proc/self/status; [ -n \"$ppid\" ] || exit 0; while [ -d /proc/$ppid ]; do printf '\\r%s %s' '⠋' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠙' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠹' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠸' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠼' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠴' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠦' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠧' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠇' \"$2\" >\"$1\"; sleep 0.08; [ -d /proc/$ppid ] || break; printf '\\r%s %s' '⠏' \"$2\" >\"$1\"; sleep 0.08; done"
 
 # the mark wiped, and the line left in its place
-def settle() -> String:
+def settle() -> String:  # noqa: L001 a shell script share/spin runs
   "printf '\\r\\033[K%s\\n' \"$2\" >\"$1\""

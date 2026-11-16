@@ -22,7 +22,7 @@ def version.older(ok: Bool, out: String) -> IO(String):
 # `bend` asked which bend it is, as a run's answer: the status line, then the
 # banner. A bend that is not on the PATH fails both spellings, so the status
 # an absent bend answers with is still the one the caller sees.
-def version() -> IO(String):
+def version() -> IO(String):  # noqa: L001 IO: runs bend
   do IO<String>:
     +out : String <- R.exec(["bend", "version"])
     version.older(R.ok(out), out)

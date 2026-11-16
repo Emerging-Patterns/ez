@@ -79,7 +79,7 @@ def rest(as: List<&2, String>) -> List<&2, String>:
       t
 
 # every argument after the program's own name, each one readable twice
-def all() -> IO(List<&2, String>):
+def all() -> IO(List<&2, String>):  # noqa: L001 IO: reads the process's words
   do IO<List<&2, String>>:
     xs : List<&1, String> <- IO.args()
     return rest(copy(xs))

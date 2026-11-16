@@ -161,7 +161,7 @@ def exact(+rs: List<&2, Row>, +ref: String) -> String:
     or_else(named(rs, "refs/tags/" ++ ref), named(rs, "refs/heads/" ++ ref)))
 
 # that commit is the tip of
-type Tip is Data:
+type Tip is Data:  # noqa: L001 git/exec's IO remote answers it; no pure def makes one
   Tip{rev: String, branch: String}
 
 # the rest of the scan only when this row said nothing. A recursive call

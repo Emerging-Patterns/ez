@@ -77,3 +77,8 @@ def next.made(refused: Bool, +world: World) -> Next:
 # what the interpreter does next on a World
 def next(+world: World) -> Next:
   next.made(R.refuses(RP.plan(remove(world))), world)
+
+# the World with more of the lock's answers in it
+def more(world: World, rs: List<&2, W.Reply>) -> World:
+  World{r, here, listing, locks} = world
+  World{r, here, listing, List.append(&2, W.Reply, locks, rs)}

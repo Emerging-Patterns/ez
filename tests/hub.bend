@@ -10,6 +10,7 @@ import ../src/doctor/plan.bend as DP
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
+import ../src/check/out.bend as O
 
 # a check whose answer is a yes or a no
 def yes(name: String, ok: Bool) -> IO(Unit):
@@ -17,7 +18,7 @@ def yes(name: String, ok: Bool) -> IO(Unit):
 
 # what a program answered, with bend's update nag taken out of it
 def answer(+out: String) -> String:
-  W.last(String.lines(Q.filter(R.text(out))))
+  O.last(String.lines(Q.filter(R.text(out))))
 
 # a package's manifest: one `<sha256> <path>` line per file, in path order.
 # Every package here holds one file, which is all this test needs.
@@ -45,7 +46,7 @@ def named(+at: String) -> IO(List<&2, String>):
   do IO<List<&2, String>>:
     +out : String <- R.exec(["grep", "-ohE", "0x[0-9a-f]{32}", at])
     return DP.once(List.sort(~String, ~String.is_le,
-      W.nonblank(String.lines(R.text(out)))))
+      O.nonblank(String.lines(R.text(out)))))
 
 # the entry, locked against the hub that is serving the two packages. The hub
 # is the one the ledger names, since `ez lock` reads no environment for it.
@@ -54,21 +55,21 @@ def lock(+repo: String, +app: String, +hub: String) -> IO(Unit):
     _t : Bool <- F.write(app ++ "/ez.toml",
       "[package]\nname = \"app\"\nhub = \"" ++ hub ++ "\"\n")
     W.track(app)
-    _o : String <- R.exec(W.ez(repo, app, ["lock"]))
+    _o : String <- R.exec(O.ez(repo, app, ["lock"]))
     return Unit{}
 
 # BEND_LIB filled from the lock and nothing else, which is what the nix
 # derivation does and what a checkout without a network needs
 def restore(+repo: String, +app: String, +hub: String) -> IO(Unit):
   do IO<Unit>:
-    _o : String <- R.exec(W.inside(app, ["env", "BEND_HUB=" ++ hub,
+    _o : String <- R.exec(O.inside(app, ["env", "BEND_HUB=" ++ hub,
       repo ++ "/bin/ez.bin", "fetch"]))
     return Unit{}
 
 # the entry built against a BEND_LIB, with the hub pointed at a dead port so a
 # fallback to the network cannot be what made it work
 def build(+app: String, +lib: String) -> IO(String):
-  R.exec(W.inside(app, ["env", "BEND_HUB=http://127.0.0.1:1",
+  R.exec(O.inside(app, ["env", "BEND_HUB=http://127.0.0.1:1",
     "BEND_LIB=" ++ lib, "bend", "main.bend"]))
 
 # everything, once the scratch directory and the port are known
@@ -86,7 +87,7 @@ def go(+repo: String, +root: String, +port: String) -> IO(Unit):
     _w : Bool <- F.write(root ++ "/app/main.bend",
       "import Base\nimport " ++ mid ++ "/src/mid.bend as B\n\n" ++
       "def main() -> U32:\n  B.quad(11)\n")
-    +pid : String <- W.spawn(W.inside(root ++ "/hub", ["python3", "-m",
+    +pid : String <- W.spawn(O.inside(root ++ "/hub", ["python3", "-m",
       "http.server", port, "--bind", "127.0.0.1"]))
     up : Bool <- W.ready(["curl", "-fsS", "--max-time", "5",
       "http://127.0.0.1:" ++ port ++ "/"])

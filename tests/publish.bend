@@ -11,6 +11,7 @@ import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
+import ../src/check/out.bend as O
 
 # the repo being published: a nested layout with an import across it, which is
 # the shape that makes the file walk worth checking. One comment is not ASCII,
@@ -58,10 +59,10 @@ def ours(+here: String, +entry: String) -> IO(String):
 # package: the proof of work reports as it goes, on the same stream.
 def theirs(+repo: String, +port: String) -> IO(String):
   do IO<String>:
-    +out : String <- R.exec(W.inside(repo, ["env",
+    +out : String <- R.exec(O.inside(repo, ["env",
       "BEND_HUB=http://127.0.0.1:" ++ port, "bend", "src/lib.bend",
       "--publish"]))
-    return W.starting(String.lines(R.text(out)), "0x")
+    return O.starting(String.lines(R.text(out)), "0x")
 
 # the two hashes, and then the two manifests the hashes are taken over. The
 # manifests are compared with their trailing blank dropped from both sides:
@@ -74,7 +75,7 @@ def compare(+here: String, +root: String, +port: String) -> IO(Unit):
     +out : String <- ours(here, root ++ "/repo/src/lib.bend")
     +said : List<&2, String> <- IO.pure(List<&2, String>,
       String.lines(Q.filter(R.text(out))))
-    Check.eq_str("ez computes the hash bend publishes", W.nth(said, 0n), got)
+    Check.eq_str("ez computes the hash bend publishes", O.nth(said, 0n), got)
     +man : Maybe<&2, String> <- F.read(root ++ "/hub/" ++ got ++ "/manifest")
     Check.eq_str("ez computes the manifest bend publishes",
       Q.chomp(String.join(List.drop(&2, String, said, 2n), "\n")),

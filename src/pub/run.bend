@@ -32,11 +32,14 @@ import ./plan.bend as PP
 import ../ws/run.bend as WsRun
 
 # what a program printed, and whether it exited 0
-def ran(+out: String) -> PW.Answer:
+def ran(+out: String) -> PW.Answer:  # noqa: L001 reads snap's exec output, which no law can import
   PW.Ran{R.ok(out), R.text(out)}
 
 # one question, answered
-def answer(+lib: String, ask: PW.Ask) -> IO(PW.Answer):
+def answer(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  +lib: String,
+  ask: PW.Ask
+) -> IO(PW.Answer):
   match ask:
     case PW.ToolAsk{q}:
       do IO<PW.Answer>:
@@ -72,11 +75,6 @@ def answer.all(+lib: String, asks: List<&2, PW.Ask>) -> IO(List<&2, PW.Reply>):
         rest : List<&2, PW.Reply> <- answer.all(lib, t)
         return PW.Reply{h, a} <> rest
 
-# the World with more answers in it
-def more(world: PW.World, rs: List<&2, PW.Reply>) -> PW.World:
-  PW.World{here, ledger, replies} = world
-  PW.World{here, ledger, List.append(&2, PW.Reply, replies, rs)}
-
 # the planner's step: its questions answered and the loop gone round again,
 # or its plan run
 def loop.step(st: PP.Step, +lib: String, world: PW.World, go: PW.World -> IO(Unit)) -> IO(Unit):
@@ -84,7 +82,7 @@ def loop.step(st: PP.Step, +lib: String, world: PW.World, go: PW.World -> IO(Uni
     case PP.Asking{asks}:
       do IO<Unit>:
         rs : List<&2, PW.Reply> <- answer.all(lib, asks)
-        go(more(world, rs))
+        go(PW.more(world, rs))
     case PP.Run{pl}:
       Run.exec.plan(lib, pl)
 
@@ -92,12 +90,12 @@ def loop.step(st: PP.Step, +lib: String, world: PW.World, go: PW.World -> IO(Uni
 # know how many the package holds until it has read them, so this is a guard
 # against a planner that keeps asking, not a limit on a package: running out
 # of it dies loudly.
-def rounds() -> Nat:
+def rounds() -> Nat:  # noqa: L001 the IO loop's fuel
   100000n
 
 # the loop, under fuel. The walk asks for one file a round, so the fuel is a
 # guard against a planner that keeps asking, not a limit on a package.
-def loop(fuel: Nat, +lib: String, +world: PW.World) -> IO(Unit):
+def loop(fuel: Nat, +lib: String, +world: PW.World) -> IO(Unit):  # noqa: L001 IO driver: the interpreter's loop
   match fuel:
     case 0n:
       IO.die(Unit, 1, "ez: ez publish kept asking questions")
@@ -106,7 +104,7 @@ def loop(fuel: Nat, +lib: String, +world: PW.World) -> IO(Unit):
 
 # `ez publish`: the package the project's ledger names, checked, sent, and
 # the hash bend answered checked against ez's own
-def run() -> IO(Unit):
+def run() -> IO(Unit):  # noqa: L001 IO entry of the command
   do IO<Unit>:
     lib : String <- Env.lib()
     +pwd : String <- R.exec(["pwd"])

@@ -12,5 +12,5 @@ import ./src/ez/app.bend as App
 
 # the ez command line: read the words, run the command they name, and exit
 # as it ends
-def main() -> IO(Unit):
+def main() -> IO(Unit):  # noqa: L001 IO entry point
   App.main()

@@ -53,13 +53,16 @@ def tree.seen(got: Maybe<&2, String>, +dir: String) -> IO(DW.Answer):
       IO.pure(DW.Answer, DW.Away{})
 
 # a package's tree under the library directory
-def tree(+dir: String) -> IO(DW.Answer):
+def tree(+dir: String) -> IO(DW.Answer):  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
   do IO<DW.Answer>:
     m : Maybe<&2, String> <- F.read(dir ++ "/manifest")
     tree.seen(m, dir)
 
 # one question, answered. `lib` is the library directory the planner names.
-def answer(+lib: String, ask: DW.Ask) -> IO(DW.Answer):
+def answer(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  +lib: String,
+  ask: DW.Ask
+) -> IO(DW.Answer):
   match ask:
     case DW.Probe{+name}:
       do IO<DW.Answer>:
@@ -91,11 +94,6 @@ def answer.all(+lib: String, asks: List<&2, DW.Ask>) -> IO(List<&2, DW.Reply>):
         rest : List<&2, DW.Reply> <- answer.all(lib, t)
         return DW.Reply{h, a} <> rest
 
-# the World with more answers in it
-def more(world: DW.World, rs: List<&2, DW.Reply>) -> DW.World:
-  DW.World{cc, lib, ledger, lock, replies} = world
-  DW.World{cc, lib, ledger, lock, List.append(&2, DW.Reply, replies, rs)}
-
 # the planner's step: its questions answered and the loop gone round again,
 # or its plan run
 def loop.step(st: DP.Step, +lib: String, world: DW.World, go: DW.World -> IO(Unit)) -> IO(Unit):
@@ -103,7 +101,7 @@ def loop.step(st: DP.Step, +lib: String, world: DW.World, go: DW.World -> IO(Uni
     case DP.Asking{asks}:
       do IO<Unit>:
         rs : List<&2, DW.Reply> <- answer.all(lib, asks)
-        go(more(world, rs))
+        go(DW.more(world, rs))
     case DP.Run{pl}:
       Run.exec.plan("", pl)
 
@@ -111,13 +109,18 @@ def loop.step(st: DP.Step, +lib: String, world: DW.World, go: DW.World -> IO(Uni
 # and each other, and the packages they reach are not known until BEND_LIB
 # has answered, so this is a guard against a planner that keeps asking, not
 # a limit on a project: running out of it dies loudly.
-def rounds() -> Nat:
+def rounds() -> Nat:  # noqa: L001 the IO loop's fuel
   100000n
 
 # the loop, under fuel. Every round adds at least one answer, since the
 # planner never asks what the World answers already, and the lock check asks
 # about each package at most once.
-def loop(fuel: Nat, +lib: String, +back: WsDoc.Back, +world: DW.World) -> IO(Unit):
+def loop(  # noqa: L001 IO driver: the interpreter's loop
+  fuel: Nat,
+  +lib: String,
+  +back: WsDoc.Back,
+  +world: DW.World
+) -> IO(Unit):
   match fuel:
     case 0n:
       IO.die(Unit, 1, "ez: ez doctor kept asking questions")
@@ -125,7 +128,7 @@ def loop(fuel: Nat, +lib: String, +back: WsDoc.Back, +world: DW.World) -> IO(Uni
       loop.step(WsDoc.step(back, world), lib, world, w => loop(f, lib, back, w))
 
 # a variable's text, "" when it is unset
-def var(name: String) -> IO(String):
+def var(name: String) -> IO(String):  # noqa: L001 IO: reads an environment variable
   do IO<String>:
     r : Result<&1, &1, U32 & String, String> <- IO.get_env(name)
     return Args.text_of(r)
@@ -136,7 +139,7 @@ def run.doctored(dd: WsDoc.Doctored, +cc: String, +lib: String, lk: Maybe<&2, St
   loop(rounds(), DP.lib.at(lib), back, DW.World{cc, lib, led, lk, []})
 
 # `ez doctor`: the toolchain and the project, reported on
-def run() -> IO(Unit):
+def run() -> IO(Unit):  # noqa: L001 IO entry of the command
   do IO<Unit>:
     cc : String <- var("CC")
     +lib : String <- var("BEND_LIB")

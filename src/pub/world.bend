@@ -43,10 +43,6 @@ type World is Data:
 def toml() -> String:
   "ez.toml"
 
-# the lock's path, which is fixed
-def lockfile() -> String:
-  "ez.lock.toml"
-
 # the directory the project is in
 def here(world: World) -> String:
   World{h, _ledger, _replies} = world
@@ -104,3 +100,8 @@ def look(rs: List<&2, Reply>, +want: String) -> Heard:
 # the answer to a question, or none yet
 def heard(+world: World, ask: Ask) -> Heard:
   look(replies(world), key(ask))
+
+# the World with more answers in it
+def more(world: World, rs: List<&2, Reply>) -> World:
+  World{here, ledger, replies} = world
+  World{here, ledger, List.append(&2, Reply, replies, rs)}

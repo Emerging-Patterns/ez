@@ -71,11 +71,6 @@ def want(world: World) -> String:
   World{_a, _t, w, _here, _env, _bend, _ledger, _lock, _rs, _ups} = world
   w
 
-# the directory ez runs in
-def here(world: World) -> String:
-  World{_a, _t, _want, h, _env, _bend, _ledger, _lock, _rs, _ups} = world
-  h
-
 # the variables
 def env(world: World) -> Env:
   World{_a, _t, _want, _here, e, _bend, _ledger, _lock, _rs, _ups} = world
@@ -230,3 +225,9 @@ def look(rs: List<&2, Reply>, +want: String) -> Heard:
 # the answer to a question, or none yet
 def heard(+world: World, ask: Ask) -> Heard:
   look(replies(world), key(ask))
+
+# the World with more answers in it
+def more(world: World, rs: List<&2, Reply>, us: List<&2, Up.Reply>) -> World:
+  World{a, t, want, here, env, bend, ledger, lock, replies, ups} = world
+  World{a, t, want, here, env, bend, ledger, lock, List.append(&2, Reply, replies, rs),
+    List.append(&2, Up.Reply, ups, us)}
