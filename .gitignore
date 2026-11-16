@@ -8,3 +8,4 @@ result
 .ez/lib/*
 bin/ez.bin
 .claude/
+.direnv/
