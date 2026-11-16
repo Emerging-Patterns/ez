@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.0](https://github.com/Emerging-Patterns/ez/compare/v1.16.0...v1.17.0) (2026-11-16)
+
+
+### Bug Fixes
+
+* **lint:** coverage at error ([#174](https://github.com/Emerging-Patterns/ez/issues/174)) ([24333be](https://github.com/Emerging-Patterns/ez/commit/24333be729624193f3a27b0eee96da1fbc0d0f83))
+* **lint:** ez 1.16.0, bolt 1.65.0; clear bolt findings ([#173](https://github.com/Emerging-Patterns/ez/issues/173)) ([5431805](https://github.com/Emerging-Patterns/ez/commit/5431805f9de81aa29cb17043ac991769a04a53c9))
+
 ## [1.16.0](https://github.com/Emerging-Patterns/ez/compare/v1.15.0...v1.16.0) (2026-11-15)
 
 
