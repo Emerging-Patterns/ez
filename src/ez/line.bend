@@ -43,39 +43,71 @@ type Sub is Data:
   CToolUpgrade{}
   CHelp{}
 
+# `ez init`: a name, an entry and the one-line description
+def spec.init() -> Shake.Sub:
+  Shake.sub("init", "scaffold a project: ez.toml, ignore, entry, src/",
+    [
+      Shake.pos("name", "package name", False{}, None{}, []),
+      Shake.pos("entry", "entry file", False{}, None{}, []),
+      Shake.opt("description", None{}, Some{"description"},
+        "one line: the entry's first line, which the hub shows", False{}, None{}, [])
+    ], [])
+
+# `ez add`: a target, its ref and entry, and the name to record it under
+def spec.add() -> Shake.Sub:
+  Shake.sub("add", "record a git or hub package",
+    [
+      Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
+        []),
+      Shake.pos("ref", "commit, tag or branch", False{}, None{}, []),
+      Shake.pos("entry", "entry file", False{}, None{}, []),
+      Shake.opt("rename", None{}, Some{"rename"},
+        "record it under this name, ahead of its own (a TOML bare key)",
+        False{}, None{}, [])
+    ], [])
+
+# `ez lock`: `--upgrade` and the one package it may be limited to
+def spec.lock() -> Shake.Sub:
+  Shake.sub("lock", "resolve every import, write ez.lock.toml",
+    [
+      Shake.flag("upgrade", None{}, Some{"upgrade"},
+        "re-pin git deps and tools that moved, then write the lock"),
+      Shake.opt("package", None{}, Some{"package"},
+        "with --upgrade, only this dependency or tool", False{}, None{}, [])
+    ], [])
+
+# a `tool` subcommand that names a target and may name the entry to build
+def spec.tool.target(+name: String, +about: String) -> Shake.Sub:
+  Shake.sub(name, about,
+    [
+      Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
+        []),
+      Shake.opt("entry", None{}, Some{"entry"},
+        "build this file of the checkout, not the one it names", False{}, None{}, [])
+    ], [])
+
+# `ez tool`: the group, with `sync` and the three that take a target
+def spec.tool() -> Shake.Sub:
+  Shake.sub("tool", "build or run another project's binary", [], [
+    Shake.sub("sync", "build and link every pinned tool at its lock rev",
+      [], []),
+    spec.tool.target("run", "fetch, build and run the binary a repo declares"),
+    spec.tool.target("install", "build the binary and link it on PATH"),
+    spec.tool.target("upgrade", "rebuild when the commit moved, and refresh the link")
+  ])
+
 # the program: every command, and the flags and positionals it binds
 def spec() -> Shake.Cli:
   Shake.app("ez", "dependency tracking and builds for Bend 2", None{},
     [],
     [
-      Shake.sub("init", "scaffold a project: ez.toml, ignore, entry, src/",
-        [
-          Shake.pos("name", "package name", False{}, None{}, []),
-          Shake.pos("entry", "entry file", False{}, None{}, []),
-          Shake.opt("description", None{}, Some{"description"},
-            "one line: the entry's first line, which the hub shows", False{}, None{}, [])
-        ], []),
-      Shake.sub("add", "record a git or hub package",
-        [
-          Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
-            []),
-          Shake.pos("ref", "commit, tag or branch", False{}, None{}, []),
-          Shake.pos("entry", "entry file", False{}, None{}, []),
-          Shake.opt("rename", None{}, Some{"rename"},
-            "record it under this name, ahead of its own (a TOML bare key)",
-            False{}, None{}, [])
-        ], []),
+      spec.init(),
+      spec.add(),
       Shake.sub("remove", "drop a package from the ledger",
         [
           Shake.pos("name", "package name", True{}, None{}, [])
         ], []),
-      Shake.sub("lock", "resolve every import, write ez.lock.toml",
-        [
-          Shake.flag("upgrade", None{}, Some{"upgrade"},
-            "re-pin git deps and tools that moved, then write the lock"),
-          Shake.opt("package", None{}, Some{"package"},
-            "with --upgrade, only this dependency or tool", False{}, None{}, [])
-        ], []),
+      spec.lock(),
       Shake.sub("fetch", "fill BEND_LIB from the lock", [], []),
       Shake.sub("check", "check the entry, without running it", [], []),
       Shake.sub("build", "build the entry to a native binary",
@@ -83,31 +115,7 @@ def spec() -> Shake.Cli:
           Shake.pos("out", "output path", False{}, None{}, [])
         ], []),
       Shake.sub("run", "check and run the entry", [], []),
-      Shake.sub("tool", "build or run another project's binary", [], [
-        Shake.sub("sync", "build and link every pinned tool at its lock rev",
-          [], []),
-        Shake.sub("run", "fetch, build and run the binary a repo declares",
-          [
-            Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
-              []),
-            Shake.opt("entry", None{}, Some{"entry"},
-              "build this file of the checkout, not the one it names", False{}, None{}, [])
-          ], []),
-        Shake.sub("install", "build the binary and link it on PATH",
-          [
-            Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
-              []),
-            Shake.opt("entry", None{}, Some{"entry"},
-              "build this file of the checkout, not the one it names", False{}, None{}, [])
-          ], []),
-        Shake.sub("upgrade", "rebuild when the commit moved, and refresh the link",
-          [
-            Shake.pos("target", "owner/repo, git url, path, or name@version", True{}, None{},
-              []),
-            Shake.opt("entry", None{}, Some{"entry"},
-              "build this file of the checkout, not the one it names", False{}, None{}, [])
-          ], [])
-      ]),
+      spec.tool(),
       Shake.sub("publish", "send the entry to the hub, under ez's 0x name",
         [], []),
       Shake.sub("test", "run every */tests/*.bend against its trailer", [], []),

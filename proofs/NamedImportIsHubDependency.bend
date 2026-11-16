@@ -44,7 +44,7 @@ law unnamed_at:
   {K.visit.put(K.asked(l, K.beside(file),
       _u => K.named.check(K.unnamed(K.scan.mods(K.scan(text))),
         _v => K.foreign.check(tree, Path.dir(file), K.nsdir(ns), K.scan.foreign(K.scan(text))))),
-      tree, K.scan(text), text, file, ns, eb, seen, out, rest)
+      tree, K.Opened{file, ns, text, K.scan(text)}, eb, seen, out, rest)
     == K.State{seen, out, K.Unnamed{K.unnamed(K.scan.mods(K.scan(text)))}, K.Task{file, ns} <> rest}
     : K.State}
 
@@ -53,20 +53,20 @@ def unnamed_at(l, tree, text, file, ns, eb, seen, out, rest, g, n):
     case K.Here{_x}:
       %n : {K.visit.put(K.named.check.at(_, K.unnamed(K.scan.mods(K.scan(text))),
           _v => K.foreign.check(tree, Path.dir(file), K.nsdir(ns), K.scan.foreign(K.scan(text)))),
-        tree, K.scan(text), text, file, ns, eb, seen, out, rest)
+        tree, K.Opened{file, ns, text, K.scan(text)}, eb, seen, out, rest)
         == K.State{seen, out, K.Unnamed{K.unnamed(K.scan.mods(K.scan(text)))}, K.Task{file, ns} <> rest}
         : K.State}
       {==}
     case K.Absent{}:
       %n : {K.visit.put(K.named.check.at(_, K.unnamed(K.scan.mods(K.scan(text))),
           _v => K.foreign.check(tree, Path.dir(file), K.nsdir(ns), K.scan.foreign(K.scan(text)))),
-        tree, K.scan(text), text, file, ns, eb, seen, out, rest)
+        tree, K.Opened{file, ns, text, K.scan(text)}, eb, seen, out, rest)
         == K.State{seen, out, K.Unnamed{K.unnamed(K.scan.mods(K.scan(text)))}, K.Task{file, ns} <> rest}
         : K.State}
       {==}
     case K.Unasked{}:
-      Eq.bit.absurd2(&2, {K.visit.put(K.Asking{K.beside(file)}, tree, K.scan(text), text, file, ns,
-        eb, seen, out, rest)
+      Eq.bit.absurd2(&2, {K.visit.put(K.Asking{K.beside(file)},
+        tree, K.Opened{file, ns, text, K.scan(text)}, eb, seen, out, rest)
         == K.State{seen, out, K.Unnamed{K.unnamed(K.scan.mods(K.scan(text)))}, K.Task{file, ns} <> rest}
         : K.State}, g)
 

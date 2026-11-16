@@ -691,7 +691,7 @@ def loop.step(st: Plan.Step, +lib: String, back: WsUp.Back, world: W.World, go: 
 # it dies loudly. The walk inside each round takes its fuel from its inputs
 # (`Plan.walk.fuel`).
 def rounds() -> Nat:
-  U32.to_nat(100000)
+  100000n
 
 # the loop, under fuel. Every round adds at least one answer, since the
 # planner never asks what the World answers already.

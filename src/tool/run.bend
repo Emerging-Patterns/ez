@@ -68,7 +68,7 @@ def said.rev(ls: List<&2, String>) -> String:
 
 # a line that is an absolute path, as `rev-parse --show-toplevel` prints one
 def line.abs(+line: String) -> Bool:
-  String.eq(String.take(line, 1n), "/")
+  String.starts_with(line, "/")
 
 # the first line that is an absolute path, or ""
 def said.abs(ls: List<&2, String>) -> String:
@@ -278,7 +278,7 @@ def loop.step(st: TP.Step, world: TW.World, go: TW.World -> IO(Unit)) -> IO(Unit
 # is only a guard against a planner that keeps asking, and running out of it
 # dies loudly.
 def rounds() -> Nat:
-  U32.to_nat(100)
+  100n
 
 # the loop, under fuel. Every round adds an answer, since the planner never
 # asks what the World answers already, and it asks at most five rounds, so

@@ -25,7 +25,6 @@
 # them itself.
 import Base
 import ../toml/toml.bend as T
-import ../lock/lock.bend as L
 import ../lock/world.bend as W
 import ../lock/up.bend as Up
 

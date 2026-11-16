@@ -63,7 +63,7 @@ def loop.step(st: AR.Next, +lib: String, world: AR.World, go: AR.World -> IO(Uni
 # import graph, as `ez lock` does (`Run.rounds`). This is only a guard against
 # a planner that keeps asking, and running out of it dies loudly.
 def rounds() -> Nat:
-  U32.to_nat(100000)
+  100000n
 
 # the loop, under fuel. Every round adds an answer, since the planner never
 # asks what the World answers already, so the fuel is only a guard.

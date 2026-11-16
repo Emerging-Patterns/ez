@@ -25,7 +25,6 @@ import ../io/file.bend as F
 import ../lock/run.bend as Run
 import ../tool/run.bend as ToolRun
 import ../tool/world.bend as TW
-import ../hub/hub.bend as Web
 import ../hub/get.bend as Net
 import ../share/env.bend as Env
 import ./world.bend as PW
@@ -94,7 +93,7 @@ def loop.step(st: PP.Step, +lib: String, world: PW.World, go: PW.World -> IO(Uni
 # against a planner that keeps asking, not a limit on a package: running out
 # of it dies loudly.
 def rounds() -> Nat:
-  U32.to_nat(100000)
+  100000n
 
 # the loop, under fuel. The walk asks for one file a round, so the fuel is a
 # guard against a planner that keeps asking, not a limit on a package.

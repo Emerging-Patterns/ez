@@ -63,7 +63,7 @@ law hub_name:
   for manifest: String
   for srcs: List<&2, String>
   for +branch: String
-  {fate.name(Up.dep.hub(hubbed, dep, hash, rev, root, nar, manifest, srcs, branch), M.dep.name(dep))
+  {fate.name(Up.dep.hub(hubbed, dep, hash, Up.Moved{rev, root, nar, manifest, srcs}, branch), M.dep.name(dep))
     == M.dep.name(dep) : String}
 
 def hub_name(hubbed, dep, hash, rev, root, nar, manifest, srcs, branch):

@@ -32,18 +32,3 @@ def coverage() -> String:
 # law claims one computed case and no guarantee, and nothing exempts one.
 def closed() -> String:
   "error"
-
-# Rules bolt 1.23 to 1.27 added or widened, which fire on code that predates
-# them: `pick` (C003, a search bound above its pick: src/ws/joint.bend,
-# src/ws/workspace.bend), `concat` (U004, an append passed through a
-# continuation: src/check/serve.bend, src/io/file.bend) and `prefix` (U017, a
-# take compared to a literal: src/tool/run.bend). They are advice until those
-# six findings are fixed, and go back to their groups' level then.
-def pick() -> String:
-  "warn"
-
-def concat() -> String:
-  "warn"
-
-def prefix() -> String:
-  "warn"

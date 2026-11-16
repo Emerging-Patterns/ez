@@ -113,22 +113,21 @@ def step.look(
     case Found{v}:
       step.verdict(v, ns, src, hash, rest, packs, asks, bad)
 
-# a hash already resolved, or already asked about, is passed over
+# a hash already resolved, or already asked about, is passed over. `wk` is
+# the walk with the hash popped off its queue.
 def step.pick(
   seen: Bool,
   +orgs: List<&2, L.Origin>,
   +ns: List<&2, L.Name>,
   +js: List<&2, W.Judged>,
   +hash: String,
-  rest: List<&2, String>,
-  packs: List<&2, L.Pack>,
-  asks: List<&2, String>,
-  bad: String
+  wk: Walk
 ) -> Walk:
   match seen:
     case True{}:
-      Walk{rest, packs, asks, bad}
+      wk
     case False{}:
+      Walk{rest, packs, asks, bad} = wk
       step.look(look(js, hash), ns, L.origin(orgs, hash), hash, rest, packs, asks, bad)
 
 # the next hash of the queue, or the walk as it is when the queue is empty
@@ -145,8 +144,8 @@ def step.pop(
     case []:
       Walk{[], packs, asks, bad}
     case +h <> t:
-      step.pick(Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, ns, js, h, t,
-        packs, asks, bad)
+      step.pick(Bool.or(L.has(packs, h), L.seen.holds(asks, h)), orgs, ns, js, h,
+        Walk{t, packs, asks, bad})
 
 # one step of the walk
 def walk.step(+orgs: List<&2, L.Origin>, +ns: List<&2, L.Name>, +js: List<&2, W.Judged>, wk: Walk) -> Walk:
