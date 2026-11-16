@@ -3,7 +3,7 @@
 # runs programs through snap's foreign effect, so that a law may import them
 # (laws/CappedRunWords.bend).
 import Base
-import snap@1.4.0.0/src/answer.bend as R
+import snap@1.6.0.0/src/answer.bend as R
 import ./env.bend as Env
 
 # the cgroup a capped run gets. `MemorySwapMax=0` matters: without it the

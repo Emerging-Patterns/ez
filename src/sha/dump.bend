@@ -4,7 +4,7 @@
 # sha/nar because bend 2.0.32 fails a proof whose imports reach foreign code,
 # so a law may import sha/nar but never this.
 import Base
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ../io/file.bend as F
 import ./nar.bend as Nar
 

@@ -6,7 +6,7 @@
 # internal: it fixes ez/line.bend's reading of shake's parse, whose own
 # correctness is shake's (cited in ez/line.bend's header).
 import Base
-import shake@0.6.0.0/main.bend as Shake
+import shake@0.9.0.0/main.bend as Shake
 import ../src/ez/line.bend as L
 
 # whether a line's end runs the help subcommand

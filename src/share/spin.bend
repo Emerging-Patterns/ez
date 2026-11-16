@@ -5,7 +5,7 @@
 # whose imports reach foreign code, so a law may import share/say but never
 # this.
 import Base
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ./say.bend as Say
 
 # one fd of this process, as a path. A failure is not a terminal.

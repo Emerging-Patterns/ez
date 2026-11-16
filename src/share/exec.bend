@@ -4,7 +4,7 @@
 # foreign effect, and lives apart because bend 2.0.32 fails a proof whose
 # imports reach foreign code, so a law may import share/env but never this.
 import Base
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ./env.bend as Env
 
 # a program run with this project's BEND_LIB set for it

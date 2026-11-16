@@ -6,7 +6,7 @@
 # directory, and `setsid --fork` returns as soon as the child is a session of
 # its own. Nothing here goes through a shell.
 import Base
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ./out.bend as O
 
 # the directory the test is running in, which is the repo `ez test` was run from
