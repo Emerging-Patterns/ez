@@ -25,7 +25,7 @@ import ./doctor.bend as Doc
 import ./relock.bend as Rel
 
 # what the search found, and the top of the checkout it searched from
-type Searched is Data:
+type Searched is Data:  # noqa: L001 carried between the IO driver's steps
   Searched{top: String, found: R.Found}
 
 # a directory's ez.toml, from the top of the checkout
@@ -63,14 +63,14 @@ def here.git(ok: Bool, +text: String) -> Maybe<&2, List<&2, String>>:
       None{}
 
 # the search for the root, from where ez runs up to the top of its checkout
-def search() -> IO(Searched):
+def search() -> IO(Searched):  # noqa: L001 IO: searches up for the workspace root
   do IO<Searched>:
     +pre : String <- Sn.exec(["git", "rev-parse", "--show-prefix"])
     +top : String <- Sn.exec(["git", "rev-parse", "--show-toplevel"])
     search.at(here.git(Bool.and(Sn.ok(pre), Sn.ok(top)), Sn.text(pre)), String.trim(Sn.text(top)))
 
 # the program's own name, and every word after it
-def argv() -> IO(List<&2, String>):
+def argv() -> IO(List<&2, String>):  # noqa: L001 IO: reads argv
   do IO<List<&2, String>>:
     xs : List<&1, String> <- IO.args()
     return Args.copy(xs)
@@ -136,18 +136,9 @@ def read.found(ps: List<&2, String>) -> IO(List<&2, J.Found>):
         rest : List<&2, J.Found> <- read.found(tl)
         return J.Found{hd, F.text_of(mm)} <> rest
 
-# the non-empty lines
-def lines(ss: List<&2, String>) -> List<&2, String>:
-  match ss:
-    case []:
-      []
-    case +hd <> tl:
-      +more = lines(tl)
-      Bool.pick(List<&2, String>, String.is_empty(hd), more, hd <> more)
-
 # the ledger `ez lock` is planned from, what an upgrade needs to write its
 # pins back, and the answers the lock reads the workspace's members from
-type Planned is Data:
+type Planned is Data:  # noqa: L001 carried between the IO driver's steps
   Planned{ledger: Maybe<&2, String>, back: U.Back, seeds: List<&2, LW.Reply>}
 
 # the joint ledger, as the lock reads it, or the refusal that leaves none
@@ -179,7 +170,7 @@ def joint.listed(
   match ok:
     case True{}:
       do IO<Planned>:
-        +fs : List<&2, J.Found> <- read.found(lines(String.lines(out)))
+        +fs : List<&2, J.Found> <- read.found(Args.nonempty(String.lines(out)))
         lk : Maybe<&2, String> <- F.read("ez.lock.toml")
         joint.at(J.joint(text, fs, files), text, spec, fs, files, F.text_of(lk))
     case False{}:
@@ -208,7 +199,10 @@ def joint.read(rd: W.Read, +text: String, +files: List<&2, K.Source>) -> IO(Plan
 # the ledger `ez lock` is planned from: ez.toml as it is, or, at a workspace
 # root, the joint ledger of the root and every member. `files` are the
 # committed `.bend` files, which a member's package is walked over.
-def ledger(led: Maybe<&2, String>, +files: List<&2, K.Source>) -> IO(Planned):
+def ledger(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  led: Maybe<&2, String>,
+  +files: List<&2, K.Source>
+) -> IO(Planned):
   match led:
     case None{}:
       IO.pure(Planned, Planned{None{}, U.Alone{}, []})
@@ -304,9 +298,9 @@ def pins.at(+dir: String) -> IO(List<&2, M.Dep>):
     mm : Maybe<&2, String> <- F.read(dir ++ "/ez.toml")
     +out : String <- Sn.exec(["git", "-C", dir, "-c", "core.quotepath=off", "ls-files", "--",
       ":(glob)**/ez.toml"])
-    fs : List<&2, J.Found> <- read.under(dir, lines(String.lines(Sn.text(out))))
+    fs : List<&2, J.Found> <- read.under(dir, Args.nonempty(String.lines(Sn.text(out))))
     +bend : String <- Sn.exec(["git", "-C", dir, "-c", "core.quotepath=off", "ls-files", "--", "*.bend"])
-    files : List<&2, K.Source> <- files.under(dir, lines(String.lines(Sn.text(bend))))
+    files : List<&2, K.Source> <- files.under(dir, Args.nonempty(String.lines(Sn.text(bend))))
     return pins.joint(J.joint(F.text_of(mm), fs, files))
 
 # the ref, once the workspace's pins are known
@@ -358,7 +352,7 @@ def listing.listed(ok: Bool, +dir: String, +out: String) -> IO(LW.Listing):
   match ok:
     case True{}:
       do IO<LW.Listing>:
-        fs : List<&2, LW.Source> <- sources.under(dir, lines(String.lines(out)))
+        fs : List<&2, LW.Source> <- sources.under(dir, Args.nonempty(String.lines(out)))
         return LW.Listed{fs}
     case False{}:
       IO.pure(LW.Listing, LW.Unlisted{
@@ -373,12 +367,12 @@ def listing.at(+dir: String) -> IO(LW.Listing):
 
 # what a command run at `rel` from the root at `at` reads of the root: its
 # ledger, every ez.toml and `.bend` file git lists under it, and its lock
-def rooted(+at: String, rel: List<&2, String>) -> IO(Rel.Rooted):
+def rooted(+at: String, rel: List<&2, String>) -> IO(Rel.Rooted):  # noqa: L001 IO: reads the workspace
   do IO<Rel.Rooted>:
     mm : Maybe<&2, String> <- F.read(at ++ "/ez.toml")
     +out : String <- Sn.exec(["git", "-C", at, "-c", "core.quotepath=off", "ls-files", "--",
       ":(glob)**/ez.toml"])
-    fs : List<&2, J.Found> <- read.under(at, lines(String.lines(Sn.text(out))))
+    fs : List<&2, J.Found> <- read.under(at, Args.nonempty(String.lines(Sn.text(out))))
     ls : LW.Listing <- listing.at(at)
     lk : Maybe<&2, String> <- F.read(at ++ "/ez.lock.toml")
     return Rel.Rooted{at, rel, F.text_of(mm), fs, ls, F.text_of(lk)}
@@ -424,9 +418,9 @@ def lock.path() -> IO(String):
 def doctor.root(+text: String) -> IO(Doc.Doctored):
   do IO<Doc.Doctored>:
     +out : String <- Sn.exec(["git", "-c", "core.quotepath=off", "ls-files", "--", ":(glob)**/ez.toml"])
-    +fs : List<&2, J.Found> <- read.found(lines(String.lines(Sn.text(out))))
+    +fs : List<&2, J.Found> <- read.found(Args.nonempty(String.lines(Sn.text(out))))
     +bend : String <- Sn.exec(["git", "-c", "core.quotepath=off", "ls-files", "--", "*.bend"])
-    files : List<&2, K.Source> <- files.under(".", lines(String.lines(Sn.text(bend))))
+    files : List<&2, K.Source> <- files.under(".", Args.nonempty(String.lines(Sn.text(bend))))
     return Doc.joint(J.joint(text, fs, files), text, fs)
 
 # what one ledger's text says, for the doctor

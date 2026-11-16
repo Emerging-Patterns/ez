@@ -7,123 +7,28 @@
 # its own. Nothing here goes through a shell.
 import Base
 import snap@1.4.0.0/main.bend as R
-
-# the non-empty strings, which is what a program's output amounts to once its
-# trailing newline has been counted as a line
-def nonblank(ss: List<&2, String>) -> List<&2, String>:
-  match ss:
-    case Nil{}:
-      Nil{}
-    case Con{+h, t}:
-      +more = nonblank(t)
-      Bool.pick(List<&2, String>, String.is_empty(h), more, h <> more)
-
-# the first line of a list of them
-def first(ls: List<&2, String>) -> String:
-  match ls:
-    case []:
-      ""
-    case h <> t:
-      h
-
-# a one-line answer, without the newline the program ended it with
-def line(+out: String) -> String:
-  first(String.lines(R.text(out)))
-
-# the last line of a list of them
-def last(ls: List<&2, String>) -> String:
-  match ls:
-    case []:
-      ""
-    case Con{h, Nil{}}:
-      h
-    case Con{_h, t}:
-      last(t)
-
-# the last thing a program said, which for one that reports as it goes is its
-# answer
-def tail(+out: String) -> String:
-  last(String.lines(R.text(out)))
-
-# the nth of a list of strings, or "" when there is no such one. The list and
-# the count are scrutinised together, so the walk needs no helper to branch.
-def nth(ls: List<&2, String>, index: Nat) -> String:
-  match ls index:
-    case Nil{} _m:
-      ""
-    case Con{h, _t} 0n:
-      h
-    case Con{_h, t} 1n+p:
-      nth(t, p)
-
-# one step of a search for the first line that answers. Both searches here
-# want it, so it is stated once.
-#
-# A recursive call in an arm of a `Bool.pick` is not an arm: `Bool.pick` is an
-# ordinary function, so both arms are built before it picks one and the line
-# found first still costs a walk of every line after it. The rest of the
-# search arrives as a thunk, which is a value, and only the arm that wants it
-# applies it.
-def first.step(here: Bool, text: String, rest: Unit -> String) -> String:
-  match here:
-    case True{}:
-      text
-    case False{}:
-      rest(Unit{})
-
-# the first line that starts with this, or "" when none does
-def starting(ls: List<&2, String>, +pre: String) -> String:
-  match ls:
-    case []:
-      ""
-    case +h <> t:
-      first.step(String.starts_with(h, pre), h, _u => starting(t, pre))
-
-# the first line that holds this anywhere in it, or "" when none does
-def containing(ls: List<&2, String>, +sub: String) -> String:
-  match ls:
-    case []:
-      ""
-    case +h <> t:
-      first.step(String.contains(h, sub), h, _u => containing(t, sub))
-
-# the last line that starts with this, or "" when none does. A build's answer
-# is the last thing it says, because its log arrives on the same stream.
-def starting.last(ls: List<&2, String>, +pre: String, got: String) -> String:
-  match ls:
-    case []:
-      got
-    case +h <> t:
-      starting.last(t, pre, Bool.pick(String, String.starts_with(h, pre), h, got))
-
-# what a `key = "value"` line holds, which is all ez's own files ever hold
-def quoted(+row: String) -> String:
-  nth(String.split(row, '"'), 1n)
-
-# the value a text gives a key, over its `key = "value"` lines
-def value(+text: String, +key: String) -> String:
-  quoted(starting(String.lines(text), key))
+import ./out.bend as O
 
 # the directory the test is running in, which is the repo `ez test` was run from
-def here() -> IO(String):
+def here() -> IO(String):  # noqa: L001 IO: runs pwd
   do IO<String>:
     +out : String <- R.exec(["pwd"])
-    return line(out)
+    return O.line(out)
 
 # a fresh empty directory, removed when the test is done with it
-def tmp() -> IO(String):
+def tmp() -> IO(String):  # noqa: L001 IO: runs mktemp
   do IO<String>:
     +out : String <- R.exec(["mktemp", "-d"])
-    return line(out)
+    return O.line(out)
 
 # a directory, and every directory above it
-def mkdir(at: String) -> IO(Unit):
+def mkdir(at: String) -> IO(Unit):  # noqa: L001 IO: runs mkdir
   do IO<Unit>:
     _o : String <- R.exec(["mkdir", "-p", at])
     return Unit{}
 
 # a directory and everything under it, gone
-def rm(at: String) -> IO(Unit):
+def rm(at: String) -> IO(Unit):  # noqa: L001 IO: runs rm
   do IO<Unit>:
     _o : String <- R.exec(["rm", "-rf", at])
     return Unit{}
@@ -131,49 +36,38 @@ def rm(at: String) -> IO(Unit):
 # a project's files, tracked by a repository of its own. `ez lock` starts from
 # the `.bend` files git tracks, so a project a test writes is one it has to
 # add before it locks; staged is enough, since `git ls-files` reads the index.
-def track(+at: String) -> IO(Unit):
+def track(+at: String) -> IO(Unit):  # noqa: L001 IO: runs git
   do IO<Unit>:
     _i : String <- R.exec(["git", "-C", at, "init", "-q"])
     _a : String <- R.exec(["git", "-C", at, "add", "-A"])
     return Unit{}
 
-# a command run in a directory, with the gate's BEND_LIB taken away. Base has
-# no chdir, so the directory is `env`'s business; and a test that is about
-# where packages come from must not inherit the one the gate set for itself.
-def inside(at: String, args: List<&2, String>) -> List<&2, String>:
-  List.append(&2, String, ["env", "-C", at, "-u", "BEND_LIB"], args)
-
-# `ez` run in a project directory. The binary is the whole of ez, so it is
-# started with nothing in front of it but the directory it runs in.
-def ez(+repo: String, +app: String, args: List<&2, String>) -> List<&2, String>:
-  inside(app, List.append(&2, String, [repo ++ "/bin/ez.bin"], args))
-
 # the one file a pattern names, or "" when it names none. The lock's name is
 # ez's business and not a test's, so a test looks for it rather than spelling
 # it out.
-def only(+at: String, +pat: String) -> IO(String):
+def only(+at: String, +pat: String) -> IO(String):  # noqa: L001 IO: runs find
   do IO<String>:
     +out : String <- R.exec(["find", at, "-maxdepth", "1", "-name", pat])
-    return first(nonblank(String.lines(R.text(out))))
+    return O.first(O.nonblank(String.lines(R.text(out))))
 
 # a TCP port nothing is listening on, so a stray server elsewhere can never
 # answer for the one this test started
-def port() -> IO(String):
+def port() -> IO(String):  # noqa: L001 IO: asks the host for a port
   do IO<String>:
     +out : String <- R.exec(["python3", "-c",
       "import socket; s=socket.socket(); s.bind((\"127.0.0.1\", 0)); " ++
       "print(s.getsockname()[1]); s.close()"])
-    return line(out)
+    return O.line(out)
 
 # a program started and left running, and the pid it was given. `R.exec` waits
 # for what it runs and reads it to the end, which a server never reaches, so
 # this is the other effect.
-def spawn(args: List<&2, String>) -> IO(String):
+def spawn(args: List<&2, String>) -> IO(String):  # noqa: L001 IO: starts a program
   R.start(args)
 
 # a started program stopped again, by the pid it was started with, so a test
 # can never stop anything but what it started
-def stop(pid: String) -> IO(Unit):
+def stop(pid: String) -> IO(Unit):  # noqa: L001 IO: runs kill
   do IO<Unit>:
     _o : String <- R.exec(["kill", pid])
     return Unit{}
@@ -182,7 +76,7 @@ def stop(pid: String) -> IO(Unit):
 # the server it just started. A Bend server started on the interpreted lane
 # takes tens of seconds to reach its first accept, so the count is generous. The verdict and the count are scrutinised
 # together, so one def covers both endings and nothing recurses mutually.
-def until(+args: List<&2, String>, tries: Nat, ok: Bool) -> IO(Bool):
+def until(+args: List<&2, String>, tries: Nat, ok: Bool) -> IO(Bool):  # noqa: L001 IO: retries a program
   match tries ok:
     case _k True{}:
       IO.pure(Bool, True{})
@@ -195,5 +89,5 @@ def until(+args: List<&2, String>, tries: Nat, ok: Bool) -> IO(Bool):
         until(args, m, R.ok(out))
 
 # a server answered before the test went on without it
-def ready(args: List<&2, String>) -> IO(Bool):
+def ready(args: List<&2, String>) -> IO(Bool):  # noqa: L001 IO: waits on a program
   until(args, 600n, False{})

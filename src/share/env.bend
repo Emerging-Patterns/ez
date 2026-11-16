@@ -12,13 +12,13 @@ def or_else(+value: String, +alt: String) -> String:
   Bool.pick(String, String.is_empty(value), alt, value)
 
 # what a variable holds, with a default for when it holds nothing
-def var(name: String, +alt: String) -> IO(String):
+def var(name: String, +alt: String) -> IO(String):  # noqa: L001 IO: reads the environment
   do IO<String>:
     r : Result<&1, &1, U32 & String, String> <- IO.get_env(name)
     return or_else(Args.text_of(r), alt)
 
 # where this project's packages live
-def lib() -> IO(String):
+def lib() -> IO(String):  # noqa: L001 IO: reads the environment
   var("BEND_LIB", ".ez/lib")
 
 # the command with the project's BEND_LIB in front of it

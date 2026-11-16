@@ -9,6 +9,7 @@ import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
+import ../src/check/out.bend as O
 
 # a check whose answer is a yes or a no
 def yes(name: String, ok: Bool) -> IO(Unit):
@@ -16,7 +17,7 @@ def yes(name: String, ok: Bool) -> IO(Unit):
 
 # what a program answered, with bend's update nag taken out of it
 def answer(+out: String) -> String:
-  W.last(String.lines(Q.filter(R.text(out))))
+  O.last(String.lines(Q.filter(R.text(out))))
 
 # the upstream repo: two files, one importing the other, committed, tagged and
 # never published
@@ -37,7 +38,7 @@ def upstream(+at: String) -> IO(String):
     _g : String <- R.exec(["git", "-C", at, "-c", "user.email=t@t",
       "-c", "user.name=t", "tag", "-a", "v1.0", "-m", "v1.0"])
     +rev : String <- R.exec(["git", "-C", at, "rev-parse", "HEAD"])
-    return W.line(rev)
+    return O.line(rev)
 
 # that repo served over the protocol, so the nix sandbox can reach it too. The
 # annotated tag is pushed as well, since the peeled `^{}` row is the one that
@@ -67,18 +68,18 @@ def serve(+at: String, +port: String) -> IO(String):
 # file rather than one of them overwriting the other.
 def vendor(+repo: String, +app: String, +url: String, +rev: String) -> IO(String):
   do IO<String>:
-    _i : String <- R.exec(W.ez(repo, app, ["init", "myapp", "main.bend"]))
-    +out : String <- R.exec(W.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
+    _i : String <- R.exec(O.ez(repo, app, ["init", "myapp", "main.bend"]))
+    +out : String <- R.exec(O.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
     +led : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
-    +hash : String <- IO.pure(String, W.value(F.text_of(led), "hash"))
+    +hash : String <- IO.pure(String, O.value(F.text_of(led), "hash"))
     Check.eq_str("add says the import line the package is reachable by",
-      W.containing(String.lines(R.text(out)), "import "),
+      O.containing(String.lines(R.text(out)), "import "),
       "import " ++ hash ++ "/lib.bend as Lib")
-    +tag : String <- R.exec(W.inside(app, ["env",
+    +tag : String <- R.exec(O.inside(app, ["env",
       "BEND_LIB=" ++ app ++ "/.ez/tag", repo ++ "/bin/ez.bin", "add", url,
       "v1.0", "src/lib.bend"]))
     Check.eq_str("the tag it resolved through is written down",
-      W.containing(String.lines(R.text(tag)), " is "), "v1.0 is " ++ rev)
+      O.containing(String.lines(R.text(tag)), " is "), "v1.0 is " ++ rev)
     +same : String <- R.exec(["diff", "-r", app ++ "/.ez/lib/" ++ hash,
       app ++ "/.ez/tag/" ++ hash])
     yes("a tag vendors the same package as its commit", R.ok(same))
@@ -92,18 +93,18 @@ def local(+repo: String, +app: String, +hash: String, +rev: String) -> IO(Unit):
       "import Base\nimport " ++ hash ++ "/lib.bend as Lib\n\n" ++
       "def main() -> U32:\n  Lib.quad(11)\n")
     W.track(app)
-    +out : String <- R.exec(W.inside(app, ["env", "BEND_HUB=http://127.0.0.1:1",
+    +out : String <- R.exec(O.inside(app, ["env", "BEND_HUB=http://127.0.0.1:1",
       "BEND_LIB=" ++ app ++ "/.ez/lib", "bend", "main.bend"]))
     Check.eq_str("the vendored package builds, with no hub at all",
       answer(out), "44")
-    _lk : String <- R.exec(W.ez(repo, app, ["lock"]))
+    _lk : String <- R.exec(O.ez(repo, app, ["lock"]))
     +at : String <- W.only(app, "ez.lock.*")
     +txt : Maybe<&2, String> <- F.read(at)
     yes("the lock records the git rev, not the hub",
       Bool.and(String.contains(F.text_of(txt), "git"),
         String.contains(F.text_of(txt), rev)))
     Check.eq_str("the lock keeps the tag beside the rev",
-      W.value(F.text_of(txt), "tag"), "v1.0")
+      O.value(F.text_of(txt), "tag"), "v1.0")
 
 # nix rebuilding the package from the rev alone. The store path is the last
 # line of the build that names one, since the build's log shares the stream.
@@ -115,11 +116,11 @@ def rebuild(+repo: String, +app: String, +hash: String) -> IO(Unit):
       "/nix/bend-lib.nix { } " ++ lock ++ "\n")
     +out : String <- R.exec(["nix-build", "--no-out-link", app ++ "/build.nix"])
     +at : String <- IO.pure(String,
-      W.starting.last(String.lines(R.text(out)), "/nix/store/", ""))
+      O.starting.last(String.lines(R.text(out)), "/nix/store/", ""))
     +same : String <- R.exec(["diff", "-r", app ++ "/.ez/lib/" ++ hash,
       at ++ "/" ++ hash])
     yes("nix rebuilds the package byte for byte", R.ok(same))
-    +ran : String <- R.exec(W.inside(app, ["env", "BEND_HUB=http://127.0.0.1:1",
+    +ran : String <- R.exec(O.inside(app, ["env", "BEND_HUB=http://127.0.0.1:1",
       "BEND_LIB=" ++ at, "bend", "main.bend"]))
     Check.eq_str("the nix tree builds with no hub", answer(ran), "44")
 

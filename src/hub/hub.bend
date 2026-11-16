@@ -55,11 +55,3 @@ def judge(ok: Bool, good: Bool, url: String, body: String) -> Got:
       Miss{url ++ ": " ++ body}
     case True{}:
       judge.hash(good, url, body)
-
-# a fetch's outcome on one line
-def show(got: Got) -> String:
-  match got:
-    case Miss{why}:
-      "miss " ++ why
-    case Have{body}:
-      "have " ++ body

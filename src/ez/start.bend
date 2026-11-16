@@ -32,9 +32,13 @@ def does(ask: Ask) -> String:
     case Run{_as}:
       "ez run runs a project's entry"
 
+# the ledger's path, which is fixed
+def toml() -> String:
+  "ez.toml"
+
 # why a directory with no ez.toml is refused
 def none(ask: Ask) -> String:
-  "ez: no ez.toml here; " ++ does(ask) ++ ", and ez init makes one"
+  "ez: no " ++ toml() ++ " here; " ++ does(ask) ++ ", and ez init makes one"
 
 # the entry file a ledger names, or "main.bend" when it names none
 def entry.or(+file: String) -> String:

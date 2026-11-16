@@ -11,12 +11,12 @@ import ./clock.bend as Clock
 # how many seconds a whole run may take. Five minutes is what the gate is held
 # to; a tree that honestly needs longer says so in EZ_DEADLINE, and "0" turns
 # the budget off for someone bisecting with the cache cold.
-def seconds() -> IO(String):
+def seconds() -> IO(String):  # noqa: L001 IO driver
   Env.var("EZ_DEADLINE", "300")
 
 # the second the run must be finished by, worked out once at the start so that
 # nothing later has to add anything up
-def by(+secs: String) -> IO(String):
+def by(+secs: String) -> IO(String):  # noqa: L001 IO driver
   do IO<String>:
     +out : String <- R.exec(["date", "-d", "+" ++ secs ++ " seconds", "+%s"])
     return String.trim(R.text(out))
@@ -30,7 +30,7 @@ def start.go(keep: Bool, +secs: String) -> IO(String):
       by(secs)
 
 # the deadline, or "" when there is none
-def start(+secs: String) -> IO(String):
+def start(+secs: String) -> IO(String):  # noqa: L001 IO driver
   start.go(Clock.on(secs), secs)
 
 # whether the deadline has gone by
@@ -51,5 +51,5 @@ def over.go(none: Bool, +deadline: String) -> IO(Bool):
 
 # whether the run has outstayed its budget, which a run with no budget never
 # has
-def over(+deadline: String) -> IO(Bool):
+def over(+deadline: String) -> IO(Bool):  # noqa: L001 IO driver
   over.go(String.is_empty(deadline), deadline)

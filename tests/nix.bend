@@ -9,6 +9,7 @@ import ../src/share/sha.bend as Sha
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
+import ../src/check/out.bend as O
 
 # a check whose answer is a yes or a no
 def yes(name: String, ok: Bool) -> IO(Unit):
@@ -16,7 +17,7 @@ def yes(name: String, ok: Bool) -> IO(Unit):
 
 # what a program answered, with bend's update nag taken out of it
 def answer(+out: String) -> String:
-  W.last(String.lines(Q.filter(R.text(out))))
+  O.last(String.lines(Q.filter(R.text(out))))
 
 # a one-file package written into a hub directory, under the name its own
 # manifest's digest gives it
@@ -36,7 +37,7 @@ def lock(+repo: String, +app: String, +hub: String) -> IO(String):
     _t : Bool <- F.write(app ++ "/ez.toml",
       "[package]\nname = \"app\"\nhub = \"" ++ hub ++ "\"\n")
     W.track(app)
-    _o : String <- R.exec(W.ez(repo, app, ["lock"]))
+    _o : String <- R.exec(O.ez(repo, app, ["lock"]))
     +at : String <- W.only(app, "ez.lock.*")
     yes("the lock was written", Bool.not(String.is_empty(at)))
     return at
@@ -50,10 +51,10 @@ def sandbox(+repo: String, +app: String, +hash: String, +lock: String) -> IO(Uni
       "/nix/bend-lib.nix { } " ++ lock ++ "\n")
     +out : String <- R.exec(["nix-build", "--no-out-link", app ++ "/build.nix"])
     +at : String <- IO.pure(String,
-      W.starting.last(String.lines(R.text(out)), "/nix/store/", ""))
+      O.starting.last(String.lines(R.text(out)), "/nix/store/", ""))
     +got : String <- R.exec(["test", "-f", at ++ "/" ++ hash ++ "/src/lib.bend"])
     yes("nix fetched the package through the lock", R.ok(got))
-    +ran : String <- R.exec(W.inside(app, ["env", "BEND_HUB=http://127.0.0.1:1",
+    +ran : String <- R.exec(O.inside(app, ["env", "BEND_HUB=http://127.0.0.1:1",
       "BEND_LIB=" ++ at, "bend", "main.bend"]))
     Check.eq_str("the store path builds with the hub unreachable",
       answer(ran), "42")
@@ -68,7 +69,7 @@ def go(+repo: String, +root: String, +port: String) -> IO(Unit):
     _w : Bool <- F.write(root ++ "/app/main.bend",
       "import Base\nimport " ++ a ++ "/src/lib.bend as A\n\n" ++
       "def main() -> U32:\n  A.double(21)\n")
-    +pid : String <- W.spawn(W.inside(root ++ "/hub", ["python3", "-m",
+    +pid : String <- W.spawn(O.inside(root ++ "/hub", ["python3", "-m",
       "http.server", port, "--bind", "127.0.0.1"]))
     up : Bool <- W.ready(["curl", "-fsS", "--max-time", "5",
       "http://127.0.0.1:" ++ port ++ "/"])

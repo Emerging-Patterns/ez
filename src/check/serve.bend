@@ -124,7 +124,7 @@ def send.done(sr: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>)
   Socket.close(sock)
 
 # one answer written in one go and the connection closed
-def answer(sock: Socket, text: String) -> IO(Unit):
+def answer(sock: Socket, text: String) -> IO(Unit):  # noqa: L001 IO: test server socket write
   do IO<Unit>:
     sr : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(sock, text)
     send.done(sr)
@@ -169,7 +169,7 @@ def piece.go(fuel: Nat, +width: Nat, sock: Socket, +text: String) -> IO(Socket):
 
 # one answer written in pieces of n characters and the connection closed. The
 # fuel is one piece per character, which no answer can outrun.
-def pieces(sock: Socket, width: Nat, +text: String) -> IO(Unit):
+def pieces(sock: Socket, width: Nat, +text: String) -> IO(Unit):  # noqa: L001 IO: test server socket write
   do IO<Unit>:
     sock2 : Socket <- piece.go(String.length(text), width, sock, text)
     Socket.close(sock2)
@@ -300,9 +300,9 @@ def recv.head(fuel: Nat, sock: Socket, +parts: List<&2, String>) -> IO(Socket & 
 # the reads a request may take, 64 KiB at most each: 256 MiB, past any request
 # a test sends. How long a request is is not known until its head has arrived,
 # so the reads cannot be counted up front.
-def reads() -> Nat:
+def reads() -> Nat:  # noqa: L001 fuel for the request read loop, an IO driver
   4096n
 
 # a whole request read off a socket, and the socket it came on
-def request(sock: Socket) -> IO(Socket & String):
+def request(sock: Socket) -> IO(Socket & String):  # noqa: L001 IO: test server socket read
   recv.head(reads(), sock, [])

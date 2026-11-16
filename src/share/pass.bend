@@ -16,5 +16,5 @@ def ezpass.run(cmd: String) -> IO(U32):
   import "./pass.js"
 
 # a program run with its arguments, on ez's own stdio
-def run(argv: List<&2, String>) -> IO(U32):
+def run(argv: List<&2, String>) -> IO(U32):  # noqa: L001 IO: runs a program
   ezpass.run(R.cmd(argv))

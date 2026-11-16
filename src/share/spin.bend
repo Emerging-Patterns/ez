@@ -9,20 +9,20 @@ import snap@1.4.0.0/main.bend as R
 import ./say.bend as Say
 
 # one fd of this process, as a path. A failure is not a terminal.
-def link(+fd: String) -> IO(String):
+def link(+fd: String) -> IO(String):  # noqa: L001 IO: the spinner
   do IO<String>:
     +out : String <- R.exec(["sh", "-c", Say.probe(), "sh", fd])
     return String.trim(R.text(out))
 
 # the terminal this process writes to, stderr's first, or empty for none
-def dev() -> IO(String):
+def dev() -> IO(String):  # noqa: L001 IO: the spinner
   do IO<String>:
     +err : String <- link("2")
     +out : String <- link("1")
     return Say.tty.pick(err, out)
 
 # the mark, when there is a terminal to draw it on
-def start(on: Bool, +dev: String, +msg: String) -> IO(Say.Spin):
+def start(on: Bool, +dev: String, +msg: String) -> IO(Say.Spin):  # noqa: L001 IO: the spinner
   match on:
     case False{}:
       IO.pure(Say.Spin, Say.Spin{"", "", ""})
@@ -42,14 +42,14 @@ def hold.at(plain: Bool, +dev: String, +msg: String) -> IO(Say.Spin):
 
 # the line, then the mark when a terminal will show it moving. A pipe gets
 # the line and nothing else.
-def hold(+msg: String) -> IO(Say.Spin):
+def hold(+msg: String) -> IO(Say.Spin):  # noqa: L001 IO: the spinner
   do IO<Say.Spin>:
     +tty : String <- dev()
     hold.at(String.is_empty(tty), tty, msg)
 
 # a spinner that never started still owes its line, unless the plain path
 # already printed it and left the message empty
-def owed(empty: Bool, +msg: String) -> IO(Unit):
+def owed(empty: Bool, +msg: String) -> IO(Unit):  # noqa: L001 IO: the spinner
   match empty:
     case True{}:
       IO.pure(Unit, Unit{})
@@ -71,6 +71,6 @@ def done.bad(bad: Bool, +dev: String, +pid: String, +msg: String) -> IO(Unit):
       done.live(dev, pid, msg)
 
 # the step finished: the mark stopped and the line left, or the line owed
-def done(spin: Say.Spin) -> IO(Unit):
+def done(spin: Say.Spin) -> IO(Unit):  # noqa: L001 IO: the spinner
   Say.Spin{+term, +pid, +msg} = spin
   done.bad(Bool.or(String.is_empty(pid), String.eq(pid, "0")), term, pid, msg)

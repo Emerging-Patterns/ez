@@ -1581,13 +1581,6 @@ def resumed.fuel(+tree: Tree, +st: State) -> Nat:
   State{_seen, _out, _stop, queue} = st
   (List.length(&2, Task, queue) + walk.fuel(fs) : Nat)
 
-# how many files the walk from disk may ask for. It asks for one file a round
-# and cannot know how many the checkout holds until it has read them, so this
-# is a guard against a walk that keeps asking, not a limit on a package: a
-# package of more files than this is refused, never hashed short.
-def asks() -> Nat:
-  100000n
-
 # the walk over what has been read so far, and each file it asks for read
 # and handed back, until it no longer asks
 def pkg.ask(fuel: Nat, +top: String, +entry: String, +eb: String, +tree: Tree, +st: State) -> IO(Pkg):
@@ -1602,12 +1595,16 @@ def pkg.ask(fuel: Nat, +top: String, +entry: String, +eb: String, +tree: Tree, +
 # the package an entry would be published as, walked over its checkout: the
 # entry and every file the walk reaches are paths from `top`, read from disk
 # as the walk asks for them. An import that climbs above `top` is refused.
+# The walk may ask for 100000 files. It asks for one file a round and cannot
+# know how many the checkout holds until it has read them, so that is a guard
+# against a walk that keeps asking, not a limit on a package: a package of
+# more files than this is refused, never hashed short.
 def walk.io(+top: String, +entry: String) -> IO(Pkg):
-  pkg.ask(asks(), top, entry, P.base(entry), Tree{False{}, [], []},
+  pkg.ask(100000n, top, entry, P.base(entry), Tree{False{}, [], []},
     start(entry))
 
 # the package an entry of a checkout would be published as
-def pkg_in(+top: String, +entry: String) -> IO(Pkg):
+def pkg_in(+top: String, +entry: String) -> IO(Pkg):  # noqa: L001 IO driver
   walk.io(top, P.norm(entry))
 
 # an entry named from the working directory is walked over the working
@@ -1623,7 +1620,7 @@ def pkg.from(abs: Bool, +entry: String) -> IO(Pkg):
 # every foreign body beside them, and the hash over their manifest. A relative
 # entry's checkout is the working directory, which is the project a command
 # runs in.
-def pkg_of(+entry: String) -> IO(Pkg):
+def pkg_of(+entry: String) -> IO(Pkg):  # noqa: L001 IO driver
   pkg.from(String.starts_with(entry, "/"), entry)
 
 # the hash that names a package

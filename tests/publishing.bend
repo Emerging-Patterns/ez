@@ -14,6 +14,7 @@ import ../src/ez/quiet.bend as Q
 import ../src/pub/plan.bend as P
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
+import ../src/check/out.bend as O
 
 # a check whose answer is a yes or a no
 def yes(name: String, ok: Bool) -> IO(Unit):
@@ -56,7 +57,7 @@ def path() -> IO(String):
 # assignments before the command, and `W.inside` has already put an `env`
 # there.
 def ez(+repo: String, +app: String, vars: List<&2, String>, args: List<&2, String>) -> List<&2, String>:
-  W.inside(app, List.append(&2, String, vars,
+  O.inside(app, List.append(&2, String, vars,
     List.append(&2, String, [repo ++ "/bin/ez.bin"], args)))
 
 # the project being published: the nested layout `tests/publish.bend` uses, so
@@ -120,11 +121,11 @@ def consumer(+root: String, +hub: String, +hash: String) -> IO(Unit):
     _w : Bool <- F.write(root ++ "/consumer/main.bend",
       "import Base\nimport " ++ hash ++ "/lib.bend as Lib\n\n" ++
       "def main() -> U32:\n  Lib.quad(11)\n")
-    +out : String <- R.exec(W.inside(root ++ "/consumer",
+    +out : String <- R.exec(O.inside(root ++ "/consumer",
       ["env", "BEND_HUB=" ++ hub, "BEND_LIB=" ++ root ++ "/consumer/lib",
         "bend", "main.bend"]))
     Check.eq_str("a consumer's import of that name resolves and runs",
-      W.last(said(out)), "44")
+      O.last(said(out)), "44")
 
 # the tree clean, the hub up, and the package sent. Two lines come back: the
 # name ez computed, and the import line a consumer would write. Before the
@@ -137,11 +138,11 @@ def publishes(+repo: String, +app: String, +root: String, +hub: String) -> IO(St
     yes("publish sends from a tree whose only extra files are ignored",
       R.ok(out))
     +ls : List<&2, String> <- IO.pure(List<&2, String>, reported(out))
-    +hash : String <- IO.pure(String, W.nth(ls, 0n))
+    +hash : String <- IO.pure(String, O.nth(ls, 0n))
     yes("and reports a 0x name and nothing else on its first line",
       P.is_name(hash))
     Check.eq_str("and then the import line a consumer would write",
-      W.nth(ls, 1n), "import " ++ hash ++ "/lib.bend as Lib")
+      O.nth(ls, 1n), "import " ++ hash ++ "/lib.bend as Lib")
     yes("and says, on stderr, the line the hub describes it by",
       String.contains(R.text(out), "hub description: import Base"))
     m : Maybe<&2, String> <- F.read(root ++ "/hub/" ++ hash ++ "/manifest")
@@ -208,7 +209,7 @@ def go(+repo: String, +root: String, +port: String) -> IO(Unit):
   +hub = "http://127.0.0.1:" ++ port
   do IO<Unit>:
     project(app)
-    _i : String <- R.exec(W.ez(repo, app, ["init", "myapp", "src/lib.bend"]))
+    _i : String <- R.exec(O.ez(repo, app, ["init", "myapp", "src/lib.bend"]))
     refuses.dirty(repo, app, hub)
     commit(app)
     ignored(app)

@@ -22,23 +22,6 @@ import ../ws/run.bend as WsRun
 import ./relock.bend as AR
 import ../ws/relock.bend as Rel
 
-# the World with more answers in it
-def more(world: AR.World, rs: List<&2, Up.Reply>) -> AR.World:
-  AR.World{A.World{args, here, home, ledger, ignore, replies, hubs}, listing, locks} = world
-  AR.World{A.World{args, here, home, ledger, ignore, List.append(&2, Up.Reply, replies, rs), hubs},
-    listing, locks}
-
-# the World with more of the hub's answers in it
-def more.hub(world: AR.World, rs: List<&2, W.Reply>) -> AR.World:
-  AR.World{A.World{args, here, home, ledger, ignore, replies, hubs}, listing, locks} = world
-  AR.World{A.World{args, here, home, ledger, ignore, replies, List.append(&2, W.Reply, hubs, rs)},
-    listing, locks}
-
-# the World with more of the lock's answers in it
-def more.lock(world: AR.World, rs: List<&2, W.Reply>) -> AR.World:
-  AR.World{a, listing, locks} = world
-  AR.World{a, listing, List.append(&2, W.Reply, locks, rs)}
-
 # the planner's step: its questions answered and the loop gone round again,
 # or its plan run
 def loop.step(st: AR.Next, +lib: String, world: AR.World, go: AR.World -> IO(Unit)) -> IO(Unit):
@@ -46,15 +29,15 @@ def loop.step(st: AR.Next, +lib: String, world: AR.World, go: AR.World -> IO(Uni
     case AR.AskGit{asks}:
       do IO<Unit>:
         rs : List<&2, Up.Reply> <- Run.answer.ups(lib, asks)
-        go(more(world, rs))
+        go(AR.more(world, rs))
     case AR.AskHub{asks}:
       do IO<Unit>:
         rs : List<&2, W.Reply> <- Run.answer.all(lib, asks)
-        go(more.hub(world, rs))
+        go(AR.more.hub(world, rs))
     case AR.AskLock{asks}:
       do IO<Unit>:
         rs : List<&2, W.Reply> <- Run.answer.all(lib, asks)
-        go(more.lock(world, rs))
+        go(AR.more.lock(world, rs))
     case AR.Planned{pl}:
       Run.exec.plan(lib, pl)
 
@@ -62,12 +45,17 @@ def loop.step(st: AR.Next, +lib: String, world: AR.World, go: AR.World -> IO(Uni
 # target and two for a name; the lock after it asks a round per level of the
 # import graph, as `ez lock` does (`Run.rounds`). This is only a guard against
 # a planner that keeps asking, and running out of it dies loudly.
-def rounds() -> Nat:
+def rounds() -> Nat:  # noqa: L001 the IO loop's fuel
   100000n
 
 # the loop, under fuel. Every round adds an answer, since the planner never
 # asks what the World answers already, so the fuel is only a guard.
-def loop(fuel: Nat, +lib: String, +ws: Rel.Ws, +world: AR.World) -> IO(Unit):
+def loop(  # noqa: L001 IO driver: the interpreter's loop
+  fuel: Nat,
+  +lib: String,
+  +ws: Rel.Ws,
+  +world: AR.World
+) -> IO(Unit):
   match fuel:
     case 0n:
       IO.die(Unit, 1, "ez: ez add kept asking questions")
@@ -75,7 +63,12 @@ def loop(fuel: Nat, +lib: String, +ws: Rel.Ws, +world: AR.World) -> IO(Unit):
       loop.step(Rel.add.next(ws, world), lib, world, w => loop(f, lib, ws, w))
 
 # `ez add <target> [ref] [entry.bend] [--rename NAME]`
-def run(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Unit):
+def run(  # noqa: L001 IO entry of the command
+  +target: String,
+  +ref: String,
+  +entry: String,
+  +rename: String
+) -> IO(Unit):
   do IO<Unit>:
     lib : String <- Run.bend.lib()
     +pwd : String <- R.exec(["pwd"])

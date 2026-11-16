@@ -62,11 +62,11 @@ def get.loc(loc: Url.Loc, url: String) -> IO(String):
       get.scheme(String.eq(scheme, "file"), url, path)
 
 # the body at a url: "0" and the body, or a status and the reason
-def get(+url: String) -> IO(String):
+def get(+url: String) -> IO(String):  # noqa: L001 IO: fetches over HTTP
   get.loc(Http.parse_url(url), url)
 
 # the file at a url, accepted only when it hashes to `want`
-def fetch(+url: String, want: String) -> IO(Hub.Got):
+def fetch(+url: String, want: String) -> IO(Hub.Got):  # noqa: L001 IO: fetches over HTTP
   do IO<Hub.Got>:
     +out : String <- get(url)
     return Hub.judge(R.ok(out), Hub.matches(want, R.text(out)), url, R.text(out))

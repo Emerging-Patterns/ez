@@ -226,3 +226,18 @@ def next.add(nx: AP.Next, +world: World) -> Next:
 # what the interpreter does next on a World
 def next(+world: World) -> Next:
   next.add(AP.next(add(world)), world)
+
+# the World with more of git's answers in the add's World
+def more(world: World, rs: List<&2, Up.Reply>) -> World:
+  World{a, listing, locks} = world
+  World{A.more(a, rs), listing, locks}
+
+# the World with more of the hub's answers in the add's World
+def more.hub(world: World, rs: List<&2, W.Reply>) -> World:
+  World{a, listing, locks} = world
+  World{A.more.hub(a, rs), listing, locks}
+
+# the World with more of the lock's answers in it
+def more.lock(world: World, rs: List<&2, W.Reply>) -> World:
+  World{a, listing, locks} = world
+  World{a, listing, List.append(&2, W.Reply, locks, rs)}

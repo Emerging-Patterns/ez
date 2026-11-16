@@ -136,3 +136,8 @@ def heard(rs: List<&2, Reply>, ask: Ask) -> Heard:
 # the answer the sources question has had on a World, or none yet
 def sources(world: World) -> Heard:
   heard(replies(world), Sources{})
+
+# the World with more answers in it
+def more(world: World, rs: List<&2, Reply>) -> World:
+  World{cc, lib, ledger, lock, replies} = world
+  World{cc, lib, ledger, lock, List.append(&2, Reply, replies, rs)}

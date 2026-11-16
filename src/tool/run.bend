@@ -29,6 +29,7 @@ import ../fetch/run.bend as FetchRun
 import ../pkg/path.bend as P
 import ../run/bend.bend as Bend
 import ../share/cap.bend as Cap
+import ../share/capped.bend as Capped
 import ../share/say.bend as Say
 import ../share/spin.bend as Spin
 import ../share/pass.bend as Pass
@@ -39,7 +40,7 @@ import ./plan.bend as TP
 # answering
 
 # the first line, or nothing
-def line0(ls: List<&2, String>) -> String:
+def line0(ls: List<&2, String>) -> String:  # noqa: L001 reads bend's banner for the IO driver
   match ls:
     case []:
       ""
@@ -97,7 +98,9 @@ def said.top(+out: String) -> String:
 # what git says of a path that has a real path: the top of its checkout,
 # HEAD, and what `git status` names, untracked files included whatever the
 # repository's own settings hide
-def located(+abs: String) -> IO(TW.Answer):
+def located(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  +abs: String
+) -> IO(TW.Answer):
   do IO<TW.Answer>:
     +top : String <- R.exec(["git", "-C", abs, "rev-parse", "--show-toplevel"])
     +head : String <- R.exec(["git", "-C", abs, "rev-parse", "HEAD"])
@@ -115,13 +118,15 @@ def locate.real(ok: Bool, +path: String, +text: String) -> IO(TW.Answer):
       located(String.trim(text))
 
 # a local path, made real, and what git says of it
-def locate(+path: String) -> IO(TW.Answer):
+def locate(  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
+  +path: String
+) -> IO(TW.Answer):
   do IO<TW.Answer>:
     +out : String <- R.exec(["realpath", path])
     locate.real(R.ok(out), path, R.text(out))
 
 # one question answered
-def answer(ask: TW.Ask) -> IO(TW.Answer):
+def answer(ask: TW.Ask) -> IO(TW.Answer):  # noqa: L001 IO: answers the planner's questions (trusted in src/ez/app.bend)
   match ask:
     case TW.Read{path}:
       do IO<TW.Answer>:
@@ -144,12 +149,6 @@ def answer.all(asks: List<&2, TW.Ask>) -> IO(List<&2, TW.Reply>):
         a : TW.Answer <- answer(h)
         rest : List<&2, TW.Reply> <- answer.all(t)
         return TW.Reply{h, a} <> rest
-
-# the World with more answers in it
-def more(world: TW.World, rs: List<&2, TW.Reply>, us: List<&2, Up.Reply>) -> TW.World:
-  TW.World{a, t, want, here, env, bend, ledger, lock, replies, ups} = world
-  TW.World{a, t, want, here, env, bend, ledger, lock, List.append(&2, TW.Reply, replies, rs),
-    List.append(&2, Up.Reply, ups, us)}
 
 # ---------------------------------------------------------------------------
 # executing
@@ -177,14 +176,18 @@ def compile.said(ok: Bool, +why: String, +text: String) -> IO(Unit):
         IO.die(Unit, 1, "")
 
 # `bend <file> -o <out>` under the memory cap, with the checkout's library
-def compile(+lib: String, +file: String, +out: String) -> IO(Unit):
+def compile(  # noqa: L001 IO: runs the plan (trusted in src/ez/app.bend)
+  +lib: String,
+  +file: String,
+  +out: String
+) -> IO(Unit):
   do IO<Unit>:
     +on : Bool <- Cap.ok()
     Cap.warn.err(on)
     +g : String <- Cap.gb()
     _mk : String <- R.exec(["mkdir", "-p", P.dir(out)])
-    +bin : String <- R.exec(Cap.argv(on, g, lib, ["bend", file, "-o", out]))
-    compile.said(R.ok(bin), Cap.why(bin, g), R.text(bin))
+    +bin : String <- R.exec(Capped.argv(on, g, lib, ["bend", file, "-o", out]))
+    compile.said(R.ok(bin), Capped.why(bin, g), R.text(bin))
 
 # the library a build reads: an ez project's lock fetched into it as `ez
 # fetch` fetches one, with every relative path in it read from the
@@ -215,7 +218,7 @@ def exec.make(making: TP.Make) -> IO(Unit):
         Run.write(at, key)
 
 # the lines a person is told, each on stderr
-def tell(ls: List<&2, String>) -> IO(Unit):
+def tell(ls: List<&2, String>) -> IO(Unit):  # noqa: L001 IO: runs the plan (trusted in src/ez/app.bend)
   match ls:
     case []:
       IO.pure(Unit, Unit{})
@@ -270,20 +273,20 @@ def loop.step(st: TP.Step, world: TW.World, go: TW.World -> IO(Unit)) -> IO(Unit
       do IO<Unit>:
         rs : List<&2, TW.Reply> <- answer.all(asks)
         us : List<&2, Up.Reply> <- Run.answer.ups("", ups)
-        go(more(world, rs, us))
+        go(TW.more(world, rs, us))
     case TP.Run{pl}:
       exec.plan(pl)
 
 # the rounds the loop may take. The planner asks at most five rounds, so this
 # is only a guard against a planner that keeps asking, and running out of it
 # dies loudly.
-def rounds() -> Nat:
+def rounds() -> Nat:  # noqa: L001 the IO loop's fuel
   100n
 
 # the loop, under fuel. Every round adds an answer, since the planner never
 # asks what the World answers already, and it asks at most five rounds, so
 # the fuel is only a guard.
-def loop(fuel: Nat, +world: TW.World) -> IO(Unit):
+def loop(fuel: Nat, +world: TW.World) -> IO(Unit):  # noqa: L001 IO driver: the interpreter's loop
   match fuel:
     case 0n:
       IO.die(Unit, 1, "ez: ez tool kept asking questions")
@@ -291,7 +294,7 @@ def loop(fuel: Nat, +world: TW.World) -> IO(Unit):
       loop.step(TP.step(world), world, w => loop(f, w))
 
 # a variable, "" when it is unset
-def var(name: String) -> IO(String):
+def var(name: String) -> IO(String):  # noqa: L001 IO: reads an environment variable
   do IO<String>:
     r : Result<&1, &1, U32 & String, String> <- IO.get_env(name)
     return Run.env.text(r)
@@ -304,7 +307,7 @@ def bend.is() -> IO(String):
     return Bool.pick(String, R.ok(out), line0(String.lines(String.trim(R.text(out)))), "")
 
 # the variables the tool commands read
-def env() -> IO(TW.Env):
+def env() -> IO(TW.Env):  # noqa: L001 IO: reads the environment
   do IO<TW.Env>:
     +b : String <- var("EZ_TOOL_BIN")
     +x : String <- var("XDG_BIN_HOME")
@@ -315,7 +318,7 @@ def env() -> IO(TW.Env):
 
 # one target, run, installed or upgraded, over the project's ledger and lock,
 # building the file `want` names when it names one
-def go(
+def go(  # noqa: L001 IO driver
   act: TW.Act,
   +target: String,
   +want: String,
@@ -328,7 +331,7 @@ def go(
   loop(rounds(), TW.World{act, target, want, here, vars, bend, led, lock, [], []})
 
 # `ez tool run [--entry <file>] <target> [-- args…]`, `install` and `upgrade`
-def run(act: TW.Act, +target: String, +want: String) -> IO(Unit):
+def run(act: TW.Act, +target: String, +want: String) -> IO(Unit):  # noqa: L001 IO entry of the command
   do IO<Unit>:
     +pwd : String <- R.exec(["pwd"])
     +vars : TW.Env <- env()
@@ -369,7 +372,7 @@ def sync.go(
     Run.end(TP.sync.outcome(synced))
 
 # `ez tool sync`: every pin the ledger names, installed at its lock rev
-def sync() -> IO(Unit):
+def sync() -> IO(Unit):  # noqa: L001 IO entry of the command
   do IO<Unit>:
     +pwd : String <- R.exec(["pwd"])
     +vars : TW.Env <- env()

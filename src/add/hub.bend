@@ -425,23 +425,6 @@ def asks.hub(as: List<&2, W.Ask>, +hub: String) -> Bool:
       +rest = asks.hub(t, hub)
       Bool.and(String.eq(ask.hub(h), hub), rest)
 
-# whether a question asks the hub what a name names
-def names.one(ask: W.Ask) -> Bool:
-  match ask:
-    case W.Name{_nv, _hub}:
-      True{}
-    case _:
-      False{}
-
-# whether any question does
-def names(as: List<&2, W.Ask>) -> Bool:
-  match as:
-    case []:
-      False{}
-    case h <> t:
-      +rest = names(t)
-      Bool.or(names.one(h), rest)
-
 # the last of some lines, `prev` when there are none after it
 def last.go(ls: List<&2, String>, +prev: String) -> String:
   match ls:

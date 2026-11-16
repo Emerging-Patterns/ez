@@ -8,6 +8,7 @@ import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
+import ../src/check/out.bend as O
 
 # a check whose answer is a yes or a no
 def yes(name: String, ok: Bool) -> IO(Unit):
@@ -39,7 +40,7 @@ def stanza(+text: String, +head: String) -> String:
 # what a program answered, with bend's update nag taken out of it, since a
 # run's output and bend's own lines arrive on the same stream
 def answer(+out: String) -> String:
-  W.last(String.lines(Q.filter(R.text(out))))
+  O.last(String.lines(Q.filter(R.text(out))))
 
 # the upstream package: a repo with one file, committed and never published
 def upstream(+at: String) -> IO(String):
@@ -53,7 +54,7 @@ def upstream(+at: String) -> IO(String):
     _c : String <- R.exec(["git", "-C", at, "-c", "user.email=t@t",
       "-c", "user.name=t", "commit", "-q", "-m", "init"])
     +rev : String <- R.exec(["git", "-C", at, "rev-parse", "HEAD"])
-    return W.line(rev)
+    return O.line(rev)
 
 # that repo served the way a real remote is, so `ez add` reaches it over the
 # protocol and not over the file system
@@ -75,7 +76,7 @@ def serve(+at: String, +port: String) -> IO(String):
 # the ledger, the lock and the vendored tree, each asked what it holds
 def ledger(+repo: String, +app: String, +url: String, +rev: String) -> IO(String):
   do IO<String>:
-    _i : String <- R.exec(W.ez(repo, app, ["init", "myapp", "main.bend"]))
+    _i : String <- R.exec(O.ez(repo, app, ["init", "myapp", "main.bend"]))
     t : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
     Check.eq_str("init writes a ledger", Q.chomp(F.text_of(t)),
       "[package]\nname = \"myapp\"\nentry = \"main.bend\"")
@@ -84,10 +85,10 @@ def ledger(+repo: String, +app: String, +url: String, +rev: String) -> IO(String
       Q.chomp(F.text_of(e)),
       "# myapp: TODO describe myapp\nimport Base\nimport ./src/lib.bend as Lib\n\n" ++
         "def main() -> IO(Unit):\n  IO.print(Lib.greeting())")
-    _a : String <- R.exec(W.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
+    _a : String <- R.exec(O.ez(repo, app, ["add", url, rev, "src/lib.bend"]))
     +t2 : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
-    +hash : String <- IO.pure(String, W.value(F.text_of(t2), "hash"))
-    +nar : String <- IO.pure(String, W.value(F.text_of(t2), "narHash"))
+    +hash : String <- IO.pure(String, O.value(F.text_of(t2), "hash"))
+    +nar : String <- IO.pure(String, O.value(F.text_of(t2), "narHash"))
     Check.eq_str("add records the package under its name",
       stanza(F.text_of(t2), "[deps.upstream]"),
       "[deps.upstream]\nhash = \"" ++ hash ++ "\"\ngit = \"" ++ url ++
@@ -105,14 +106,14 @@ def project(+repo: String, +app: String, +hash: String, +rev: String) -> IO(Unit
       "import Base\nimport " ++ hash ++ "/lib.bend as L\n\n" ++
       "def main() -> U32:\n  L.double(21)\n")
     W.track(app)
-    _l : String <- R.exec(W.ez(repo, app, ["lock"]))
+    _l : String <- R.exec(O.ez(repo, app, ["lock"]))
     +at : String <- W.only(app, "ez.lock.*")
     +lock : Maybe<&2, String> <- F.read(at)
     yes("lock records the git source",
       Bool.and(String.contains(F.text_of(lock), "git"),
         String.contains(F.text_of(lock), rev)))
     W.rm(app ++ "/.ez/lib")
-    _f : String <- R.exec(W.ez(repo, app, ["fetch"]))
+    _f : String <- R.exec(O.ez(repo, app, ["fetch"]))
     +got : String <- R.exec(["test", "-f",
       app ++ "/.ez/lib/" ++ hash ++ "/lib.bend"])
     yes("fetch fills BEND_LIB from the lock alone", R.ok(got))
@@ -120,9 +121,9 @@ def project(+repo: String, +app: String, +hash: String, +rev: String) -> IO(Unit
 # what `ez` says once there is no remote left to ask
 def offline(+repo: String, +app: String) -> IO(Unit):
   do IO<Unit>:
-    +ck : String <- R.exec(W.ez(repo, app, ["check"]))
+    +ck : String <- R.exec(O.ez(repo, app, ["check"]))
     yes("check passes with the git remote gone", R.ok(ck))
-    +rn : String <- R.exec(W.ez(repo, app, ["run"]))
+    +rn : String <- R.exec(O.ez(repo, app, ["run"]))
     Check.eq_str("run gives the program's answer", answer(rn), "42")
 
 # the test runner, on a file that prints its trailer and then on one that does
@@ -132,12 +133,12 @@ def runner(+repo: String, +app: String) -> IO(Unit):
     W.mkdir(app ++ "/src/tests")
     _w : Bool <- F.write(app ++ "/src/tests/ok.bend",
       "import Base\n\ndef main() -> IO(Unit):\n  IO.print(\"ok one\")\n\n#|ok one\n")
-    +good : String <- R.exec(W.ez(repo, app, ["test"]))
+    +good : String <- R.exec(O.ez(repo, app, ["test"]))
     Check.eq_str("test passes a file that prints its trailer", answer(good),
       "PASS: 1 / 1")
     _b : Bool <- F.write(app ++ "/src/tests/bad.bend",
       "import Base\n\ndef main() -> IO(Unit):\n  IO.print(\"ok one\")\n\n#|ok two\n")
-    +bad : String <- R.exec(W.ez(repo, app, ["test"]))
+    +bad : String <- R.exec(O.ez(repo, app, ["test"]))
     yes("test fails a file that does not", Bool.not(R.ok(bad)))
     W.rm(app ++ "/src/tests/bad.bend")
 
@@ -145,19 +146,19 @@ def runner(+repo: String, +app: String) -> IO(Unit):
 # the package is dropped from the ledger while the import line stays
 def drifted(+repo: String, +app: String, +hash: String) -> IO(Unit):
   do IO<Unit>:
-    +ok : String <- R.exec(W.ez(repo, app, ["doctor"]))
+    +ok : String <- R.exec(O.ez(repo, app, ["doctor"]))
     yes("doctor passes a project with nothing wrong", R.ok(ok))
-    _r : String <- R.exec(W.ez(repo, app, ["remove", "upstream"]))
+    _r : String <- R.exec(O.ez(repo, app, ["remove", "upstream"]))
     +t : Maybe<&2, String> <- F.read(app ++ "/ez.toml")
     yes("remove drops it from the ledger",
       Bool.not(String.contains(F.text_of(t), "deps.upstream")))
     Check.eq_str("and leaves the package stanza alone",
-      W.value(F.text_of(t), "name"), "myapp")
-    +bad : String <- R.exec(W.ez(repo, app, ["doctor"]))
+      O.value(F.text_of(t), "name"), "myapp")
+    +bad : String <- R.exec(O.ez(repo, app, ["doctor"]))
     yes("doctor reports a hash the ledger no longer names",
       String.contains(R.text(bad), "drift: " ++ hash ++ " is imported"))
     yes("and that drift fails the command", Bool.not(R.ok(bad)))
-    +no : String <- R.exec(W.ez(repo, app, ["nonsense"]))
+    +no : String <- R.exec(O.ez(repo, app, ["nonsense"]))
     yes("an unknown subcommand fails", Bool.not(R.ok(no)))
 
 # everything, once the scratch directory, the port and the binary are known

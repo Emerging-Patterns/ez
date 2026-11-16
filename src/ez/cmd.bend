@@ -10,6 +10,7 @@ import ../lock/plan.bend as P
 import ../share/env.bend as Env
 import ../share/exec.bend as Exec
 import ../share/cap.bend as Cap
+import ../share/capped.bend as Capped
 import ../share/args.bend as Args
 import ../ez/ends.bend as E
 import ../ez/start.bend as S
@@ -20,20 +21,16 @@ import ../add/run.bend as AddRun
 import ../fetch/run.bend as FetchRun
 import ../pub/run.bend as PubRun
 
-# the ledger's path, which is fixed
-def toml() -> String:
-  "ez.toml"
-
 # what `ez check`, `ez build` or `ez run` does, decided from ez.toml as it is
 # on disk (`S.start`): a missing or unreadable ledger is refused before
 # anything is started or made
-def started(+ask: S.Ask) -> IO(S.Start):
+def started(+ask: S.Ask) -> IO(S.Start):  # noqa: L001 IO driver
   do IO<S.Start>:
-    t : Maybe<&2, String> <- F.read(toml())
+    t : Maybe<&2, String> <- F.read(S.toml())
     return S.start(ask, t)
 
 # a refusal said, and the command ended on it with exit 1
-def refused(+why: String) -> IO(Unit):
+def refused(+why: String) -> IO(Unit):  # noqa: L001 IO driver
   Run.end(P.Refused{why})
 
 # a build's output, printed with a word in front of it for a run the kernel
@@ -80,7 +77,7 @@ def check.go(start: S.Start) -> IO(Unit):
         Run.end(E.checked(out))
 
 # `ez check`
-def check() -> IO(Unit):
+def check() -> IO(Unit):  # noqa: L001 IO driver
   do IO<Unit>:
     start : S.Start <- started(S.Check{})
     check.go(start)
@@ -99,10 +96,10 @@ def build.go(start: S.Start, +out: String) -> IO(Unit):
         Cap.warn(cap)
         +g : String <- Cap.gb()
         +bin : String <- Cap.run(cap, line)
-        report.capped(Cap.why(bin, g), bin)
+        report.capped(Capped.why(bin, g), bin)
 
 # `ez build [out]`
-def build(+out: String) -> IO(Unit):
+def build(+out: String) -> IO(Unit):  # noqa: L001 IO driver
   do IO<Unit>:
     start : S.Start <- started(S.Build{out})
     build.go(start, out)
@@ -128,7 +125,7 @@ def run.go(+start: S.Start) -> IO(Unit):
 
 # `ez run [args..]`: the entry run by bend, which checks it first, with every
 # word after `run`, as `cargo run` runs a project's binary
-def run(as: List<&2, String>) -> IO(Unit):
+def run(as: List<&2, String>) -> IO(Unit):  # noqa: L001 IO driver
   do IO<Unit>:
     +start : S.Start <- started(S.Run{as})
     run.go(start)
@@ -137,7 +134,7 @@ def run(as: List<&2, String>) -> IO(Unit):
 # the hub once the tree is clean and git tracks every file of the package,
 # and bend's answer checked against the `0x` name ez computed. A ledger that
 # is missing or does not parse is refused, and nothing is sent.
-def publish() -> IO(Unit):
+def publish() -> IO(Unit):  # noqa: L001 IO driver
   PubRun.run()
 
 # `ez lock`, plain or `--upgrade`, is the planner's
@@ -157,17 +154,17 @@ def lock.go(flags: P.Outcome, up: Bool, +name: String) -> IO(Unit):
       Run.end(P.Refused{why})
 
 # `ez lock` and `ez lock --upgrade [--package NAME]`
-def lock(+up: Bool, +name: String) -> IO(Unit):
+def lock(+up: Bool, +name: String) -> IO(Unit):  # noqa: L001 IO driver
   lock.go(E.lock.flags(up, name), up, name)
 
 # `ez fetch`, planned by fetch/plan.bend: BEND_LIB filled from the lock, with
 # nothing re-resolved, and nothing laid unless every package checks
-def fetch() -> IO(Unit):
+def fetch() -> IO(Unit):  # noqa: L001 IO driver
   FetchRun.run()
 
 # `ez init [name] [entry.bend] [--description TEXT]`: a new project, planned
 # by init/plan.bend
-def init(+asked: String, +file: String, +desc: String) -> IO(Unit):
+def init(+asked: String, +file: String, +desc: String) -> IO(Unit):  # noqa: L001 IO driver
   InitRun.run(asked, file, desc)
 
 # `ez add <target> [rev|tag|branch] [entry.bend] [--rename NAME]`, planned by
@@ -175,9 +172,9 @@ def init(+asked: String, +file: String, +desc: String) -> IO(Unit):
 # shapes `ez tool run` takes, or a hub package's `<name>@<version>`
 # (add/hub.bend). A missing ref is resolved, and a missing entry is read from
 # the checkout, or from the package the hub serves.
-def add(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Unit):
+def add(+target: String, +ref: String, +entry: String, +rename: String) -> IO(Unit):  # noqa: L001 IO driver
   AddRun.run(target, ref, entry, rename)
 
 # `ez remove <name>`, planned by remove/plan.bend
-def remove(+name: String) -> IO(Unit):
+def remove(+name: String) -> IO(Unit):  # noqa: L001 IO driver
   RemoveRun.run(name)

@@ -9,29 +9,12 @@ import ../io/file.bend as F
 import ./nar.bend as Nar
 
 # a command's output as it printed it, or the walk stopped with why it failed
-def said(ok: Bool, +why: String, +text: String) -> IO(String):
+def said(ok: Bool, +why: String, +text: String) -> IO(String):  # noqa: L001 IO: reads the tree off the disk
   match ok:
     case False{}:
       IO.die(String, 1, "ez: nar hash: " ++ why ++ text)
     case True{}:
       IO.pure(String, text)
-
-# what a program printed, with the status line in front of it taken off and
-# nothing else touched
-def printed.at(ends: Bool, tail: String, rest: Unit -> String) -> String:
-  match ends:
-    case True{}:
-      tail
-    case False{}:
-      rest(Unit{})
-
-# the output after its first newline
-def printed(out: String) -> String:
-  match out:
-    case SNil{}:
-      ""
-    case SCon{c, +t}:
-      printed.at(Char.is_eq(c, '\n'), t, _u => printed(t))
 
 # a path of the tree, as the file effect is to open it
 def under.top(+top: String, +at: String) -> String:
@@ -91,7 +74,7 @@ def ent.of(+top: String, row: Nar.Row) -> IO(Nar.Ent):
   ent.read(String.eq(kind, "f"), kind, mode, name, at, target, under.top(top, at))
 
 # every path of the listing, read
-def ents(+top: String, rs: List<&2, Nar.Row>) -> IO(List<&2, Nar.Ent>):
+def ents(+top: String, rs: List<&2, Nar.Row>) -> IO(List<&2, Nar.Ent>):  # noqa: L001 IO: reads the tree off the disk
   match rs:
     case []:
       IO.pure(List<&2, Nar.Ent>, [])
@@ -102,7 +85,7 @@ def ents(+top: String, rs: List<&2, Nar.Row>) -> IO(List<&2, Nar.Ent>):
         return e <> rest
 
 # the tree's node, or the walk stopped when the listing made none
-def built(got: Maybe<&2, String>, +path: String) -> IO(String):
+def built(got: Maybe<&2, String>, +path: String) -> IO(String):  # noqa: L001 IO: reads the tree off the disk
   match got:
     case None{}:
       IO.die(String, 1, "ez: nar hash: " ++ path ++ ": the listing does not make a tree")
@@ -110,15 +93,15 @@ def built(got: Maybe<&2, String>, +path: String) -> IO(String):
       IO.pure(String, node)
 
 # the NAR serial of one path
-def dump(+path: String) -> IO(String):
+def dump(+path: String) -> IO(String):  # noqa: L001 IO: reads the tree off the disk
   do IO<String>:
     +out : String <- R.exec(Nar.listing.argv(path))
-    text : String <- said(R.ok(out), path ++ ": ", printed(out))
+    text : String <- said(R.ok(out), path ++ ": ", R.text(out))
     es : List<&2, Nar.Ent> <- ents(path, Nar.rows(Nar.cut(text)))
     built(Nar.tree(es), path)
 
 # the SRI narHash of a path, the same string `nix hash path --sri` prints
-def path(+work: String) -> IO(String):
+def path(+work: String) -> IO(String):  # noqa: L001 IO: reads the tree off the disk
   do IO<String>:
     node : String <- dump(work)
     return Nar.sri(Nar.archive(node))

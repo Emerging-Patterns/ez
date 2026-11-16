@@ -13,7 +13,7 @@ import ../share/spin.bend as Spin
 import ./git.bend as G
 
 # a git command that failed stops the command, with whatever git said
-def ran(ok: Bool, what: String, text: String) -> IO(Unit):
+def ran(ok: Bool, what: String, text: String) -> IO(Unit):  # noqa: L001 IO: runs git
   match ok:
     case True{}:
       IO.pure(Unit, Unit{})
@@ -21,7 +21,7 @@ def ran(ok: Bool, what: String, text: String) -> IO(Unit):
       IO.die(Unit, 1, "ez: git " ++ what ++ ": " ++ text)
 
 # one git command
-def run(what: String, args: List<&2, String>) -> IO(Unit):
+def run(what: String, args: List<&2, String>) -> IO(Unit):  # noqa: L001 IO: runs git
   do IO<Unit>:
     +out : String <- R.exec(args)
     ran(R.ok(out), what, R.text(out))
@@ -32,7 +32,7 @@ def run(what: String, args: List<&2, String>) -> IO(Unit):
 # else: a fetch from inside its work directory, and `ls-remote` from the top
 # of any repository around it. Every git command here that is handed a source
 # is handed this instead.
-def anchored(+url: String) -> IO(String):
+def anchored(+url: String) -> IO(String):  # noqa: L001 IO: runs git
   do IO<String>:
     +here : String <- R.exec(["pwd"])
     return P.anchor(String.trim(R.text(here)), url)
@@ -50,18 +50,18 @@ def clone.say(+work: String, +url: String, +rev: String, +msg: String) -> IO(Uni
     Spin.done(s)
 
 # a shallow clone of one commit into `work`, with a line saying what it fetches
-def clone(+work: String, +url: String, +rev: String) -> IO(Unit):
+def clone(+work: String, +url: String, +rev: String) -> IO(Unit):  # noqa: L001 IO: runs git
   clone.say(work, url, rev, Say.git.fetch(url))
 
 # the NAR hash nix rebuilds the checkout by. `fetchgit` hashes the working
 # tree with its `.git` taken off, so that is what is weighed here and the
 # caller strips `.git` before asking. Computed in Bend; nix is not required.
-def nar(+work: String) -> IO(String):
+def nar(+work: String) -> IO(String):  # noqa: L001 IO: runs git
   Dump.path(work)
 
 # the NAR hash of one commit. The checkout is weighed the way `fetchgit`
 # weighs it, then removed. Nothing is laid under BEND_LIB.
-def weigh(+url: String, +rev: String) -> IO(String):
+def weigh(+url: String, +rev: String) -> IO(String):  # noqa: L001 IO: runs git
   +work = ".ez/weigh-" ++ rev
   do IO<String>:
     _rm : String <- R.exec(["rm", "-rf", work])
@@ -93,7 +93,7 @@ def remote.said(ok: Bool, +url: String, +text: String) -> IO(G.Tip):
 
 # HEAD on the remote: the commit the default branch tips, and that branch's
 # name. `--symref` is what puts the branch on the line in front of the commit.
-def remote(+url: String) -> IO(G.Tip):
+def remote(+url: String) -> IO(G.Tip):  # noqa: L001 IO: runs git
   do IO<G.Tip>:
     +from : String <- anchored(url)
     +out : String <- R.exec(["git", "ls-remote", "--symref", from, "HEAD"])

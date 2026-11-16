@@ -10,7 +10,7 @@ import ../lock/run.bend as Run
 import ./plan.bend as IP
 
 # `ez init [name] [entry.bend] [--description TEXT]`
-def run(+name: String, +file: String, +desc: String) -> IO(Unit):
+def run(+name: String, +file: String, +desc: String) -> IO(Unit):  # noqa: L001 IO entry of the command
   do IO<Unit>:
     lib : String <- Run.bend.lib()
     led : Maybe<&2, String> <- F.read(IP.toml())

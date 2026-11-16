@@ -3,7 +3,7 @@
 import Base
 
 # the line a check prints, pass or fail
-def say(ok: Bool, name: String, got: String, want: String) -> IO(Unit):
+def say(ok: Bool, name: String, got: String, want: String) -> IO(Unit):  # noqa: L001 IO: prints a test verdict
   match ok:
     case True{}:
       IO.print("ok " ++ name)
@@ -11,5 +11,5 @@ def say(ok: Bool, name: String, got: String, want: String) -> IO(Unit):
       IO.print("FAIL " ++ name ++ ": got " ++ got ++ ", want " ++ want)
 
 # passes when two strings are equal
-def eq_str(name: String, +got: String, +want: String) -> IO(Unit):
+def eq_str(name: String, +got: String, +want: String) -> IO(Unit):  # noqa: L001 IO: prints a test verdict
   say(String.eq(got, want), name, got, want)

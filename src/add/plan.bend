@@ -648,10 +648,6 @@ def qs.v(verdict: Verdict) -> List<&2, Q>:
 def wants(+world: A.World) -> List<&2, Up.Ask>:
   asks.of(qs.v(decide(world)), A.from(world))
 
-# whether every answer the planner needs is in
-def answered(+world: A.World) -> Bool:
-  List.is_empty(&2, Up.Ask, wants(world))
-
 # the questions still open, or the plan once there are none
 type Step is Data:
   Asking{asks: List<&2, Up.Ask>}

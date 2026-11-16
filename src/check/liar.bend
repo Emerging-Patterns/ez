@@ -36,19 +36,24 @@ def text_of(res: Result<&1, &1, U32 & String, String>) -> String:
 
 # what the liar says: everything the real bend says, or everything but the one
 # line that is an answer
-def go(mute: Bool) -> IO(Unit):
+def lines(mute: Bool) -> List<&2, String>:
   match mute:
     case True{}:
-      do IO<Unit>:
-        IO.print(mining(other()))
-        IO.print(importing(other()))
+      [mining(other()), importing(other())]
     case False{}:
+      [mining(other()), other(), importing(other())]
+
+# every line said, in order
+def say(ls: List<&2, String>) -> IO(Unit):
+  match ls:
+    case []:
+      IO.pure(Unit, Unit{})
+    case h <> t:
       do IO<Unit>:
-        IO.print(mining(other()))
-        IO.print(other())
-        IO.print(importing(other()))
+        IO.print(h)
+        say(t)
 
 def main() -> IO(Unit):
   do IO<Unit>:
     r : Result<&1, &1, U32 & String, String> <- IO.get_env("EZ_LIAR")
-    go(String.eq(String.trim(text_of(r)), "mute"))
+    say(lines(String.eq(String.trim(text_of(r)), "mute")))
