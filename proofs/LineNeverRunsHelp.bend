@@ -1,6 +1,6 @@
 # proofs of laws/LineNeverRunsHelp.bend
 import Base
-import shake@0.6.0.0/main.bend as Shake
+import shake@0.9.0.0/main.bend as Shake
 import ../src/ez/line.bend as L
 import ../laws/LineNeverRunsHelp.bend as Laws
 

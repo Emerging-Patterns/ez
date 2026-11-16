@@ -6,7 +6,7 @@
 # The hub is check/oracle.bend, never the real one. `bend --publish` uploads,
 # and uploading someone's tree to a public hub is not a thing a test does.
 import Base
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check

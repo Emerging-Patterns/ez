@@ -4,7 +4,7 @@
 # `key = "value"` lines. They are pure, so a law reaches them without the
 # programs check/world.bend runs.
 import Base
-import snap@1.4.0.0/src/answer.bend as A
+import snap@1.6.0.0/src/answer.bend as A
 
 # the non-empty strings, which is what a program's output amounts to once its
 # trailing newline has been counted as a line

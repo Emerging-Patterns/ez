@@ -17,7 +17,7 @@
 # or a loop that runs out of fuel, exits 1. The words they are handed are
 # trusted in share/args.bend.
 import Base
-import shake@0.6.0.0/main.bend as Shake
+import shake@0.9.0.0/main.bend as Shake
 import ../share/args.bend as Args
 import ./cmd.bend as Cmd
 import ./test.bend as Test

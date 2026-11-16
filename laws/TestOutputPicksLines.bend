@@ -12,7 +12,7 @@
 # Every command a test runs inside a project runs there through `env -C` with
 # BEND_LIB taken away, and `ez` is the repo's own built binary.
 import Base
-import snap@1.4.0.0/src/answer.bend as A
+import snap@1.6.0.0/src/answer.bend as A
 import ../src/check/out.bend as O
 
 # LAW: an empty line is dropped

@@ -15,7 +15,7 @@
 # decides nothing; that it reads and executes faithfully is trusted in
 # ez/app.bend.
 import Base
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ../run/bend.bend as Bend
 import ../io/file.bend as F
 import ../share/args.bend as Args

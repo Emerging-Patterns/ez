@@ -21,7 +21,7 @@
 # and a bare `--help` before any positional of the command is a request for
 # help as `help` is (shake's laws/HelpWordAsksForHelp.bend).
 import Base
-import shake@0.6.0.0/main.bend as Shake
+import shake@0.9.0.0/main.bend as Shake
 
 # a subcommand
 type Sub is Data:

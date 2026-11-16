@@ -19,7 +19,7 @@
 # the socket, and the oracle stops of its own accord after a million of them.
 import Base
 import ../io/file.bend as F
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ./serve.bend as S
 import ./body.bend as B
 import ./argv.bend as Argv

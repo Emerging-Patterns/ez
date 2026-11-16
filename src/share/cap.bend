@@ -7,7 +7,7 @@
 # kills for memory looks exactly like one that succeeded and happened to write
 # no binary. The cap is what turns that into a legible exit 137.
 import Base
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ./env.bend as Env
 import ./capped.bend as Capped
 

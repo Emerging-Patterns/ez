@@ -6,7 +6,7 @@
 # unit tests beside the code are about what can be said without one.
 import Base
 import ../src/hub/get.bend as Net
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ../src/check/kit.bend as Check
 import ../src/check/world.bend as W
 

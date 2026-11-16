@@ -7,7 +7,7 @@
 # tree away and asks again: the lock fetches it at the ledger's rev and
 # checks it.
 import Base
-import snap@1.4.0.0/main.bend as R
+import snap@1.6.0.0/main.bend as R
 import ../src/io/file.bend as F
 import ../src/ez/quiet.bend as Q
 import ../src/check/kit.bend as Check

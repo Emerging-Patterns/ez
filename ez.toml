@@ -10,20 +10,20 @@ root = "."
 narHash = "sha256-Tu8uurWltf6TQd0mNO10BTQq5WYPKrLhOAa+GZRp/zY="
 entry = "package.bend"
 [deps.emerging-eztoml]
-hash = "0xc5d9d3e28b79ea98be22eb42c7e37802"
-hub = "emerging-eztoml@0.9.0.0"
+hash = "0x47fd85dd809332039766cf6e32914f54"
+hub = "emerging-eztoml@0.11.0.0"
 entry = "main.bend"
 [deps.snap]
-hash = "0x8e26a6f8c31689519e618374376ee3dd"
-hub = "snap@1.4.0.0"
+hash = "0x868383407d284eb98ec06d42345da047"
+hub = "snap@1.6.0.0"
 entry = "main.bend"
 [deps.shake]
-hash = "0xa383b26a5a0ef35663b3615d7aedf9e3"
-hub = "shake@0.6.0.0"
+hash = "0x64697f57fea19681b5fa4f87014ce63d"
+hub = "shake@0.9.0.0"
 entry = "main.bend"
 [deps.ezhttp]
-hash = "0x7367809738fddd234b8d2bed772ad2cf"
-hub = "ezhttp@0.23.0.0"
+hash = "0x0b59049ea5717d6f2fd30293c7271ede"
+hub = "ezhttp@0.26.0.0"
 entry = "main.bend"
 [tools]
 [tools.bolt]
