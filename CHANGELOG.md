@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/Emerging-Patterns/ez/compare/v1.17.0...v1.18.0) (2026-11-16)
+
+
+### Bug Fixes
+
+* **deps:** eztoml 0.11.0, snap 1.6.0, shake 0.9.0, ezhttp 0.26.0 ([#176](https://github.com/Emerging-Patterns/ez/issues/176)) ([7bfbba2](https://github.com/Emerging-Patterns/ez/commit/7bfbba21ec8f386fd69400f2e015c4b3a8f532da))
+
 ## [1.17.0](https://github.com/Emerging-Patterns/ez/compare/v1.16.0...v1.17.0) (2026-11-16)
 
 
